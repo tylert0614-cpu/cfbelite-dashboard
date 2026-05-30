@@ -42,7 +42,7 @@ function rankingRows(teams, rows, field = "team_id") { return teams.map((t) => (
 export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [currentYear, setCurrentYear] = useState("2029");
-  const [currentWeek, setCurrentWeek] = useState("10");
+  const [currentWeek, setCurrentWeek] = useState("Week 1");
   const [teams, setTeams] = useState([]);
   const [users, setUsers] = useState([]);
   const [assignments, setAssignments] = useState([]);
@@ -97,8 +97,9 @@ export default function App() {
 
   async function loadData() {
     setLoading(true); setError("");
-    const [teamsRes, usersRes, assignmentsRes, standingsRes, resultsRes, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, historyRes] = await Promise.all([
+    const [teamsRes, settingsRes, usersRes, assignmentsRes, standingsRes, resultsRes, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, historyRes] = await Promise.all([
       supabase.from("teams").select("*").order("name"),
+      supabase.from("league_settings").select("*").eq("id", 1).single(),
       supabase.from("discord_users").select("*").order("discord_username"),
       supabase.from("team_assignments").select("*, teams(name), discord_users(discord_username)").order("created_at"),
       supabase.from("team_standings").select("*").order("team_name"),
@@ -112,9 +113,18 @@ export default function App() {
       supabase.from("recruiting_classes").select("*, teams(name)").order("season_year", { ascending: false }),
       supabase.from("team_history_records").select("*, teams(name)").order("season_year", { ascending: false }),
     ]);
-    const firstError = [teamsRes, usersRes, assignmentsRes, standingsRes, resultsRes, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, historyRes].find((r) => r.error)?.error;
+    const firstError = [teamsRes, settingsRes, usersRes, assignmentsRes, standingsRes, resultsRes, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, historyRes].find((r) => r.error)?.error;
     if (firstError) setError(firstError.message);
     else {
+      if (settingsRes.data) {
+        setCurrentYear(String(settingsRes.data.current_year));
+        setCurrentWeek(settingsRes.data.current_week);
+        setNewResult((prev) => ({
+          ...prev,
+          season_year: Number(settingsRes.data.current_year),
+          week: settingsRes.data.current_week,
+        }));
+      }
       setTeams(teamsRes.data || []); setUsers(usersRes.data || []);
       setAssignments((assignmentsRes.data || []).sort((a,b) => (a.teams?.name || "").localeCompare(b.teams?.name || "")));
       const loadedStandings = standingsRes.data || [];
@@ -141,6 +151,60 @@ export default function App() {
   }
   async function deleteRow(table, id) { const { error: deleteError } = await supabase.from(table).delete().eq("id", id); if (deleteError) setError(deleteError.message); await loadData(); }
   async function updateRow(table, id, field, value) { const { error: updateError } = await supabase.from(table).update({ [field]: value === "" ? null : value }).eq("id", id); if (updateError) setError(updateError.message); else setError(""); await loadData(); }
+  async function updateLeagueSetting(field, value) {
+    const payload = {
+      [field]: field === "current_year" ? Number(value) : value,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error: updateError } = await supabase
+      .from("league_settings")
+      .update(payload)
+      .eq("id", 1);
+
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    setError("");
+
+    if (field === "current_year") {
+      setCurrentYear(String(value));
+      setNewResult((prev) => ({ ...prev, season_year: Number(value) }));
+    }
+
+    if (field === "current_week") {
+      setCurrentWeek(value);
+      setNewResult((prev) => ({ ...prev, week: value }));
+    }
+  }
+  async function saveLeagueSettings() {
+    const payload = {
+      id: 1,
+      current_year: Number(currentYear),
+      current_week: currentWeek,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error: upsertError } = await supabase
+      .from("league_settings")
+      .upsert(payload, { onConflict: "id" });
+
+    if (upsertError) {
+      setError(upsertError.message);
+      return;
+    }
+
+    setNewResult((prev) => ({
+      ...prev,
+      season_year: Number(currentYear),
+      week: currentWeek,
+    }));
+    setError("");
+    await loadData();
+  }
+
   async function saveDraft(table, id, draft, numericFields = []) {
     const payload = {};
     Object.entries(draft || {}).forEach(([key, value]) => {
@@ -229,7 +293,7 @@ export default function App() {
   async function addHistory(teamId) { const { error: e } = await supabase.from("team_history_records").insert({ team_id: teamId, season_year: Number(newHistory.season_year || currentYear), record: newHistory.record || "0-0" }); if (e) { setError(`History add failed: ${e.message}`); return; } setNewHistory({ season_year: Number(currentYear), record: "0-0" }); setError(""); await loadData(); }
 
   return <div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={errorBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab}/>
-    {activeTab === "dashboard" && <><Stats currentYear={currentYear} setCurrentYear={setCurrentYear} currentWeek={currentWeek} setCurrentWeek={setCurrentWeek} teams={teams}/><UserStandings teams={teamOptions} results={currentYearResults} goToTeam={goToTeam}/><RecordResult newResult={newResult} setNewResult={setNewResult} teams={teamOptions} users={userOptions} submitResult={submitResult}/><Standings rows={orderedStandings.filter((r)=>JSON.stringify(r).toLowerCase().includes(search.standings.toLowerCase()))} search={search.standings} setSearch={(v)=>setSearch({...search,standings:v})} goToTeam={goToTeam} draggedStanding={draggedStanding} setDraggedStanding={setDraggedStanding} reorderStandings={reorderStandings}/><Results rows={currentYearResults.filter((r)=>JSON.stringify(r).toLowerCase().includes(search.results.toLowerCase()))} deleteResult={(id)=>deleteRow("game_results", id)} search={search.results} setSearch={(v)=>setSearch({...search,results:v})}/></>}
+    {activeTab === "dashboard" && <><Stats currentYear={currentYear} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} currentWeek={currentWeek} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} teams={teams} saveSettings={saveLeagueSettings}/><UserStandings teams={teamOptions} results={currentYearResults} goToTeam={goToTeam}/><RecordResult newResult={newResult} setNewResult={setNewResult} teams={teamOptions} users={userOptions} submitResult={submitResult}/><Standings rows={orderedStandings.filter((r)=>JSON.stringify(r).toLowerCase().includes(search.standings.toLowerCase()))} search={search.standings} setSearch={(v)=>setSearch({...search,standings:v})} goToTeam={goToTeam} draggedStanding={draggedStanding} setDraggedStanding={setDraggedStanding} reorderStandings={reorderStandings}/><Results rows={currentYearResults.filter((r)=>JSON.stringify(r).toLowerCase().includes(search.results.toLowerCase()))} deleteResult={(id)=>deleteRow("game_results", id)} search={search.results} setSearch={(v)=>setSearch({...search,results:v})}/></>}
     {activeTab === "assignments" && <Assignments rows={assignments} teams={teamOptions} users={userOptions} addAssignment={addAssignment} updateRow={updateRow} deleteRow={deleteRow} drafts={draftAssignments} setDrafts={setDraftAssignments} saveDraft={saveDraft} getDraft={getDraft} teamChange={teamChange} setTeamChange={setTeamChange} changeUserTeam={changeUserTeam}/>}    
     {activeTab === "h2h" && <H2H results={results} search={search.h2h} setSearch={(v)=>setSearch({...search,h2h:v})}/>}    
     {activeTab === "allAmericans" && <AllAmericans rows={allAmericans} teams={teamOptions} addRow={addAA} updateRow={updateRow} deleteRow={deleteRow} rankings={rankingRows(teamOptions, allAmericans)} drafts={draftAllAmericans} setDrafts={setDraftAllAmericans} saveDraft={saveDraft} getDraft={getDraft}/>}    
@@ -244,7 +308,7 @@ export default function App() {
 
 function Header({ loading, reload }) { return <header style={header}><div><h1 style={title}>CFBElite 27 Dashboard</h1><p style={subtitle}>Live Supabase League Management System</p></div><button onClick={reload} style={statusBox}>{loading ? "Loading..." : "LIVE DATABASE"}</button></header>; }
 function TabBar({ tabs, activeTab, setActiveTab }) { return <div style={tabScroller}><div style={tabRow}>{tabs.map(([key,label])=><button key={key} onClick={()=>setActiveTab(key)} style={activeTab===key?activeTabStyle:tabStyle}>{label}</button>)}</div></div>; }
-function Stats({ currentYear, setCurrentYear, currentWeek, setCurrentWeek, teams }) { return <div style={statsGrid}><Stat title="Teams" value={teams.length}/><div style={statCard}><div style={statTitle}>Current Year</div><input value={currentYear} onChange={(e)=>setCurrentYear(e.target.value)} style={statInput}/></div><div style={statCard}><div style={statTitle}>Current Week</div><input value={currentWeek} onChange={(e)=>setCurrentWeek(e.target.value)} style={statInput}/></div></div>; }
+function Stats({ currentYear, setCurrentYear, currentWeek, setCurrentWeek, teams, saveSettings }) { return <div style={statsGrid}><Stat title="Teams" value={teams.length}/><div style={statCard}><div style={statTitle}>Current Year</div><select value={currentYear} onChange={(e)=>setCurrentYear(e.target.value)} style={statSelect}>{YEARS.map((year)=><option key={year} value={year}>{year}</option>)}</select></div><div style={statCard}><div style={statTitle}>Current Week</div><select value={currentWeek} onChange={(e)=>setCurrentWeek(e.target.value)} style={statSelect}>{WEEKS.map((week)=><option key={week} value={week}>{week}</option>)}</select></div><div style={statCard}><div style={statTitle}>League Settings</div><button onClick={saveSettings} style={button}>Save Year / Week</button><p style={mutedText}>Click save after changing year or week so every visitor sees the same setting.</p></div></div>; }
 function Stat({ title, value }) { return <div style={statCard}><div style={statTitle}>{title}</div><div style={statValue}>{value}</div></div>; }
 function UserStandings({ teams, results, goToTeam }) { const ordered = teams.map((t)=>({ team:t, record:recordFromResults(t.id, results) })).sort((a,b)=> b.record.wins - a.record.wins || a.record.losses - b.record.losses || a.team.name.localeCompare(b.team.name)); return <section style={card}><h2 style={sectionTitle}>User vs User Standings</h2><Table headers={["#","Team","Record","Avg PF","Avg PA","Top 25"]}>{ordered.map(({team:t, record:r}, index)=>{return <tr key={t.id} style={trStyle}><td style={td}>#{index + 1}</td><td style={clickableTeamCell} onClick={()=>goToTeam(t.id)}>{t.name}</td><td style={td}>{r.wins}-{r.losses}</td><td style={td}>{r.avgPf}</td><td style={td}>{r.avgPa}</td><td style={td}>{top25Wins(t.id, results)}</td></tr>})}</Table></section>; }
 function RecordResult({ newResult, setNewResult, teams, users, submitResult }) { return <section style={card}><h2 style={sectionTitle}>Record User vs User Result</h2><div style={formGrid}><input placeholder="Year" value={newResult.season_year} onChange={(e)=>setNewResult({...newResult,season_year:e.target.value})} style={input}/><select value={newResult.week} onChange={(e)=>setNewResult({...newResult,week:e.target.value})} style={input}>{WEEKS.map((w)=><option key={w}>{w}</option>)}</select><select value={newResult.team_1_id} onChange={(e)=>setNewResult({...newResult,team_1_id:e.target.value})} style={input}><option value="">Team 1</option>{teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}</select><select value={newResult.team_1_user_id} onChange={(e)=>setNewResult({...newResult,team_1_user_id:e.target.value})} style={input}><option value="">Team 1 Discord</option>{users.map((u)=><option key={u.id} value={u.id}>{u.discord_username}</option>)}</select><input placeholder="Team 1 Rank" value={newResult.team_1_rank} onChange={(e)=>setNewResult({...newResult,team_1_rank:e.target.value})} style={input}/><input placeholder="Team 1 Score" value={newResult.team_1_score} onChange={(e)=>setNewResult({...newResult,team_1_score:e.target.value})} style={input}/><select value={newResult.team_2_id} onChange={(e)=>setNewResult({...newResult,team_2_id:e.target.value})} style={input}><option value="">Team 2</option>{teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}</select><select value={newResult.team_2_user_id} onChange={(e)=>setNewResult({...newResult,team_2_user_id:e.target.value})} style={input}><option value="">Team 2 Discord</option>{users.map((u)=><option key={u.id} value={u.id}>{u.discord_username}</option>)}</select><input placeholder="Team 2 Rank" value={newResult.team_2_rank} onChange={(e)=>setNewResult({...newResult,team_2_rank:e.target.value})} style={input}/><input placeholder="Team 2 Score" value={newResult.team_2_score} onChange={(e)=>setNewResult({...newResult,team_2_score:e.target.value})} style={input}/><input placeholder="Tags" value={newResult.tags} onChange={(e)=>setNewResult({...newResult,tags:e.target.value})} style={input}/><button onClick={submitResult} style={button}>Record Result</button></div></section>; }
@@ -340,6 +404,8 @@ const statCard={background:"#18181b",border:"1px solid #27272a",borderRadius:22,
 const statTitle={color:"#a1a1aa",fontSize:14,marginBottom:10,textTransform:"uppercase"};
 const statValue={fontSize:38,fontWeight:900,color:"white"};
 const statInput={...statValue,background:"transparent",color:"white",border:"none",outline:"none",width:"100%"};
+const settingSelect={...input,fontSize:24,fontWeight:900};
+const statSelect={background:"#27272a",color:"white",border:"1px solid #3f3f46",borderRadius:12,padding:14,fontSize:24,fontWeight:900,width:"100%"};
 const card={background:"#18181b",border:"1px solid #27272a",borderRadius:24,padding:24,marginBottom:32};
 const sectionTop={display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"};
 const sectionTitle={fontSize:30,fontWeight:900,margin:0,color:"white"};
