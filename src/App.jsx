@@ -61,13 +61,22 @@ function TeamLabel({ team, name }) {
 
 function championshipRowsByDiscord(champions) {
   const map = new Map();
+
   champions.forEach((champion) => {
-    const name = champion.discord_users?.discord_username || "Unassigned";
-    map.set(name, (map.get(name) || 0) + 1);
+    const discord = champion.discord_users?.discord_username || "Unassigned";
+    const teamName = champion.teams?.name || "Team TBD";
+    const year = champion.season_year || "Year TBD";
+
+    if (!map.has(discord)) {
+      map.set(discord, { discord, total: 0, teams: [] });
+    }
+
+    const row = map.get(discord);
+    row.total += 1;
+    row.teams.push(`${year} ${teamName}`);
   });
-  return [...map.entries()]
-    .map(([discord, total]) => ({ discord, total }))
-    .sort((a, b) => b.total - a.total || a.discord.localeCompare(b.discord));
+
+  return [...map.values()].sort((a, b) => b.total - a.total || a.discord.localeCompare(b.discord));
 }
 
 export default function App() {
@@ -124,7 +133,7 @@ export default function App() {
     setDraggedStanding(null);
   }
 
-  const tabs = [["dashboard","Dashboard"],["assignments","Users/Team Assignments"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],["draft","CFBElite 27 Draft Order"],["playoff","CFP Bracket"],...teamOptions.map((team) => [`team-${team.id}`, team.name])];
+  const tabs = [["dashboard","Dashboard"],["assignments","Users/Team Assignments"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...teamOptions.map((team) => [`team-${team.id}`, team.name])];
 
   async function loadData() {
     setLoading(true); setError("");
@@ -324,15 +333,13 @@ export default function App() {
   async function addHistory(teamId) { const { error: e } = await supabase.from("team_history_records").insert({ team_id: teamId, season_year: Number(newHistory.season_year || currentYear), record: newHistory.record || "0-0" }); if (e) { setError(`History add failed: ${e.message}`); return; } setNewHistory({ season_year: Number(currentYear), record: "0-0" }); setError(""); await loadData(); }
 
   return <div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={errorBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab}/>
-    {activeTab === "dashboard" && <><Stats currentYear={currentYear} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} currentWeek={currentWeek} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} teams={teams} assignments={assignments} saveSettings={saveLeagueSettings}/><UserStandings teams={teamOptions} results={currentYearResults} goToTeam={goToTeam}/><ChampionshipsByUser champions={nationalChampions}/><RecordResult newResult={newResult} setNewResult={setNewResult} teams={teamOptions} users={userOptions} assignments={assignments} submitResult={submitResult}/><Standings rows={orderedStandings.filter((r)=>JSON.stringify(r).toLowerCase().includes(search.standings.toLowerCase()))} search={search.standings} setSearch={(v)=>setSearch({...search,standings:v})} goToTeam={goToTeam} teams={teamOptions} draggedStanding={draggedStanding} setDraggedStanding={setDraggedStanding} reorderStandings={reorderStandings}/><Results rows={currentYearResults.filter((r)=>JSON.stringify(r).toLowerCase().includes(search.results.toLowerCase()))} deleteResult={(id)=>deleteRow("game_results", id)} search={search.results} setSearch={(v)=>setSearch({...search,results:v})}/></>}
+    {activeTab === "dashboard" && <><Stats currentYear={currentYear} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} currentWeek={currentWeek} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} teams={teams} assignments={assignments} saveSettings={saveLeagueSettings}/><UserStandings teams={teamOptions} results={currentYearResults} goToTeam={goToTeam}/><ChampionshipsByUser champions={nationalChampions}/><RecordResult newResult={newResult} setNewResult={setNewResult} teams={teamOptions} users={userOptions} assignments={assignments} submitResult={submitResult}/><Standings rows={orderedStandings.filter((r)=>JSON.stringify(r).toLowerCase().includes(search.standings.toLowerCase()))} search={search.standings} setSearch={(v)=>setSearch({...search,standings:v})} goToTeam={goToTeam} teams={teamOptions} results={currentYearResults} draggedStanding={draggedStanding} setDraggedStanding={setDraggedStanding} reorderStandings={reorderStandings}/><Results rows={currentYearResults.filter((r)=>JSON.stringify(r).toLowerCase().includes(search.results.toLowerCase()))} deleteResult={(id)=>deleteRow("game_results", id)} search={search.results} setSearch={(v)=>setSearch({...search,results:v})}/></>}
     {activeTab === "assignments" && <Assignments rows={assignments} teams={teamOptions} users={userOptions} addAssignment={addAssignment} updateRow={updateRow} deleteRow={deleteRow} drafts={draftAssignments} setDrafts={setDraftAssignments} saveDraft={saveDraft} getDraft={getDraft} teamChange={teamChange} setTeamChange={setTeamChange} changeUserTeam={changeUserTeam}/>}    
     {activeTab === "h2h" && <H2H results={results} search={search.h2h} setSearch={(v)=>setSearch({...search,h2h:v})}/>}    
     {activeTab === "allAmericans" && <AllAmericans rows={allAmericans} teams={teamOptions} addRow={addAA} updateRow={updateRow} deleteRow={deleteRow} rankings={rankingRows(teamOptions, allAmericans)} drafts={draftAllAmericans} setDrafts={setDraftAllAmericans} saveDraft={saveDraft} getDraft={getDraft}/>}    
     {activeTab === "awards" && <Awards rows={awards} teams={teamOptions} addRow={addAward} updateRow={updateRow} deleteRow={deleteRow} rankings={rankingRows(teamOptions, awards)} drafts={draftAwards} setDrafts={setDraftAwards} saveDraft={saveDraft} getDraft={getDraft}/>}    
     {activeTab === "heismans" && <Heismans rows={heismans} teams={teamOptions} addRow={addHeisman} updateRow={updateRow} deleteRow={deleteRow} drafts={draftHeismans} setDrafts={setDraftHeismans} saveDraft={saveDraft} getDraft={getDraft}/>}    
     {activeTab === "nationalChampions" && <NationalChampions rows={nationalChampions} teams={teamOptions} users={userOptions} addRow={addNationalChampion} updateRow={updateRow} deleteRow={deleteRow} drafts={draftChampions} setDrafts={setDraftChampions} saveDraft={saveDraft} getDraft={getDraft}/>}        
-    {activeTab === "draft" && <DraftOrder rows={draftOrder} users={userOptions} updateRow={updateRow} drafts={draftDraftOrder} setDrafts={setDraftDraftOrder} saveDraft={saveDraft} getDraft={getDraft}/>}        
-    {activeTab === "playoff" && <Playoff rows={playoffGames} teams={teamOptions} updateRow={updateRow} drafts={draftPlayoff} setDrafts={setDraftPlayoff} saveDraft={saveDraft} getDraft={getDraft}/>}        
     {selectedTeam && <TeamPage team={selectedTeam} standings={standings.find((r)=>r.team_id===selectedTeam.id)} results={results.filter((r)=>r.team_1_id===selectedTeam.id||r.team_2_id===selectedTeam.id)} allAmericans={allAmericans.filter((r)=>r.team_id===selectedTeam.id)} awards={awards.filter((r)=>r.team_id===selectedTeam.id)} heismans={heismans.filter((r)=>r.team_id===selectedTeam.id)} recruiting={recruiting.filter((r)=>r.team_id===selectedTeam.id)} historyRows={historyRows.filter((r)=>r.team_id===selectedTeam.id)} addRecruiting={addRecruiting} addHistory={addHistory} updateRow={updateRow} deleteRow={deleteRow} newRecruiting={newRecruiting} setNewRecruiting={setNewRecruiting} newHistory={newHistory} setNewHistory={setNewHistory}/>}    
   </div></div>;
 }
@@ -348,7 +355,6 @@ function Stats({ currentYear, setCurrentYear, currentWeek, setCurrentWeek, teams
 
   return (
     <div style={statsGrid}>
-      <Stat title="Teams" value={teams.length} />
       <Stat title="Active Coaches" value={`${activeCoaches} / ${teams.length || 32}`} />
       <div style={statCard}>
         <div style={statTitle}>Current Year</div>
@@ -407,18 +413,20 @@ function ChampionshipsByUser({ champions }) {
   return (
     <section style={card}>
       <h2 style={sectionTitle}>National Championships by Discord User</h2>
-      <Table headers={["#", "Discord User", "Championships"]}>
+      <Table headers={["#", "Discord User", "Championships", "Teams / Years"]}>
         {rows.length ? rows.map((row, index) => (
           <tr key={row.discord} style={trStyle}>
             <td style={td}>#{index + 1}</td>
             <td style={teamCell}>{row.discord}</td>
             <td style={td}>{row.total}</td>
+            <td style={td}>{row.teams.join(", ")}</td>
           </tr>
         )) : (
           <tr style={trStyle}>
             <td style={td}>—</td>
             <td style={td}>No national champions recorded yet.</td>
             <td style={td}>0</td>
+            <td style={td}>—</td>
           </tr>
         )}
       </Table>
@@ -484,32 +492,38 @@ function RecordResult({ newResult, setNewResult, teams, users, assignments, subm
 }
 
 function SearchBox({ value, onChange }) { return <input value={value} onChange={(e)=>onChange(e.target.value)} placeholder="Search..." style={searchInput}/>; }
-function Standings({ rows, search, setSearch, goToTeam, teams, draggedStanding, setDraggedStanding, reorderStandings }) {
+function Standings({ rows, search, setSearch, goToTeam, teams, results, draggedStanding, setDraggedStanding, reorderStandings }) {
   return (
     <section style={card}>
       <div style={sectionTop}>
         <div>
           <h2 style={sectionTitle}>Commissioner League Standings</h2>
-          <p style={mutedText}>Drag teams up or down to set commissioner order.</p>
+          <p style={mutedText}>Drag teams up or down to set commissioner order. Stats below are calculated from recorded results for the selected Current Year.</p>
         </div>
         <SearchBox value={search} onChange={setSearch} />
       </div>
-      <Table headers={["Move", "#", "Team", "W", "L", "PF", "PA", "Top 25", "Conf", "Nattys", "Bowl"]}>
+      <Table headers={["Move", "#", "Team", "W", "L", "Avg PF", "Avg PA", "Top 25", "Conf", "Nattys", "Bowl"]}>
         {rows.map((row, index) => {
           const team = teams.find((item) => item.id === row.team_id);
+          const teamId = row.team_id;
+          const record = recordFromResults(teamId, results);
+          const bowl = bowlRecord(teamId, results);
+          const confTitles = titleCount(teamId, results, "Conference Championship Week");
+          const nattys = titleCount(teamId, results, "National Championship Week");
+
           return (
             <tr key={row.team_id} style={trStyle} draggable onDragStart={() => setDraggedStanding(index)} onDragOver={(e) => e.preventDefault()} onDrop={() => reorderStandings(index)}>
               <td style={td}>☰</td>
               <td style={td}>#{index + 1}</td>
               <td style={clickableTeamCell} onClick={() => goToTeam(row.team_id)}><TeamLabel team={team} name={row.team_name} /></td>
-              <td style={td}>{row.wins}</td>
-              <td style={td}>{row.losses}</td>
-              <td style={td}>{row.pf}</td>
-              <td style={td}>{row.pa}</td>
-              <td style={td}>{row.top_25_wins ?? 0}</td>
-              <td style={td}>{row.conference_titles ?? 0}</td>
-              <td style={td}>{row.national_titles ?? 0}</td>
-              <td style={td}>{row.bowl_wins ?? 0}-{row.bowl_losses ?? 0}</td>
+              <td style={td}>{record.wins}</td>
+              <td style={td}>{record.losses}</td>
+              <td style={td}>{record.avgPf}</td>
+              <td style={td}>{record.avgPa}</td>
+              <td style={td}>{top25Wins(teamId, results)}</td>
+              <td style={td}>{confTitles}</td>
+              <td style={td}>{nattys}</td>
+              <td style={td}>{bowl.wins}-{bowl.losses}</td>
             </tr>
           );
         })}
