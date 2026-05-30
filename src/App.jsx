@@ -39,6 +39,61 @@ function titleCount(teamId, results, week) { return results.filter((r) => r.week
 function bowlRecord(teamId, results) { return recordFromResults(teamId, results.filter((r) => ["Bowl Week 1","Bowl Week 2","Bowl Week 3","National Championship Week"].includes(r.week))); }
 function rankingRows(teams, rows, field = "team_id") { return teams.map((t) => ({ team: t.name, total: rows.filter((r) => r[field] === t.id).length })).sort((a,b) => b.total - a.total || a.team.localeCompare(b.team)); }
 
+function clampSor(value) {
+  return Math.max(0.1, Math.min(10, value));
+}
+
+function pollRankDifficulty(rank) {
+  const number = Number(rank);
+  if (!number || number < 1 || number > 25) return 0.1;
+  return 10 - ((number - 1) / 24) * 4;
+}
+
+function userStandingRankMap(teams, results) {
+  const ordered = teams
+    .map((team) => ({ team, record: recordFromResults(team.id, results) }))
+    .sort((a, b) => b.record.wins - a.record.wins || a.record.losses - b.record.losses || a.team.name.localeCompare(b.team.name));
+
+  const map = new Map();
+  ordered.forEach((row, index) => map.set(row.team.id, index + 1));
+  return map;
+}
+
+function standingRankDifficulty(teamId, teams, results) {
+  if (!teams.length) return 0.1;
+  const rankMap = userStandingRankMap(teams, results);
+  const rank = rankMap.get(teamId) || teams.length;
+  if (teams.length === 1) return 10;
+  return 10 - ((rank - 1) / (teams.length - 1)) * 9.9;
+}
+
+function recordDifficulty(teamId, results) {
+  const record = recordFromResults(teamId, results);
+  if (!record.games) return 5;
+  const winPct = record.wins / record.games;
+  return 0.1 + winPct * 9.9;
+}
+
+function strengthOfResult(teamId, teams, results) {
+  const games = results.filter((result) => result.team_1_id === teamId || result.team_2_id === teamId);
+  if (!games.length) return "—";
+
+  const total = games.reduce((sum, result) => {
+    const isTeam1 = result.team_1_id === teamId;
+    const opponentId = isTeam1 ? result.team_2_id : result.team_1_id;
+    const opponentRank = isTeam1 ? result.team_2_rank : result.team_1_rank;
+
+    const standingsScore = standingRankDifficulty(opponentId, teams, results);
+    const recordScore = recordDifficulty(opponentId, results);
+    const rankedScore = pollRankDifficulty(opponentRank);
+
+    const gameDifficulty = (standingsScore * 0.45) + (recordScore * 0.35) + (rankedScore * 0.20);
+    return sum + clampSor(gameDifficulty);
+  }, 0);
+
+  return clampSor(total / games.length).toFixed(1);
+}
+
 function getHelmetUrl(team) {
   return team?.helmet_url || team?.helmet || team?.logo_url || team?.logo || team?.image_url || "";
 }
@@ -385,14 +440,14 @@ function Stat({ title, value }) { return <div style={statCard}><div style={statT
 
 function UserStandings({ teams, results, goToTeam }) {
   const ordered = teams
-    .map((team) => ({ team, record: recordFromResults(team.id, results) }))
+    .map((team) => ({ team, record: recordFromResults(team.id, results), sor: strengthOfResult(team.id, teams, results) }))
     .sort((a, b) => b.record.wins - a.record.wins || a.record.losses - b.record.losses || a.team.name.localeCompare(b.team.name));
 
   return (
     <section style={card}>
       <h2 style={sectionTitle}>User vs User Standings</h2>
-      <Table headers={["#", "Team", "Record", "Avg PF", "Avg PA", "Top 25"]}>
-        {ordered.map(({ team, record }, index) => (
+      <Table headers={["#", "Team", "Record", "Avg PF", "Avg PA", "Top 25", "SOR"]}>
+        {ordered.map(({ team, record, sor }, index) => (
           <tr key={team.id} style={trStyle}>
             <td style={td}>#{index + 1}</td>
             <td style={clickableTeamCell} onClick={() => goToTeam(team.id)}><TeamLabel team={team} /></td>
@@ -400,6 +455,7 @@ function UserStandings({ teams, results, goToTeam }) {
             <td style={td}>{record.avgPf}</td>
             <td style={td}>{record.avgPa}</td>
             <td style={td}>{top25Wins(team.id, results)}</td>
+            <td style={td}>{sor}</td>
           </tr>
         ))}
       </Table>
@@ -502,7 +558,7 @@ function Standings({ rows, search, setSearch, goToTeam, teams, results, draggedS
         </div>
         <SearchBox value={search} onChange={setSearch} />
       </div>
-      <Table headers={["Move", "#", "Team", "W", "L", "Avg PF", "Avg PA", "Top 25", "Conf", "Nattys", "Bowl"]}>
+      <Table headers={["Move", "#", "Team", "W", "L", "Avg PF", "Avg PA", "Top 25", "Conf", "Nattys", "Bowl", "SOR"]}>
         {rows.map((row, index) => {
           const team = teams.find((item) => item.id === row.team_id);
           const teamId = row.team_id;
@@ -510,6 +566,7 @@ function Standings({ rows, search, setSearch, goToTeam, teams, results, draggedS
           const bowl = bowlRecord(teamId, results);
           const confTitles = titleCount(teamId, results, "Conference Championship Week");
           const nattys = titleCount(teamId, results, "National Championship Week");
+          const sor = strengthOfResult(teamId, teams, results);
 
           return (
             <tr key={row.team_id} style={trStyle} draggable onDragStart={() => setDraggedStanding(index)} onDragOver={(e) => e.preventDefault()} onDrop={() => reorderStandings(index)}>
@@ -524,6 +581,7 @@ function Standings({ rows, search, setSearch, goToTeam, teams, results, draggedS
               <td style={td}>{confTitles}</td>
               <td style={td}>{nattys}</td>
               <td style={td}>{bowl.wins}-{bowl.losses}</td>
+              <td style={td}>{sor}</td>
             </tr>
           );
         })}
@@ -627,7 +685,7 @@ function NationalChampions({ rows, teams, users, addRow, updateRow, deleteRow, d
 }
 function DraftOrder({ rows, users, updateRow, drafts, setDrafts, saveDraft, getDraft }) { return <section style={card}><h2 style={sectionTitle}>CFBElite 27 Draft Order</h2><Table headers={["Pick","Team Name","Discord User","Save"]}>{rows.map((r)=>{const d=getDraft(drafts,r);return <tr key={r.id} style={trStyle}><td style={teamCell}>#{r.pick_number}</td><td style={td}><input value={d.team_name||""} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),team_name:e.target.value}})} style={input}/></td><td style={td}><select value={d.discord_user_id||""} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),discord_user_id:e.target.value}})} style={input}><option value="">Select User</option>{users.map((u)=><option key={u.id} value={u.id}>{u.discord_username}</option>)}</select></td><td style={td}><button onClick={()=>saveDraft("draft_order_27",r.id,drafts[r.id])} style={button}>Save</button></td></tr>})}</Table></section>; }
 function Playoff({ rows, teams, updateRow, drafts, setDrafts, saveDraft, getDraft }) { return <section style={card}><h2 style={sectionTitle}>College Football Playoff Bracket</h2><div style={bracketGrid}>{["First Round","Quarterfinals","Semifinals","National Championship"].map((round)=><div key={round}><h3>{round}</h3>{rows.filter((g)=>g.round===round).map((g)=>{const d=getDraft(drafts,g);return <div key={g.id} style={gameCard}><input value={d.bowl_name||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),bowl_name:e.target.value}})} placeholder="Bowl" style={input}/><input value={d.top_seed||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),top_seed:e.target.value}})} placeholder="Top Seed" style={input}/><select value={d.top_team_id||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),top_team_id:e.target.value}})} style={input}><option value="">Top Team</option>{teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}</select><b style={{textAlign:"center"}}>VS</b><input value={d.bottom_seed||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),bottom_seed:e.target.value}})} placeholder="Bottom Seed" style={input}/><select value={d.bottom_team_id||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),bottom_team_id:e.target.value}})} style={input}><option value="">Bottom Team</option>{teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}</select><input value={d.score||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),score:e.target.value}})} placeholder="Score" style={input}/><button onClick={()=>saveDraft("playoff_games",g.id,drafts[g.id])} style={button}>Save Game</button></div>})}</div>)}</div></section>; }
-function TeamPage({ team, standings, results, allAmericans, awards, heismans, recruiting, historyRows, addRecruiting, addHistory, updateRow, deleteRow, newRecruiting, setNewRecruiting, newHistory, setNewHistory }) { const stat=standings||{}; const rec=recordFromResults(team.id, results); const bowl=bowlRecord(team.id, results); return <section style={card}><h2 style={sectionTitle}><TeamLabel team={team} /></h2><div style={statsGrid}><Stat title="Overall" value={`${stat.wins??0}-${stat.losses??0}`}/><Stat title="Avg PF" value={rec.avgPf}/><Stat title="Avg PA" value={rec.avgPa}/><Stat title="Top 25" value={top25Wins(team.id, results)}/><Stat title="Top 25 Class" value={recruiting.filter((r)=>Number(r.rank) >= 1 && Number(r.rank) <= 25).length}/><Stat title="Awards" value={awards.length}/><Stat title="All-Americans" value={allAmericans.length}/><Stat title="Heismans" value={heismans.length}/><Stat title="Conf Titles" value={titleCount(team.id, results, "Conference Championship Week")}/><Stat title="Nattys" value={titleCount(team.id, results, "National Championship Week")}/><Stat title="Bowl" value={`${bowl.wins}-${bowl.losses}`}/></div><div style={twoCol}><div style={miniCard}><h3>Recruiting Rankings</h3><div style={formGrid}><input placeholder="Year" value={newRecruiting.season_year} onChange={(e)=>setNewRecruiting({...newRecruiting,season_year:e.target.value})} style={input}/><input placeholder="Rank" value={newRecruiting.rank} onChange={(e)=>setNewRecruiting({...newRecruiting,rank:e.target.value})} style={input}/><button onClick={()=>addRecruiting(team.id)} style={button}>Add</button></div>{recruiting.map((r)=><div key={r.id} style={miniRow}>{r.season_year}: #{r.rank} <DeleteButton onClick={()=>deleteRow("recruiting_classes",r.id)}/></div>)}</div><div style={miniCard}><h3>History</h3><div style={formGrid}><input placeholder="Year" value={newHistory.season_year} onChange={(e)=>setNewHistory({...newHistory,season_year:e.target.value})} style={input}/><input placeholder="Record" value={newHistory.record} onChange={(e)=>setNewHistory({...newHistory,record:e.target.value})} style={input}/><button onClick={()=>addHistory(team.id)} style={button}>Add</button></div>{historyRows.map((r)=><div key={r.id} style={miniRow}><input value={r.season_year} onChange={(e)=>updateRow("team_history_records",r.id,"season_year",Number(e.target.value))} style={smallInput}/><input value={r.record || ""} onChange={(e)=>updateRow("team_history_records",r.id,"record",e.target.value)} style={smallInput}/><DeleteButton onClick={()=>deleteRow("team_history_records",r.id)}/></div>)}</div></div><Results rows={results} deleteResult={()=>{}} search="" setSearch={()=>{}}/><div style={twoCol}><MiniList title="All-Americans" rows={allAmericans.map((r)=>`${r.player_name} — ${r.type}, ${r.position}, ${r.season_year}`)}/><MiniList title="Awards" rows={awards.map((r)=>`${r.player_name} — ${r.award_name}, ${r.position}, ${r.season_year}`)}/><MiniList title="Heisman Winners" rows={heismans.map((r)=>`${r.player_name} — ${r.position}, ${r.season_year}`)}/></div></section>; }
+function TeamPage({ team, standings, results, allAmericans, awards, heismans, recruiting, historyRows, addRecruiting, addHistory, updateRow, deleteRow, newRecruiting, setNewRecruiting, newHistory, setNewHistory }) { const stat=standings||{}; const rec=recordFromResults(team.id, results); const bowl=bowlRecord(team.id, results); return <section style={card}><h2 style={sectionTitle}><TeamLabel team={team} /></h2><div style={statsGrid}><Stat title="Overall" value={`${stat.wins??0}-${stat.losses??0}`}/><Stat title="Avg PF" value={rec.avgPf}/><Stat title="Avg PA" value={rec.avgPa}/><Stat title="Top 25" value={top25Wins(team.id, results)}/><Stat title="Top 25 Class" value={recruiting.filter((r)=>Number(r.rank) >= 1 && Number(r.rank) <= 25).length}/><Stat title="Awards" value={awards.length}/><Stat title="All-Americans" value={allAmericans.length}/><Stat title="Heismans" value={heismans.length}/><Stat title="Conf Titles" value={titleCount(team.id, results, "Conference Championship Week")}/><Stat title="Nattys" value={titleCount(team.id, results, "National Championship Week")}/><Stat title="Bowl" value={`${bowl.wins}-${bowl.losses}`}/><Stat title="SOR" value={strengthOfResult(team.id, results)}/></div><div style={twoCol}><div style={miniCard}><h3>Recruiting Rankings</h3><div style={formGrid}><input placeholder="Year" value={newRecruiting.season_year} onChange={(e)=>setNewRecruiting({...newRecruiting,season_year:e.target.value})} style={input}/><input placeholder="Rank" value={newRecruiting.rank} onChange={(e)=>setNewRecruiting({...newRecruiting,rank:e.target.value})} style={input}/><button onClick={()=>addRecruiting(team.id)} style={button}>Add</button></div>{recruiting.map((r)=><div key={r.id} style={miniRow}>{r.season_year}: #{r.rank} <DeleteButton onClick={()=>deleteRow("recruiting_classes",r.id)}/></div>)}</div><div style={miniCard}><h3>History</h3><div style={formGrid}><input placeholder="Year" value={newHistory.season_year} onChange={(e)=>setNewHistory({...newHistory,season_year:e.target.value})} style={input}/><input placeholder="Record" value={newHistory.record} onChange={(e)=>setNewHistory({...newHistory,record:e.target.value})} style={input}/><button onClick={()=>addHistory(team.id)} style={button}>Add</button></div>{historyRows.map((r)=><div key={r.id} style={miniRow}><input value={r.season_year} onChange={(e)=>updateRow("team_history_records",r.id,"season_year",Number(e.target.value))} style={smallInput}/><input value={r.record || ""} onChange={(e)=>updateRow("team_history_records",r.id,"record",e.target.value)} style={smallInput}/><DeleteButton onClick={()=>deleteRow("team_history_records",r.id)}/></div>)}</div></div><Results rows={results} deleteResult={()=>{}} search="" setSearch={()=>{}}/><div style={twoCol}><MiniList title="All-Americans" rows={allAmericans.map((r)=>`${r.player_name} — ${r.type}, ${r.position}, ${r.season_year}`)}/><MiniList title="Awards" rows={awards.map((r)=>`${r.player_name} — ${r.award_name}, ${r.position}, ${r.season_year}`)}/><MiniList title="Heisman Winners" rows={heismans.map((r)=>`${r.player_name} — ${r.position}, ${r.season_year}`)}/></div></section>; }
 function MiniList({ title, rows }) { return <div style={miniCard}><h3>{title}</h3>{rows.map((r,i)=><div key={i} style={miniRow}>{r}</div>)}</div>; }
 function Table({ headers, children }) { return <div style={{overflowX:"auto",marginTop:20}}><table style={table}><thead><tr>{headers.map((h)=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div>; }
 function DeleteButton({ onClick }) { return <button onClick={onClick} style={deleteButton}>Delete</button>; }
