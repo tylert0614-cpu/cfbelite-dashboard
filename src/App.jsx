@@ -147,7 +147,7 @@ export default function App() {
     if (!newResult.team_1_id || !newResult.team_2_id || team1Score === null || team2Score === null) { setError("Please select both teams and enter both scores."); return; }
     const { error: insertError } = await supabase.from("game_results").insert({ season_year: Number(newResult.season_year), week: newResult.week, team_1_id: newResult.team_1_id, team_2_id: newResult.team_2_id, team_1_user_id: newResult.team_1_user_id || null, team_2_user_id: newResult.team_2_user_id || null, team_1_score: team1Score, team_2_score: team2Score, team_1_rank: newResult.team_1_rank ? Number(newResult.team_1_rank) : null, team_2_rank: newResult.team_2_rank ? Number(newResult.team_2_rank) : null, tags: newResult.tags.split(",").map((tag) => tag.trim()).filter(Boolean) });
     if (insertError) { setError(insertError.message); return; }
-    setNewResult({ ...EMPTY_RESULT, season_year: Number(currentYear) }); await loadData();
+    setNewResult({ ...EMPTY_RESULT, season_year: Number(currentYear), week: currentWeek }); await loadData();
   }
   async function deleteRow(table, id) { const { error: deleteError } = await supabase.from(table).delete().eq("id", id); if (deleteError) setError(deleteError.message); await loadData(); }
   async function updateRow(table, id, field, value) { const { error: updateError } = await supabase.from(table).update({ [field]: value === "" ? null : value }).eq("id", id); if (updateError) setError(updateError.message); else setError(""); await loadData(); }
@@ -311,7 +311,145 @@ function TabBar({ tabs, activeTab, setActiveTab }) { return <div style={tabScrol
 function Stats({ currentYear, setCurrentYear, currentWeek, setCurrentWeek, teams, saveSettings }) { return <div style={statsGrid}><Stat title="Teams" value={teams.length}/><div style={statCard}><div style={statTitle}>Current Year</div><select value={currentYear} onChange={(e)=>setCurrentYear(e.target.value)} style={statSelect}>{YEARS.map((year)=><option key={year} value={year}>{year}</option>)}</select></div><div style={statCard}><div style={statTitle}>Current Week</div><select value={currentWeek} onChange={(e)=>setCurrentWeek(e.target.value)} style={statSelect}>{WEEKS.map((week)=><option key={week} value={week}>{week}</option>)}</select></div><div style={statCard}><div style={statTitle}>League Settings</div><button onClick={saveSettings} style={button}>Save Year / Week</button><p style={mutedText}>Click save after changing year or week so every visitor sees the same setting.</p></div></div>; }
 function Stat({ title, value }) { return <div style={statCard}><div style={statTitle}>{title}</div><div style={statValue}>{value}</div></div>; }
 function UserStandings({ teams, results, goToTeam }) { const ordered = teams.map((t)=>({ team:t, record:recordFromResults(t.id, results) })).sort((a,b)=> b.record.wins - a.record.wins || a.record.losses - b.record.losses || a.team.name.localeCompare(b.team.name)); return <section style={card}><h2 style={sectionTitle}>User vs User Standings</h2><Table headers={["#","Team","Record","Avg PF","Avg PA","Top 25"]}>{ordered.map(({team:t, record:r}, index)=>{return <tr key={t.id} style={trStyle}><td style={td}>#{index + 1}</td><td style={clickableTeamCell} onClick={()=>goToTeam(t.id)}>{t.name}</td><td style={td}>{r.wins}-{r.losses}</td><td style={td}>{r.avgPf}</td><td style={td}>{r.avgPa}</td><td style={td}>{top25Wins(t.id, results)}</td></tr>})}</Table></section>; }
-function RecordResult({ newResult, setNewResult, teams, users, submitResult }) { return <section style={card}><h2 style={sectionTitle}>Record User vs User Result</h2><div style={formGrid}><input placeholder="Year" value={newResult.season_year} onChange={(e)=>setNewResult({...newResult,season_year:e.target.value})} style={input}/><select value={newResult.week} onChange={(e)=>setNewResult({...newResult,week:e.target.value})} style={input}>{WEEKS.map((w)=><option key={w}>{w}</option>)}</select><select value={newResult.team_1_id} onChange={(e)=>setNewResult({...newResult,team_1_id:e.target.value})} style={input}><option value="">Team 1</option>{teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}</select><select value={newResult.team_1_user_id} onChange={(e)=>setNewResult({...newResult,team_1_user_id:e.target.value})} style={input}><option value="">Team 1 Discord</option>{users.map((u)=><option key={u.id} value={u.id}>{u.discord_username}</option>)}</select><input placeholder="Team 1 Rank" value={newResult.team_1_rank} onChange={(e)=>setNewResult({...newResult,team_1_rank:e.target.value})} style={input}/><input placeholder="Team 1 Score" value={newResult.team_1_score} onChange={(e)=>setNewResult({...newResult,team_1_score:e.target.value})} style={input}/><select value={newResult.team_2_id} onChange={(e)=>setNewResult({...newResult,team_2_id:e.target.value})} style={input}><option value="">Team 2</option>{teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}</select><select value={newResult.team_2_user_id} onChange={(e)=>setNewResult({...newResult,team_2_user_id:e.target.value})} style={input}><option value="">Team 2 Discord</option>{users.map((u)=><option key={u.id} value={u.id}>{u.discord_username}</option>)}</select><input placeholder="Team 2 Rank" value={newResult.team_2_rank} onChange={(e)=>setNewResult({...newResult,team_2_rank:e.target.value})} style={input}/><input placeholder="Team 2 Score" value={newResult.team_2_score} onChange={(e)=>setNewResult({...newResult,team_2_score:e.target.value})} style={input}/><input placeholder="Tags" value={newResult.tags} onChange={(e)=>setNewResult({...newResult,tags:e.target.value})} style={input}/><button onClick={submitResult} style={button}>Record Result</button></div></section>; }
+function RecordResult({ newResult, setNewResult, teams, users, submitResult }) {
+  return (
+    <section style={card}>
+      <h2 style={sectionTitle}>Record User vs User Result</h2>
+      <p style={mutedText}>
+        Year and week are locked to the saved league settings above.
+      </p>
+
+      <div style={formGrid}>
+        <input
+          value={newResult.season_year}
+          disabled
+          title="Controlled by Current Year"
+          style={{ ...input, opacity: 0.7, cursor: "not-allowed" }}
+        />
+
+        <select
+          value={newResult.week}
+          disabled
+          title="Controlled by Current Week"
+          style={{ ...input, opacity: 0.7, cursor: "not-allowed" }}
+        >
+          {WEEKS.map((w) => (
+            <option key={w}>{w}</option>
+          ))}
+        </select>
+
+        <select
+          value={newResult.team_1_id}
+          onChange={(e) =>
+            setNewResult({ ...newResult, team_1_id: e.target.value })
+          }
+          style={input}
+        >
+          <option value="">Team 1</option>
+          {teams.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={newResult.team_1_user_id}
+          onChange={(e) =>
+            setNewResult({ ...newResult, team_1_user_id: e.target.value })
+          }
+          style={input}
+        >
+          <option value="">Team 1 Discord</option>
+          {users.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.discord_username}
+            </option>
+          ))}
+        </select>
+
+        <input
+          placeholder="Team 1 Rank"
+          value={newResult.team_1_rank}
+          onChange={(e) =>
+            setNewResult({ ...newResult, team_1_rank: e.target.value })
+          }
+          style={input}
+        />
+
+        <input
+          placeholder="Team 1 Score"
+          value={newResult.team_1_score}
+          onChange={(e) =>
+            setNewResult({ ...newResult, team_1_score: e.target.value })
+          }
+          style={input}
+        />
+
+        <select
+          value={newResult.team_2_id}
+          onChange={(e) =>
+            setNewResult({ ...newResult, team_2_id: e.target.value })
+          }
+          style={input}
+        >
+          <option value="">Team 2</option>
+          {teams.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={newResult.team_2_user_id}
+          onChange={(e) =>
+            setNewResult({ ...newResult, team_2_user_id: e.target.value })
+          }
+          style={input}
+        >
+          <option value="">Team 2 Discord</option>
+          {users.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.discord_username}
+            </option>
+          ))}
+        </select>
+
+        <input
+          placeholder="Team 2 Rank"
+          value={newResult.team_2_rank}
+          onChange={(e) =>
+            setNewResult({ ...newResult, team_2_rank: e.target.value })
+          }
+          style={input}
+        />
+
+        <input
+          placeholder="Team 2 Score"
+          value={newResult.team_2_score}
+          onChange={(e) =>
+            setNewResult({ ...newResult, team_2_score: e.target.value })
+          }
+          style={input}
+        />
+
+        <input
+          placeholder="Tags"
+          value={newResult.tags}
+          onChange={(e) =>
+            setNewResult({ ...newResult, tags: e.target.value })
+          }
+          style={input}
+        />
+
+        <button onClick={submitResult} style={button}>
+          Record Result
+        </button>
+      </div>
+    </section>
+  );
+}
 function SearchBox({ value, onChange }) { return <input value={value} onChange={(e)=>onChange(e.target.value)} placeholder="Search..." style={searchInput}/>; }
 function Standings({ rows, search, setSearch, goToTeam, draggedStanding, setDraggedStanding, reorderStandings }) { return <section style={card}><div style={sectionTop}><div><h2 style={sectionTitle}>Commissioner League Standings</h2><p style={mutedText}>Drag teams up or down to set commissioner order.</p></div><SearchBox value={search} onChange={setSearch}/></div><Table headers={["Move","#","Team","W","L","PF","PA","Top 25","Conf","Nattys","Bowl"]}>{rows.map((r, index)=><tr key={r.team_id} style={trStyle} draggable onDragStart={()=>setDraggedStanding(index)} onDragOver={(e)=>e.preventDefault()} onDrop={()=>reorderStandings(index)}><td style={td}>☰</td><td style={td}>#{index + 1}</td><td style={clickableTeamCell} onClick={()=>goToTeam(r.team_id)}>{r.team_name}</td><td style={td}>{r.wins}</td><td style={td}>{r.losses}</td><td style={td}>{r.pf}</td><td style={td}>{r.pa}</td><td style={td}>{r.top_25_wins ?? 0}</td><td style={td}>{r.conference_titles ?? 0}</td><td style={td}>{r.national_titles ?? 0}</td><td style={td}>{r.bowl_wins ?? 0}-{r.bowl_losses ?? 0}</td></tr>)}</Table></section>; }
 function Results({ rows, deleteResult, search, setSearch }) { return <section style={card}><div style={sectionTop}><h2 style={sectionTitle}>User vs User Results</h2><SearchBox value={search} onChange={setSearch}/></div><Table headers={["Year","Week","Team 1","User 1","Score","Team 2","User 2","Tags",""]}>{rows.map((r)=><tr key={r.id} style={trStyle}><td style={td}>{r.season_year}</td><td style={td}>{r.week}</td><td style={teamCell}>{r.team_1?.name||"—"}</td><td style={td}>{r.user_1?.discord_username||"—"}</td><td style={td}>{r.team_1_score}-{r.team_2_score}</td><td style={teamCell}>{r.team_2?.name||"—"}</td><td style={td}>{r.user_2?.discord_username||"—"}</td><td style={td}>{r.tags?.join(", ")||"—"}</td><td style={td}><DeleteButton onClick={()=>deleteResult(r.id)}/></td></tr>)}</Table></section>; }
@@ -404,7 +542,6 @@ const statCard={background:"#18181b",border:"1px solid #27272a",borderRadius:22,
 const statTitle={color:"#a1a1aa",fontSize:14,marginBottom:10,textTransform:"uppercase"};
 const statValue={fontSize:38,fontWeight:900,color:"white"};
 const statInput={...statValue,background:"transparent",color:"white",border:"none",outline:"none",width:"100%"};
-const settingSelect={...input,fontSize:24,fontWeight:900};
 const statSelect={background:"#27272a",color:"white",border:"1px solid #3f3f46",borderRadius:12,padding:14,fontSize:24,fontWeight:900,width:"100%"};
 const card={background:"#18181b",border:"1px solid #27272a",borderRadius:24,padding:24,marginBottom:32};
 const sectionTop={display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"};
