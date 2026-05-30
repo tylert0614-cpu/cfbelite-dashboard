@@ -203,6 +203,7 @@ export default function App() {
   const [historyRows, setHistoryRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [standingsOrder, setStandingsOrder] = useState([]);
+  const [commissionerRankings, setCommissionerRankings] = useState([]);
   const [draggedStanding, setDraggedStanding] = useState(null);
   const [userSort, setUserSort] = useState({ key: "record", direction: "desc" });
   const [commissionerSort, setCommissionerSort] = useState({ key: "manual", direction: "desc" });
@@ -234,31 +235,61 @@ export default function App() {
     ? standingsOrder.map((id) => standings.find((row) => row.team_id === id)).filter(Boolean)
     : standings;
   function goToTeam(teamId) { setActiveTab(`team-${teamId}`); }
-  function reorderStandings(dropTeamId) {
+  async function saveCommissionerRankings(order) {
+    const activeOrder = order.filter((teamId) => activeTeamIds.has(teamId));
+    const payload = activeOrder.map((teamId, index) => ({
+      team_id: teamId,
+      rank: index + 1,
+      updated_at: new Date().toISOString(),
+    }));
+
+    if (!payload.length) return;
+
+    const { error: rankingError } = await supabase
+      .from("commissioner_rankings")
+      .upsert(payload, { onConflict: "team_id" });
+
+    if (rankingError) {
+      setError(`Commissioner ranking save failed: ${rankingError.message}`);
+      return;
+    }
+
+    setError("");
+  }
+
+  async function reorderStandings(dropTeamId) {
     if (!draggedStanding || !dropTeamId || draggedStanding === dropTeamId) return;
-    setStandingsOrder((prev) => {
-      const base = prev.length ? prev : standings.map((row) => row.team_id);
-      const next = [...base];
-      const fromIndex = next.indexOf(draggedStanding);
-      const toIndex = next.indexOf(dropTeamId);
-      if (fromIndex === -1 || toIndex === -1) return next;
-      const [moved] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, moved);
-      return next;
-    });
+
+    const base = standingsOrder.length ? standingsOrder : standings.map((row) => row.team_id);
+    const next = [...base];
+    const fromIndex = next.indexOf(draggedStanding);
+    const toIndex = next.indexOf(dropTeamId);
+
+    if (fromIndex === -1 || toIndex === -1) {
+      setDraggedStanding(null);
+      return;
+    }
+
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+
+    setStandingsOrder(next);
     setDraggedStanding(null);
+    setCommissionerSort({ key: "manual", direction: "desc" });
+    await saveCommissionerRankings(next);
   }
 
   const tabs = [["dashboard","Dashboard"],["assignments","Users/Team Assignments"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...activeTeamOptions.map((team) => [`team-${team.id}`, team.name])];
 
   async function loadData() {
     setLoading(true); setError("");
-    const [teamsRes, settingsRes, usersRes, assignmentsRes, standingsRes, resultsRes, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, historyRes] = await Promise.all([
+    const [teamsRes, settingsRes, usersRes, assignmentsRes, standingsRes, rankingsRes, resultsRes, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, historyRes] = await Promise.all([
       supabase.from("teams").select("*").order("name"),
       supabase.from("league_settings").select("*").eq("id", 1).single(),
       supabase.from("discord_users").select("*").order("discord_username"),
       supabase.from("team_assignments").select("*, teams(name), discord_users(discord_username)").order("created_at"),
       supabase.from("team_standings").select("*").order("team_name"),
+      supabase.from("commissioner_rankings").select("*").order("rank"),
       supabase.from("game_results").select(`*, team_1:teams!game_results_team_1_id_fkey(*), team_2:teams!game_results_team_2_id_fkey(*), user_1:discord_users!game_results_team_1_user_id_fkey(discord_username), user_2:discord_users!game_results_team_2_user_id_fkey(discord_username)`).order("created_at", { ascending: false }),
       supabase.from("all_americans").select("*, teams(name)").order("season_year", { ascending: false }),
       supabase.from("awards").select("*, teams(name)").order("season_year", { ascending: false }),
@@ -269,7 +300,7 @@ export default function App() {
       supabase.from("recruiting_classes").select("*, teams(name)").order("season_year", { ascending: false }),
       supabase.from("team_history_records").select("*, teams(name)").order("season_year", { ascending: false }),
     ]);
-    const firstError = [teamsRes, settingsRes, usersRes, assignmentsRes, standingsRes, resultsRes, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, historyRes].find((r) => r.error)?.error;
+    const firstError = [teamsRes, settingsRes, usersRes, assignmentsRes, standingsRes, rankingsRes, resultsRes, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, historyRes].find((r) => r.error)?.error;
     if (firstError) setError(firstError.message);
     else {
       if (settingsRes.data) {
@@ -284,13 +315,24 @@ export default function App() {
       setTeams(teamsRes.data || []); setUsers(usersRes.data || []);
       setAssignments((assignmentsRes.data || []).sort((a,b) => (a.teams?.name || "").localeCompare(b.teams?.name || "")));
       const loadedStandings = standingsRes.data || [];
+      const loadedRankings = rankingsRes.data || [];
       setStandings(loadedStandings);
-      setStandingsOrder((prev) => {
-        const ids = loadedStandings.map((row) => row.team_id);
-        const kept = prev.filter((id) => ids.includes(id));
-        const added = ids.filter((id) => !kept.includes(id));
-        return [...kept, ...added];
-      });
+      setCommissionerRankings(loadedRankings);
+
+      const standingIds = loadedStandings.map((row) => row.team_id);
+      const rankedIds = loadedRankings
+        .sort((a, b) => a.rank - b.rank)
+        .map((row) => row.team_id)
+        .filter((id) => standingIds.includes(id));
+      const unrankedIds = standingIds
+        .filter((id) => !rankedIds.includes(id))
+        .sort((a, b) => {
+          const aName = loadedStandings.find((row) => row.team_id === a)?.team_name || "";
+          const bName = loadedStandings.find((row) => row.team_id === b)?.team_name || "";
+          return aName.localeCompare(bName);
+        });
+
+      setStandingsOrder([...rankedIds, ...unrankedIds]);
       setResults(resultsRes.data || []); setAllAmericans(aaRes.data || []); setAwards(awardsRes.data || []); setHeismans(heismanRes.data || []); setNationalChampions(championsRes.data || []); setDraftOrder(draftRes.data || []); setPlayoffGames(playoffRes.data || []); setRecruiting(recruitingRes.data || []);
       setHistoryRows(historyRes.data || []);
     }
@@ -670,7 +712,7 @@ function Standings({ rows, search, setSearch, goToTeam, teams, results, draggedS
       <div style={sectionTop}>
         <div>
           <h2 style={sectionTitle}>Commissioner League Standings</h2>
-          <p style={mutedText}>Click a column header to sort greatest/least. Drag order is preserved when no stat column is selected.</p>
+          <p style={mutedText}>Click a column header to sort greatest/least. Drag teams to save the official commissioner order for everyone.</p>
         </div>
         <SearchBox value={search} onChange={setSearch} />
       </div>
