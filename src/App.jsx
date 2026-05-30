@@ -134,6 +134,56 @@ function championshipRowsByDiscord(champions) {
   return [...map.values()].sort((a, b) => b.total - a.total || a.discord.localeCompare(b.discord));
 }
 
+function sortableValue(value) {
+  const number = Number(value);
+  if (Number.isFinite(number)) return number;
+  return String(value || "").toLowerCase();
+}
+
+function compareForSort(a, b, key, direction) {
+  const multiplier = direction === "asc" ? 1 : -1;
+
+  if (key === "record") {
+    const aWinPct = a.games ? a.wins / a.games : 0;
+    const bWinPct = b.games ? b.wins / b.games : 0;
+    if (aWinPct !== bWinPct) return (aWinPct - bWinPct) * multiplier;
+    if (a.wins !== b.wins) return (a.wins - b.wins) * multiplier;
+    if (a.losses !== b.losses) return (b.losses - a.losses) * multiplier;
+    return a.teamName.localeCompare(b.teamName);
+  }
+
+  const av = sortableValue(a[key]);
+  const bv = sortableValue(b[key]);
+
+  if (typeof av === "number" && typeof bv === "number") {
+    if (av !== bv) return (av - bv) * multiplier;
+    return a.teamName.localeCompare(b.teamName);
+  }
+
+  const textCompare = String(av).localeCompare(String(bv));
+  return textCompare * multiplier;
+}
+
+function SortButton({ label, sortKey, sortState, setSortState }) {
+  const active = sortState?.key === sortKey;
+  const arrow = active ? (sortState.direction === "desc" ? " ▼" : " ▲") : "";
+
+  return (
+    <button
+      type="button"
+      onClick={() =>
+        setSortState((prev) => ({
+          key: sortKey,
+          direction: prev?.key === sortKey && prev.direction === "desc" ? "asc" : "desc",
+        }))
+      }
+      style={sortButton}
+    >
+      {label}{arrow}
+    </button>
+  );
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [currentYear, setCurrentYear] = useState("2029");
@@ -154,6 +204,8 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [standingsOrder, setStandingsOrder] = useState([]);
   const [draggedStanding, setDraggedStanding] = useState(null);
+  const [userSort, setUserSort] = useState({ key: "record", direction: "desc" });
+  const [commissionerSort, setCommissionerSort] = useState({ key: "manual", direction: "desc" });
   const [error, setError] = useState("");
   const [search, setSearch] = useState({ standings: "", results: "", assignments: "", allAmericans: "", awards: "", h2h: "" });
   const [newResult, setNewResult] = useState(EMPTY_RESULT);
@@ -388,7 +440,7 @@ export default function App() {
   async function addHistory(teamId) { const { error: e } = await supabase.from("team_history_records").insert({ team_id: teamId, season_year: Number(newHistory.season_year || currentYear), record: newHistory.record || "0-0" }); if (e) { setError(`History add failed: ${e.message}`); return; } setNewHistory({ season_year: Number(currentYear), record: "0-0" }); setError(""); await loadData(); }
 
   return <div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={errorBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab}/>
-    {activeTab === "dashboard" && <><Stats currentYear={currentYear} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} currentWeek={currentWeek} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} teams={teams} assignments={assignments} saveSettings={saveLeagueSettings}/><UserStandings teams={teamOptions} results={currentYearResults} goToTeam={goToTeam}/><ChampionshipsByUser champions={nationalChampions}/><RecordResult newResult={newResult} setNewResult={setNewResult} teams={teamOptions} users={userOptions} assignments={assignments} submitResult={submitResult}/><Standings rows={orderedStandings.filter((r)=>JSON.stringify(r).toLowerCase().includes(search.standings.toLowerCase()))} search={search.standings} setSearch={(v)=>setSearch({...search,standings:v})} goToTeam={goToTeam} teams={teamOptions} results={currentYearResults} draggedStanding={draggedStanding} setDraggedStanding={setDraggedStanding} reorderStandings={reorderStandings}/><Results rows={currentYearResults.filter((r)=>JSON.stringify(r).toLowerCase().includes(search.results.toLowerCase()))} deleteResult={(id)=>deleteRow("game_results", id)} search={search.results} setSearch={(v)=>setSearch({...search,results:v})}/></>}
+    {activeTab === "dashboard" && <><Stats currentYear={currentYear} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} currentWeek={currentWeek} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} teams={teams} assignments={assignments} saveSettings={saveLeagueSettings}/><UserStandings teams={teamOptions} results={currentYearResults} goToTeam={goToTeam} sortState={userSort} setSortState={setUserSort}/><ChampionshipsByUser champions={nationalChampions}/><RecordResult newResult={newResult} setNewResult={setNewResult} teams={teamOptions} users={userOptions} assignments={assignments} submitResult={submitResult}/><Standings rows={orderedStandings.filter((r)=>JSON.stringify(r).toLowerCase().includes(search.standings.toLowerCase()))} search={search.standings} setSearch={(v)=>setSearch({...search,standings:v})} goToTeam={goToTeam} teams={teamOptions} results={currentYearResults} draggedStanding={draggedStanding} setDraggedStanding={setDraggedStanding} reorderStandings={reorderStandings} sortState={commissionerSort} setSortState={setCommissionerSort}/><Results rows={currentYearResults.filter((r)=>JSON.stringify(r).toLowerCase().includes(search.results.toLowerCase()))} deleteResult={(id)=>deleteRow("game_results", id)} search={search.results} setSearch={(v)=>setSearch({...search,results:v})}/></>}
     {activeTab === "assignments" && <Assignments rows={assignments} teams={teamOptions} users={userOptions} addAssignment={addAssignment} updateRow={updateRow} deleteRow={deleteRow} drafts={draftAssignments} setDrafts={setDraftAssignments} saveDraft={saveDraft} getDraft={getDraft} teamChange={teamChange} setTeamChange={setTeamChange} changeUserTeam={changeUserTeam}/>}    
     {activeTab === "h2h" && <H2H results={results} search={search.h2h} setSearch={(v)=>setSearch({...search,h2h:v})}/>}    
     {activeTab === "allAmericans" && <AllAmericans rows={allAmericans} teams={teamOptions} addRow={addAA} updateRow={updateRow} deleteRow={deleteRow} rankings={rankingRows(teamOptions, allAmericans)} drafts={draftAllAmericans} setDrafts={setDraftAllAmericans} saveDraft={saveDraft} getDraft={getDraft}/>}    
@@ -438,24 +490,45 @@ function Stats({ currentYear, setCurrentYear, currentWeek, setCurrentWeek, teams
 
 function Stat({ title, value }) { return <div style={statCard}><div style={statTitle}>{title}</div><div style={statValue}>{value}</div></div>; }
 
-function UserStandings({ teams, results, goToTeam }) {
-  const ordered = teams
-    .map((team) => ({ team, record: recordFromResults(team.id, results), sor: strengthOfResult(team.id, teams, results) }))
-    .sort((a, b) => b.record.wins - a.record.wins || a.record.losses - b.record.losses || a.team.name.localeCompare(b.team.name));
+function UserStandings({ teams, results, goToTeam, sortState, setSortState }) {
+  const rows = teams
+    .map((team) => {
+      const record = recordFromResults(team.id, results);
+      return {
+        team,
+        teamName: team.name,
+        wins: record.wins,
+        losses: record.losses,
+        games: record.games,
+        avgPf: Number(record.avgPf),
+        avgPa: Number(record.avgPa),
+        top25: top25Wins(team.id, results),
+        sor: Number(strengthOfResult(team.id, teams, results)),
+      };
+    })
+    .sort((a, b) => compareForSort(a, b, sortState.key, sortState.direction));
 
   return (
     <section style={card}>
       <h2 style={sectionTitle}>User vs User Standings</h2>
-      <Table headers={["#", "Team", "Record", "Avg PF", "Avg PA", "Top 25", "SOR"]}>
-        {ordered.map(({ team, record, sor }, index) => (
-          <tr key={team.id} style={trStyle}>
+      <Table headers={[
+        "#",
+        <SortButton label="Team" sortKey="teamName" sortState={sortState} setSortState={setSortState} />,
+        <SortButton label="Record" sortKey="record" sortState={sortState} setSortState={setSortState} />,
+        <SortButton label="Avg PF" sortKey="avgPf" sortState={sortState} setSortState={setSortState} />,
+        <SortButton label="Avg PA" sortKey="avgPa" sortState={sortState} setSortState={setSortState} />,
+        <SortButton label="Top 25" sortKey="top25" sortState={sortState} setSortState={setSortState} />,
+        <SortButton label="SOR" sortKey="sor" sortState={sortState} setSortState={setSortState} />,
+      ]}>
+        {rows.map((row, index) => (
+          <tr key={row.team.id} style={trStyle}>
             <td style={td}>#{index + 1}</td>
-            <td style={clickableTeamCell} onClick={() => goToTeam(team.id)}><TeamLabel team={team} /></td>
-            <td style={td}>{record.wins}-{record.losses}</td>
-            <td style={td}>{record.avgPf}</td>
-            <td style={td}>{record.avgPa}</td>
-            <td style={td}>{top25Wins(team.id, results)}</td>
-            <td style={td}>{sor}</td>
+            <td style={clickableTeamCell} onClick={() => goToTeam(row.team.id)}><TeamLabel team={row.team} /></td>
+            <td style={td}>{row.wins}-{row.losses}</td>
+            <td style={td}>{row.avgPf.toFixed(1)}</td>
+            <td style={td}>{row.avgPa.toFixed(1)}</td>
+            <td style={td}>{row.top25}</td>
+            <td style={td}>{row.sor.toFixed(1)}</td>
           </tr>
         ))}
       </Table>
@@ -548,43 +621,75 @@ function RecordResult({ newResult, setNewResult, teams, users, assignments, subm
 }
 
 function SearchBox({ value, onChange }) { return <input value={value} onChange={(e)=>onChange(e.target.value)} placeholder="Search..." style={searchInput}/>; }
-function Standings({ rows, search, setSearch, goToTeam, teams, results, draggedStanding, setDraggedStanding, reorderStandings }) {
+function Standings({ rows, search, setSearch, goToTeam, teams, results, draggedStanding, setDraggedStanding, reorderStandings, sortState, setSortState }) {
+  const computedRows = rows
+    .map((row, originalIndex) => {
+      const team = teams.find((item) => item.id === row.team_id);
+      const teamId = row.team_id;
+      const record = recordFromResults(teamId, results);
+      const bowl = bowlRecord(teamId, results);
+      return {
+        ...row,
+        originalIndex,
+        team,
+        teamName: row.team_name || team?.name || "",
+        wins: record.wins,
+        losses: record.losses,
+        games: record.games,
+        avgPf: Number(record.avgPf),
+        avgPa: Number(record.avgPa),
+        top25: top25Wins(teamId, results),
+        conf: titleCount(teamId, results, "Conference Championship Week"),
+        nattys: titleCount(teamId, results, "National Championship Week"),
+        bowlText: `${bowl.wins}-${bowl.losses}`,
+        bowlScore: bowl.wins - bowl.losses,
+        sor: Number(strengthOfResult(teamId, teams, results)),
+      };
+    })
+    .sort((a, b) => {
+      if (sortState.key === "manual") return a.originalIndex - b.originalIndex;
+      return compareForSort(a, b, sortState.key, sortState.direction);
+    });
+
   return (
     <section style={card}>
       <div style={sectionTop}>
         <div>
           <h2 style={sectionTitle}>Commissioner League Standings</h2>
-          <p style={mutedText}>Drag teams up or down to set commissioner order. Stats below are calculated from recorded results for the selected Current Year.</p>
+          <p style={mutedText}>Click a column header to sort greatest/least. Drag order is preserved when no stat column is selected.</p>
         </div>
         <SearchBox value={search} onChange={setSearch} />
       </div>
-      <Table headers={["Move", "#", "Team", "W", "L", "Avg PF", "Avg PA", "Top 25", "Conf", "Nattys", "Bowl", "SOR"]}>
-        {rows.map((row, index) => {
-          const team = teams.find((item) => item.id === row.team_id);
-          const teamId = row.team_id;
-          const record = recordFromResults(teamId, results);
-          const bowl = bowlRecord(teamId, results);
-          const confTitles = titleCount(teamId, results, "Conference Championship Week");
-          const nattys = titleCount(teamId, results, "National Championship Week");
-          const sor = strengthOfResult(teamId, teams, results);
-
-          return (
-            <tr key={row.team_id} style={trStyle} draggable onDragStart={() => setDraggedStanding(index)} onDragOver={(e) => e.preventDefault()} onDrop={() => reorderStandings(index)}>
-              <td style={td}>☰</td>
-              <td style={td}>#{index + 1}</td>
-              <td style={clickableTeamCell} onClick={() => goToTeam(row.team_id)}><TeamLabel team={team} name={row.team_name} /></td>
-              <td style={td}>{record.wins}</td>
-              <td style={td}>{record.losses}</td>
-              <td style={td}>{record.avgPf}</td>
-              <td style={td}>{record.avgPa}</td>
-              <td style={td}>{top25Wins(teamId, results)}</td>
-              <td style={td}>{confTitles}</td>
-              <td style={td}>{nattys}</td>
-              <td style={td}>{bowl.wins}-{bowl.losses}</td>
-              <td style={td}>{sor}</td>
-            </tr>
-          );
-        })}
+      <Table headers={[
+        "Move",
+        "#",
+        <SortButton label="Team" sortKey="teamName" sortState={sortState} setSortState={setSortState} />,
+        <SortButton label="W" sortKey="wins" sortState={sortState} setSortState={setSortState} />,
+        <SortButton label="L" sortKey="losses" sortState={sortState} setSortState={setSortState} />,
+        <SortButton label="Avg PF" sortKey="avgPf" sortState={sortState} setSortState={setSortState} />,
+        <SortButton label="Avg PA" sortKey="avgPa" sortState={sortState} setSortState={setSortState} />,
+        <SortButton label="Top 25" sortKey="top25" sortState={sortState} setSortState={setSortState} />,
+        <SortButton label="Conf" sortKey="conf" sortState={sortState} setSortState={setSortState} />,
+        <SortButton label="Nattys" sortKey="nattys" sortState={sortState} setSortState={setSortState} />,
+        <SortButton label="Bowl" sortKey="bowlScore" sortState={sortState} setSortState={setSortState} />,
+        <SortButton label="SOR" sortKey="sor" sortState={sortState} setSortState={setSortState} />,
+      ]}>
+        {computedRows.map((row, index) => (
+          <tr key={row.team_id} style={trStyle} draggable onDragStart={() => setDraggedStanding(row.originalIndex)} onDragOver={(e) => e.preventDefault()} onDrop={() => reorderStandings(row.originalIndex)}>
+            <td style={td}>☰</td>
+            <td style={td}>#{index + 1}</td>
+            <td style={clickableTeamCell} onClick={() => goToTeam(row.team_id)}><TeamLabel team={row.team} name={row.teamName} /></td>
+            <td style={td}>{row.wins}</td>
+            <td style={td}>{row.losses}</td>
+            <td style={td}>{row.avgPf.toFixed(1)}</td>
+            <td style={td}>{row.avgPa.toFixed(1)}</td>
+            <td style={td}>{row.top25}</td>
+            <td style={td}>{row.conf}</td>
+            <td style={td}>{row.nattys}</td>
+            <td style={td}>{row.bowlText}</td>
+            <td style={td}>{row.sor.toFixed(1)}</td>
+          </tr>
+        ))}
       </Table>
     </section>
   );
@@ -687,7 +792,7 @@ function DraftOrder({ rows, users, updateRow, drafts, setDrafts, saveDraft, getD
 function Playoff({ rows, teams, updateRow, drafts, setDrafts, saveDraft, getDraft }) { return <section style={card}><h2 style={sectionTitle}>College Football Playoff Bracket</h2><div style={bracketGrid}>{["First Round","Quarterfinals","Semifinals","National Championship"].map((round)=><div key={round}><h3>{round}</h3>{rows.filter((g)=>g.round===round).map((g)=>{const d=getDraft(drafts,g);return <div key={g.id} style={gameCard}><input value={d.bowl_name||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),bowl_name:e.target.value}})} placeholder="Bowl" style={input}/><input value={d.top_seed||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),top_seed:e.target.value}})} placeholder="Top Seed" style={input}/><select value={d.top_team_id||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),top_team_id:e.target.value}})} style={input}><option value="">Top Team</option>{teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}</select><b style={{textAlign:"center"}}>VS</b><input value={d.bottom_seed||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),bottom_seed:e.target.value}})} placeholder="Bottom Seed" style={input}/><select value={d.bottom_team_id||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),bottom_team_id:e.target.value}})} style={input}><option value="">Bottom Team</option>{teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}</select><input value={d.score||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),score:e.target.value}})} placeholder="Score" style={input}/><button onClick={()=>saveDraft("playoff_games",g.id,drafts[g.id])} style={button}>Save Game</button></div>})}</div>)}</div></section>; }
 function TeamPage({ team, standings, results, allAmericans, awards, heismans, recruiting, historyRows, addRecruiting, addHistory, updateRow, deleteRow, newRecruiting, setNewRecruiting, newHistory, setNewHistory }) { const stat=standings||{}; const rec=recordFromResults(team.id, results); const bowl=bowlRecord(team.id, results); return <section style={card}><h2 style={sectionTitle}><TeamLabel team={team} /></h2><div style={statsGrid}><Stat title="Overall" value={`${stat.wins??0}-${stat.losses??0}`}/><Stat title="Avg PF" value={rec.avgPf}/><Stat title="Avg PA" value={rec.avgPa}/><Stat title="Top 25" value={top25Wins(team.id, results)}/><Stat title="Top 25 Class" value={recruiting.filter((r)=>Number(r.rank) >= 1 && Number(r.rank) <= 25).length}/><Stat title="Awards" value={awards.length}/><Stat title="All-Americans" value={allAmericans.length}/><Stat title="Heismans" value={heismans.length}/><Stat title="Conf Titles" value={titleCount(team.id, results, "Conference Championship Week")}/><Stat title="Nattys" value={titleCount(team.id, results, "National Championship Week")}/><Stat title="Bowl" value={`${bowl.wins}-${bowl.losses}`}/><Stat title="SOR" value={strengthOfResult(team.id, results)}/></div><div style={twoCol}><div style={miniCard}><h3>Recruiting Rankings</h3><div style={formGrid}><input placeholder="Year" value={newRecruiting.season_year} onChange={(e)=>setNewRecruiting({...newRecruiting,season_year:e.target.value})} style={input}/><input placeholder="Rank" value={newRecruiting.rank} onChange={(e)=>setNewRecruiting({...newRecruiting,rank:e.target.value})} style={input}/><button onClick={()=>addRecruiting(team.id)} style={button}>Add</button></div>{recruiting.map((r)=><div key={r.id} style={miniRow}>{r.season_year}: #{r.rank} <DeleteButton onClick={()=>deleteRow("recruiting_classes",r.id)}/></div>)}</div><div style={miniCard}><h3>History</h3><div style={formGrid}><input placeholder="Year" value={newHistory.season_year} onChange={(e)=>setNewHistory({...newHistory,season_year:e.target.value})} style={input}/><input placeholder="Record" value={newHistory.record} onChange={(e)=>setNewHistory({...newHistory,record:e.target.value})} style={input}/><button onClick={()=>addHistory(team.id)} style={button}>Add</button></div>{historyRows.map((r)=><div key={r.id} style={miniRow}><input value={r.season_year} onChange={(e)=>updateRow("team_history_records",r.id,"season_year",Number(e.target.value))} style={smallInput}/><input value={r.record || ""} onChange={(e)=>updateRow("team_history_records",r.id,"record",e.target.value)} style={smallInput}/><DeleteButton onClick={()=>deleteRow("team_history_records",r.id)}/></div>)}</div></div><Results rows={results} deleteResult={()=>{}} search="" setSearch={()=>{}}/><div style={twoCol}><MiniList title="All-Americans" rows={allAmericans.map((r)=>`${r.player_name} — ${r.type}, ${r.position}, ${r.season_year}`)}/><MiniList title="Awards" rows={awards.map((r)=>`${r.player_name} — ${r.award_name}, ${r.position}, ${r.season_year}`)}/><MiniList title="Heisman Winners" rows={heismans.map((r)=>`${r.player_name} — ${r.position}, ${r.season_year}`)}/></div></section>; }
 function MiniList({ title, rows }) { return <div style={miniCard}><h3>{title}</h3>{rows.map((r,i)=><div key={i} style={miniRow}>{r}</div>)}</div>; }
-function Table({ headers, children }) { return <div style={{overflowX:"auto",marginTop:20}}><table style={table}><thead><tr>{headers.map((h)=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div>; }
+function Table({ headers, children }) { return <div style={{overflowX:"auto",marginTop:20}}><table style={table}><thead><tr>{headers.map((h, index)=><th key={typeof h === "string" ? h : index} style={th}>{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div>; }
 function DeleteButton({ onClick }) { return <button onClick={onClick} style={deleteButton}>Delete</button>; }
 
 const page={minHeight:"100vh",width:"100%",background:"#09090b",color:"white",overflowX:"hidden"};
@@ -714,6 +819,7 @@ const input={background:"#27272a",border:"1px solid #3f3f46",color:"white",paddi
 const smallInput={...input,width:"120px",marginRight:8};
 const searchInput={...input,maxWidth:320};
 const button={background:"#dc2626",color:"white",border:"none",borderRadius:12,padding:14,fontWeight:700,cursor:"pointer"};
+const sortButton={background:"transparent",border:"none",color:"#a1a1aa",fontSize:13,textTransform:"uppercase",fontWeight:800,cursor:"pointer",padding:0};
 const deleteButton={background:"#7f1d1d",color:"white",border:"1px solid #dc2626",borderRadius:10,padding:"8px 10px",cursor:"pointer"};
 const table={width:"100%",borderCollapse:"collapse",minWidth:820};
 const th={textAlign:"left",padding:"14px 10px",color:"#a1a1aa",fontSize:13,textTransform:"uppercase",borderBottom:"1px solid #27272a"};
