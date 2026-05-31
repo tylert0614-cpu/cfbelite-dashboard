@@ -686,6 +686,29 @@ export default function App() {
     setError("");
     await loadData();
   }
+  async function saveTeamAssets(team, draft) {
+    const merged = { ...team, ...(draft || {}) };
+    const payload = {
+      helmet_url: merged.helmet_url || null,
+      logo_url: merged.logo_url || null,
+      primary_color: merged.primary_color || null,
+      secondary_color: merged.secondary_color || null,
+    };
+
+    const { error: updateError } = await supabase
+      .from("teams")
+      .update(payload)
+      .eq("id", team.id);
+
+    if (updateError) {
+      setError(`Team asset save failed: ${updateError.message}`);
+      return;
+    }
+
+    setError("");
+    await loadData();
+  }
+
   function getDraft(drafts, row) { return { ...row, ...(drafts[row.id] || {}) }; }
   async function changeUserTeam() {
     if (!teamChange.discord_user_id || !teamChange.new_team_id) { setError("Select a Discord user and new team first."); return; }
@@ -767,7 +790,7 @@ export default function App() {
     {activeTab === "prestige" && <PrestigeLeaderboard users={userOptions} teams={teamOptions} activeTeams={activeTeamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}
     {activeTab === "recordBook" && <RecordBook users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}
     {activeTab === "weeklyNews" && <WeeklyNews results={results} teams={teamOptions} currentYear={currentYear} currentWeek={currentWeek}/> }
-    {activeTab === "teamAssets" && <TeamAssets teams={activeTeamOptions} saveDraft={saveDraft} getDraft={getDraft}/>} 
+    {activeTab === "teamAssets" && <TeamAssets teams={activeTeamOptions} saveTeamAssets={saveTeamAssets} getDraft={getDraft}/>}
     {activeTab === "assignments" && <Assignments rows={assignments} teams={teamOptions} users={userOptions} addAssignment={addAssignment} updateRow={updateRow} deleteRow={deleteRow} drafts={draftAssignments} setDrafts={setDraftAssignments} saveDraft={saveDraft} getDraft={getDraft} teamChange={teamChange} setTeamChange={setTeamChange} changeUserTeam={changeUserTeam}/>}    
     {activeTab === "h2h" && <H2H results={results} search={search.h2h} setSearch={(v)=>setSearch({...search,h2h:v})}/>}    
     {activeTab === "allAmericans" && <AllAmericans rows={allAmericans} teams={teamOptions} addRow={addAA} updateRow={updateRow} deleteRow={deleteRow} rankings={rankingRows(activeTeamOptions, allAmericans)} drafts={draftAllAmericans} setDrafts={setDraftAllAmericans} saveDraft={saveDraft} getDraft={getDraft}/>}    
@@ -1231,7 +1254,7 @@ function getDirectedH2HRows(results) {
   });
 }
 
-function TeamAssets({ teams, saveDraft, getDraft }) {
+function TeamAssets({ teams, saveTeamAssets, getDraft }) {
   const [drafts, setDrafts] = useState({});
 
   return (
@@ -1239,7 +1262,7 @@ function TeamAssets({ teams, saveDraft, getDraft }) {
       <div style={sectionTop}>
         <div>
           <h2 style={sectionTitle}>Team Helmet / Logo Admin</h2>
-          <p style={mutedText}>Paste helmet and logo image URLs here. These feed into team labels throughout the dashboard.</p>
+          <p style={mutedText}>Paste helmet/logo URLs and team colors for the 32 active league teams. Colors drive each team page background and text.</p>
         </div>
       </div>
       <Table headers={["Preview", "Team", "Helmet URL", "Logo URL", "Primary Color", "Secondary Color", "Save"]}>
@@ -1253,7 +1276,7 @@ function TeamAssets({ teams, saveDraft, getDraft }) {
               <td style={td}><input value={draft.logo_url || ""} onChange={(e)=>setDrafts({...drafts,[team.id]:{...(drafts[team.id]||{}),logo_url:e.target.value}})} placeholder="Logo image URL" style={input}/></td>
               <td style={td}><input value={draft.primary_color || ""} onChange={(e)=>setDrafts({...drafts,[team.id]:{...(drafts[team.id]||{}),primary_color:e.target.value}})} placeholder="#000000" style={input}/></td>
               <td style={td}><input value={draft.secondary_color || ""} onChange={(e)=>setDrafts({...drafts,[team.id]:{...(drafts[team.id]||{}),secondary_color:e.target.value}})} placeholder="#ffffff" style={input}/></td>
-              <td style={td}><button onClick={()=>saveDraft("teams", team.id, drafts[team.id])} style={button}>Save</button></td>
+              <td style={td}><button onClick={()=>saveTeamAssets(team, drafts[team.id])} style={button}>Save</button></td>
             </tr>
           );
         })}
@@ -1313,8 +1336,19 @@ function TeamPage({ team, standings, results, allResults, teams, assignments, al
   const bowl = bowlRecord(team.id, results);
   const activeCoach = activeCoachForTeam(team.id, assignments);
   const coachName = activeCoach?.discord_users?.discord_username || "Unassigned";
+  const primaryColor = team.primary_color || "#18181b";
+  const secondaryColor = team.secondary_color || "#ffffff";
+  const teamPageStyle = {
+    ...card,
+    background: primaryColor,
+    color: secondaryColor,
+    border: `1px solid ${secondaryColor}`,
+  };
+  const teamSectionTitle = { ...sectionTitle, color: secondaryColor };
+  const teamCoachBanner = { ...coachBanner, color: secondaryColor, border: `1px solid ${secondaryColor}` };
+  const teamCoachNameStyle = { ...coachNameStyle, color: secondaryColor };
 
-  return <section style={card}><h2 style={sectionTitle}><TeamLabel team={team} /></h2><div style={coachBanner}><div><div style={statTitle}>Current Discord User / Coach</div><div style={coachNameStyle}>{coachName}</div></div><div><div style={statTitle}>Program Page</div><div style={mutedText}>Team history and coach profile combined.</div></div></div><div style={statsGrid}><Stat title="Overall" value={`${stat.wins??0}-${stat.losses??0}`}/><Stat title="Avg PF" value={rec.avgPf}/><Stat title="Avg PA" value={rec.avgPa}/><Stat title="Top 25" value={top25Wins(team.id, results)}/><Stat title="Top 25 Class" value={recruiting.filter((r)=>Number(r.rank) >= 1 && Number(r.rank) <= 25).length}/><Stat title="Awards" value={awards.length}/><Stat title="All-Americans" value={allAmericans.length}/><Stat title="Heismans" value={heismans.length}/><Stat title="Conf Titles" value={titleCount(team.id, results, "Conference Championship Week")}/><Stat title="Nattys" value={titleCount(team.id, results, "National Championship Week")}/><Stat title="Bowl" value={`${bowl.wins}-${bowl.losses}`}/><Stat title="SOR" value={strengthOfResult(team.id, teams, allResults)}/></div><div style={twoCol}><div style={miniCard}><h3>Recruiting Rankings</h3><div style={formGrid}><input placeholder="Year" value={newRecruiting.season_year} onChange={(e)=>setNewRecruiting({...newRecruiting,season_year:e.target.value})} style={input}/><input placeholder="Rank" value={newRecruiting.rank} onChange={(e)=>setNewRecruiting({...newRecruiting,rank:e.target.value})} style={input}/><button onClick={()=>addRecruiting(team.id)} style={button}>Add</button></div>{recruiting.map((r)=><div key={r.id} style={miniRow}>{r.season_year}: #{r.rank} <DeleteButton onClick={()=>deleteRow("recruiting_classes",r.id)}/></div>)}</div><div style={miniCard}><h3>History</h3><div style={formGrid}><input placeholder="Year" value={newHistory.season_year} onChange={(e)=>setNewHistory({...newHistory,season_year:e.target.value})} style={input}/><input placeholder="Record" value={newHistory.record} onChange={(e)=>setNewHistory({...newHistory,record:e.target.value})} style={input}/><button onClick={()=>addHistory(team.id)} style={button}>Add</button></div>{historyRows.map((r)=><div key={r.id} style={miniRow}><input value={r.season_year} onChange={(e)=>updateRow("team_history_records",r.id,"season_year",Number(e.target.value))} style={smallInput}/><input value={r.record || ""} onChange={(e)=>updateRow("team_history_records",r.id,"record",e.target.value)} style={smallInput}/><DeleteButton onClick={()=>deleteRow("team_history_records",r.id)}/></div>)}</div></div><Results rows={results} deleteResult={()=>{}} search="" setSearch={()=>{}}/><div style={twoCol}><MiniList title="All-Americans" rows={allAmericans.map((r)=>`${r.player_name} — ${r.type}, ${r.position}, ${r.season_year}`)}/><MiniList title="Awards" rows={awards.map((r)=>`${r.player_name} — ${r.award_name}, ${r.position}, ${r.season_year}`)}/><MiniList title="Heisman Winners" rows={heismans.map((r)=>`${r.player_name} — ${r.position}, ${r.season_year}`)}/></div></section>;
+  return <section style={teamPageStyle}><h2 style={teamSectionTitle}><TeamLabel team={team} /></h2><div style={teamCoachBanner}><div><div style={statTitle}>Current Discord User / Coach</div><div style={teamCoachNameStyle}>{coachName}</div></div><div><div style={statTitle}>Program Page</div><div style={mutedText}>Team history and coach profile combined.</div></div></div><div style={statsGrid}><Stat title="Overall" value={`${stat.wins??0}-${stat.losses??0}`}/><Stat title="Avg PF" value={rec.avgPf}/><Stat title="Avg PA" value={rec.avgPa}/><Stat title="Top 25" value={top25Wins(team.id, results)}/><Stat title="Top 25 Class" value={recruiting.filter((r)=>Number(r.rank) >= 1 && Number(r.rank) <= 25).length}/><Stat title="Awards" value={awards.length}/><Stat title="All-Americans" value={allAmericans.length}/><Stat title="Heismans" value={heismans.length}/><Stat title="Conf Titles" value={titleCount(team.id, results, "Conference Championship Week")}/><Stat title="Nattys" value={titleCount(team.id, results, "National Championship Week")}/><Stat title="Bowl" value={`${bowl.wins}-${bowl.losses}`}/><Stat title="SOR" value={strengthOfResult(team.id, teams, allResults)}/></div><div style={twoCol}><div style={miniCard}><h3>Recruiting Rankings</h3><div style={formGrid}><input placeholder="Year" value={newRecruiting.season_year} onChange={(e)=>setNewRecruiting({...newRecruiting,season_year:e.target.value})} style={input}/><input placeholder="Rank" value={newRecruiting.rank} onChange={(e)=>setNewRecruiting({...newRecruiting,rank:e.target.value})} style={input}/><button onClick={()=>addRecruiting(team.id)} style={button}>Add</button></div>{recruiting.map((r)=><div key={r.id} style={miniRow}>{r.season_year}: #{r.rank} <DeleteButton onClick={()=>deleteRow("recruiting_classes",r.id)}/></div>)}</div><div style={miniCard}><h3>History</h3><div style={formGrid}><input placeholder="Year" value={newHistory.season_year} onChange={(e)=>setNewHistory({...newHistory,season_year:e.target.value})} style={input}/><input placeholder="Record" value={newHistory.record} onChange={(e)=>setNewHistory({...newHistory,record:e.target.value})} style={input}/><button onClick={()=>addHistory(team.id)} style={button}>Add</button></div>{historyRows.map((r)=><div key={r.id} style={miniRow}><input value={r.season_year} onChange={(e)=>updateRow("team_history_records",r.id,"season_year",Number(e.target.value))} style={smallInput}/><input value={r.record || ""} onChange={(e)=>updateRow("team_history_records",r.id,"record",e.target.value)} style={smallInput}/><DeleteButton onClick={()=>deleteRow("team_history_records",r.id)}/></div>)}</div></div><Results rows={results} deleteResult={()=>{}} search="" setSearch={()=>{}}/><div style={twoCol}><MiniList title="All-Americans" rows={allAmericans.map((r)=>`${r.player_name} — ${r.type}, ${r.position}, ${r.season_year}`)}/><MiniList title="Awards" rows={awards.map((r)=>`${r.player_name} — ${r.award_name}, ${r.position}, ${r.season_year}`)}/><MiniList title="Heisman Winners" rows={heismans.map((r)=>`${r.player_name} — ${r.position}, ${r.season_year}`)}/></div></section>;
 }
 function MiniList({ title, rows }) { return <div style={miniCard}><h3>{title}</h3>{rows.map((r,i)=><div key={i} style={miniRow}>{r}</div>)}</div>; }
 function Table({ headers, children }) { return <div style={{overflowX:"auto",marginTop:20}}><table style={table}><thead><tr>{headers.map((h, index)=><th key={typeof h === "string" ? h : index} style={th}>{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div>; }
@@ -1333,7 +1367,7 @@ const activeTabStyle={...tabStyle,background:"#dc2626",border:"1px solid #ef4444
 const statsGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))",gap:20,marginBottom:32};
 const statCard={background:"#18181b",border:"1px solid #27272a",borderRadius:22,padding:24};
 const statTitle={color:"#a1a1aa",fontSize:14,marginBottom:10,textTransform:"uppercase"};
-const statValue={fontSize:38,fontWeight:900,color:"white"};
+const statValue={fontSize:38,fontWeight:900,color:"inherit"};
 const statInput={...statValue,background:"transparent",color:"white",border:"none",outline:"none",width:"100%"};
 const statSelect={background:"#27272a",color:"white",border:"1px solid #3f3f46",borderRadius:12,padding:14,fontSize:24,fontWeight:900,width:"100%"};
 const card={background:"#18181b",border:"1px solid #27272a",borderRadius:24,padding:24,marginBottom:32};
@@ -1349,7 +1383,7 @@ const deleteButton={background:"#7f1d1d",color:"white",border:"1px solid #dc2626
 const table={width:"100%",borderCollapse:"collapse",minWidth:820};
 const th={textAlign:"left",padding:"14px 10px",color:"#a1a1aa",fontSize:13,textTransform:"uppercase",borderBottom:"1px solid #27272a"};
 const trStyle={borderBottom:"1px solid #27272a"};
-const td={padding:"16px 10px",color:"white"};
+const td={padding:"16px 10px",color:"inherit"};
 const teamCell={...td,color:"#f87171",fontWeight:700};
 const clickableTeamCell={...teamCell,cursor:"pointer",textDecoration:"underline"};
 const mutedText={color:"#a1a1aa",marginTop:8,marginBottom:0};
