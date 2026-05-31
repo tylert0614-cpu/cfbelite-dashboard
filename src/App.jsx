@@ -334,37 +334,40 @@ function recordBookRows(users, teams, assignments, results, allAmericans, awards
 }
 
 function weeklyNewsItems(results, teams, currentYear, currentWeek) {
-  const weekResults = results.filter((row) => String(row.season_year) === String(currentYear) && row.week === currentWeek);
-  const latest = weekResults.length ? weekResults : results.slice(0, 10);
+  const yearResults = results.filter((row) => String(row.season_year) === String(currentYear));
+  if (!yearResults.length) return [`No ${currentYear} results have been recorded yet. Once results are entered, this page will automatically generate storylines.`];
 
-  if (!latest.length) return ["No games have been recorded yet. Once results are entered, this page will automatically generate storylines."];
+  const currentWeekResults = yearResults.filter((row) => row.week === currentWeek);
+  const source = currentWeekResults.length ? currentWeekResults : yearResults;
+  const seen = new Set();
+  const uniqueGames = source.filter((game) => {
+    const key = game.id || `${game.season_year}-${game.week}-${game.team_1_id}-${game.team_2_id}-${game.team_1_score}-${game.team_2_score}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 12);
 
-  const items = latest.map((game) => {
+  const stories = uniqueGames.map((game) => {
     const team1 = game.team_1?.name || teamNameById(game.team_1_id, teams);
     const team2 = game.team_2?.name || teamNameById(game.team_2_id, teams);
     const s1 = Number(game.team_1_score || 0);
     const s2 = Number(game.team_2_score || 0);
-    const winner = s1 >= s2 ? team1 : team2;
-    const loser = s1 >= s2 ? team2 : team1;
+    const team1Won = s1 >= s2;
+    const winner = team1Won ? team1 : team2;
+    const loser = team1Won ? team2 : team1;
     const winScore = Math.max(s1, s2);
     const loseScore = Math.min(s1, s2);
-    const margin = Math.abs(s1 - s2);
-    const rankedLoser = s1 > s2 ? game.team_2_rank : game.team_1_rank;
+    const rankedLoser = team1Won ? game.team_2_rank : game.team_1_rank;
     const rankedText = Number(rankedLoser) >= 1 && Number(rankedLoser) <= 25 ? ` over ranked #${rankedLoser} ${loser}` : ` over ${loser}`;
-    return { text: `${winner} defeated${rankedText}, ${winScore}-${loseScore}.`, margin, total: s1 + s2 };
+    return `${game.week}: ${winner} defeated${rankedText}, ${winScore}-${loseScore}.`;
   });
 
-  const closest = [...items].sort((a, b) => a.margin - b.margin)[0];
-  const biggest = [...items].sort((a, b) => b.margin - a.margin)[0];
-  const highest = [...items].sort((a, b) => b.total - a.total)[0];
-
   return [
-    `${latest.length} result${latest.length === 1 ? "" : "s"} recorded for ${weekResults.length ? currentWeek : "the latest games on file"}.`,
-    closest ? `Closest game: ${closest.text}` : null,
-    biggest ? `Biggest statement: ${biggest.text}` : null,
-    highest ? `Highest-scoring game: ${highest.text}` : null,
-    ...items.slice(0, 8).map((item) => item.text),
-  ].filter(Boolean);
+    currentWeekResults.length
+      ? `${currentWeekResults.length} result${currentWeekResults.length === 1 ? "" : "s"} recorded for ${currentYear} ${currentWeek}.`
+      : `No results are recorded for ${currentYear} ${currentWeek} yet. Showing latest ${currentYear} storylines instead.`,
+    ...stories,
+  ];
 }
 
 function sortableValue(value) {
@@ -438,6 +441,8 @@ export default function App() {
   const [standingsOrder, setStandingsOrder] = useState([]);
   const [commissionerRankings, setCommissionerRankings] = useState([]);
   const [draggedStanding, setDraggedStanding] = useState(null);
+  const [tabOrder, setTabOrder] = useState([]);
+  const [draggedTab, setDraggedTab] = useState(null);
   const [userSort, setUserSort] = useState({ key: "record", direction: "desc" });
   const [commissionerSort, setCommissionerSort] = useState({ key: "manual", direction: "desc" });
   const [error, setError] = useState("");
@@ -512,13 +517,46 @@ export default function App() {
     await saveCommissionerRankings(next);
   }
 
-  const tabs = [["dashboard","Dashboard"],["prestige","Prestige"],["recordBook","Record Book"],["weeklyNews","Weekly News"],["assignments","Users/Team Assignments"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...activeTeamOptions.map((team) => [`team-${team.id}`, team.name])];
+  const baseTabs = [["dashboard","Dashboard"],["prestige","Prestige"],["recordBook","Record Book"],["weeklyNews","Weekly News"],["assignments","Users/Team Assignments"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...activeTeamOptions.map((team) => [`team-${team.id}`, team.name])];
+  const tabs = useMemo(() => {
+    const tabMap = new Map(baseTabs);
+    const ordered = tabOrder
+      .map((key) => tabMap.has(key) ? [key, tabMap.get(key)] : null)
+      .filter(Boolean);
+    const remaining = baseTabs.filter(([key]) => !tabOrder.includes(key));
+    return [...ordered, ...remaining];
+  }, [tabOrder, activeTeamOptions]);
+
+  async function saveTabOrder(nextTabs) {
+    const order = nextTabs.map(([key]) => key);
+    setTabOrder(order);
+    const { error: saveError } = await supabase
+      .from("dashboard_tab_order")
+      .upsert({ id: 1, tab_order: order, updated_at: new Date().toISOString() }, { onConflict: "id" });
+    if (saveError) setError(`Tab order save failed: ${saveError.message}`);
+  }
+
+  async function reorderTabs(dropKey) {
+    if (!draggedTab || !dropKey || draggedTab === dropKey) return;
+    const currentTabs = [...tabs];
+    const fromIndex = currentTabs.findIndex(([key]) => key === draggedTab);
+    const toIndex = currentTabs.findIndex(([key]) => key === dropKey);
+    if (fromIndex === -1 || toIndex === -1) {
+      setDraggedTab(null);
+      return;
+    }
+    const [moved] = currentTabs.splice(fromIndex, 1);
+    currentTabs.splice(toIndex, 0, moved);
+    setDraggedTab(null);
+    await saveTabOrder(currentTabs);
+  }
 
   async function loadData() {
     setLoading(true); setError("");
-    const [teamsRes, settingsRes, usersRes, assignmentsRes, standingsRes, rankingsRes, resultsRes, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, historyRes] = await Promise.all([
+    const [teamsRes, settingsRes, tabOrderRes, usersRes, assignmentsRes, standingsRes, rankingsRes, resultsRes, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, historyRes] = await Promise.all([
       supabase.from("teams").select("*").order("name"),
       supabase.from("league_settings").select("*").eq("id", 1).single(),
+      supabase.from("dashboard_tab_order").select("*").eq("id", 1).single(),
       supabase.from("discord_users").select("*").order("discord_username"),
       supabase.from("team_assignments").select("*, teams(name), discord_users(discord_username)").order("created_at"),
       supabase.from("team_standings").select("*").order("team_name"),
@@ -533,9 +571,10 @@ export default function App() {
       supabase.from("recruiting_classes").select("*, teams(name)").order("season_year", { ascending: false }),
       supabase.from("team_history_records").select("*, teams(name)").order("season_year", { ascending: false }),
     ]);
-    const firstError = [teamsRes, settingsRes, usersRes, assignmentsRes, standingsRes, rankingsRes, resultsRes, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, historyRes].find((r) => r.error)?.error;
+    const firstError = [teamsRes, settingsRes, tabOrderRes, usersRes, assignmentsRes, standingsRes, rankingsRes, resultsRes, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, historyRes].find((r) => r.error)?.error;
     if (firstError) setError(firstError.message);
     else {
+      if (tabOrderRes.data?.tab_order) setTabOrder(tabOrderRes.data.tab_order);
       if (settingsRes.data) {
         setCurrentYear(String(settingsRes.data.current_year));
         setCurrentWeek(settingsRes.data.current_week);
@@ -723,15 +762,15 @@ export default function App() {
   async function addRecruiting(teamId) { const { error: e } = await supabase.from("recruiting_classes").insert({ team_id: teamId, season_year: Number(newRecruiting.season_year || currentYear), rank: newRecruiting.rank ? Number(newRecruiting.rank) : null }); if (e) { setError(`Recruiting add failed: ${e.message}`); return; } setError(""); await loadData(); }
   async function addHistory(teamId) { const { error: e } = await supabase.from("team_history_records").insert({ team_id: teamId, season_year: Number(newHistory.season_year || currentYear), record: newHistory.record || "0-0" }); if (e) { setError(`History add failed: ${e.message}`); return; } setNewHistory({ season_year: Number(currentYear), record: "0-0" }); setError(""); await loadData(); }
 
-  return <div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={errorBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab}/>
+  return <div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={errorBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} draggedTab={draggedTab} setDraggedTab={setDraggedTab} reorderTabs={reorderTabs}/>
     {activeTab === "dashboard" && <><Stats currentYear={currentYear} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} currentWeek={currentWeek} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} teams={activeTeamOptions} assignments={assignments} saveSettings={saveLeagueSettings}/><UserStandings teams={activeTeamOptions} results={currentYearResults} goToTeam={goToTeam} sortState={userSort} setSortState={setUserSort}/><ChampionshipsByUser champions={nationalChampions}/><RecordResult newResult={newResult} setNewResult={setNewResult} teams={activeTeamOptions} users={userOptions} assignments={assignments} submitResult={submitResult}/><Standings rows={orderedStandings.filter((r)=>activeTeamIds.has(r.team_id)).filter((r)=>JSON.stringify(r).toLowerCase().includes(search.standings.toLowerCase()))} search={search.standings} setSearch={(v)=>setSearch({...search,standings:v})} goToTeam={goToTeam} teams={activeTeamOptions} results={currentYearResults} draggedStanding={draggedStanding} setDraggedStanding={setDraggedStanding} reorderStandings={reorderStandings} sortState={commissionerSort} setSortState={setCommissionerSort}/><Results rows={currentYearResults.filter((r)=>JSON.stringify(r).toLowerCase().includes(search.results.toLowerCase()))} deleteResult={(id)=>deleteRow("game_results", id)} search={search.results} setSearch={(v)=>setSearch({...search,results:v})}/></>}
     {activeTab === "prestige" && <PrestigeLeaderboard users={userOptions} teams={teamOptions} activeTeams={activeTeamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}
     {activeTab === "recordBook" && <RecordBook users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}
     {activeTab === "weeklyNews" && <WeeklyNews results={results} teams={teamOptions} currentYear={currentYear} currentWeek={currentWeek}/>}
     {activeTab === "assignments" && <Assignments rows={assignments} teams={teamOptions} users={userOptions} addAssignment={addAssignment} updateRow={updateRow} deleteRow={deleteRow} drafts={draftAssignments} setDrafts={setDraftAssignments} saveDraft={saveDraft} getDraft={getDraft} teamChange={teamChange} setTeamChange={setTeamChange} changeUserTeam={changeUserTeam}/>}    
     {activeTab === "h2h" && <H2H results={results} search={search.h2h} setSearch={(v)=>setSearch({...search,h2h:v})}/>}    
-    {activeTab === "allAmericans" && <AllAmericans rows={allAmericans} teams={teamOptions} addRow={addAA} updateRow={updateRow} deleteRow={deleteRow} rankings={rankingRows(teamOptions, allAmericans)} drafts={draftAllAmericans} setDrafts={setDraftAllAmericans} saveDraft={saveDraft} getDraft={getDraft}/>}    
-    {activeTab === "awards" && <Awards rows={awards} teams={teamOptions} addRow={addAward} updateRow={updateRow} deleteRow={deleteRow} rankings={rankingRows(teamOptions, awards)} drafts={draftAwards} setDrafts={setDraftAwards} saveDraft={saveDraft} getDraft={getDraft}/>}    
+    {activeTab === "allAmericans" && <AllAmericans rows={allAmericans} teams={teamOptions} addRow={addAA} updateRow={updateRow} deleteRow={deleteRow} rankings={rankingRows(activeTeamOptions, allAmericans)} drafts={draftAllAmericans} setDrafts={setDraftAllAmericans} saveDraft={saveDraft} getDraft={getDraft}/>}    
+    {activeTab === "awards" && <Awards rows={awards} teams={teamOptions} addRow={addAward} updateRow={updateRow} deleteRow={deleteRow} rankings={rankingRows(activeTeamOptions, awards)} drafts={draftAwards} setDrafts={setDraftAwards} saveDraft={saveDraft} getDraft={getDraft}/>}    
     {activeTab === "heismans" && <Heismans rows={heismans} teams={teamOptions} addRow={addHeisman} updateRow={updateRow} deleteRow={deleteRow} drafts={draftHeismans} setDrafts={setDraftHeismans} saveDraft={saveDraft} getDraft={getDraft}/>}    
     {activeTab === "nationalChampions" && <NationalChampions rows={nationalChampions} teams={teamOptions} users={userOptions} addRow={addNationalChampion} updateRow={updateRow} deleteRow={deleteRow} drafts={draftChampions} setDrafts={setDraftChampions} saveDraft={saveDraft} getDraft={getDraft}/>}        
     {selectedTeam && <TeamPage team={selectedTeam} standings={standings.find((r)=>r.team_id===selectedTeam.id)} results={results.filter((r)=>r.team_1_id===selectedTeam.id||r.team_2_id===selectedTeam.id)} allAmericans={allAmericans.filter((r)=>r.team_id===selectedTeam.id)} awards={awards.filter((r)=>r.team_id===selectedTeam.id)} heismans={heismans.filter((r)=>r.team_id===selectedTeam.id)} recruiting={recruiting.filter((r)=>r.team_id===selectedTeam.id)} historyRows={historyRows.filter((r)=>r.team_id===selectedTeam.id)} teams={activeTeamOptions} assignments={assignments} allResults={currentYearResults} addRecruiting={addRecruiting} addHistory={addHistory} updateRow={updateRow} deleteRow={deleteRow} newRecruiting={newRecruiting} setNewRecruiting={setNewRecruiting} newHistory={newHistory} setNewHistory={setNewHistory}/>}    
@@ -739,7 +778,28 @@ export default function App() {
 }
 
 function Header({ loading, reload }) { return <header style={header}><div><h1 style={title}>CFBElite 27 Dashboard</h1><p style={subtitle}>Live Supabase League Management System</p></div><button onClick={reload} style={statusBox}>{loading ? "Loading..." : "LIVE DATABASE"}</button></header>; }
-function TabBar({ tabs, activeTab, setActiveTab }) { return <div style={tabScroller}><div style={tabRow}>{tabs.map(([key,label])=><button key={key} onClick={()=>setActiveTab(key)} style={activeTab===key?activeTabStyle:tabStyle}>{label}</button>)}</div></div>; }
+function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reorderTabs }) {
+  return (
+    <div style={tabScroller}>
+      <div style={tabRow}>
+        {tabs.map(([key,label])=>(
+          <button
+            key={key}
+            draggable
+            onDragStart={()=>setDraggedTab(key)}
+            onDragOver={(event)=>event.preventDefault()}
+            onDrop={()=>reorderTabs(key)}
+            onClick={()=>setActiveTab(key)}
+            title="Drag tabs left or right to rearrange. The order saves for everyone."
+            style={activeTab===key?activeTabStyle:tabStyle}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 function Stats({ currentYear, setCurrentYear, currentWeek, setCurrentWeek, teams, assignments, saveSettings }) {
   const activeCoaches = new Set(
     assignments
@@ -1054,7 +1114,7 @@ function RecordBook({ users, teams, assignments, results, allAmericans, awards, 
   return (
     <section style={card}>
       <h2 style={sectionTitle}>Automated Record Book</h2>
-      <p style={mutedText}>Fully automated from recorded games, team assignments, awards, All-Americans, Heismans, national champions, and recruiting ranks.</p>
+      <p style={mutedText}>Fully automated across all years from recorded games, team assignments, awards, All-Americans, Heismans, national champions, and recruiting ranks.</p>
       <Table headers={["Record", "Holder", "Value"]}>
         {rows.map((row) => (
           <tr key={row.record} style={trStyle}>
@@ -1074,7 +1134,7 @@ function WeeklyNews({ results, teams, currentYear, currentWeek }) {
   return (
     <section style={card}>
       <h2 style={sectionTitle}>Automated Weekly News</h2>
-      <p style={mutedText}>Generated from the results table. No manual writing required.</p>
+      <p style={mutedText}>Generated from current-year results only. Each recorded result is mentioned once, with no manual writing required.</p>
       <div style={miniCard}>
         <h3>{currentYear} — {currentWeek}</h3>
         {items.map((item, index) => (
