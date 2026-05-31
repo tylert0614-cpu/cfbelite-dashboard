@@ -517,7 +517,7 @@ export default function App() {
     await saveCommissionerRankings(next);
   }
 
-  const baseTabs = [["dashboard","Dashboard"],["prestige","Prestige"],["recordBook","Record Book"],["weeklyNews","Weekly News"],["assignments","Users/Team Assignments"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...activeTeamOptions.map((team) => [`team-${team.id}`, team.name])];
+  const baseTabs = [["dashboard","Dashboard"],["prestige","Prestige"],["recordBook","Record Book"],["weeklyNews","Weekly News"],["teamAssets","Team Assets"],["assignments","Users/Team Assignments"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...activeTeamOptions.map((team) => [`team-${team.id}`, team.name])];
   const tabs = useMemo(() => {
     const tabMap = new Map(baseTabs);
     const ordered = tabOrder
@@ -766,7 +766,8 @@ export default function App() {
     {activeTab === "dashboard" && <><Stats currentYear={currentYear} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} currentWeek={currentWeek} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} teams={activeTeamOptions} assignments={assignments} saveSettings={saveLeagueSettings}/><UserStandings teams={activeTeamOptions} results={currentYearResults} goToTeam={goToTeam} sortState={userSort} setSortState={setUserSort}/><ChampionshipsByUser champions={nationalChampions}/><RecordResult newResult={newResult} setNewResult={setNewResult} teams={activeTeamOptions} users={userOptions} assignments={assignments} submitResult={submitResult}/><Standings rows={orderedStandings.filter((r)=>activeTeamIds.has(r.team_id)).filter((r)=>JSON.stringify(r).toLowerCase().includes(search.standings.toLowerCase()))} search={search.standings} setSearch={(v)=>setSearch({...search,standings:v})} goToTeam={goToTeam} teams={activeTeamOptions} results={currentYearResults} draggedStanding={draggedStanding} setDraggedStanding={setDraggedStanding} reorderStandings={reorderStandings} sortState={commissionerSort} setSortState={setCommissionerSort}/><Results rows={currentYearResults.filter((r)=>JSON.stringify(r).toLowerCase().includes(search.results.toLowerCase()))} deleteResult={(id)=>deleteRow("game_results", id)} search={search.results} setSearch={(v)=>setSearch({...search,results:v})}/></>}
     {activeTab === "prestige" && <PrestigeLeaderboard users={userOptions} teams={teamOptions} activeTeams={activeTeamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}
     {activeTab === "recordBook" && <RecordBook users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}
-    {activeTab === "weeklyNews" && <WeeklyNews results={results} teams={teamOptions} currentYear={currentYear} currentWeek={currentWeek}/>}
+    {activeTab === "weeklyNews" && <WeeklyNews results={results} teams={teamOptions} currentYear={currentYear} currentWeek={currentWeek}/> }
+    {activeTab === "teamAssets" && <TeamAssets teams={teamOptions} saveDraft={saveDraft} getDraft={getDraft}/>}
     {activeTab === "assignments" && <Assignments rows={assignments} teams={teamOptions} users={userOptions} addAssignment={addAssignment} updateRow={updateRow} deleteRow={deleteRow} drafts={draftAssignments} setDrafts={setDraftAssignments} saveDraft={saveDraft} getDraft={getDraft} teamChange={teamChange} setTeamChange={setTeamChange} changeUserTeam={changeUserTeam}/>}    
     {activeTab === "h2h" && <H2H results={results} search={search.h2h} setSearch={(v)=>setSearch({...search,h2h:v})}/>}    
     {activeTab === "allAmericans" && <AllAmericans rows={allAmericans} teams={teamOptions} addRow={addAA} updateRow={updateRow} deleteRow={deleteRow} rankings={rankingRows(activeTeamOptions, allAmericans)} drafts={draftAllAmericans} setDrafts={setDraftAllAmericans} saveDraft={saveDraft} getDraft={getDraft}/>}    
@@ -1169,7 +1170,99 @@ function Assignments({ rows, teams, users, addAssignment, updateRow, deleteRow, 
     </tr>})}</Table>
   </section>;
 }
-function H2H({ results, search, setSearch }) { const map=new Map(); results.forEach((r)=>{const u1=r.user_1?.discord_username;const u2=r.user_2?.discord_username;if(!u1||!u2)return;const t1Win=r.team_1_score>r.team_2_score;[[u1,u2,t1Win],[u2,u1,!t1Win]].forEach(([u,o,w])=>{const k=`${u}-${o}`;if(!map.has(k))map.set(k,{user:u,opp:o,w:0,l:0});if(w)map.get(k).w++;else map.get(k).l++;});}); const rows=[...map.values()].filter((r)=>JSON.stringify(r).toLowerCase().includes(search.toLowerCase())).sort((a,b)=>a.user.localeCompare(b.user)||a.opp.localeCompare(b.opp)); return <section style={card}><div style={sectionTop}><div><h2 style={sectionTitle}>User vs User H2H</h2><p style={mutedText}>All-time across every recorded season.</p></div><SearchBox value={search} onChange={setSearch}/></div><Table headers={["User","Opponent","W","L","Record"]}>{rows.map((r)=><tr key={`${r.user}-${r.opp}`} style={trStyle}><td style={teamCell}>{r.user}</td><td style={td}>{r.opp}</td><td style={td}>{r.w}</td><td style={td}>{r.l}</td><td style={td}>{r.w}-{r.l}</td></tr>)}</Table></section>; }
+
+function weekSortValue(week) {
+  const index = WEEKS.indexOf(week);
+  return index === -1 ? 999 : index;
+}
+
+function resultSortValue(result) {
+  return Number(result.season_year || 0) * 1000 + weekSortValue(result.week);
+}
+
+function getDirectedH2HRows(results) {
+  const map = new Map();
+
+  results.forEach((result) => {
+    const user1 = result.user_1?.discord_username;
+    const user2 = result.user_2?.discord_username;
+    if (!user1 || !user2) return;
+
+    const score1 = Number(result.team_1_score || 0);
+    const score2 = Number(result.team_2_score || 0);
+    if (score1 === score2) return;
+
+    const winner = score1 > score2 ? user1 : user2;
+    const gameOrder = resultSortValue(result);
+    const createdOrder = result.created_at ? new Date(result.created_at).getTime() : 0;
+    const game = { winner, gameOrder, createdOrder };
+
+    [[user1, user2], [user2, user1]].forEach(([user, opponent]) => {
+      const key = `${user}-${opponent}`;
+      if (!map.has(key)) map.set(key, { user, opp: opponent, w: 0, l: 0, games: [] });
+      const row = map.get(key);
+      if (winner === user) row.w += 1;
+      else row.l += 1;
+      row.games.push(game);
+    });
+  });
+
+  return [...map.values()].map((row) => {
+    const orderedGames = [...row.games].sort((a, b) => {
+      if (b.gameOrder !== a.gameOrder) return b.gameOrder - a.gameOrder;
+      return b.createdOrder - a.createdOrder;
+    });
+
+    if (!orderedGames.length) return { ...row, streak: "—" };
+
+    const latestIsWin = orderedGames[0].winner === row.user;
+    let streakCount = 0;
+
+    for (const game of orderedGames) {
+      const isWin = game.winner === row.user;
+      if (isWin !== latestIsWin) break;
+      streakCount += 1;
+    }
+
+    return {
+      ...row,
+      streak: `${latestIsWin ? "W" : "L"}${streakCount}`,
+    };
+  });
+}
+
+function TeamAssets({ teams, saveDraft, getDraft }) {
+  const [drafts, setDrafts] = useState({});
+
+  return (
+    <section style={card}>
+      <div style={sectionTop}>
+        <div>
+          <h2 style={sectionTitle}>Team Helmet / Logo Admin</h2>
+          <p style={mutedText}>Paste helmet and logo image URLs here. These feed into team labels throughout the dashboard.</p>
+        </div>
+      </div>
+      <Table headers={["Preview", "Team", "Helmet URL", "Logo URL", "Primary Color", "Secondary Color", "Save"]}>
+        {teams.map((team) => {
+          const draft = getDraft(drafts, team);
+          return (
+            <tr key={team.id} style={trStyle}>
+              <td style={td}><TeamLabel team={draft} /></td>
+              <td style={teamCell}>{team.name}</td>
+              <td style={td}><input value={draft.helmet_url || ""} onChange={(e)=>setDrafts({...drafts,[team.id]:{...(drafts[team.id]||{}),helmet_url:e.target.value}})} placeholder="Helmet image URL" style={input}/></td>
+              <td style={td}><input value={draft.logo_url || ""} onChange={(e)=>setDrafts({...drafts,[team.id]:{...(drafts[team.id]||{}),logo_url:e.target.value}})} placeholder="Logo image URL" style={input}/></td>
+              <td style={td}><input value={draft.primary_color || ""} onChange={(e)=>setDrafts({...drafts,[team.id]:{...(drafts[team.id]||{}),primary_color:e.target.value}})} placeholder="#000000" style={input}/></td>
+              <td style={td}><input value={draft.secondary_color || ""} onChange={(e)=>setDrafts({...drafts,[team.id]:{...(drafts[team.id]||{}),secondary_color:e.target.value}})} placeholder="#ffffff" style={input}/></td>
+              <td style={td}><button onClick={()=>saveDraft("teams", team.id, drafts[team.id])} style={button}>Save</button></td>
+            </tr>
+          );
+        })}
+      </Table>
+    </section>
+  );
+}
+
+function H2H({ results, search, setSearch }) { const rows=getDirectedH2HRows(results).filter((r)=>JSON.stringify(r).toLowerCase().includes(search.toLowerCase())).sort((a,b)=>a.user.localeCompare(b.user)||a.opp.localeCompare(b.opp)); return <section style={card}><div style={sectionTop}><div><h2 style={sectionTitle}>User vs User H2H</h2><p style={mutedText}>All-time across every recorded season. Current streak is based on the most recent meetings between the two users.</p></div><SearchBox value={search} onChange={setSearch}/></div><Table headers={["User","Opponent","W","L","Record","Current Streak"]}>{rows.map((r)=><tr key={`${r.user}-${r.opp}`} style={trStyle}><td style={teamCell}>{r.user}</td><td style={td}>{r.opp}</td><td style={td}>{r.w}</td><td style={td}>{r.l}</td><td style={td}>{r.w}-{r.l}</td><td style={td}>{r.streak}</td></tr>)}</Table></section>; }
 function Rankings({ title, rows }) { return <div style={miniCard}><h3>{title}</h3>{rows.map((r,i)=><div key={r.team} style={miniRow}>#{i+1} {r.team}: <b>{r.total}</b></div>)}</div>; }
 function AllAmericans({ rows, teams, addRow, updateRow, deleteRow, rankings, drafts, setDrafts, saveDraft, getDraft }) {
   return <section style={card}><div style={sectionTop}><h2 style={sectionTitle}>All-Americans</h2><button onClick={addRow} style={button}>Add</button></div><div style={twoColWide}><div><Table headers={["Type","Player","Team","Position","Year","Save",""]}>{rows.map((r)=>{const d=getDraft(drafts,r);return <tr key={r.id} style={trStyle}>
