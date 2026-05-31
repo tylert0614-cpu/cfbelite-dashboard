@@ -687,25 +687,31 @@ export default function App() {
     await loadData();
   }
   async function saveTeamAssets(team, draft) {
-    const merged = { ...team, ...(draft || {}) };
+    const clean = (value) => {
+      const text = String(value || "").trim();
+      return text.length ? text : null;
+    };
+
     const payload = {
-      helmet_url: merged.helmet_url || null,
-      logo_url: merged.logo_url || null,
-      primary_color: merged.primary_color || null,
-      secondary_color: merged.secondary_color || null,
+      helmet_url: clean(draft?.helmet_url ?? team.helmet_url),
+      logo_url: clean(draft?.logo_url ?? team.logo_url),
+      primary_color: clean(draft?.primary_color ?? team.primary_color),
+      secondary_color: clean(draft?.secondary_color ?? team.secondary_color),
     };
 
     const { error: updateError } = await supabase
       .from("teams")
       .update(payload)
-      .eq("id", team.id);
+      .eq("id", team.id)
+      .select("id, name, helmet_url, logo_url, primary_color, secondary_color")
+      .single();
 
     if (updateError) {
       setError(`Team asset save failed: ${updateError.message}`);
       return;
     }
 
-    setError("");
+    setError(`Saved team assets for ${team.name}.`);
     await loadData();
   }
 
@@ -790,7 +796,7 @@ export default function App() {
     {activeTab === "prestige" && <PrestigeLeaderboard users={userOptions} teams={teamOptions} activeTeams={activeTeamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}
     {activeTab === "recordBook" && <RecordBook users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}
     {activeTab === "weeklyNews" && <WeeklyNews results={results} teams={teamOptions} currentYear={currentYear} currentWeek={currentWeek}/> }
-    {activeTab === "teamAssets" && <TeamAssets teams={activeTeamOptions} saveTeamAssets={saveTeamAssets} getDraft={getDraft}/>}
+    {activeTab === "teamAssets" && <TeamAssets teams={activeTeamOptions} saveTeamAssets={saveTeamAssets}/>}
     {activeTab === "assignments" && <Assignments rows={assignments} teams={teamOptions} users={userOptions} addAssignment={addAssignment} updateRow={updateRow} deleteRow={deleteRow} drafts={draftAssignments} setDrafts={setDraftAssignments} saveDraft={saveDraft} getDraft={getDraft} teamChange={teamChange} setTeamChange={setTeamChange} changeUserTeam={changeUserTeam}/>}    
     {activeTab === "h2h" && <H2H results={results} search={search.h2h} setSearch={(v)=>setSearch({...search,h2h:v})}/>}    
     {activeTab === "allAmericans" && <AllAmericans rows={allAmericans} teams={teamOptions} addRow={addAA} updateRow={updateRow} deleteRow={deleteRow} rankings={rankingRows(activeTeamOptions, allAmericans)} drafts={draftAllAmericans} setDrafts={setDraftAllAmericans} saveDraft={saveDraft} getDraft={getDraft}/>}    
@@ -1254,8 +1260,35 @@ function getDirectedH2HRows(results) {
   });
 }
 
-function TeamAssets({ teams, saveTeamAssets, getDraft }) {
+function TeamAssets({ teams, saveTeamAssets }) {
   const [drafts, setDrafts] = useState({});
+
+  useEffect(() => {
+    setDrafts((previous) => {
+      const next = { ...previous };
+      teams.forEach((team) => {
+        if (!next[team.id]) {
+          next[team.id] = {
+            helmet_url: team.helmet_url || "",
+            logo_url: team.logo_url || "",
+            primary_color: team.primary_color || "",
+            secondary_color: team.secondary_color || "",
+          };
+        }
+      });
+      return next;
+    });
+  }, [teams]);
+
+  const updateDraft = (teamId, field, value) => {
+    setDrafts((previous) => ({
+      ...previous,
+      [teamId]: {
+        ...(previous[teamId] || {}),
+        [field]: value,
+      },
+    }));
+  };
 
   return (
     <section style={card}>
@@ -1267,16 +1300,24 @@ function TeamAssets({ teams, saveTeamAssets, getDraft }) {
       </div>
       <Table headers={["Preview", "Team", "Helmet URL", "Logo URL", "Primary Color", "Secondary Color", "Save"]}>
         {teams.map((team) => {
-          const draft = getDraft(drafts, team);
+          const draft = drafts[team.id] || {
+            helmet_url: team.helmet_url || "",
+            logo_url: team.logo_url || "",
+            primary_color: team.primary_color || "",
+            secondary_color: team.secondary_color || "",
+          };
+
+          const previewTeam = { ...team, ...draft };
+
           return (
             <tr key={team.id} style={trStyle}>
-              <td style={td}><TeamLabel team={draft} /></td>
+              <td style={td}><TeamLabel team={previewTeam} /></td>
               <td style={teamCell}>{team.name}</td>
-              <td style={td}><input value={draft.helmet_url || ""} onChange={(e)=>setDrafts({...drafts,[team.id]:{...(drafts[team.id]||{}),helmet_url:e.target.value}})} placeholder="Helmet image URL" style={input}/></td>
-              <td style={td}><input value={draft.logo_url || ""} onChange={(e)=>setDrafts({...drafts,[team.id]:{...(drafts[team.id]||{}),logo_url:e.target.value}})} placeholder="Logo image URL" style={input}/></td>
-              <td style={td}><input value={draft.primary_color || ""} onChange={(e)=>setDrafts({...drafts,[team.id]:{...(drafts[team.id]||{}),primary_color:e.target.value}})} placeholder="#000000" style={input}/></td>
-              <td style={td}><input value={draft.secondary_color || ""} onChange={(e)=>setDrafts({...drafts,[team.id]:{...(drafts[team.id]||{}),secondary_color:e.target.value}})} placeholder="#ffffff" style={input}/></td>
-              <td style={td}><button onClick={()=>saveTeamAssets(team, drafts[team.id])} style={button}>Save</button></td>
+              <td style={td}><input value={draft.helmet_url} onChange={(e)=>updateDraft(team.id,"helmet_url",e.target.value)} placeholder="Helmet image URL" style={input}/></td>
+              <td style={td}><input value={draft.logo_url} onChange={(e)=>updateDraft(team.id,"logo_url",e.target.value)} placeholder="Logo image URL" style={input}/></td>
+              <td style={td}><input value={draft.primary_color} onChange={(e)=>updateDraft(team.id,"primary_color",e.target.value)} placeholder="#000000" style={input}/></td>
+              <td style={td}><input value={draft.secondary_color} onChange={(e)=>updateDraft(team.id,"secondary_color",e.target.value)} placeholder="#ffffff" style={input}/></td>
+              <td style={td}><button onClick={()=>saveTeamAssets(team, draft)} style={button}>Save</button></td>
             </tr>
           );
         })}
