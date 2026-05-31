@@ -688,7 +688,7 @@ export default function App() {
   }
   async function saveTeamAssets(team, draft) {
     const clean = (value) => {
-      const text = String(value || "").trim();
+      const text = String(value ?? "").trim();
       return text.length ? text : null;
     };
 
@@ -706,6 +706,28 @@ export default function App() {
 
     if (updateError) {
       setError(`Team asset save failed: ${updateError.message}`);
+      return;
+    }
+
+    const { data: verifyRows, error: verifyError } = await supabase
+      .from("teams")
+      .select("id, name, helmet_url, logo_url, primary_color, secondary_color")
+      .eq("id", team.id)
+      .limit(1);
+
+    if (verifyError) {
+      setError(`Team asset save verification failed: ${verifyError.message}`);
+      return;
+    }
+
+    const savedRow = verifyRows?.[0];
+    const primarySaved = (savedRow?.primary_color || null) === payload.primary_color;
+    const secondarySaved = (savedRow?.secondary_color || null) === payload.secondary_color;
+    const helmetSaved = (savedRow?.helmet_url || null) === payload.helmet_url;
+    const logoSaved = (savedRow?.logo_url || null) === payload.logo_url;
+
+    if (!savedRow || !primarySaved || !secondarySaved || !helmetSaved || !logoSaved) {
+      setError(`Team asset save did not persist for ${team.name}. Check Supabase RLS/policies for the teams table.`);
       return;
     }
 
@@ -1265,14 +1287,12 @@ function TeamAssets({ teams, saveTeamAssets }) {
     setDrafts((previous) => {
       const next = { ...previous };
       teams.forEach((team) => {
-        if (!next[team.id]) {
-          next[team.id] = {
-            helmet_url: team.helmet_url || "",
-            logo_url: team.logo_url || "",
-            primary_color: team.primary_color || "",
-            secondary_color: team.secondary_color || "",
-          };
-        }
+        next[team.id] = {
+          helmet_url: previous[team.id]?.helmet_url ?? team.helmet_url ?? "",
+          logo_url: previous[team.id]?.logo_url ?? team.logo_url ?? "",
+          primary_color: previous[team.id]?.primary_color ?? team.primary_color ?? "",
+          secondary_color: previous[team.id]?.secondary_color ?? team.secondary_color ?? "",
+        };
       });
       return next;
     });
@@ -1304,9 +1324,7 @@ function TeamAssets({ teams, saveTeamAssets }) {
             primary_color: team.primary_color || "",
             secondary_color: team.secondary_color || "",
           };
-
           const previewTeam = { ...team, ...draft };
-
           return (
             <tr key={team.id} style={trStyle}>
               <td style={td}><TeamLabel team={previewTeam} /></td>
