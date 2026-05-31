@@ -702,9 +702,7 @@ export default function App() {
     const { error: updateError } = await supabase
       .from("teams")
       .update(payload)
-      .eq("id", team.id)
-      .select("id, name, helmet_url, logo_url, primary_color, secondary_color")
-      .single();
+      .eq("id", team.id);
 
     if (updateError) {
       setError(`Team asset save failed: ${updateError.message}`);
