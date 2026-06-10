@@ -7,6 +7,7 @@ const supabase = createClient(
 );
 
 const WEEKS = ["Week 1","Week 2","Week 3","Week 4","Week 5","Week 6","Week 7","Week 8","Week 9","Week 10","Week 11","Week 12","Week 13","Week 14","Conference Championship Week","Bowl Week 1","Bowl Week 2","Bowl Week 3","National Championship Week"];
+function weekIndex(week) { const index = WEEKS.indexOf(week); return index === -1 ? 999 : index; }
 const POSITIONS = ["Coach","QB","RB","WR","TE","LT","LG","C","RG","RT","EDGE","DT","SAM","WILL","MIKE","CB","FS","SS","KR","PR","K","P"];
 const YEARS = Array.from({ length: 25 }, (_, index) => String(2026 + index));
 const ALL_AMERICAN_TYPES = ["First-Team", "Second-Team", "Freshman"];
@@ -813,7 +814,7 @@ export default function App() {
   async function addHistory(teamId) { const { error: e } = await supabase.from("team_history_records").insert({ team_id: teamId, season_year: Number(newHistory.season_year || currentYear), record: newHistory.record || "0-0" }); if (e) { setError(`History add failed: ${e.message}`); return; } setNewHistory({ season_year: Number(currentYear), record: "0-0" }); setError(""); await loadData(); }
 
   return <div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={errorBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} draggedTab={draggedTab} setDraggedTab={setDraggedTab} reorderTabs={reorderTabs}/>
-    {activeTab === "dashboard" && <><Stats currentYear={currentYear} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} currentWeek={currentWeek} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} teams={activeTeamOptions} assignments={assignments} saveSettings={saveLeagueSettings}/><LeaguePulse teams={activeTeamOptions} results={currentYearResults} allAmericans={allAmericans} awards={awards} currentYear={currentYear}/><ComputerRankings teams={activeTeamOptions} results={currentYearResults} sortState={userSort} setSortState={setUserSort}/><DashboardRecognition allAmericanRows={rankingRows(activeTeamOptions, allAmericans)} awardRows={rankingRows(activeTeamOptions, awards)}/><RecentActivity results={currentYearResults} allAmericans={allAmericans} awards={awards} heismans={heismans} champions={nationalChampions}/><RecordResult newResult={newResult} setNewResult={setNewResult} teams={activeTeamOptions} users={userOptions} assignments={assignments} submitResult={submitResult}/></>}
+    {activeTab === "dashboard" && <><Stats currentYear={currentYear} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} currentWeek={currentWeek} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} teams={activeTeamOptions} assignments={assignments} saveSettings={saveLeagueSettings}/><LeaguePulse teams={activeTeamOptions} results={currentYearResults} allAmericans={allAmericans} awards={awards} currentYear={currentYear}/><ComputerRankings teams={activeTeamOptions} results={currentYearResults} currentWeek={currentWeek} sortState={userSort} setSortState={setUserSort}/><DashboardRecognition allAmericanRows={rankingRows(activeTeamOptions, allAmericans)} awardRows={rankingRows(activeTeamOptions, awards)}/><RecentActivity results={currentYearResults} allAmericans={allAmericans} awards={awards} heismans={heismans} champions={nationalChampions}/><RecordResult newResult={newResult} setNewResult={setNewResult} teams={activeTeamOptions} users={userOptions} assignments={assignments} submitResult={submitResult}/></>}
     {activeTab === "allTimeStandings" && <AllTimeUserStandings users={userOptions} teams={teamOptions} assignments={assignments} results={results} sortState={commissionerSort} setSortState={setCommissionerSort}/>}    
     {activeTab === "coachHOF" && <CoachHallOfFame users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
     {activeTab === "playerHOF" && <PlayerHallOfFame teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions}/>}    
@@ -888,11 +889,27 @@ function LeaguePulse({ teams, results, allAmericans = [], awards = [], currentYe
 
 function PulseCard({ title, value, sub }) { return <div style={pulseCard}><div style={statTitle}>{title}</div><div style={pulseValue}>{value}</div><div style={mutedText}>{sub}</div></div>; }
 
-function ComputerRankings({ teams, results, sortState, setSortState }) {
+function rankingMovement(currentRank, previousRank) {
+  if (!previousRank || !currentRank) return { label: "NEW", style: movementNeutral };
+  const change = previousRank - currentRank;
+  if (change > 0) return { label: `▲ ${change}`, style: movementUp };
+  if (change < 0) return { label: `▼ ${Math.abs(change)}`, style: movementDown };
+  return { label: "—", style: movementNeutral };
+}
+
+function MovementBadge({ currentRank, previousRank }) {
+  const movement = rankingMovement(currentRank, previousRank);
+  return <span style={movement.style}>{movement.label}</span>;
+}
+
+function ComputerRankings({ teams, results, currentWeek, sortState, setSortState }) {
   const baseRows = computerRankingRows(teams, results);
+  const previousResults = results.filter((result) => weekIndex(result.week) < weekIndex(currentWeek));
+  const previousRows = computerRankingRows(teams, previousResults);
+  const previousRankMap = new Map(previousRows.map((row) => [row.team.id, row.rank]));
   const activeSort = sortState?.key ? sortState : { key: "score", direction: "desc" };
   const rows = [...baseRows].sort((a,b)=>compareForSort(a,b,activeSort.key,activeSort.direction));
-  return <section style={card}><div style={sectionTop}><div><h2 style={sectionTitle}>CFBElite Computer Rankings</h2><p style={mutedText}>Automated 32-user ranking. Formula: record, SOR, quality wins, scoring margin, and wins. Updates after every result.</p></div></div><Table headers={["#",<SortButton label="Team" sortKey="teamName" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="Record" sortKey="record" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="QW" sortKey="qw" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="Avg PF" sortKey="avgPf" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="Avg PA" sortKey="avgPa" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="SOR" sortKey="sor" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="Score" sortKey="score" sortState={activeSort} setSortState={setSortState}/>]}>{rows.map((row,index)=><tr key={row.team.id} style={trStyle}><td style={rankCell}>#{index + 1}</td><td style={teamCell}><TeamLabel team={row.team}/></td><td style={td}>{row.wins}-{row.losses}</td><td style={td}>{row.qw}</td><td style={td}>{row.avgPf.toFixed(1)}</td><td style={td}>{row.avgPa.toFixed(1)}</td><td style={td}>{row.sor.toFixed(1)}</td><td style={scoreCell}>{row.score.toFixed(1)}</td></tr>)}</Table></section>;
+  return <section style={card}><div style={sectionTop}><div><h2 style={sectionTitle}>CFBElite Computer Rankings</h2><p style={mutedText}>Automated 32-user ranking. Formula: record, SOR, quality wins, scoring margin, and wins. Movement compares current rank to the rank through the previous league week.</p></div></div><Table headers={["#","Move",<SortButton label="Team" sortKey="teamName" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="Record" sortKey="record" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="QW" sortKey="qw" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="Avg PF" sortKey="avgPf" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="Avg PA" sortKey="avgPa" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="SOR" sortKey="sor" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="Score" sortKey="score" sortState={activeSort} setSortState={setSortState}/>]}>{rows.map((row)=><tr key={row.team.id} style={trStyle}><td style={rankCell}>#{row.rank}</td><td style={td}><MovementBadge currentRank={row.rank} previousRank={previousRankMap.get(row.team.id)}/></td><td style={teamCell}><TeamLabel team={row.team}/></td><td style={td}>{row.wins}-{row.losses}</td><td style={td}>{row.qw}</td><td style={td}>{row.avgPf.toFixed(1)}</td><td style={td}>{row.avgPa.toFixed(1)}</td><td style={td}>{row.sor.toFixed(1)}</td><td style={scoreCell}>{row.score.toFixed(1)}</td></tr>)}</Table></section>;
 }
 
 function DashboardRecognition({ allAmericanRows, awardRows }) {
@@ -966,9 +983,58 @@ function RecognitionTable({ title, headers, rows }) {
   return <div style={miniCard}><h3 style={miniTitle}>{title}</h3><Table headers={headers}>{rows.length ? rows.map((row, index)=><tr key={row.id || index} style={trStyle}>{row.cells.map((cell, cellIndex)=><td key={cellIndex} style={cellIndex === 0 ? teamCell : td}>{cell}</td>)}</tr>) : <tr style={trStyle}><td style={td} colSpan={headers.length}>No records yet.</td></tr>}</Table></div>;
 }
 
+function assignmentYears(assignment) {
+  const start = Number(assignment.start_year || 0);
+  const end = assignment.end_year ? Number(assignment.end_year) : null;
+  if (!start) return "—";
+  return end ? `${start}-${end}` : `${start}-Present`;
+}
+
+function assignmentResultScope(assignment, results) {
+  const start = Number(assignment.start_year || 0);
+  const end = assignment.end_year ? Number(assignment.end_year) : 9999;
+  return results.filter((result) => {
+    const year = Number(result.season_year || 0);
+    return result.team_1_id === assignment.team_id || result.team_2_id === assignment.team_id
+      ? year >= start && year <= end
+      : false;
+  });
+}
+
+function assignmentAwardScope(assignment, rows) {
+  const start = Number(assignment.start_year || 0);
+  const end = assignment.end_year ? Number(assignment.end_year) : 9999;
+  return rows.filter((row) => {
+    const year = Number(row.season_year || 0);
+    return row.team_id === assignment.team_id && year >= start && year <= end;
+  });
+}
+
+function CoachTimelineTable({ timeline, teams, results, allAmericans, awards, heismans, nationalChampions }) {
+  const rows = timeline.map((assignment) => {
+    const team = teams.find((item) => item.id === assignment.team_id);
+    const scopedResults = assignmentResultScope(assignment, results);
+    const rec = recordFromResults(assignment.team_id, scopedResults);
+    const scopedAA = assignmentAwardScope(assignment, allAmericans);
+    const scopedAwards = assignmentAwardScope(assignment, awards);
+    const scopedHeismans = assignmentAwardScope(assignment, heismans);
+    const confTitles = titleCount(assignment.team_id, scopedResults, "Conference Championship Week");
+    const nattysByResult = titleCount(assignment.team_id, scopedResults, "National Championship Week");
+    const start = Number(assignment.start_year || 0);
+    const end = assignment.end_year ? Number(assignment.end_year) : 9999;
+    const nattysByEntry = nationalChampions.filter((champion) => {
+      const year = Number(champion.season_year || 0);
+      return champion.team_id === assignment.team_id && year >= start && year <= end;
+    }).length;
+    return { assignment, team, rec, allAmericans: scopedAA.length, awards: scopedAwards.length, heismans: scopedHeismans.length, confTitles, nattys: Math.max(nattysByResult, nattysByEntry) };
+  });
+
+  return <div style={miniCard}><h3 style={miniTitle}>Career Timeline</h3><Table headers={["Years", "School", "Record", "All-Americans", "Awards", "Conf Titles", "Heismans", "Nattys"]}>{rows.length ? rows.map((row)=><tr key={row.assignment.id} style={trStyle}><td style={td}>{assignmentYears(row.assignment)}</td><td style={teamCell}>{row.team ? <TeamLabel team={row.team}/> : teamNameById(row.assignment.team_id, teams)}</td><td style={td}>{row.rec.wins}-{row.rec.losses}</td><td style={td}>{row.allAmericans}</td><td style={td}>{row.awards}</td><td style={td}>{row.confTitles}</td><td style={td}>{row.heismans}</td><td style={td}>{row.nattys}</td></tr>) : <tr style={trStyle}><td style={td} colSpan={8}>No team history assigned.</td></tr>}</Table></div>;
+}
+
 function CoachProfile({ user, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting }) {
   const coachStats = getCoachStats(usersFallback(user), teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
-  const stats = coachStats.find((row)=>row.userId === user.id) || { wins:0, losses:0, nattys:0, confTitles:0, top25Wins:0, awards:0, allAmericans:0, heismans:0, prestige:0, teamsCoachedText:"—" };
+  const stats = coachStats.find((row)=>row.userId === user.id) || { wins:0, losses:0, nattys:0, confTitles:0, top25Wins:0, awards:0, allAmericans:0, heismans:0, prestige:0 };
   const activeAssignment = assignments.find((a)=>a.discord_user_id===user.id && a.status==="Active");
   const currentTeam = teams.find((t)=>t.id===activeAssignment?.team_id);
   const timeline = assignments.filter((a)=>a.discord_user_id===user.id).sort((a,b)=>Number(a.start_year||0)-Number(b.start_year||0));
@@ -982,9 +1048,9 @@ function CoachProfile({ user, teams, assignments, results, allAmericans, awards,
   const coachHeismans = rowsForCoachUser(heismans, user, assignments);
 
   return <section style={profileCard}>
-    <div style={profileHero}><div><div style={eyebrow}>Coach Profile</div><h2 style={profileName}>{user.discord_username}</h2><p style={mutedText}>Current Team: {currentTeam?.name || "Unassigned"}</p></div>{currentTeam && <TeamLabel team={currentTeam}/>}</div>
+    <div style={profileHero}><div><div style={eyebrow}>Coach Profile</div><h2 style={profileName}>{user.discord_username}</h2><p style={mutedText}>Current Team: {currentTeam?.name || "Unassigned"}</p></div></div>
     <div style={statsGrid}><Stat title="Career Record" value={`${stats?.wins||0}-${stats?.losses||0}`}/><Stat title="National Titles" value={stats?.nattys||0}/><Stat title="Conference Titles" value={stats?.confTitles||0}/><Stat title="Top 25 Wins" value={stats?.top25Wins||0}/><Stat title="Awards" value={stats?.awards||0}/><Stat title="All-Americans" value={stats?.allAmericans||0}/><Stat title="Heismans" value={stats?.heismans||0}/><Stat title="Prestige" value={(stats?.prestige||0).toFixed(1)}/></div>
-    <div style={twoCol}><div style={miniCard}><h3 style={miniTitle}>Career Timeline</h3>{timeline.length ? timeline.map((a)=><div key={a.id} style={miniRow}>{a.start_year || "?"}-{a.end_year || "Present"}: {a.teams?.name || teamNameById(a.team_id, teams)}</div>) : <div style={miniRow}>No team history assigned.</div>}</div><div style={miniCard}><h3 style={miniTitle}>Teams Coached</h3><div style={miniRow}>{stats?.teamsCoachedText || "—"}</div></div></div>
+    <CoachTimelineTable timeline={timeline} teams={teams} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions}/>
     <Results rows={coachResults} deleteResult={()=>{}} search="" setSearch={()=>{}}/>
     <RecognitionTable title="All-Americans" headers={["Player","Position","Team","Year","Type"]} rows={coachAA.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year,r.type]}))}/>
     <RecognitionTable title="Award Winners" headers={["Player","Position","Team","Year","Award"]} rows={coachAwards.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year,r.award_name]}))}/>
@@ -1690,10 +1756,15 @@ const helmetIcon={width:30,height:30,objectFit:"contain",borderRadius:8,backgrou
 const helmetFallback={fontSize:22,lineHeight:1};
 const coachBanner={display:"flex",justifyContent:"space-between",gap:20,alignItems:"center",background:"rgba(7,7,12,.75)",border:"1px solid rgba(250,204,21,.16)",borderRadius:18,padding:18,margin:"18px 0 24px",flexWrap:"wrap"};
 const coachNameStyle={fontSize:28,fontWeight:900,color:"#facc15"};
+const pulseGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))",gap:20,marginBottom:32};
 const pulseCard={...statCard,background:"linear-gradient(135deg, rgba(49,46,129,.85), rgba(12,12,18,.95))"};
 const pulseValue={fontSize:24,fontWeight:950,color:"#facc15"};
 const rankCell={...td,fontWeight:950,color:"#facc15"};
 const scoreCell={...td,fontWeight:950,color:"#facc15",fontSize:18};
+const movementBase={display:"inline-flex",alignItems:"center",justifyContent:"center",minWidth:54,borderRadius:999,padding:"6px 10px",fontSize:12,fontWeight:950};
+const movementUp={...movementBase,background:"rgba(22,163,74,.18)",color:"#86efac",border:"1px solid rgba(134,239,172,.35)"};
+const movementDown={...movementBase,background:"rgba(220,38,38,.18)",color:"#fca5a5",border:"1px solid rgba(252,165,165,.35)"};
+const movementNeutral={...movementBase,background:"rgba(255,255,255,.08)",color:"#d6d3d1",border:"1px solid rgba(255,255,255,.14)"};
 const leaderRow={display:"flex",justifyContent:"space-between",gap:12,borderBottom:"1px solid rgba(255,255,255,.08)",padding:"11px 0",color:"#f5f5f4"};
 const activityList={display:"grid",gap:10,marginTop:18};
 const activityItem={background:"rgba(255,255,255,.045)",border:"1px solid rgba(255,255,255,.08)",borderRadius:14,padding:"12px 14px",color:"#f5f5f4"};
@@ -1718,9 +1789,3 @@ const hofScoreSpan={color:"#c4b5fd"};
 const hofChips={display:"flex",gap:10,flexWrap:"wrap",marginTop:22};
 const chip={display:"grid",gap:2,background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.12)",borderRadius:999,padding:"8px 12px",fontSize:12};
 const accoladeList={marginTop:16};
-const pulseGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-  gap: 16,
-  marginBottom: 18,
-};
