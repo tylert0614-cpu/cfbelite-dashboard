@@ -297,168 +297,9 @@ function getCoachStats(users, teams, assignments, results, allAmericans, awards,
     .sort((a, b) => b.prestige - a.prestige || b.wins - a.wins || a.discord.localeCompare(b.discord));
 }
 
-
-function teamById(teamId, teams) {
-  return teams.find((team) => team.id === teamId) || null;
-}
-
-function resultWinnerTeamId(result) {
-  const score1 = Number(result.team_1_score || 0);
-  const score2 = Number(result.team_2_score || 0);
-  if (score1 > score2) return result.team_1_id;
-  if (score2 > score1) return result.team_2_id;
-  return null;
-}
-
-function teamWonWeekInYear(teamId, year, week, results) {
-  return results.some((result) => (
-    String(result.season_year) === String(year) &&
-    result.week === week &&
-    resultWinnerTeamId(result) === teamId
-  ));
-}
-
-function teamWonNationalTitleInYear(teamId, year, results, nationalChampions) {
-  return nationalChampions.some((champion) => String(champion.season_year) === String(year) && champion.team_id === teamId) ||
-    teamWonWeekInYear(teamId, year, "National Championship Week", results);
-}
-
-function teamWonConferenceTitleInYear(teamId, year, results) {
-  return teamWonWeekInYear(teamId, year, "Conference Championship Week", results);
-}
-
-function getPrimaryTeamForCoach(row, teams) {
-  const activeName = row.activeTeams?.[0];
-  return teams.find((team) => team.name === activeName) ||
-    teams.find((team) => row.teamsCoached?.has?.(team.name)) ||
-    null;
-}
-
-function getCoachHallOfFameRows(users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting) {
-  return getCoachStats(users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting)
-    .map((coach) => {
-      const score =
-        coach.nattys * 10 +
-        coach.confTitles * 4 +
-        coach.wins * 0.6 +
-        coach.top25Wins * 1.5 +
-        coach.bowlWins * 1.2 +
-        coach.heismans * 5 +
-        coach.awards * 2 +
-        coach.allAmericans * 1;
-
-      const accolades = [
-        `${coach.wins}-${coach.losses} career record`,
-        `${coach.nattys} national title${coach.nattys === 1 ? "" : "s"}`,
-        `${coach.confTitles} conference title${coach.confTitles === 1 ? "" : "s"}`,
-        `${coach.top25Wins} Top 25 win${coach.top25Wins === 1 ? "" : "s"}`,
-        `${coach.bowlWins}-${coach.bowlLosses} bowl record`,
-        `${coach.heismans} Heisman winner${coach.heismans === 1 ? "" : "s"}`,
-        `${coach.awards} award winner${coach.awards === 1 ? "" : "s"}`,
-        `${coach.allAmericans} All-American${coach.allAmericans === 1 ? "" : "s"}`,
-      ];
-
-      return {
-        ...coach,
-        hofScore: Number(score.toFixed(1)),
-        team: getPrimaryTeamForCoach(coach, teams),
-        accolades,
-      };
-    })
-    .filter((coach) => coach.nattys >= 1 || coach.wins >= 20 || coach.confTitles >= 2 || coach.heismans >= 1 || coach.awards >= 5 || coach.allAmericans >= 8)
-    .sort((a, b) => b.hofScore - a.hofScore || b.wins - a.wins || a.discord.localeCompare(b.discord));
-}
-
-function getPlayerHallOfFameRows(teams, results, allAmericans, awards, heismans, nationalChampions) {
-  const playerMap = new Map();
-
-  function playerKey(playerName, teamId) {
-    return `${String(playerName || "").trim().toLowerCase()}|${teamId || "unknown"}`;
-  }
-
-  function ensurePlayer(playerName, teamId, position, year) {
-    const key = playerKey(playerName, teamId);
-    if (!playerMap.has(key)) {
-      playerMap.set(key, {
-        key,
-        playerName: playerName || "Unknown Player",
-        teamId,
-        team: teamById(teamId, teams),
-        positions: new Set(),
-        years: new Set(),
-        awards: [],
-        heismans: [],
-        allAmericans: [],
-        confTitleYears: new Set(),
-        nattyYears: new Set(),
-        hofScore: 0,
-      });
-    }
-
-    const row = playerMap.get(key);
-    if (position) row.positions.add(position);
-    if (year) row.years.add(String(year));
-    return row;
-  }
-
-  allAmericans.forEach((row) => {
-    const player = ensurePlayer(row.player_name, row.team_id, row.position, row.season_year);
-    player.allAmericans.push({ year: row.season_year, type: row.type, teamId: row.team_id });
-  });
-
-  awards.forEach((row) => {
-    const player = ensurePlayer(row.player_name, row.team_id, row.position, row.season_year);
-    player.awards.push({ year: row.season_year, name: row.award_name, teamId: row.team_id });
-  });
-
-  heismans.forEach((row) => {
-    const player = ensurePlayer(row.player_name, row.team_id, row.position, row.season_year);
-    player.heismans.push({ year: row.season_year, teamId: row.team_id });
-  });
-
-  playerMap.forEach((player) => {
-    const creditedSeasons = new Set([
-      ...player.awards.map((item) => `${item.year}|${item.teamId}`),
-      ...player.heismans.map((item) => `${item.year}|${item.teamId}`),
-      ...player.allAmericans.map((item) => `${item.year}|${item.teamId}`),
-    ]);
-
-    creditedSeasons.forEach((seasonKey) => {
-      const [year, teamId] = seasonKey.split("|");
-      if (teamWonConferenceTitleInYear(teamId, year, results)) player.confTitleYears.add(String(year));
-      if (teamWonNationalTitleInYear(teamId, year, results, nationalChampions)) player.nattyYears.add(String(year));
-    });
-
-    player.hofScore =
-      player.heismans.length * 12 +
-      player.awards.length * 5 +
-      player.allAmericans.length * 3 +
-      player.nattyYears.size * 6 +
-      player.confTitleYears.size * 3;
-  });
-
-  return [...playerMap.values()]
-    .filter((player) => player.heismans.length >= 1 || player.awards.length >= 2 || player.allAmericans.length >= 2 || player.hofScore >= 10)
-    .map((player) => ({
-      ...player,
-      positionText: [...player.positions].filter(Boolean).sort().join(", ") || "—",
-      yearText: [...player.years].sort().join(", ") || "—",
-      accolades: [
-        ...player.heismans.map((item) => `${item.year} Heisman Trophy`),
-        ...player.awards.map((item) => `${item.year} ${item.name}`),
-        ...player.allAmericans.map((item) => `${item.year} ${item.type} All-American`),
-        ...[...player.confTitleYears].sort().map((year) => `${year} Conference Champion`),
-        ...[...player.nattyYears].sort().map((year) => `${year} National Champion`),
-      ],
-    }))
-    .sort((a, b) => b.hofScore - a.hofScore || a.playerName.localeCompare(b.playerName));
-}
-
-
 function recordBookRows(users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting) {
   const coachRows = getCoachStats(users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
-  const activeTeams = teams.filter((team) => assignments.some((assignment) => assignment.team_id === team.id && assignment.status === "Active"));
-  const teamRows = activeTeams.map((team) => {
+  const teamRows = teams.map((team) => {
     const rec = recordFromResults(team.id, results);
     return {
       label: team.name,
@@ -468,7 +309,7 @@ function recordBookRows(users, teams, assignments, results, allAmericans, awards
       top25: top25Wins(team.id, results),
       conf: titleCount(team.id, results, "Conference Championship Week"),
       nattys: titleCount(team.id, results, "National Championship Week"),
-      sor: Number(strengthOfResult(team.id, activeTeams, results)) || 0,
+      sor: Number(strengthOfResult(team.id, teams, results)) || 0,
     };
   });
 
@@ -478,16 +319,13 @@ function recordBookRows(users, teams, assignments, results, allAmericans, awards
   };
 
   return [
-    best(coachRows, "prestige", "Highest coach prestige", (value) => Number(value).toFixed(1)),
-    best(coachRows, "wins", "Most coach wins"),
+    best(coachRows, "wins", "All-time most wins by Discord user"),
     best(coachRows, "nattys", "Most national titles"),
     best(coachRows, "confTitles", "Most conference titles"),
     best(coachRows, "top25Wins", "Most Top 25 wins"),
     best(coachRows, "heismans", "Most Heisman winners"),
-    best(teamRows, "wins", "Most active team wins"),
-    best(teamRows, "avgPf", "Highest active team Avg PF", (value) => Number(value).toFixed(1)),
-    best(teamRows, "top25", "Most active team Top 25 wins"),
-    best(teamRows, "sor", "Toughest active team SOR", (value) => Number(value).toFixed(1)),
+    best(teamRows, "avgPf", "Highest Avg PF", (value) => Number(value).toFixed(1)),
+    best(teamRows, "top25", "Most Top 25 wins", (value) => Number(value)),
   ];
 }
 
@@ -626,6 +464,11 @@ export default function App() {
   ), [assignments]);
   const activeTeamOptions = useMemo(() => teamOptions.filter((team) => activeTeamIds.has(team.id)), [teamOptions, activeTeamIds]);
   const selectedTeam = activeTab.startsWith("team-") ? teams.find((team) => `team-${team.id}` === activeTab) : null;
+  const activeCoachUsers = useMemo(() => {
+    const activeUserIds = new Set(assignments.filter((assignment) => assignment.status === "Active" && assignment.discord_user_id).map((assignment) => assignment.discord_user_id));
+    return userOptions.filter((user) => activeUserIds.has(user.id));
+  }, [assignments, userOptions]);
+  const selectedCoach = activeTab.startsWith("coach-") ? users.find((user) => `coach-${user.id}` === activeTab) : null;
   const currentYearResults = results.filter((r) => String(r.season_year) === String(currentYear));
   const orderedStandings = standingsOrder.length
     ? standingsOrder.map((id) => standings.find((row) => row.team_id === id)).filter(Boolean)
@@ -675,7 +518,7 @@ export default function App() {
     await saveCommissionerRankings(next);
   }
 
-  const baseTabs = [["dashboard","Dashboard"],["prestige","Prestige"],["recordBook","Record Book"],["weeklyNews","Weekly News"],["teamAssets","Team Assets"],["assignments","Users/Team Assignments"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],["coachHof","Coach Hall of Fame"],["playerHof","Player Hall of Fame"],...activeTeamOptions.map((team) => [`team-${team.id}`, team.name])];
+  const baseTabs = [["dashboard","Dashboard"],["recordBook","Record Book"],["allTimeStandings","All-Time User Standings"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["assignments","Users/Team Assignments"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...activeCoachUsers.map((user) => [`coach-${user.id}`, user.discord_username])];
   const tabs = useMemo(() => {
     const tabMap = new Map(baseTabs);
     const ordered = tabOrder
@@ -970,22 +813,147 @@ export default function App() {
   async function addHistory(teamId) { const { error: e } = await supabase.from("team_history_records").insert({ team_id: teamId, season_year: Number(newHistory.season_year || currentYear), record: newHistory.record || "0-0" }); if (e) { setError(`History add failed: ${e.message}`); return; } setNewHistory({ season_year: Number(currentYear), record: "0-0" }); setError(""); await loadData(); }
 
   return <div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={errorBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} draggedTab={draggedTab} setDraggedTab={setDraggedTab} reorderTabs={reorderTabs}/>
-    {activeTab === "dashboard" && <><Stats currentYear={currentYear} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} currentWeek={currentWeek} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} teams={activeTeamOptions} assignments={assignments} saveSettings={saveLeagueSettings}/><UserStandings teams={activeTeamOptions} results={currentYearResults} goToTeam={goToTeam} sortState={userSort} setSortState={setUserSort}/><ChampionshipsByUser champions={nationalChampions}/><RecordResult newResult={newResult} setNewResult={setNewResult} teams={activeTeamOptions} users={userOptions} assignments={assignments} submitResult={submitResult}/><Standings rows={orderedStandings.filter((r)=>activeTeamIds.has(r.team_id)).filter((r)=>JSON.stringify(r).toLowerCase().includes(search.standings.toLowerCase()))} search={search.standings} setSearch={(v)=>setSearch({...search,standings:v})} goToTeam={goToTeam} teams={activeTeamOptions} results={currentYearResults} draggedStanding={draggedStanding} setDraggedStanding={setDraggedStanding} reorderStandings={reorderStandings} sortState={commissionerSort} setSortState={setCommissionerSort}/><Results rows={currentYearResults.filter((r)=>JSON.stringify(r).toLowerCase().includes(search.results.toLowerCase()))} deleteResult={(id)=>deleteRow("game_results", id)} search={search.results} setSearch={(v)=>setSearch({...search,results:v})}/></>}
-    {activeTab === "prestige" && <PrestigeLeaderboard users={userOptions} teams={teamOptions} activeTeams={activeTeamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}
-    {activeTab === "recordBook" && <RecordBook users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}
-    {activeTab === "weeklyNews" && <WeeklyNews results={results} teams={teamOptions} currentYear={currentYear} currentWeek={currentWeek}/> }
-    {activeTab === "teamAssets" && <TeamAssets teams={activeTeamOptions} saveTeamAssets={saveTeamAssets}/>}
+    {activeTab === "dashboard" && <><Stats currentYear={currentYear} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} currentWeek={currentWeek} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} teams={activeTeamOptions} assignments={assignments} saveSettings={saveLeagueSettings}/><LeaguePulse teams={activeTeamOptions} results={currentYearResults}/><ComputerRankings teams={activeTeamOptions} results={currentYearResults} sortState={userSort} setSortState={setUserSort}/><DashboardRecognition allAmericanRows={rankingRows(activeTeamOptions, allAmericans)} awardRows={rankingRows(activeTeamOptions, awards)}/><RecentActivity results={currentYearResults} allAmericans={allAmericans} awards={awards} heismans={heismans} champions={nationalChampions}/><RecordResult newResult={newResult} setNewResult={setNewResult} teams={activeTeamOptions} users={userOptions} assignments={assignments} submitResult={submitResult}/></>}
+    {activeTab === "recordBook" && <RecordBook users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
+    {activeTab === "allTimeStandings" && <AllTimeUserStandings teams={activeTeamOptions} results={results} sortState={commissionerSort} setSortState={setCommissionerSort}/>}    
+    {activeTab === "coachHOF" && <CoachHallOfFame users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
+    {activeTab === "playerHOF" && <PlayerHallOfFame teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions}/>}    
     {activeTab === "assignments" && <Assignments rows={assignments} teams={teamOptions} users={userOptions} addAssignment={addAssignment} updateRow={updateRow} deleteRow={deleteRow} drafts={draftAssignments} setDrafts={setDraftAssignments} saveDraft={saveDraft} getDraft={getDraft} teamChange={teamChange} setTeamChange={setTeamChange} changeUserTeam={changeUserTeam}/>}    
     {activeTab === "h2h" && <H2H results={results} search={search.h2h} setSearch={(v)=>setSearch({...search,h2h:v})}/>}    
-    {activeTab === "allAmericans" && <AllAmericans rows={allAmericans} teams={teamOptions} addRow={addAA} updateRow={updateRow} deleteRow={deleteRow} rankings={rankingRows(activeTeamOptions, allAmericans)} drafts={draftAllAmericans} setDrafts={setDraftAllAmericans} saveDraft={saveDraft} getDraft={getDraft}/>}    
-    {activeTab === "awards" && <Awards rows={awards} teams={teamOptions} addRow={addAward} updateRow={updateRow} deleteRow={deleteRow} rankings={rankingRows(activeTeamOptions, awards)} drafts={draftAwards} setDrafts={setDraftAwards} saveDraft={saveDraft} getDraft={getDraft}/>}    
+    {activeTab === "allAmericans" && <AllAmericans rows={allAmericans} teams={teamOptions} addRow={addAA} updateRow={updateRow} deleteRow={deleteRow} rankings={[]} drafts={draftAllAmericans} setDrafts={setDraftAllAmericans} saveDraft={saveDraft} getDraft={getDraft}/>}    
+    {activeTab === "awards" && <Awards rows={awards} teams={teamOptions} addRow={addAward} updateRow={updateRow} deleteRow={deleteRow} rankings={[]} drafts={draftAwards} setDrafts={setDraftAwards} saveDraft={saveDraft} getDraft={getDraft}/>}    
     {activeTab === "heismans" && <Heismans rows={heismans} teams={teamOptions} addRow={addHeisman} updateRow={updateRow} deleteRow={deleteRow} drafts={draftHeismans} setDrafts={setDraftHeismans} saveDraft={saveDraft} getDraft={getDraft}/>}    
     {activeTab === "nationalChampions" && <NationalChampions rows={nationalChampions} teams={teamOptions} users={userOptions} addRow={addNationalChampion} updateRow={updateRow} deleteRow={deleteRow} drafts={draftChampions} setDrafts={setDraftChampions} saveDraft={saveDraft} getDraft={getDraft}/>}        
-    {activeTab === "coachHof" && <CoachHallOfFame users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}
-    {activeTab === "playerHof" && <PlayerHallOfFame teams={teamOptions} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions}/>}        
-    {selectedTeam && <TeamPage team={selectedTeam} standings={standings.find((r)=>r.team_id===selectedTeam.id)} results={results.filter((r)=>r.team_1_id===selectedTeam.id||r.team_2_id===selectedTeam.id)} allAmericans={allAmericans.filter((r)=>r.team_id===selectedTeam.id)} awards={awards.filter((r)=>r.team_id===selectedTeam.id)} heismans={heismans.filter((r)=>r.team_id===selectedTeam.id)} recruiting={recruiting.filter((r)=>r.team_id===selectedTeam.id)} historyRows={historyRows.filter((r)=>r.team_id===selectedTeam.id)} teams={activeTeamOptions} assignments={assignments} allResults={currentYearResults} addRecruiting={addRecruiting} addHistory={addHistory} updateRow={updateRow} deleteRow={deleteRow} newRecruiting={newRecruiting} setNewRecruiting={setNewRecruiting} newHistory={newHistory} setNewHistory={setNewHistory}/>}    
+    {selectedCoach && <CoachProfile user={selectedCoach} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
   </div></div>;
 }
+
+
+function qualityWins(teamId, results) {
+  return results.filter((result) => {
+    const s1 = Number(result.team_1_score || 0);
+    const s2 = Number(result.team_2_score || 0);
+    const team1Win = result.team_1_id === teamId && s1 > s2;
+    const team2Win = result.team_2_id === teamId && s2 > s1;
+    if (!team1Win && !team2Win) return false;
+    const opponentRank = team1Win ? Number(result.team_2_rank) : Number(result.team_1_rank);
+    return opponentRank >= 1 && opponentRank <= 25;
+  }).length;
+}
+
+function computerRankingRows(teams, results) {
+  const base = teams.map((team) => {
+    const rec = recordFromResults(team.id, results);
+    const games = rec.games || 0;
+    const winPct = games ? rec.wins / games : 0;
+    const avgPf = Number(rec.avgPf);
+    const avgPa = Number(rec.avgPa);
+    const sor = Number(strengthOfResult(team.id, teams, results)) || 0;
+    const qw = qualityWins(team.id, results);
+    const margin = avgPf - avgPa;
+    const score = (winPct * 45) + (sor * 3.5) + (qw * 6) + (Math.max(-20, Math.min(30, margin)) * 0.45) + (rec.wins * 1.5);
+    return { team, teamName: team.name, wins: rec.wins, losses: rec.losses, games, avgPf, avgPa, top25: top25Wins(team.id, results), qw, sor, score: Number(score.toFixed(1)) };
+  });
+  return base.sort((a,b)=>b.score-a.score || b.wins-a.wins || a.losses-b.losses || a.teamName.localeCompare(b.teamName)).map((row,index)=>({...row, rank:index+1}));
+}
+
+function LeaguePulse({ teams, results }) {
+  const rankings = computerRankingRows(teams, results);
+  const bestOffense = [...rankings].sort((a,b)=>b.avgPf-a.avgPf)[0];
+  const bestDefense = [...rankings].sort((a,b)=>a.avgPa-b.avgPa)[0];
+  const toughest = [...rankings].sort((a,b)=>b.sor-a.sor)[0];
+  const qwLeader = [...rankings].sort((a,b)=>b.qw-a.qw || b.wins-a.wins)[0];
+  return <div style={statsGrid}>
+    <PulseCard title="#1 Computer Rank" value={rankings[0]?.teamName || "—"} sub={rankings[0] ? `${rankings[0].wins}-${rankings[0].losses} · ${rankings[0].score} score` : "No games yet"}/>
+    <PulseCard title="Best Offense" value={bestOffense?.teamName || "—"} sub={bestOffense ? `${bestOffense.avgPf.toFixed(1)} Avg PF` : "—"}/>
+    <PulseCard title="Best Defense" value={bestDefense?.teamName || "—"} sub={bestDefense ? `${bestDefense.avgPa.toFixed(1)} Avg PA` : "—"}/>
+    <PulseCard title="Best Resume" value={qwLeader?.teamName || "—"} sub={qwLeader ? `${qwLeader.qw} quality wins` : "—"}/>
+    <PulseCard title="Toughest Road" value={toughest?.teamName || "—"} sub={toughest ? `${toughest.sor.toFixed(1)} SOR` : "—"}/>
+  </div>;
+}
+function PulseCard({ title, value, sub }) { return <div style={pulseCard}><div style={statTitle}>{title}</div><div style={pulseValue}>{value}</div><div style={mutedText}>{sub}</div></div>; }
+
+function ComputerRankings({ teams, results, sortState, setSortState }) {
+  const baseRows = computerRankingRows(teams, results);
+  const rows = [...baseRows].sort((a,b)=> sortState?.key ? compareForSort(a,b,sortState.key,sortState.direction) : a.rank-b.rank);
+  return <section style={card}><div style={sectionTop}><div><h2 style={sectionTitle}>CFBElite Computer Rankings</h2><p style={mutedText}>Automated 32-user ranking. Formula: record, SOR, quality wins, scoring margin, and wins. Updates after every result.</p></div></div><Table headers={["#",<SortButton label="Team" sortKey="teamName" sortState={sortState} setSortState={setSortState}/>,<SortButton label="Record" sortKey="record" sortState={sortState} setSortState={setSortState}/>,<SortButton label="QW" sortKey="qw" sortState={sortState} setSortState={setSortState}/>,<SortButton label="Avg PF" sortKey="avgPf" sortState={sortState} setSortState={setSortState}/>,<SortButton label="Avg PA" sortKey="avgPa" sortState={sortState} setSortState={setSortState}/>,<SortButton label="SOR" sortKey="sor" sortState={sortState} setSortState={setSortState}/>,<SortButton label="Score" sortKey="score" sortState={sortState} setSortState={setSortState}/>]}>{rows.map((row)=><tr key={row.team.id} style={trStyle}><td style={rankCell}>#{row.rank}</td><td style={teamCell}><TeamLabel team={row.team}/></td><td style={td}>{row.wins}-{row.losses}</td><td style={td}>{row.qw}</td><td style={td}>{row.avgPf.toFixed(1)}</td><td style={td}>{row.avgPa.toFixed(1)}</td><td style={td}>{row.sor.toFixed(1)}</td><td style={scoreCell}>{row.score.toFixed(1)}</td></tr>)}</Table></section>;
+}
+
+function DashboardRecognition({ allAmericanRows, awardRows }) {
+  const cleanAA = allAmericanRows.filter((r)=>r.total>0).slice(0,10);
+  const cleanAwards = awardRows.filter((r)=>r.total>0).slice(0,10);
+  return <section style={card}><h2 style={sectionTitle}>Recognition Leaders</h2><div style={twoCol}><LeaderboardCard title="All-American Rankings" rows={cleanAA}/><LeaderboardCard title="Awards Rankings" rows={cleanAwards}/></div></section>;
+}
+function LeaderboardCard({ title, rows }) { return <div style={miniCard}><h3 style={miniTitle}>{title}</h3>{rows.length ? rows.map((r,i)=><div key={r.team} style={leaderRow}><span>#{i+1} {r.team}</span><b>{r.total}</b></div>) : <div style={miniRow}>No entries yet.</div>}</div>; }
+
+function RecentActivity({ results, allAmericans, awards, heismans, champions }) {
+  const items = [
+    ...results.map((r)=>({time:r.created_at, text:`Result: ${r.team_1?.name || "Team 1"} ${r.team_1_score}-${r.team_2_score} ${r.team_2?.name || "Team 2"}`})),
+    ...allAmericans.map((r)=>({time:r.created_at, text:`All-American: ${r.player_name} (${r.teams?.name || "Team"})`})),
+    ...awards.map((r)=>({time:r.created_at, text:`Award: ${r.player_name} won ${r.award_name}`})),
+    ...heismans.map((r)=>({time:r.created_at, text:`Heisman: ${r.player_name} (${r.teams?.name || "Team"})`})),
+    ...champions.map((r)=>({time:r.created_at, text:`National Champion: ${r.teams?.name || "Team"} (${r.season_year})`})),
+  ].sort((a,b)=>new Date(b.time||0)-new Date(a.time||0)).slice(0,12);
+  return <section style={card}><h2 style={sectionTitle}>Recent Activity</h2><div style={activityList}>{items.length ? items.map((item,i)=><div key={i} style={activityItem}>{item.text}</div>) : <div style={miniRow}>No recent activity yet.</div>}</div></section>;
+}
+
+function AllTimeUserStandings({ teams, results, sortState, setSortState }) {
+  return <section style={card}><h2 style={sectionTitle}>All-Time User Standings</h2><p style={mutedText}>Exact same format as the main ranking table, but calculated across every recorded season.</p><ComputerRankings teams={teams} results={results} sortState={sortState} setSortState={setSortState}/></section>;
+}
+
+function CoachProfile({ user, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting }) {
+  const stats = getCoachStats([user], teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting)[0];
+  const activeAssignment = assignments.find((a)=>a.discord_user_id===user.id && a.status==="Active");
+  const currentTeam = teams.find((t)=>t.id===activeAssignment?.team_id);
+  const timeline = assignments.filter((a)=>a.discord_user_id===user.id).sort((a,b)=>Number(a.start_year||0)-Number(b.start_year||0));
+  return <section style={profileCard}><div style={profileHero}><div><div style={eyebrow}>Coach Profile</div><h2 style={profileName}>{user.discord_username}</h2><p style={mutedText}>Current Team: {currentTeam?.name || "Unassigned"}</p></div>{currentTeam && <TeamLabel team={currentTeam}/>}</div><div style={statsGrid}><Stat title="Career Record" value={`${stats?.wins||0}-${stats?.losses||0}`}/><Stat title="National Titles" value={stats?.nattys||0}/><Stat title="Conference Titles" value={stats?.confTitles||0}/><Stat title="Top 25 Wins" value={stats?.top25Wins||0}/><Stat title="Awards" value={stats?.awards||0}/><Stat title="All-Americans" value={stats?.allAmericans||0}/><Stat title="Heismans" value={stats?.heismans||0}/><Stat title="Prestige" value={(stats?.prestige||0).toFixed(1)}/></div><div style={twoCol}><div style={miniCard}><h3 style={miniTitle}>Career Timeline</h3>{timeline.map((a)=><div key={a.id} style={miniRow}>{a.start_year || "?"}-{a.end_year || "Present"}: {a.teams?.name || teamNameById(a.team_id, teams)}</div>)}</div><div style={miniCard}><h3 style={miniTitle}>Teams Coached</h3><div style={miniRow}>{stats?.teamsCoachedText || "—"}</div></div></div></section>;
+}
+
+function CoachHallOfFame({ users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting }) {
+  const rows = getCoachStats(users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting)
+    .filter((row)=>row.games || row.nattys || row.awards || row.allAmericans || row.heismans)
+    .sort((a,b)=>b.rawPrestige-a.rawPrestige || b.wins-a.wins);
+  return <section style={card}><h2 style={sectionTitle}>Coach Hall of Fame</h2><p style={mutedText}>Banner-style coach cards based on career wins, titles, awards, Heismans, All-Americans, and Top 25 wins.</p><div style={hofGrid}>{rows.map((row)=><CoachHofCard key={row.userId || row.discord} row={row} teams={teams} assignments={assignments}/>)}</div></section>;
+}
+function CoachHofCard({ row, teams, assignments }) {
+  const activeAssignment = assignments.find((a)=>a.discord_user_id===row.userId && a.status==="Active");
+  const team = teams.find((t)=>t.id===activeAssignment?.team_id);
+  return <div style={hofCard}><div style={hofTop}><div style={hofIconWrap}><span style={hofIcon}>🎧</span>{team && <span style={hofMiniLogo}><HofTeamIcon team={team}/></span>}</div><div><div style={eyebrow}>Coach Hall of Fame</div><h3 style={hofName}>{row.discord}</h3><div style={mutedText}>{team?.name || row.activeTeamsText}</div></div><div style={hofScore}><span>HOF Score</span><b>{Math.round(row.rawPrestige)}</b></div></div><div style={hofChips}><Chip label="Career" value={`${row.wins}-${row.losses}`}/><Chip label="Nattys" value={row.nattys}/><Chip label="Conf" value={row.confTitles}/><Chip label="Top 25" value={row.top25Wins}/><Chip label="Bowl" value={`${row.bowlWins}-${row.bowlLosses}`}/><Chip label="Heisman" value={row.heismans}/><Chip label="Awards" value={row.awards}/><Chip label="All-Americans" value={row.allAmericans}/></div></div>;
+}
+function Chip({ label, value }) { return <div style={chip}><b>{value}</b><span>{label}</span></div>; }
+function HofTeamIcon({ team }) { const url = getHelmetUrl(team); return url ? <img src={url} alt="" style={hofTeamImg}/> : <span style={hofIcon}>🏈</span>; }
+
+function playerHallRows(teams, assignments, results, allAmericans, awards, heismans, nationalChampions) {
+  const map = new Map();
+  const keyFor = (name, teamId) => `${name || "Unknown"}-${teamId || "none"}`;
+  const ensure = (name, teamId, position, year) => {
+    const key = keyFor(name, teamId);
+    if (!map.has(key)) map.set(key, { key, player:name || "Unknown Player", teamId, position:position || "—", years:new Set(), awards:[], allAmericans:[], heismans:[], confTitles:0, nattys:0, score:0 });
+    const row = map.get(key);
+    if (position) row.position = position;
+    if (year) row.years.add(String(year));
+    return row;
+  };
+  allAmericans.forEach((r)=>{ const row=ensure(r.player_name, r.team_id, r.position, r.season_year); row.allAmericans.push(`${r.season_year} ${r.type}`); });
+  awards.forEach((r)=>{ const row=ensure(r.player_name, r.team_id, r.position, r.season_year); row.awards.push(`${r.season_year} ${r.award_name}`); });
+  heismans.forEach((r)=>{ const row=ensure(r.player_name, r.team_id, r.position, r.season_year); row.heismans.push(`${r.season_year} Heisman`); });
+  map.forEach((row)=>{
+    row.years.forEach((year)=>{
+      const conf = results.some((r)=>String(r.season_year)===String(year) && r.week==="Conference Championship Week" && ((r.team_1_id===row.teamId && Number(r.team_1_score)>Number(r.team_2_score)) || (r.team_2_id===row.teamId && Number(r.team_2_score)>Number(r.team_1_score))));
+      const nattyByResult = results.some((r)=>String(r.season_year)===String(year) && r.week==="National Championship Week" && ((r.team_1_id===row.teamId && Number(r.team_1_score)>Number(r.team_2_score)) || (r.team_2_id===row.teamId && Number(r.team_2_score)>Number(r.team_1_score))));
+      const nattyByEntry = nationalChampions.some((c)=>String(c.season_year)===String(year) && c.team_id===row.teamId);
+      if (conf) row.confTitles += 1;
+      if (nattyByResult || nattyByEntry) row.nattys += 1;
+    });
+    row.score = row.heismans.length*30 + row.awards.length*12 + row.allAmericans.length*8 + row.nattys*18 + row.confTitles*8;
+  });
+  return [...map.values()].filter((r)=>r.score>0).sort((a,b)=>b.score-a.score || a.player.localeCompare(b.player));
+}
+function PlayerHallOfFame({ teams, assignments, results, allAmericans, awards, heismans, nationalChampions }) {
+  const rows = playerHallRows(teams, assignments, results, allAmericans, awards, heismans, nationalChampions);
+  return <section style={card}><h2 style={sectionTitle}>Player Hall of Fame</h2><p style={mutedText}>Players qualify through awards, Heismans, All-Americans, plus conference/national titles in the same season.</p><div style={hofGrid}>{rows.map((row)=><PlayerHofCard key={row.key} row={row} team={teams.find((t)=>t.id===row.teamId)}/>)}</div></section>;
+}
+function PlayerHofCard({ row, team }) { return <div style={hofCard}><div style={hofTop}><div style={hofIconWrap}>{team ? <HofTeamIcon team={team}/> : <span style={hofIcon}>🏈</span>}</div><div><div style={eyebrow}>Player Hall of Fame</div><h3 style={hofName}>{row.player}</h3><div style={mutedText}>{row.position} · {team?.name || "Unknown Team"}</div></div><div style={hofScore}><span>HOF Score</span><b>{row.score}</b></div></div><div style={hofChips}><Chip label="Heisman" value={row.heismans.length}/><Chip label="Awards" value={row.awards.length}/><Chip label="All-Americans" value={row.allAmericans.length}/><Chip label="Nattys" value={row.nattys}/><Chip label="Conf" value={row.confTitles}/></div><div style={accoladeList}>{[...row.heismans, ...row.awards, ...row.allAmericans].slice(0,8).map((x,i)=><div key={i} style={miniRow}>{x}</div>)}</div></div>; }
 
 function Header({ loading, reload }) { return <header style={header}><div><h1 style={title}>CFBElite 27 Dashboard</h1><p style={subtitle}>Live Supabase League Management System</p></div><button onClick={reload} style={statusBox}>{loading ? "Loading..." : "LIVE DATABASE"}</button></header>; }
 function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reorderTabs }) {
@@ -1355,97 +1323,6 @@ function WeeklyNews({ results, teams, currentYear, currentWeek }) {
   );
 }
 
-
-function HallOfFameBanner({ type, title, subtitle, team, score, accolades }) {
-  const helmetUrl = getHelmetUrl(team);
-
-  return (
-    <div style={hofBanner}>
-      <div style={hofBannerIconWrap}>
-        <div style={hofPixelIcon}>{type === "coach" ? "🎧" : "🏈"}</div>
-        {helmetUrl ? <img src={helmetUrl} alt="" style={hofTeamLogo} /> : <div style={hofTeamLogoFallback}>8</div>}
-      </div>
-      <div style={hofBannerBody}>
-        <div style={hofEyebrow}>{type === "coach" ? "Coach Hall of Fame" : "Player Hall of Fame"}</div>
-        <h3 style={hofBannerTitle}>{title}</h3>
-        <div style={hofBannerSubtitle}>{subtitle}</div>
-        <div style={hofAccoladeGrid}>
-          {accolades.filter(Boolean).map((accolade, index) => (
-            <span key={index} style={hofAccoladePill}>{accolade}</span>
-          ))}
-        </div>
-      </div>
-      <div style={hofScoreBox}>
-        <div style={statTitle}>HOF Score</div>
-        <div style={hofScoreValue}>{score}</div>
-      </div>
-    </div>
-  );
-}
-
-function CoachHallOfFame({ users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting }) {
-  const rows = getCoachHallOfFameRows(users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
-
-  return (
-    <section style={card}>
-      <div style={sectionTop}>
-        <div>
-          <h2 style={sectionTitle}>Coach Hall of Fame</h2>
-          <p style={mutedText}>Automatically generated from all-time wins, championships, Top 25 wins, bowl wins, awards, Heismans, and All-Americans.</p>
-        </div>
-      </div>
-
-      <div style={hofGrid}>
-        {rows.length ? rows.map((row) => (
-          <HallOfFameBanner
-            key={row.userId || row.discord}
-            type="coach"
-            title={row.discord}
-            subtitle={`Current Team: ${row.activeTeamsText} • Teams Coached: ${row.teamsCoachedText}`}
-            team={row.team}
-            score={row.hofScore}
-            accolades={row.accolades}
-          />
-        )) : (
-          <div style={miniCard}>No coaches have met the Hall of Fame threshold yet.</div>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function PlayerHallOfFame({ teams, results, allAmericans, awards, heismans, nationalChampions }) {
-  const rows = getPlayerHallOfFameRows(teams, results, allAmericans, awards, heismans, nationalChampions);
-
-  return (
-    <section style={card}>
-      <div style={sectionTop}>
-        <div>
-          <h2 style={sectionTitle}>Player Hall of Fame</h2>
-          <p style={mutedText}>Automatically generated from Heismans, awards, All-Americans, and title seasons tied to that player's team and year.</p>
-        </div>
-      </div>
-
-      <div style={hofGrid}>
-        {rows.length ? rows.map((row) => (
-          <HallOfFameBanner
-            key={row.key}
-            type="player"
-            title={row.playerName}
-            subtitle={`${row.positionText} • ${row.team?.name || "Unknown Team"} • Years: ${row.yearText}`}
-            team={row.team}
-            score={row.hofScore}
-            accolades={row.accolades}
-          />
-        )) : (
-          <div style={miniCard}>No players have met the Hall of Fame threshold yet.</div>
-        )}
-      </div>
-    </section>
-  );
-}
-
-
 function Assignments({ rows, teams, users, addAssignment, updateRow, deleteRow, drafts, setDrafts, saveDraft, getDraft, teamChange, setTeamChange, changeUserTeam }) {
   return <section style={card}>
     <div style={sectionTop}><h2 style={sectionTitle}>Users / Team Assignments</h2><button onClick={addAssignment} style={button}>Add Assignment</button></div>
@@ -1604,7 +1481,7 @@ function AllAmericans({ rows, teams, addRow, updateRow, deleteRow, rankings, dra
     <td style={td}><select value={String(d.season_year)} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),season_year:e.target.value}})} style={input}>{YEARS.map((y)=><option key={y}>{y}</option>)}</select></td>
     <td style={td}><button onClick={()=>saveDraft("all_americans",r.id,drafts[r.id], ["season_year"])} style={button}>Save</button></td>
     <td style={td}><DeleteButton onClick={()=>deleteRow("all_americans",r.id)}/></td>
-  </tr>})}</Table></div><Rankings title="All-American Rankings" rows={rankings}/></div></section>;
+  </tr>})}</Table></div></div></section>;
 }
 function Awards({ rows, teams, addRow, updateRow, deleteRow, rankings, drafts, setDrafts, saveDraft, getDraft }) {
   return <section style={card}><div style={sectionTop}><h2 style={sectionTitle}>Awards</h2><button onClick={addRow} style={button}>Add</button></div><div style={twoColWide}><div><Table headers={["Award","Team","Player","Position","Year","Save",""]}>{rows.map((r)=>{const d=getDraft(drafts,r);return <tr key={r.id} style={trStyle}>
@@ -1615,7 +1492,7 @@ function Awards({ rows, teams, addRow, updateRow, deleteRow, rankings, drafts, s
     <td style={td}><select value={String(d.season_year)} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),season_year:e.target.value}})} style={input}>{YEARS.map((y)=><option key={y}>{y}</option>)}</select></td>
     <td style={td}><button onClick={()=>saveDraft("awards",r.id,drafts[r.id], ["season_year"])} style={button}>Save</button></td>
     <td style={td}><DeleteButton onClick={()=>deleteRow("awards",r.id)}/></td>
-  </tr>})}</Table></div><Rankings title="Awards Rankings" rows={rankings}/></div></section>;
+  </tr>})}</Table></div></div></section>;
 }
 function Heismans({ rows, teams, addRow, updateRow, deleteRow, drafts, setDrafts, saveDraft, getDraft }) {
   return <section style={card}><div style={sectionTop}><h2 style={sectionTitle}>Heisman Winners</h2><button onClick={addRow} style={button}>Add</button></div><Table headers={["Player","Team","Position","Year","Save",""]}>{rows.map((r)=>{const d=getDraft(drafts,r);return <tr key={r.id} style={trStyle}>
@@ -1662,66 +1539,73 @@ function MiniList({ title, rows }) { return <div style={miniCard}><h3>{title}</h
 function Table({ headers, children }) { return <div style={{overflowX:"auto",marginTop:20}}><table style={table}><thead><tr>{headers.map((h, index)=><th key={typeof h === "string" ? h : index} style={th}>{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div>; }
 function DeleteButton({ onClick }) { return <button onClick={onClick} style={deleteButton}>Delete</button>; }
 
-const page={minHeight:"100vh",width:"100%",background:"#09090b",color:"white",overflowX:"hidden"};
-const container={width:"100%",maxWidth:"none",margin:0,padding:24,boxSizing:"border-box"};
-const header={display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,flexWrap:"wrap",gap:20};
-const title={fontSize:52,fontWeight:900,margin:0,color:"white"};
-const subtitle={marginTop:8,color:"#a1a1aa",fontSize:16};
-const statusBox={background:"#991b1b",border:"1px solid #dc2626",padding:"12px 20px",borderRadius:14,fontWeight:700,color:"white",cursor:"pointer"};
-const tabScroller={overflowX:"auto",background:"#111113",border:"1px solid #27272a",borderRadius:20,padding:10,marginBottom:24};
+const page={minHeight:"100vh",width:"100%",background:"radial-gradient(circle at top left, #2e1065 0, #0f1020 34%, #050509 100%)",color:"white",overflowX:"hidden",fontFamily:"Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"};
+const container={width:"100%",maxWidth:"none",margin:0,padding:"clamp(14px, 2vw, 28px)",boxSizing:"border-box"};
+const header={display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,flexWrap:"wrap",gap:20,background:"linear-gradient(135deg, rgba(88,28,135,.55), rgba(15,23,42,.8))",border:"1px solid rgba(250,204,21,.35)",borderRadius:28,padding:24,boxShadow:"0 24px 80px rgba(0,0,0,.35)"};
+const title={fontSize:"clamp(34px, 5vw, 64px)",fontWeight:950,margin:0,color:"#fff7ed",letterSpacing:"-.04em",textShadow:"0 0 28px rgba(250,204,21,.18)"};
+const subtitle={marginTop:8,color:"#d6d3d1",fontSize:16};
+const statusBox={background:"linear-gradient(135deg,#facc15,#b45309)",border:"1px solid #fde68a",padding:"12px 20px",borderRadius:999,fontWeight:900,color:"#111827",cursor:"pointer",boxShadow:"0 10px 30px rgba(250,204,21,.18)"};
+const tabScroller={overflowX:"auto",background:"rgba(15,16,32,.86)",border:"1px solid rgba(250,204,21,.18)",borderRadius:20,padding:10,marginBottom:24,position:"sticky",top:0,zIndex:10,backdropFilter:"blur(12px)"};
 const tabRow={display:"flex",gap:8,width:"max-content"};
-const tabStyle={background:"#18181b",color:"white",border:"1px solid #3f3f46",borderRadius:14,padding:"10px 14px",fontWeight:700,cursor:"pointer"};
-const activeTabStyle={...tabStyle,background:"#dc2626",border:"1px solid #ef4444"};
+const tabStyle={background:"rgba(30,27,75,.65)",color:"#e5e7eb",border:"1px solid rgba(255,255,255,.1)",borderRadius:14,padding:"10px 14px",fontWeight:800,cursor:"pointer",whiteSpace:"nowrap"};
+const activeTabStyle={...tabStyle,background:"linear-gradient(135deg,#6d28d9,#facc15)",border:"1px solid #fde68a",color:"#111827"};
 const statsGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))",gap:20,marginBottom:32};
-const statCard={background:"#18181b",border:"1px solid #27272a",borderRadius:22,padding:24};
-const statTitle={color:"#a1a1aa",fontSize:14,marginBottom:10,textTransform:"uppercase"};
-const statValue={fontSize:38,fontWeight:900,color:"inherit"};
+const statCard={background:"linear-gradient(180deg, rgba(30,27,75,.78), rgba(12,12,18,.92))",border:"1px solid rgba(250,204,21,.16)",borderRadius:22,padding:24,boxShadow:"0 14px 45px rgba(0,0,0,.28)"};
+const statTitle={color:"#c4b5fd",fontSize:12,marginBottom:10,textTransform:"uppercase",letterSpacing:".08em",fontWeight:900};
+const statValue={fontSize:38,fontWeight:950,color:"#fff7ed"};
 const statInput={...statValue,background:"transparent",color:"white",border:"none",outline:"none",width:"100%"};
-const statSelect={background:"#27272a",color:"white",border:"1px solid #3f3f46",borderRadius:12,padding:14,fontSize:24,fontWeight:900,width:"100%"};
-const card={background:"#18181b",border:"1px solid #27272a",borderRadius:24,padding:24,marginBottom:32};
+const statSelect={background:"#111827",color:"#fff7ed",border:"1px solid rgba(250,204,21,.25)",borderRadius:12,padding:14,fontSize:24,fontWeight:900,width:"100%"};
+const card={background:"linear-gradient(180deg, rgba(20,20,32,.96), rgba(10,10,18,.98))",border:"1px solid rgba(250,204,21,.18)",borderRadius:26,padding:"clamp(18px, 2vw, 28px)",marginBottom:32,boxShadow:"0 20px 80px rgba(0,0,0,.34)"};
 const sectionTop={display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"};
-const sectionTitle={fontSize:30,fontWeight:900,margin:0,color:"white"};
+const sectionTitle={fontSize:"clamp(25px, 3vw, 36px)",fontWeight:950,margin:0,color:"#fff7ed",letterSpacing:"-.03em"};
 const formGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))",gap:16,marginTop:20};
-const input={background:"#27272a",border:"1px solid #3f3f46",color:"white",padding:14,borderRadius:12,fontSize:15,width:"100%",boxSizing:"border-box"};
+const input={background:"rgba(17,24,39,.92)",border:"1px solid rgba(255,255,255,.12)",color:"#fff7ed",padding:14,borderRadius:12,fontSize:15,width:"100%",boxSizing:"border-box"};
 const smallInput={...input,width:"120px",marginRight:8};
 const searchInput={...input,maxWidth:320};
-const button={background:"#dc2626",color:"white",border:"none",borderRadius:12,padding:14,fontWeight:700,cursor:"pointer"};
-const sortButton={background:"transparent",border:"none",color:"#a1a1aa",fontSize:13,textTransform:"uppercase",fontWeight:800,cursor:"pointer",padding:0};
-const deleteButton={background:"#7f1d1d",color:"white",border:"1px solid #dc2626",borderRadius:10,padding:"8px 10px",cursor:"pointer"};
-const table={width:"100%",borderCollapse:"collapse",minWidth:820};
-const th={textAlign:"left",padding:"14px 10px",color:"#a1a1aa",fontSize:13,textTransform:"uppercase",borderBottom:"1px solid #27272a"};
-const trStyle={borderBottom:"1px solid #27272a"};
-const td={padding:"16px 10px",color:"inherit"};
-const teamCell={...td,color:"#f87171",fontWeight:700};
+const button={background:"linear-gradient(135deg,#7c3aed,#facc15)",color:"#111827",border:"none",borderRadius:12,padding:14,fontWeight:900,cursor:"pointer"};
+const sortButton={background:"transparent",border:"none",color:"#c4b5fd",fontSize:13,textTransform:"uppercase",fontWeight:900,cursor:"pointer",padding:0};
+const deleteButton={background:"#7f1d1d",color:"white",border:"1px solid #ef4444",borderRadius:10,padding:"8px 10px",cursor:"pointer"};
+const table={width:"100%",borderCollapse:"separate",borderSpacing:0,minWidth:820};
+const th={textAlign:"left",padding:"14px 10px",color:"#c4b5fd",fontSize:12,textTransform:"uppercase",borderBottom:"1px solid rgba(250,204,21,.16)",letterSpacing:".06em"};
+const trStyle={borderBottom:"1px solid rgba(255,255,255,.08)"};
+const td={padding:"16px 10px",color:"inherit",verticalAlign:"middle"};
+const teamCell={...td,color:"#facc15",fontWeight:800};
 const clickableTeamCell={...teamCell,cursor:"pointer",textDecoration:"underline"};
-const mutedText={color:"#a1a1aa",marginTop:8,marginBottom:0};
-const errorBox={background:"#7f1d1d",border:"1px solid #dc2626",color:"white",padding:"14px 18px",borderRadius:14,marginBottom:20};
+const mutedText={color:"#d6d3d1",marginTop:8,marginBottom:0};
+const errorBox={background:"rgba(127,29,29,.85)",border:"1px solid #ef4444",color:"white",padding:"14px 18px",borderRadius:14,marginBottom:20};
 const bracketGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(260px, 1fr))",gap:16,marginTop:20};
-const gameCard={display:"grid",gap:10,border:"1px solid #3f3f46",borderRadius:16,padding:14,background:"#111113",marginBottom:14};
+const gameCard={display:"grid",gap:10,border:"1px solid rgba(255,255,255,.1)",borderRadius:16,padding:14,background:"rgba(7,7,12,.75)",marginBottom:14};
 const twoCol={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(320px, 1fr))",gap:20,marginTop:24};
 const twoColWide={display:"grid",gridTemplateColumns:"minmax(0, 3fr) minmax(280px, 1fr)",gap:20,marginTop:20};
-const miniCard={background:"#111113",border:"1px solid #27272a",borderRadius:18,padding:18};
-const miniRow={borderBottom:"1px solid #27272a",padding:"10px 0",color:"#e4e4e7"};
-
+const miniCard={background:"rgba(7,7,12,.72)",border:"1px solid rgba(250,204,21,.14)",borderRadius:18,padding:18};
+const miniRow={borderBottom:"1px solid rgba(255,255,255,.08)",padding:"10px 0",color:"#e4e4e7"};
+const miniTitle={marginTop:0,color:"#facc15"};
 const teamLabel={display:"inline-flex",alignItems:"center",gap:10};
-const helmetIcon={width:28,height:28,objectFit:"contain",borderRadius:6,background:"#27272a"};
+const helmetIcon={width:30,height:30,objectFit:"contain",borderRadius:8,background:"rgba(255,255,255,.08)",padding:2};
 const helmetFallback={fontSize:22,lineHeight:1};
-
-
-const hofGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(340px, 1fr))",gap:18,marginTop:22};
-const hofBanner={display:"grid",gridTemplateColumns:"86px minmax(0,1fr) 120px",gap:18,alignItems:"center",background:"linear-gradient(135deg,#111113 0%,#18181b 55%,#3f1111 100%)",border:"1px solid #3f3f46",borderRadius:22,padding:20,boxShadow:"0 14px 30px rgba(0,0,0,.25)"};
-const hofBannerIconWrap={position:"relative",width:76,height:76,display:"grid",placeItems:"center",background:"#09090b",border:"1px solid #3f3f46",borderRadius:18};
-const hofPixelIcon={fontSize:42,filter:"drop-shadow(0 2px 0 #000)",imageRendering:"pixelated"};
-const hofTeamLogo={position:"absolute",right:-8,bottom:-8,width:34,height:34,objectFit:"contain",background:"#27272a",border:"1px solid #3f3f46",borderRadius:8,padding:3,imageRendering:"pixelated"};
-const hofTeamLogoFallback={position:"absolute",right:-8,bottom:-8,width:34,height:34,display:"grid",placeItems:"center",background:"#27272a",border:"1px solid #3f3f46",borderRadius:8,fontWeight:900,color:"#fbbf24"};
-const hofBannerBody={minWidth:0};
-const hofEyebrow={color:"#fbbf24",fontSize:12,textTransform:"uppercase",fontWeight:900,letterSpacing:1.2,marginBottom:6};
-const hofBannerTitle={fontSize:26,lineHeight:1.05,margin:"0 0 6px",color:"white",fontWeight:900};
-const hofBannerSubtitle={color:"#d4d4d8",fontSize:14,marginBottom:12};
-const hofAccoladeGrid={display:"flex",flexWrap:"wrap",gap:8};
-const hofAccoladePill={background:"#27272a",border:"1px solid #3f3f46",color:"#e4e4e7",borderRadius:999,padding:"6px 10px",fontSize:12,fontWeight:700};
-const hofScoreBox={background:"#09090b",border:"1px solid #3f3f46",borderRadius:16,padding:14,textAlign:"center"};
-const hofScoreValue={fontSize:30,fontWeight:900,color:"#fbbf24"};
-
-const coachBanner={display:"flex",justifyContent:"space-between",gap:20,alignItems:"center",background:"#111113",border:"1px solid #27272a",borderRadius:18,padding:18,margin:"18px 0 24px",flexWrap:"wrap"};
-const coachNameStyle={fontSize:28,fontWeight:900,color:"#f87171"};
+const coachBanner={display:"flex",justifyContent:"space-between",gap:20,alignItems:"center",background:"rgba(7,7,12,.75)",border:"1px solid rgba(250,204,21,.16)",borderRadius:18,padding:18,margin:"18px 0 24px",flexWrap:"wrap"};
+const coachNameStyle={fontSize:28,fontWeight:900,color:"#facc15"};
+const pulseCard={...statCard,background:"linear-gradient(135deg, rgba(49,46,129,.85), rgba(12,12,18,.95))"};
+const pulseValue={fontSize:24,fontWeight:950,color:"#facc15"};
+const rankCell={...td,fontWeight:950,color:"#facc15"};
+const scoreCell={...td,fontWeight:950,color:"#facc15",fontSize:18};
+const leaderRow={display:"flex",justifyContent:"space-between",gap:12,borderBottom:"1px solid rgba(255,255,255,.08)",padding:"11px 0",color:"#f5f5f4"};
+const activityList={display:"grid",gap:10,marginTop:18};
+const activityItem={background:"rgba(255,255,255,.045)",border:"1px solid rgba(255,255,255,.08)",borderRadius:14,padding:"12px 14px",color:"#f5f5f4"};
+const profileCard={...card,background:"linear-gradient(135deg, rgba(49,46,129,.88), rgba(7,7,12,.97))"};
+const profileHero={display:"flex",alignItems:"center",justifyContent:"space-between",gap:20,flexWrap:"wrap",marginBottom:20};
+const eyebrow={color:"#facc15",textTransform:"uppercase",letterSpacing:".12em",fontSize:12,fontWeight:950};
+const profileName={fontSize:"clamp(36px, 5vw, 64px)",margin:"6px 0",fontWeight:950,letterSpacing:"-.05em"};
+const hofGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(340px, 1fr))",gap:20,marginTop:24};
+const hofCard={background:"linear-gradient(160deg, rgba(88,28,135,.72), rgba(15,23,42,.95) 45%, rgba(69,10,10,.85))",border:"1px solid rgba(250,204,21,.28)",borderRadius:26,padding:22,boxShadow:"0 24px 70px rgba(0,0,0,.38)",minHeight:260};
+const hofTop={display:"grid",gridTemplateColumns:"86px minmax(0,1fr) 120px",gap:16,alignItems:"center"};
+const hofIconWrap={width:76,height:76,borderRadius:20,display:"grid",placeItems:"center",background:"rgba(0,0,0,.34)",border:"1px solid rgba(255,255,255,.14)",position:"relative"};
+const hofIcon={fontSize:42};
+const hofTeamImg={width:54,height:54,objectFit:"contain",imageRendering:"pixelated",filter:"drop-shadow(0 8px 14px rgba(0,0,0,.35))"};
+const hofMiniLogo={position:"absolute",right:-8,bottom:-8,background:"#111827",border:"1px solid rgba(250,204,21,.35)",borderRadius:10,padding:4};
+const hofName={fontSize:30,lineHeight:1.05,margin:"6px 0",fontWeight:950,color:"#fff7ed"};
+const hofScore={background:"rgba(0,0,0,.38)",border:"1px solid rgba(250,204,21,.2)",borderRadius:18,padding:14,textAlign:"center"};
+const hofScoreSpan={color:"#c4b5fd"};
+const hofChips={display:"flex",gap:10,flexWrap:"wrap",marginTop:22};
+const chip={display:"grid",gap:2,background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.12)",borderRadius:999,padding:"8px 12px",fontSize:12};
+const accoladeList={marginTop:16};
