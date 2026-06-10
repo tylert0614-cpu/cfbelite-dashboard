@@ -813,7 +813,7 @@ export default function App() {
   async function addHistory(teamId) { const { error: e } = await supabase.from("team_history_records").insert({ team_id: teamId, season_year: Number(newHistory.season_year || currentYear), record: newHistory.record || "0-0" }); if (e) { setError(`History add failed: ${e.message}`); return; } setNewHistory({ season_year: Number(currentYear), record: "0-0" }); setError(""); await loadData(); }
 
   return <div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={errorBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} draggedTab={draggedTab} setDraggedTab={setDraggedTab} reorderTabs={reorderTabs}/>
-    {activeTab === "dashboard" && <><Stats currentYear={currentYear} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} currentWeek={currentWeek} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} teams={activeTeamOptions} assignments={assignments} saveSettings={saveLeagueSettings}/><LeaguePulse teams={activeTeamOptions} results={currentYearResults}/><ComputerRankings teams={activeTeamOptions} results={currentYearResults} sortState={userSort} setSortState={setUserSort}/><DashboardRecognition allAmericanRows={rankingRows(activeTeamOptions, allAmericans)} awardRows={rankingRows(activeTeamOptions, awards)}/><RecentActivity results={currentYearResults} allAmericans={allAmericans} awards={awards} heismans={heismans} champions={nationalChampions}/><RecordResult newResult={newResult} setNewResult={setNewResult} teams={activeTeamOptions} users={userOptions} assignments={assignments} submitResult={submitResult}/></>}
+    {activeTab === "dashboard" && <><Stats currentYear={currentYear} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} currentWeek={currentWeek} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} teams={activeTeamOptions} assignments={assignments} saveSettings={saveLeagueSettings}/><LeaguePulse teams={activeTeamOptions} results={currentYearResults} allAmericans={allAmericans} awards={awards} currentYear={currentYear}/><ComputerRankings teams={activeTeamOptions} results={currentYearResults} sortState={userSort} setSortState={setUserSort}/><DashboardRecognition allAmericanRows={rankingRows(activeTeamOptions, allAmericans)} awardRows={rankingRows(activeTeamOptions, awards)}/><RecentActivity results={currentYearResults} allAmericans={allAmericans} awards={awards} heismans={heismans} champions={nationalChampions}/><RecordResult newResult={newResult} setNewResult={setNewResult} teams={activeTeamOptions} users={userOptions} assignments={assignments} submitResult={submitResult}/></>}
     {activeTab === "allTimeStandings" && <AllTimeUserStandings users={userOptions} teams={teamOptions} assignments={assignments} results={results} sortState={commissionerSort} setSortState={setCommissionerSort}/>}    
     {activeTab === "coachHOF" && <CoachHallOfFame users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
     {activeTab === "playerHOF" && <PlayerHallOfFame teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions}/>}    
@@ -856,19 +856,23 @@ function computerRankingRows(teams, results) {
   return base.sort((a,b)=>b.score-a.score || b.wins-a.wins || a.losses-b.losses || a.teamName.localeCompare(b.teamName)).map((row,index)=>({...row, rank:index+1}));
 }
 
-function LeaguePulse({ teams, results }) {
-  const rankings = computerRankingRows(teams, results);
-  const played = rankings.filter((row) => row.games > 0);
-  const bestOffense = [...played].sort((a,b)=>b.avgPf-a.avgPf)[0];
-  const bestDefense = [...played].sort((a,b)=>a.avgPa-b.avgPa)[0];
-  const toughest = [...played].sort((a,b)=>b.sor-a.sor)[0];
-  const qwLeader = [...played].sort((a,b)=>b.qw-a.qw || b.wins-a.wins)[0];
-  const worstDefense = [...played].sort((a,b)=>b.avgPa-a.avgPa)[0];
-  const leastAvgPf = [...played].sort((a,b)=>a.avgPf-b.avgPf)[0];
-  const easiestRoad = [...played].sort((a,b)=>a.sor-b.sor)[0];
-  const worstResume = [...played].sort((a,b)=>a.score-b.score || a.wins-b.wins)[0];
-  return <div style={statsGrid}>
-    <PulseCard title="#1 Computer Rank" value={rankings[0]?.teamName || "—"} sub={rankings[0] ? `${rankings[0].wins}-${rankings[0].losses} · ${rankings[0].score} score` : "No games yet"}/>
+function LeaguePulse({ teams, results, allAmericans = [], awards = [], currentYear }) {
+  const rows = computerRankingRows(teams, results);
+  const bestOffense = [...rows].sort((a,b)=>b.avgPf-a.avgPf)[0];
+  const bestDefense = [...rows].filter((r)=>r.games).sort((a,b)=>a.avgPa-b.avgPa)[0];
+  const qwLeader = [...rows].sort((a,b)=>b.qw-a.qw)[0];
+  const toughest = [...rows].sort((a,b)=>b.sor-a.sor)[0];
+  const worstDefense = [...rows].filter((r)=>r.games).sort((a,b)=>b.avgPa-a.avgPa)[0];
+  const leastAvgPf = [...rows].filter((r)=>r.games).sort((a,b)=>a.avgPf-b.avgPf)[0];
+  const easiestRoad = [...rows].filter((r)=>r.games).sort((a,b)=>a.sor-b.sor)[0];
+  const worstResume = [...rows].filter((r)=>r.games).sort((a,b)=>a.score-b.score)[0];
+  const yearAA = allAmericans.filter((row)=>String(row.season_year) === String(currentYear));
+  const yearAwards = awards.filter((row)=>String(row.season_year) === String(currentYear));
+  const aaLeader = rankingRows(teams, yearAA)[0];
+  const awardLeader = rankingRows(teams, yearAwards)[0];
+
+  return <div style={pulseGrid}>
+    <PulseCard title="#1 Computer Rank" value={rows[0]?.teamName || "—"} sub={rows[0] ? `${rows[0].wins}-${rows[0].losses} · ${rows[0].score} score` : "No games yet"}/>
     <PulseCard title="Best Offense" value={bestOffense?.teamName || "—"} sub={bestOffense ? `${bestOffense.avgPf.toFixed(1)} Avg PF` : "—"}/>
     <PulseCard title="Best Defense" value={bestDefense?.teamName || "—"} sub={bestDefense ? `${bestDefense.avgPa.toFixed(1)} Avg PA` : "—"}/>
     <PulseCard title="Best Resume" value={qwLeader?.teamName || "—"} sub={qwLeader ? `${qwLeader.qw} quality wins` : "—"}/>
@@ -877,8 +881,11 @@ function LeaguePulse({ teams, results }) {
     <PulseCard title="Least Avg PF" value={leastAvgPf?.teamName || "—"} sub={leastAvgPf ? `${leastAvgPf.avgPf.toFixed(1)} Avg PF` : "—"}/>
     <PulseCard title="Easiest Road" value={easiestRoad?.teamName || "—"} sub={easiestRoad ? `${easiestRoad.sor.toFixed(1)} SOR` : "—"}/>
     <PulseCard title="Worst Resume" value={worstResume?.teamName || "—"} sub={worstResume ? `${worstResume.score.toFixed(1)} computer score` : "—"}/>
+    <PulseCard title="Most All-Americans" value={aaLeader?.team || "—"} sub={aaLeader ? `${aaLeader.total} in ${currentYear}` : `0 in ${currentYear}`}/>
+    <PulseCard title="Most Awards Won" value={awardLeader?.team || "—"} sub={awardLeader ? `${awardLeader.total} in ${currentYear}` : `0 in ${currentYear}`}/>
   </div>;
 }
+
 function PulseCard({ title, value, sub }) { return <div style={pulseCard}><div style={statTitle}>{title}</div><div style={pulseValue}>{value}</div><div style={mutedText}>{sub}</div></div>; }
 
 function ComputerRankings({ teams, results, sortState, setSortState }) {
@@ -948,24 +955,55 @@ function AllTimeUserStandings({ users, teams, assignments, results, sortState, s
   return <section style={card}><h2 style={sectionTitle}>All-Time User Standings</h2><p style={mutedText}>All recorded user games across every season, grouped by Discord user. Current team is listed for context.</p><Table headers={["#",<SortButton label="Discord User" sortKey="discord" sortState={activeSort} setSortState={setSortState}/>,"Current Team",<SortButton label="Record" sortKey="record" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="QW" sortKey="qw" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="Avg PF" sortKey="avgPf" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="Avg PA" sortKey="avgPa" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="Score" sortKey="score" sortState={activeSort} setSortState={setSortState}/>]}>{rows.map((row,index)=><tr key={row.user.id} style={trStyle}><td style={rankCell}>#{index + 1}</td><td style={teamCell}>{row.discord}</td><td style={td}>{row.currentTeam ? <TeamLabel team={row.currentTeam}/> : "—"}</td><td style={td}>{row.wins}-{row.losses}</td><td style={td}>{row.qw}</td><td style={td}>{row.avgPf.toFixed(1)}</td><td style={td}>{row.avgPa.toFixed(1)}</td><td style={scoreCell}>{row.score.toFixed(1)}</td></tr>)}</Table></section>;
 }
 
+function rowsForCoachUser(rows, user, assignments) {
+  return rows.filter((row) => {
+    const assignment = coachForTeamYear(row.team_id, row.season_year, assignments);
+    return assignment?.discord_user_id === user.id;
+  });
+}
+
+function RecognitionTable({ title, headers, rows }) {
+  return <div style={miniCard}><h3 style={miniTitle}>{title}</h3><Table headers={headers}>{rows.length ? rows.map((row, index)=><tr key={row.id || index} style={trStyle}>{row.cells.map((cell, cellIndex)=><td key={cellIndex} style={cellIndex === 0 ? teamCell : td}>{cell}</td>)}</tr>) : <tr style={trStyle}><td style={td} colSpan={headers.length}>No records yet.</td></tr>}</Table></div>;
+}
+
 function CoachProfile({ user, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting }) {
-  const stats = getCoachStats([user], teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting)[0];
+  const coachStats = getCoachStats(usersFallback(user), teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
+  const stats = coachStats.find((row)=>row.userId === user.id) || { wins:0, losses:0, nattys:0, confTitles:0, top25Wins:0, awards:0, allAmericans:0, heismans:0, prestige:0, teamsCoachedText:"—" };
   const activeAssignment = assignments.find((a)=>a.discord_user_id===user.id && a.status==="Active");
   const currentTeam = teams.find((t)=>t.id===activeAssignment?.team_id);
   const timeline = assignments.filter((a)=>a.discord_user_id===user.id).sort((a,b)=>Number(a.start_year||0)-Number(b.start_year||0));
-  return <section style={profileCard}><div style={profileHero}><div><div style={eyebrow}>Coach Profile</div><h2 style={profileName}>{user.discord_username}</h2><p style={mutedText}>Current Team: {currentTeam?.name || "Unassigned"}</p></div>{currentTeam && <TeamLabel team={currentTeam}/>}</div><div style={statsGrid}><Stat title="Career Record" value={`${stats?.wins||0}-${stats?.losses||0}`}/><Stat title="National Titles" value={stats?.nattys||0}/><Stat title="Conference Titles" value={stats?.confTitles||0}/><Stat title="Top 25 Wins" value={stats?.top25Wins||0}/><Stat title="Awards" value={stats?.awards||0}/><Stat title="All-Americans" value={stats?.allAmericans||0}/><Stat title="Heismans" value={stats?.heismans||0}/><Stat title="Prestige" value={(stats?.prestige||0).toFixed(1)}/></div><div style={twoCol}><div style={miniCard}><h3 style={miniTitle}>Career Timeline</h3>{timeline.map((a)=><div key={a.id} style={miniRow}>{a.start_year || "?"}-{a.end_year || "Present"}: {a.teams?.name || teamNameById(a.team_id, teams)}</div>)}</div><div style={miniCard}><h3 style={miniTitle}>Teams Coached</h3><div style={miniRow}>{stats?.teamsCoachedText || "—"}</div></div></div></section>;
+  const coachResults = results.filter((result) => {
+    const team1UserId = result.team_1_user_id || coachForTeamYear(result.team_1_id, result.season_year, assignments)?.discord_user_id;
+    const team2UserId = result.team_2_user_id || coachForTeamYear(result.team_2_id, result.season_year, assignments)?.discord_user_id;
+    return team1UserId === user.id || team2UserId === user.id;
+  });
+  const coachAA = rowsForCoachUser(allAmericans, user, assignments);
+  const coachAwards = rowsForCoachUser(awards, user, assignments);
+  const coachHeismans = rowsForCoachUser(heismans, user, assignments);
+
+  return <section style={profileCard}>
+    <div style={profileHero}><div><div style={eyebrow}>Coach Profile</div><h2 style={profileName}>{user.discord_username}</h2><p style={mutedText}>Current Team: {currentTeam?.name || "Unassigned"}</p></div>{currentTeam && <TeamLabel team={currentTeam}/>}</div>
+    <div style={statsGrid}><Stat title="Career Record" value={`${stats?.wins||0}-${stats?.losses||0}`}/><Stat title="National Titles" value={stats?.nattys||0}/><Stat title="Conference Titles" value={stats?.confTitles||0}/><Stat title="Top 25 Wins" value={stats?.top25Wins||0}/><Stat title="Awards" value={stats?.awards||0}/><Stat title="All-Americans" value={stats?.allAmericans||0}/><Stat title="Heismans" value={stats?.heismans||0}/><Stat title="Prestige" value={(stats?.prestige||0).toFixed(1)}/></div>
+    <div style={twoCol}><div style={miniCard}><h3 style={miniTitle}>Career Timeline</h3>{timeline.length ? timeline.map((a)=><div key={a.id} style={miniRow}>{a.start_year || "?"}-{a.end_year || "Present"}: {a.teams?.name || teamNameById(a.team_id, teams)}</div>) : <div style={miniRow}>No team history assigned.</div>}</div><div style={miniCard}><h3 style={miniTitle}>Teams Coached</h3><div style={miniRow}>{stats?.teamsCoachedText || "—"}</div></div></div>
+    <Results rows={coachResults} deleteResult={()=>{}} search="" setSearch={()=>{}}/>
+    <RecognitionTable title="All-Americans" headers={["Player","Position","Team","Year","Type"]} rows={coachAA.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year,r.type]}))}/>
+    <RecognitionTable title="Award Winners" headers={["Player","Position","Team","Year","Award"]} rows={coachAwards.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year,r.award_name]}))}/>
+    <RecognitionTable title="Heisman Winners" headers={["Player","Position","Team","Year"]} rows={coachHeismans.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year]}))}/>
+  </section>;
 }
+
+function usersFallback(user) { return [user]; }
 
 function coachHofCriteria(row) {
   const accolades = row.heismans + row.awards + row.allAmericans;
-  const qualifies = row.nattys >= 1 || row.confTitles >= 2 || row.wins >= 25 || row.top25Wins >= 10 || row.rawPrestige >= 40 || accolades >= 12;
+  const qualifies = row.nattys >= 2 || (row.nattys >= 1 && row.confTitles >= 3) || row.wins >= 50 || row.top25Wins >= 20 || row.rawPrestige >= 100 || (accolades >= 25 && row.wins >= 25);
   const reasons = [];
-  if (row.nattys >= 1) reasons.push("National Champion");
-  if (row.confTitles >= 2) reasons.push("2+ Conference Titles");
-  if (row.wins >= 25) reasons.push("25+ Career Wins");
-  if (row.top25Wins >= 10) reasons.push("10+ Top 25 Wins");
-  if (row.rawPrestige >= 40) reasons.push("40+ HOF Score");
-  if (accolades >= 12) reasons.push("12+ Major Accolades");
+  if (row.nattys >= 2) reasons.push("2+ National Titles");
+  if (row.nattys >= 1 && row.confTitles >= 3) reasons.push("Title + 3 Conf Titles");
+  if (row.wins >= 50) reasons.push("50+ Career Wins");
+  if (row.top25Wins >= 20) reasons.push("20+ Top 25 Wins");
+  if (row.rawPrestige >= 100) reasons.push("100+ HOF Score");
+  if (accolades >= 25 && row.wins >= 25) reasons.push("25+ Major Accolades");
   return { qualifies, reasons };
 }
 
@@ -974,7 +1012,7 @@ function CoachHallOfFame({ users, teams, assignments, results, allAmericans, awa
     .map((row)=>({ ...row, hofCriteria: coachHofCriteria(row) }))
     .filter((row)=>row.hofCriteria.qualifies)
     .sort((a,b)=>b.rawPrestige-a.rawPrestige || b.wins-a.wins);
-  return <section style={card}><h2 style={sectionTitle}>Coach Hall of Fame</h2><p style={mutedText}>Coaches qualify automatically by meeting at least one benchmark: 1 national title, 2 conference titles, 25 career wins, 10 Top 25 wins, 40+ HOF score, or 12+ major accolades.</p>{rows.length ? <div style={hofGrid}>{rows.map((row)=><CoachHofCard key={row.userId || row.discord} row={row} teams={teams} assignments={assignments}/>)}</div> : <div style={miniRow}>No coaches have met Hall of Fame criteria yet.</div>}</section>;
+  return <section style={card}><h2 style={sectionTitle}>Coach Hall of Fame</h2><p style={mutedText}>Coaches qualify automatically by meeting tougher benchmarks: 2 national titles, 1 title plus 3 conference titles, 50 career wins, 20 Top 25 wins, 100+ HOF score, or 25+ major accolades with 25+ wins.</p>{rows.length ? <div style={hofGrid}>{rows.map((row)=><CoachHofCard key={row.userId || row.discord} row={row} teams={teams} assignments={assignments}/>)}</div> : <div style={miniRow}>No coaches have met Hall of Fame criteria yet.</div>}</section>;
 }
 function CoachHofCard({ row, teams, assignments }) {
   const activeAssignment = assignments.find((a)=>a.discord_user_id===row.userId && a.status==="Active");
@@ -1008,16 +1046,17 @@ function playerHallRows(teams, assignments, results, allAmericans, awards, heism
     });
     row.score = row.heismans.length*30 + row.awards.length*12 + row.allAmericans.length*8 + row.nattys*18 + row.confTitles*8;
     if (row.heismans.length >= 1) row.reasons.push("Heisman Winner");
-    if (row.awards.length >= 2) row.reasons.push("2+ Major Awards");
-    if (row.allAmericans.length >= 3) row.reasons.push("3+ All-American Selections");
-    if (row.nattys >= 1 && (row.heismans.length || row.awards.length || row.allAmericans.length)) row.reasons.push("Title Season Accolade");
+    if (row.heismans.length >= 1 && (row.awards.length >= 1 || row.allAmericans.length >= 2)) row.reasons.push("Heisman + Supporting Accolades");
+    if (row.awards.length >= 3) row.reasons.push("3+ Major Awards");
+    if (row.allAmericans.length >= 4) row.reasons.push("4+ All-American Selections");
+    if (row.nattys >= 1 && (row.heismans.length || row.awards.length >= 2 || row.allAmericans.length >= 3)) row.reasons.push("Elite Title Season Accolade");
     if (row.score >= 32) row.reasons.push("32+ HOF Score");
   });
-  return [...map.values()].filter((r)=>r.heismans.length >= 1 || r.awards.length >= 2 || r.allAmericans.length >= 3 || (r.nattys >= 1 && (r.awards.length || r.allAmericans.length || r.heismans.length)) || r.score >= 32).sort((a,b)=>b.score-a.score || a.player.localeCompare(b.player));
+  return [...map.values()].filter((r)=>(r.heismans.length >= 1 && (r.awards.length >= 1 || r.allAmericans.length >= 2)) || r.awards.length >= 3 || r.allAmericans.length >= 4 || (r.nattys >= 1 && (r.heismans.length || r.awards.length >= 2 || r.allAmericans.length >= 3)) || r.score >= 60).sort((a,b)=>b.score-a.score || a.player.localeCompare(b.player));
 }
 function PlayerHallOfFame({ teams, assignments, results, allAmericans, awards, heismans, nationalChampions }) {
   const rows = playerHallRows(teams, assignments, results, allAmericans, awards, heismans, nationalChampions);
-  return <section style={card}><h2 style={sectionTitle}>Player Hall of Fame</h2><p style={mutedText}>Players qualify automatically by hitting at least one benchmark: Heisman, 2 major awards, 3 All-American selections, title-season accolade, or 32+ HOF score.</p>{rows.length ? <div style={hofGrid}>{rows.map((row)=><PlayerHofCard key={row.key} row={row} team={teams.find((t)=>t.id===row.teamId)}/>)}</div> : <div style={miniRow}>No players have met Hall of Fame criteria yet.</div>}</section>;
+  return <section style={card}><h2 style={sectionTitle}>Player Hall of Fame</h2><p style={mutedText}>Players qualify automatically by tougher benchmarks: Heisman plus supporting accolades, 3 major awards, 4 All-American selections, elite title-season accolades, or 60+ HOF score.</p>{rows.length ? <div style={hofGrid}>{rows.map((row)=><PlayerHofCard key={row.key} row={row} team={teams.find((t)=>t.id===row.teamId)}/>)}</div> : <div style={miniRow}>No players have met Hall of Fame criteria yet.</div>}</section>;
 }
 function PlayerHofCard({ row, team }) { return <div style={hofCard}><div style={hofTopClean}><div style={hofIconWrap}>{team ? <HofTeamIcon team={team}/> : <span style={hofIcon}>🏈</span>}</div><div style={{minWidth:0}}><div style={eyebrow}>Player Hall of Fame</div><h3 style={hofName}>{row.player}</h3><div style={mutedText}>{row.position} · {team?.name || "Unknown Team"}</div></div></div><div style={hofScoreBand}><span>HOF Score</span><b style={hofScoreBandB}>{row.score}</b></div><div style={hofReason}>{row.reasons.join(" • ")}</div><div style={hofChips}><Chip label="Heisman" value={row.heismans.length}/><Chip label="Awards" value={row.awards.length}/><Chip label="All-Americans" value={row.allAmericans.length}/><Chip label="Nattys" value={row.nattys}/><Chip label="Conf" value={row.confTitles}/></div><div style={accoladeList}>{[...row.heismans, ...row.awards, ...row.allAmericans].slice(0,8).map((x,i)=><div key={i} style={miniRow}>{x}</div>)}</div></div>; }
 
