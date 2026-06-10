@@ -297,6 +297,164 @@ function getCoachStats(users, teams, assignments, results, allAmericans, awards,
     .sort((a, b) => b.prestige - a.prestige || b.wins - a.wins || a.discord.localeCompare(b.discord));
 }
 
+
+function teamById(teamId, teams) {
+  return teams.find((team) => team.id === teamId) || null;
+}
+
+function resultWinnerTeamId(result) {
+  const score1 = Number(result.team_1_score || 0);
+  const score2 = Number(result.team_2_score || 0);
+  if (score1 > score2) return result.team_1_id;
+  if (score2 > score1) return result.team_2_id;
+  return null;
+}
+
+function teamWonWeekInYear(teamId, year, week, results) {
+  return results.some((result) => (
+    String(result.season_year) === String(year) &&
+    result.week === week &&
+    resultWinnerTeamId(result) === teamId
+  ));
+}
+
+function teamWonNationalTitleInYear(teamId, year, results, nationalChampions) {
+  return nationalChampions.some((champion) => String(champion.season_year) === String(year) && champion.team_id === teamId) ||
+    teamWonWeekInYear(teamId, year, "National Championship Week", results);
+}
+
+function teamWonConferenceTitleInYear(teamId, year, results) {
+  return teamWonWeekInYear(teamId, year, "Conference Championship Week", results);
+}
+
+function getPrimaryTeamForCoach(row, teams) {
+  const activeName = row.activeTeams?.[0];
+  return teams.find((team) => team.name === activeName) ||
+    teams.find((team) => row.teamsCoached?.has?.(team.name)) ||
+    null;
+}
+
+function getCoachHallOfFameRows(users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting) {
+  return getCoachStats(users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting)
+    .map((coach) => {
+      const score =
+        coach.nattys * 10 +
+        coach.confTitles * 4 +
+        coach.wins * 0.6 +
+        coach.top25Wins * 1.5 +
+        coach.bowlWins * 1.2 +
+        coach.heismans * 5 +
+        coach.awards * 2 +
+        coach.allAmericans * 1;
+
+      const accolades = [
+        `${coach.wins}-${coach.losses} career record`,
+        `${coach.nattys} national title${coach.nattys === 1 ? "" : "s"}`,
+        `${coach.confTitles} conference title${coach.confTitles === 1 ? "" : "s"}`,
+        `${coach.top25Wins} Top 25 win${coach.top25Wins === 1 ? "" : "s"}`,
+        `${coach.bowlWins}-${coach.bowlLosses} bowl record`,
+        `${coach.heismans} Heisman winner${coach.heismans === 1 ? "" : "s"}`,
+        `${coach.awards} award winner${coach.awards === 1 ? "" : "s"}`,
+        `${coach.allAmericans} All-American${coach.allAmericans === 1 ? "" : "s"}`,
+      ];
+
+      return {
+        ...coach,
+        hofScore: Number(score.toFixed(1)),
+        team: getPrimaryTeamForCoach(coach, teams),
+        accolades,
+      };
+    })
+    .filter((coach) => coach.nattys >= 1 || coach.wins >= 20 || coach.confTitles >= 2 || coach.heismans >= 1 || coach.awards >= 5 || coach.allAmericans >= 8)
+    .sort((a, b) => b.hofScore - a.hofScore || b.wins - a.wins || a.discord.localeCompare(b.discord));
+}
+
+function getPlayerHallOfFameRows(teams, results, allAmericans, awards, heismans, nationalChampions) {
+  const playerMap = new Map();
+
+  function playerKey(playerName, teamId) {
+    return `${String(playerName || "").trim().toLowerCase()}|${teamId || "unknown"}`;
+  }
+
+  function ensurePlayer(playerName, teamId, position, year) {
+    const key = playerKey(playerName, teamId);
+    if (!playerMap.has(key)) {
+      playerMap.set(key, {
+        key,
+        playerName: playerName || "Unknown Player",
+        teamId,
+        team: teamById(teamId, teams),
+        positions: new Set(),
+        years: new Set(),
+        awards: [],
+        heismans: [],
+        allAmericans: [],
+        confTitleYears: new Set(),
+        nattyYears: new Set(),
+        hofScore: 0,
+      });
+    }
+
+    const row = playerMap.get(key);
+    if (position) row.positions.add(position);
+    if (year) row.years.add(String(year));
+    return row;
+  }
+
+  allAmericans.forEach((row) => {
+    const player = ensurePlayer(row.player_name, row.team_id, row.position, row.season_year);
+    player.allAmericans.push({ year: row.season_year, type: row.type, teamId: row.team_id });
+  });
+
+  awards.forEach((row) => {
+    const player = ensurePlayer(row.player_name, row.team_id, row.position, row.season_year);
+    player.awards.push({ year: row.season_year, name: row.award_name, teamId: row.team_id });
+  });
+
+  heismans.forEach((row) => {
+    const player = ensurePlayer(row.player_name, row.team_id, row.position, row.season_year);
+    player.heismans.push({ year: row.season_year, teamId: row.team_id });
+  });
+
+  playerMap.forEach((player) => {
+    const creditedSeasons = new Set([
+      ...player.awards.map((item) => `${item.year}|${item.teamId}`),
+      ...player.heismans.map((item) => `${item.year}|${item.teamId}`),
+      ...player.allAmericans.map((item) => `${item.year}|${item.teamId}`),
+    ]);
+
+    creditedSeasons.forEach((seasonKey) => {
+      const [year, teamId] = seasonKey.split("|");
+      if (teamWonConferenceTitleInYear(teamId, year, results)) player.confTitleYears.add(String(year));
+      if (teamWonNationalTitleInYear(teamId, year, results, nationalChampions)) player.nattyYears.add(String(year));
+    });
+
+    player.hofScore =
+      player.heismans.length * 12 +
+      player.awards.length * 5 +
+      player.allAmericans.length * 3 +
+      player.nattyYears.size * 6 +
+      player.confTitleYears.size * 3;
+  });
+
+  return [...playerMap.values()]
+    .filter((player) => player.heismans.length >= 1 || player.awards.length >= 2 || player.allAmericans.length >= 2 || player.hofScore >= 10)
+    .map((player) => ({
+      ...player,
+      positionText: [...player.positions].filter(Boolean).sort().join(", ") || "—",
+      yearText: [...player.years].sort().join(", ") || "—",
+      accolades: [
+        ...player.heismans.map((item) => `${item.year} Heisman Trophy`),
+        ...player.awards.map((item) => `${item.year} ${item.name}`),
+        ...player.allAmericans.map((item) => `${item.year} ${item.type} All-American`),
+        ...[...player.confTitleYears].sort().map((year) => `${year} Conference Champion`),
+        ...[...player.nattyYears].sort().map((year) => `${year} National Champion`),
+      ],
+    }))
+    .sort((a, b) => b.hofScore - a.hofScore || a.playerName.localeCompare(b.playerName));
+}
+
+
 function recordBookRows(users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting) {
   const coachRows = getCoachStats(users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
   const activeTeams = teams.filter((team) => assignments.some((assignment) => assignment.team_id === team.id && assignment.status === "Active"));
@@ -517,7 +675,7 @@ export default function App() {
     await saveCommissionerRankings(next);
   }
 
-  const baseTabs = [["dashboard","Dashboard"],["prestige","Prestige"],["recordBook","Record Book"],["weeklyNews","Weekly News"],["teamAssets","Team Assets"],["assignments","Users/Team Assignments"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...activeTeamOptions.map((team) => [`team-${team.id}`, team.name])];
+  const baseTabs = [["dashboard","Dashboard"],["prestige","Prestige"],["recordBook","Record Book"],["weeklyNews","Weekly News"],["teamAssets","Team Assets"],["assignments","Users/Team Assignments"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],["coachHof","Coach Hall of Fame"],["playerHof","Player Hall of Fame"],...activeTeamOptions.map((team) => [`team-${team.id}`, team.name])];
   const tabs = useMemo(() => {
     const tabMap = new Map(baseTabs);
     const ordered = tabOrder
@@ -823,6 +981,8 @@ export default function App() {
     {activeTab === "awards" && <Awards rows={awards} teams={teamOptions} addRow={addAward} updateRow={updateRow} deleteRow={deleteRow} rankings={rankingRows(activeTeamOptions, awards)} drafts={draftAwards} setDrafts={setDraftAwards} saveDraft={saveDraft} getDraft={getDraft}/>}    
     {activeTab === "heismans" && <Heismans rows={heismans} teams={teamOptions} addRow={addHeisman} updateRow={updateRow} deleteRow={deleteRow} drafts={draftHeismans} setDrafts={setDraftHeismans} saveDraft={saveDraft} getDraft={getDraft}/>}    
     {activeTab === "nationalChampions" && <NationalChampions rows={nationalChampions} teams={teamOptions} users={userOptions} addRow={addNationalChampion} updateRow={updateRow} deleteRow={deleteRow} drafts={draftChampions} setDrafts={setDraftChampions} saveDraft={saveDraft} getDraft={getDraft}/>}        
+    {activeTab === "coachHof" && <CoachHallOfFame users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}
+    {activeTab === "playerHof" && <PlayerHallOfFame teams={teamOptions} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions}/>}        
     {selectedTeam && <TeamPage team={selectedTeam} standings={standings.find((r)=>r.team_id===selectedTeam.id)} results={results.filter((r)=>r.team_1_id===selectedTeam.id||r.team_2_id===selectedTeam.id)} allAmericans={allAmericans.filter((r)=>r.team_id===selectedTeam.id)} awards={awards.filter((r)=>r.team_id===selectedTeam.id)} heismans={heismans.filter((r)=>r.team_id===selectedTeam.id)} recruiting={recruiting.filter((r)=>r.team_id===selectedTeam.id)} historyRows={historyRows.filter((r)=>r.team_id===selectedTeam.id)} teams={activeTeamOptions} assignments={assignments} allResults={currentYearResults} addRecruiting={addRecruiting} addHistory={addHistory} updateRow={updateRow} deleteRow={deleteRow} newRecruiting={newRecruiting} setNewRecruiting={setNewRecruiting} newHistory={newHistory} setNewHistory={setNewHistory}/>}    
   </div></div>;
 }
@@ -1195,6 +1355,97 @@ function WeeklyNews({ results, teams, currentYear, currentWeek }) {
   );
 }
 
+
+function HallOfFameBanner({ type, title, subtitle, team, score, accolades }) {
+  const helmetUrl = getHelmetUrl(team);
+
+  return (
+    <div style={hofBanner}>
+      <div style={hofBannerIconWrap}>
+        <div style={hofPixelIcon}>{type === "coach" ? "🎧" : "🏈"}</div>
+        {helmetUrl ? <img src={helmetUrl} alt="" style={hofTeamLogo} /> : <div style={hofTeamLogoFallback}>8</div>}
+      </div>
+      <div style={hofBannerBody}>
+        <div style={hofEyebrow}>{type === "coach" ? "Coach Hall of Fame" : "Player Hall of Fame"}</div>
+        <h3 style={hofBannerTitle}>{title}</h3>
+        <div style={hofBannerSubtitle}>{subtitle}</div>
+        <div style={hofAccoladeGrid}>
+          {accolades.filter(Boolean).map((accolade, index) => (
+            <span key={index} style={hofAccoladePill}>{accolade}</span>
+          ))}
+        </div>
+      </div>
+      <div style={hofScoreBox}>
+        <div style={statTitle}>HOF Score</div>
+        <div style={hofScoreValue}>{score}</div>
+      </div>
+    </div>
+  );
+}
+
+function CoachHallOfFame({ users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting }) {
+  const rows = getCoachHallOfFameRows(users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
+
+  return (
+    <section style={card}>
+      <div style={sectionTop}>
+        <div>
+          <h2 style={sectionTitle}>Coach Hall of Fame</h2>
+          <p style={mutedText}>Automatically generated from all-time wins, championships, Top 25 wins, bowl wins, awards, Heismans, and All-Americans.</p>
+        </div>
+      </div>
+
+      <div style={hofGrid}>
+        {rows.length ? rows.map((row) => (
+          <HallOfFameBanner
+            key={row.userId || row.discord}
+            type="coach"
+            title={row.discord}
+            subtitle={`Current Team: ${row.activeTeamsText} • Teams Coached: ${row.teamsCoachedText}`}
+            team={row.team}
+            score={row.hofScore}
+            accolades={row.accolades}
+          />
+        )) : (
+          <div style={miniCard}>No coaches have met the Hall of Fame threshold yet.</div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function PlayerHallOfFame({ teams, results, allAmericans, awards, heismans, nationalChampions }) {
+  const rows = getPlayerHallOfFameRows(teams, results, allAmericans, awards, heismans, nationalChampions);
+
+  return (
+    <section style={card}>
+      <div style={sectionTop}>
+        <div>
+          <h2 style={sectionTitle}>Player Hall of Fame</h2>
+          <p style={mutedText}>Automatically generated from Heismans, awards, All-Americans, and title seasons tied to that player's team and year.</p>
+        </div>
+      </div>
+
+      <div style={hofGrid}>
+        {rows.length ? rows.map((row) => (
+          <HallOfFameBanner
+            key={row.key}
+            type="player"
+            title={row.playerName}
+            subtitle={`${row.positionText} • ${row.team?.name || "Unknown Team"} • Years: ${row.yearText}`}
+            team={row.team}
+            score={row.hofScore}
+            accolades={row.accolades}
+          />
+        )) : (
+          <div style={miniCard}>No players have met the Hall of Fame threshold yet.</div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+
 function Assignments({ rows, teams, users, addAssignment, updateRow, deleteRow, drafts, setDrafts, saveDraft, getDraft, teamChange, setTeamChange, changeUserTeam }) {
   return <section style={card}>
     <div style={sectionTop}><h2 style={sectionTitle}>Users / Team Assignments</h2><button onClick={addAssignment} style={button}>Add Assignment</button></div>
@@ -1455,6 +1706,22 @@ const miniRow={borderBottom:"1px solid #27272a",padding:"10px 0",color:"#e4e4e7"
 const teamLabel={display:"inline-flex",alignItems:"center",gap:10};
 const helmetIcon={width:28,height:28,objectFit:"contain",borderRadius:6,background:"#27272a"};
 const helmetFallback={fontSize:22,lineHeight:1};
+
+
+const hofGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(340px, 1fr))",gap:18,marginTop:22};
+const hofBanner={display:"grid",gridTemplateColumns:"86px minmax(0,1fr) 120px",gap:18,alignItems:"center",background:"linear-gradient(135deg,#111113 0%,#18181b 55%,#3f1111 100%)",border:"1px solid #3f3f46",borderRadius:22,padding:20,boxShadow:"0 14px 30px rgba(0,0,0,.25)"};
+const hofBannerIconWrap={position:"relative",width:76,height:76,display:"grid",placeItems:"center",background:"#09090b",border:"1px solid #3f3f46",borderRadius:18};
+const hofPixelIcon={fontSize:42,filter:"drop-shadow(0 2px 0 #000)",imageRendering:"pixelated"};
+const hofTeamLogo={position:"absolute",right:-8,bottom:-8,width:34,height:34,objectFit:"contain",background:"#27272a",border:"1px solid #3f3f46",borderRadius:8,padding:3,imageRendering:"pixelated"};
+const hofTeamLogoFallback={position:"absolute",right:-8,bottom:-8,width:34,height:34,display:"grid",placeItems:"center",background:"#27272a",border:"1px solid #3f3f46",borderRadius:8,fontWeight:900,color:"#fbbf24"};
+const hofBannerBody={minWidth:0};
+const hofEyebrow={color:"#fbbf24",fontSize:12,textTransform:"uppercase",fontWeight:900,letterSpacing:1.2,marginBottom:6};
+const hofBannerTitle={fontSize:26,lineHeight:1.05,margin:"0 0 6px",color:"white",fontWeight:900};
+const hofBannerSubtitle={color:"#d4d4d8",fontSize:14,marginBottom:12};
+const hofAccoladeGrid={display:"flex",flexWrap:"wrap",gap:8};
+const hofAccoladePill={background:"#27272a",border:"1px solid #3f3f46",color:"#e4e4e7",borderRadius:999,padding:"6px 10px",fontSize:12,fontWeight:700};
+const hofScoreBox={background:"#09090b",border:"1px solid #3f3f46",borderRadius:16,padding:14,textAlign:"center"};
+const hofScoreValue={fontSize:30,fontWeight:900,color:"#fbbf24"};
 
 const coachBanner={display:"flex",justifyContent:"space-between",gap:20,alignItems:"center",background:"#111113",border:"1px solid #27272a",borderRadius:18,padding:18,margin:"18px 0 24px",flexWrap:"wrap"};
 const coachNameStyle={fontSize:28,fontWeight:900,color:"#f87171"};
