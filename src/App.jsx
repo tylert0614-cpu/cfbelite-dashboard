@@ -112,12 +112,12 @@ function teamPageTheme(team) {
   const secondary = getTeamSecondary(team);
   const accent = team?.accent_color || secondary || "#facc15";
   return {
-    ...profileCard,
+    ...liquidGlassPanel,
     position: "relative",
     overflow: "hidden",
     border: `1px solid ${accent}66`,
-    background: `linear-gradient(145deg, ${primary}f2 0%, rgba(15,23,42,.94) 44%, ${secondary}33 100%)`,
-    boxShadow: `0 24px 70px rgba(0,0,0,.38), inset 0 0 0 1px ${accent}22`,
+    background: `radial-gradient(circle at 8% 0%, ${accent}26, transparent 34%), radial-gradient(circle at 100% 10%, ${secondary}22, transparent 28%), linear-gradient(145deg, ${primary}e8 0%, rgba(15,23,42,.72) 48%, rgba(2,6,23,.90) 100%)`,
+    boxShadow: `0 30px 90px ${primary}66, inset 0 1px 0 rgba(255,255,255,.18)`,
   };
 }
 
@@ -1530,12 +1530,13 @@ function BackupExportPanel({ teams, users, assignments, results, awards, allAmer
 function DataHealthAlerts({ teams, users, assignments, results }) {
   const alerts = [];
   const active = assignments.filter((row)=>row.status === "Active");
-  const activeTeamIds = new Set(active.map((row)=>row.team_id).filter(Boolean));
   const duplicateTeams = active.reduce((map,row)=>map.set(row.team_id,(map.get(row.team_id)||0)+1), new Map());
   const duplicateUsers = active.reduce((map,row)=>map.set(row.discord_user_id,(map.get(row.discord_user_id)||0)+1), new Map());
-  const teamsMissingColors = teams.filter((team)=>!team.primary_color || !team.secondary_color || !team.accent_color);
+  const teamsMissingColors = teams.filter((team)=>!team.primary_color || !team.secondary_color || !team.accent_color || !team.conference);
 
-  if (teamsMissingColors.length) alerts.push(`${teamsMissingColors.length} team${teamsMissingColors.length===1?"":"s"} missing color data`);
+  if (teamsMissingColors.length) {
+    alerts.push(`${teamsMissingColors.length} team${teamsMissingColors.length===1?"":"s"} missing colors/conference: ${teamsMissingColors.slice(0,6).map((team)=>team.name).join(", ")}${teamsMissingColors.length > 6 ? "..." : ""}`);
+  }
   if ([...duplicateTeams.values()].some((count)=>count>1)) alerts.push("Duplicate active team assignments detected");
   if ([...duplicateUsers.values()].some((count)=>count>1)) alerts.push("Duplicate active user assignments detected");
   if (results.some((row)=>!row.team_1_id || !row.team_2_id)) alerts.push("Some results are missing team IDs");
@@ -2053,9 +2054,9 @@ function CoachProfile({ user, teams, assignments, results, allAmericans, awards,
   return <section style={teamThemedProfile}>
     <div style={teamProfileHeroClean}>
       <div>
-        <div style={{...eyebrow, color: accent}}>Coach Profile</div>
-        <h2 style={{...profileName, fontSize:"clamp(42px, 8vw, 76px)", lineHeight:.88, letterSpacing:"-.045em"}}>{user.discord_username}</h2>
-        <p style={teamProfileSubline}>Current Team <b>{currentTeam?.name || "Unassigned"}</b></p>
+        <div style={{...eyebrow, color: accent, letterSpacing:".18em"}}>Coach Profile</div>
+        <h2 style={teamProfileName}>{user.discord_username}</h2>
+        <p style={teamProfileSubline}><span>Current Team</span><b>{currentTeam?.name || "Unassigned"}</b></p>
       </div>
       <div style={badgeRow}>
         <span style={teamBadgeBubble}>{currentTeam?.conference || "CFBElite"}</span>
@@ -3650,7 +3651,7 @@ const tickerContent = {
   whiteSpace: "nowrap",
   color: "#fef3c7",
   fontWeight: 900,
-  animation: "cfbeliteTicker 32s linear infinite",
+  animation: "cfbeliteTicker 52s linear infinite",
 };
 
 const quickJumpCard = {
@@ -3796,22 +3797,9 @@ const rankingMobileCard = {
   overflow: "hidden",
 };
 
-const healthGood = {
-  ...card,
-  border: "1px solid rgba(34,197,94,.28)",
-  background: "rgba(22,101,52,.16)",
-  color: "#bbf7d0",
-  fontWeight: 900,
-};
 
-const healthWarn = {
-  ...card,
-  border: "1px solid rgba(250,204,21,.32)",
-  background: "rgba(113,63,18,.22)",
-  color: "#fef3c7",
-  display: "grid",
-  gap: 8,
-};
+
+
 
 
 const colorDrawerItem = {
@@ -3850,26 +3838,9 @@ const colorDrawerStripe = {
 
 
 
-const glassCard = {
-  background: "linear-gradient(145deg, rgba(255,255,255,.16), rgba(255,255,255,.055))",
-  backdropFilter: "blur(22px) saturate(145%)",
-  WebkitBackdropFilter: "blur(22px) saturate(145%)",
-  border: "1px solid rgba(255,255,255,.18)",
-  borderRadius: 28,
-  padding: 24,
-  boxShadow: "0 28px 80px rgba(0,0,0,.36), inset 0 1px 0 rgba(255,255,255,.18)",
-  marginBottom: 20,
-};
 
-const glassMiniCard = {
-  background: "linear-gradient(145deg, rgba(255,255,255,.14), rgba(255,255,255,.045))",
-  backdropFilter: "blur(18px) saturate(140%)",
-  WebkitBackdropFilter: "blur(18px) saturate(140%)",
-  border: "1px solid rgba(255,255,255,.16)",
-  borderRadius: 22,
-  padding: 18,
-  boxShadow: "0 18px 55px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.14)",
-};
+
+
 
 const teamProfileHeroClean = {
   borderRadius: 0,
@@ -3884,32 +3855,120 @@ const teamProfileHeroClean = {
   boxShadow: "none",
 };
 
-const teamProfileSubline = {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const liquidGlassPanel = {
+  background: "linear-gradient(145deg, rgba(255,255,255,.145), rgba(255,255,255,.045))",
+  backdropFilter: "blur(24px) saturate(155%)",
+  WebkitBackdropFilter: "blur(24px) saturate(155%)",
+  border: "1px solid rgba(255,255,255,.16)",
+  borderRadius: 28,
+  padding: 24,
+  boxShadow: "0 28px 85px rgba(0,0,0,.36), inset 0 1px 0 rgba(255,255,255,.16)",
+  marginBottom: 20,
+};
+
+const liquidGlassTile = {
+  background: "linear-gradient(145deg, rgba(255,255,255,.13), rgba(255,255,255,.04))",
+  backdropFilter: "blur(18px) saturate(150%)",
+  WebkitBackdropFilter: "blur(18px) saturate(150%)",
+  border: "1px solid rgba(255,255,255,.14)",
+  borderRadius: 22,
+  padding: 18,
+  boxShadow: "0 18px 55px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.14)",
+};
+
+const teamProfileName = {
   margin: "12px 0 0",
+  color: "#fff",
+  fontSize: "clamp(46px, 8vw, 82px)",
+  lineHeight: .84,
+  letterSpacing: "-.055em",
+  fontWeight: 1000,
+  textShadow: "0 18px 42px rgba(0,0,0,.34)",
+};
+
+
+const glassCard = {
+  ...liquidGlassPanel,
+};
+
+const glassMiniCard = {
+  ...liquidGlassTile,
+};
+
+const teamProfileSubline = {
+  margin: "16px 0 0",
   color: "rgba(255,255,255,.86)",
-  fontSize: "clamp(16px, 3.4vw, 22px)",
+  fontSize: "clamp(15px, 3.1vw, 21px)",
   letterSpacing: "-.01em",
+  display: "flex",
+  gap: 10,
+  flexWrap: "wrap",
+  alignItems: "baseline",
 };
 
 const badgeRow = {
   display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(104px, 1fr))",
-  gap: 8,
+  gridTemplateColumns: "repeat(2, minmax(112px, 1fr))",
+  gap: 10,
   justifyContent: "end",
-  minWidth: 260,
+  minWidth: 280,
 };
 
 const teamBadgeBubble = {
-  minWidth: 104,
+  minWidth: 112,
   textAlign: "center",
-  border: "1px solid rgba(255,255,255,.26)",
+  border: "1px solid rgba(255,255,255,.24)",
   borderRadius: 999,
-  padding: "9px 12px",
+  padding: "10px 13px",
   color: "#fff",
-  background: "rgba(255,255,255,.15)",
+  background: "linear-gradient(145deg, rgba(255,255,255,.18), rgba(255,255,255,.07))",
   fontWeight: 950,
   fontSize: 12,
-  backdropFilter: "blur(14px) saturate(140%)",
-  WebkitBackdropFilter: "blur(14px) saturate(140%)",
-  boxShadow: "inset 0 1px 0 rgba(255,255,255,.20)",
+  backdropFilter: "blur(16px) saturate(155%)",
+  WebkitBackdropFilter: "blur(16px) saturate(155%)",
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,.22), 0 10px 28px rgba(0,0,0,.18)",
+};
+
+const healthGood = {
+  ...liquidGlassPanel,
+  border: "1px solid rgba(34,197,94,.32)",
+  color: "#bbf7d0",
+  fontWeight: 900,
+};
+
+const healthWarn = {
+  ...liquidGlassPanel,
+  border: "1px solid rgba(250,204,21,.34)",
+  color: "#fef3c7",
+  display: "grid",
+  gap: 8,
 };
