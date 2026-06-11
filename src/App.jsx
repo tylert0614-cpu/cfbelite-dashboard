@@ -987,7 +987,7 @@ export default function App() {
     }
   }
 
-  return <div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={isErrorMessage(error) ? errorBox : successBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} draggedTab={draggedTab} setDraggedTab={setDraggedTab} reorderTabs={reorderTabs} adminUnlocked={adminUnlocked} adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin} teams={teamOptions} assignments={assignments} currentYear={currentYear}/>
+  return <><GlobalStyle/><div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={isErrorMessage(error) ? errorBox : successBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} draggedTab={draggedTab} setDraggedTab={setDraggedTab} reorderTabs={reorderTabs} adminUnlocked={adminUnlocked} adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin} teams={teamOptions} assignments={assignments} currentYear={currentYear}/>
     {activeTab === "dashboard" && <><QuickJump teams={activeTeamOptions} users={activeCoachUsers} setActiveTab={setActiveTab}/><DataHealthAlerts teams={teamOptions} users={userOptions} assignments={assignments} results={results}/><HeadlineTicker teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} currentWeek={currentWeek}/><Stats currentYear={currentYear} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} currentWeek={currentWeek} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} teams={activeTeamOptions} assignments={assignments} saveSettings={saveLeagueSettings}/><LeaguePulse teams={activeTeamOptions} results={currentYearResults} allAmericans={allAmericans} awards={awards} currentYear={currentYear} assignments={assignments} users={userOptions}/><GameOfTheWeekDashboard teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} weeklyMatchups={weeklyMatchups} currentYear={currentYear} currentWeek={currentWeek}/><DynastyHeadlines teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} currentWeek={currentWeek}/><Watchlist teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} currentWeek={currentWeek}/><MilestoneTracker users={userOptions} teams={teamOptions} assignments={assignments} results={results}/><ComputerRankings teams={activeTeamOptions} results={currentYearResults} currentWeek={currentWeek} sortState={userSort} setSortState={setUserSort} assignments={assignments} users={userOptions}/><DashboardRecognition allAmericanRows={rankingRows(activeTeamOptions, allAmericans)} awardRows={rankingRows(activeTeamOptions, awards)}/><RecordResult newResult={newResult} setNewResult={setNewResult} teams={activeTeamOptions} users={userOptions} assignments={assignments} submitResult={submitResult}/></>}
     {activeTab === "eloRankings" && <EloRankings users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
     {activeTab === "dynastyRecords" && <DynastyRecords users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
@@ -1008,7 +1008,7 @@ export default function App() {
     {activeTab === "heismans" && <Heismans rows={heismans} teams={teamOptions} addRow={addHeisman} updateRow={updateRow} deleteRow={deleteRow} drafts={draftHeismans} setDrafts={setDraftHeismans} saveDraft={saveDraft} getDraft={getDraft}/>}    
     {activeTab === "nationalChampions" && <NationalChampions rows={nationalChampions} teams={teamOptions} users={userOptions} addRow={addNationalChampion} updateRow={updateRow} deleteRow={deleteRow} drafts={draftChampions} setDrafts={setDraftChampions} saveDraft={saveDraft} getDraft={getDraft}/>}        
     {selectedCoach && <CoachProfile user={selectedCoach} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
-  </div></div>;
+  </div></div></>;
 }
 
 
@@ -2247,6 +2247,75 @@ function PlayerHofCard({ row, team }) {
     </div>
   );
 }
+
+function GlobalStyle() {
+  return (
+    <style>{`
+      :root {
+        --cfb-font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+        --cfb-display: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+        --glass-bg: linear-gradient(145deg, rgba(255,255,255,.16), rgba(255,255,255,.045));
+        --glass-border: rgba(255,255,255,.18);
+        --glass-shadow: 0 28px 90px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.16);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html, body, #root {
+        min-height: 100%;
+        font-family: var(--cfb-font);
+        text-rendering: geometricPrecision;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      body {
+        background:
+          radial-gradient(circle at 10% 0%, rgba(124,58,237,.34), transparent 32%),
+          radial-gradient(circle at 90% 10%, rgba(250,204,21,.12), transparent 28%),
+          radial-gradient(circle at 50% 100%, rgba(59,130,246,.16), transparent 36%),
+          #090615;
+      }
+
+      button, input, select, textarea {
+        font-family: var(--cfb-font);
+      }
+
+      button {
+        transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease, filter .18s ease;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+        filter: brightness(1.07);
+      }
+
+      button:active {
+        transform: translateY(0) scale(.99);
+      }
+
+      table {
+        border-collapse: separate;
+        border-spacing: 0;
+      }
+
+      @supports not ((backdrop-filter: blur(20px))) {
+        .glass-fallback {
+          background: rgba(15,23,42,.92) !important;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .hide-on-mobile-table {
+          display: none !important;
+        }
+      }
+    `}</style>
+  );
+}
+
 function Header({ loading, reload }) {
   return (
     <header style={heroBanner}>
@@ -3083,7 +3152,7 @@ const td={padding:"16px 10px",color:"inherit",verticalAlign:"middle"};
 const teamCell={...td,color:"#facc15",fontWeight:800};
 const clickableTeamCell={...teamCell,cursor:"pointer",textDecoration:"underline"};
 const mutedText={color:"#d6d3d1",marginTop:8,marginBottom:0};
-const errorBox={background:"rgba(127,29,29,.85)",border:"1px solid #ef4444",color:"white",padding:"14px 18px",borderRadius:14,marginBottom:20};
+
 const bracketGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(260px, 1fr))",gap:16,marginTop:20};
 const gameCard={display:"grid",gap:10,border:"1px solid rgba(255,255,255,.1)",borderRadius:16,padding:14,background:"rgba(7,7,12,.75)",marginBottom:14};
 const twoCol={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(320px, 1fr))",gap:20,marginTop:24};
@@ -3313,26 +3382,13 @@ const drawerGroupTitle = {
 };
 
 const drawerItem = {
-  width: "100%",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  textAlign: "left",
-  border: "1px solid rgba(255,255,255,.08)",
-  background: "rgba(255,255,255,.045)",
-  color: "rgba(255,255,255,.86)",
-  borderRadius: 13,
-  padding: "12px 13px",
-  marginBottom: 8,
-  cursor: "pointer",
-  fontWeight: 800,
+  ...liquidGlassNav,
 };
 
 const drawerItemActive = {
-  ...drawerItem,
-  color: "#111827",
-  background: "linear-gradient(135deg, #facc15, #f59e0b)",
-  border: "1px solid rgba(250,204,21,.85)",
+  ...liquidGlassNav,
+  border: "1px solid rgba(250,204,21,.42)",
+  boxShadow: "0 0 0 1px rgba(250,204,21,.20), 0 18px 48px rgba(250,204,21,.12), inset 0 1px 0 rgba(255,255,255,.16)",
 };
 
 const drawerEmpty = {
@@ -3548,14 +3604,7 @@ const headlineList = {
   marginTop: 12,
 };
 
-const headlineItem = {
-  border: "1px solid rgba(250,204,21,.18)",
-  background: "rgba(250,204,21,.07)",
-  color: "rgba(255,255,255,.9)",
-  borderRadius: 14,
-  padding: 12,
-  fontWeight: 800,
-};
+
 
 
 const coachTreeGrid = {
@@ -3604,14 +3653,7 @@ const hofBreakdown = {
 };
 
 
-const homeHeroCard = {
-  ...card,
-  display: "grid",
-  gridTemplateColumns: "minmax(0, 1fr) minmax(280px, .9fr)",
-  gap: 18,
-  alignItems: "center",
-  background: "linear-gradient(135deg, rgba(88,28,135,.72), rgba(15,23,42,.96) 48%, rgba(120,53,15,.55))",
-};
+
 
 const homeHeroTitle = {
   margin: "8px 0",
@@ -3654,10 +3696,7 @@ const tickerContent = {
   animation: "cfbeliteTicker 52s linear infinite",
 };
 
-const quickJumpCard = {
-  ...card,
-  padding: 14,
-};
+
 
 const quickJumpResults = {
   display: "grid",
@@ -3716,23 +3755,7 @@ const hofFringe = { color:"#bfdbfe", fontWeight:950, fontSize:11, marginTop:4 };
 const hofWatch = { color:"rgba(255,255,255,.65)", fontWeight:950, fontSize:11, marginTop:4 };
 
 
-const coachDrawerItem = {
-  width: "100%",
-  position: "relative",
-  display: "grid",
-  gridTemplateColumns: "7px minmax(0, 1fr) auto",
-  alignItems: "center",
-  gap: 12,
-  textAlign: "left",
-  borderRadius: 18,
-  padding: "14px 14px 14px 0",
-  marginBottom: 10,
-  cursor: "pointer",
-  fontWeight: 900,
-  overflow: "hidden",
-  transition: "transform .16s ease, box-shadow .16s ease, border-color .16s ease, filter .16s ease",
-  transform: "translateZ(0)",
-};
+
 
 const coachAccentStripe = {
   width: 7,
@@ -3772,15 +3795,7 @@ const activeSpark = {
 };
 
 
-const successBox = {
-  border: "1px solid rgba(34,197,94,.30)",
-  background: "rgba(22,101,52,.20)",
-  color: "#bbf7d0",
-  borderRadius: 16,
-  padding: 14,
-  marginBottom: 14,
-  fontWeight: 900,
-};
+
 
 const mobileCardGrid = {
   display: "grid",
@@ -3789,37 +3804,14 @@ const mobileCardGrid = {
   marginBottom: 14,
 };
 
-const rankingMobileCard = {
-  border: "1px solid rgba(255,255,255,.10)",
-  background: "rgba(255,255,255,.045)",
-  borderRadius: 16,
-  padding: 12,
-  overflow: "hidden",
-};
 
 
 
 
 
 
-const colorDrawerItem = {
-  width: "100%",
-  position: "relative",
-  display: "grid",
-  gridTemplateColumns: "7px minmax(0, 1fr) auto",
-  alignItems: "center",
-  gap: 12,
-  textAlign: "left",
-  borderRadius: 16,
-  padding: "13px 14px 13px 0",
-  marginBottom: 9,
-  cursor: "pointer",
-  fontWeight: 950,
-  overflow: "hidden",
-  transition: "transform .16s ease, box-shadow .16s ease, border-color .16s ease",
-  textShadow: "0 2px 10px rgba(0,0,0,.30)",
-  letterSpacing: ".01em",
-};
+
+
 
 const colorDrawerStripe = {
   width: 7,
@@ -3884,26 +3876,9 @@ const teamProfileHeroClean = {
 
 
 
-const liquidGlassPanel = {
-  background: "linear-gradient(145deg, rgba(255,255,255,.145), rgba(255,255,255,.045))",
-  backdropFilter: "blur(24px) saturate(155%)",
-  WebkitBackdropFilter: "blur(24px) saturate(155%)",
-  border: "1px solid rgba(255,255,255,.16)",
-  borderRadius: 28,
-  padding: 24,
-  boxShadow: "0 28px 85px rgba(0,0,0,.36), inset 0 1px 0 rgba(255,255,255,.16)",
-  marginBottom: 20,
-};
 
-const liquidGlassTile = {
-  background: "linear-gradient(145deg, rgba(255,255,255,.13), rgba(255,255,255,.04))",
-  backdropFilter: "blur(18px) saturate(150%)",
-  WebkitBackdropFilter: "blur(18px) saturate(150%)",
-  border: "1px solid rgba(255,255,255,.14)",
-  borderRadius: 22,
-  padding: 18,
-  boxShadow: "0 18px 55px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.14)",
-};
+
+
 
 const teamProfileName = {
   margin: "12px 0 0",
@@ -3916,13 +3891,9 @@ const teamProfileName = {
 };
 
 
-const glassCard = {
-  ...liquidGlassPanel,
-};
 
-const glassMiniCard = {
-  ...liquidGlassTile,
-};
+
+
 
 const teamProfileSubline = {
   margin: "16px 0 0",
@@ -3958,11 +3929,148 @@ const teamBadgeBubble = {
   boxShadow: "inset 0 1px 0 rgba(255,255,255,.22), 0 10px 28px rgba(0,0,0,.18)",
 };
 
+
+
+
+
+
+const liquidGlassPanel = {
+  background: "linear-gradient(145deg, rgba(255,255,255,.155), rgba(255,255,255,.045))",
+  backdropFilter: "blur(26px) saturate(160%)",
+  WebkitBackdropFilter: "blur(26px) saturate(160%)",
+  border: "1px solid rgba(255,255,255,.17)",
+  borderRadius: 30,
+  padding: 24,
+  boxShadow: "0 30px 90px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.18)",
+  marginBottom: 20,
+};
+
+const liquidGlassTile = {
+  background: "linear-gradient(145deg, rgba(255,255,255,.13), rgba(255,255,255,.04))",
+  backdropFilter: "blur(20px) saturate(155%)",
+  WebkitBackdropFilter: "blur(20px) saturate(155%)",
+  border: "1px solid rgba(255,255,255,.14)",
+  borderRadius: 24,
+  padding: 18,
+  boxShadow: "0 20px 60px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.15)",
+};
+
+const liquidGlassNav = {
+  width: "100%",
+  border: "1px solid rgba(255,255,255,.14)",
+  background: "linear-gradient(145deg, rgba(255,255,255,.12), rgba(255,255,255,.04))",
+  backdropFilter: "blur(18px) saturate(155%)",
+  WebkitBackdropFilter: "blur(18px) saturate(155%)",
+  color: "#f8fafc",
+  borderRadius: 18,
+  padding: "14px 16px",
+  fontWeight: 950,
+  cursor: "pointer",
+  boxShadow: "0 16px 42px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.14)",
+  textAlign: "left",
+};
+
+const glassCard = {
+  ...liquidGlassPanel,
+};
+
+const glassMiniCard = {
+  ...liquidGlassTile,
+};
+
+const homeHeroCard = {
+  ...liquidGlassPanel,
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1fr) minmax(280px, .9fr)",
+  gap: 18,
+  alignItems: "center",
+  background: "linear-gradient(135deg, rgba(88,28,135,.58), rgba(255,255,255,.075), rgba(15,23,42,.86))",
+};
+
+const quickJumpCard = {
+  ...liquidGlassPanel,
+  padding: 14,
+};
+
+const rankingMobileCard = {
+  ...liquidGlassTile,
+  padding: 12,
+};
+
+const headlineItem = {
+  border: "1px solid rgba(255,255,255,.14)",
+  background: "linear-gradient(145deg, rgba(255,255,255,.12), rgba(255,255,255,.04))",
+  backdropFilter: "blur(18px) saturate(150%)",
+  WebkitBackdropFilter: "blur(18px) saturate(150%)",
+  color: "rgba(255,255,255,.90)",
+  borderRadius: 18,
+  padding: 14,
+  fontWeight: 850,
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,.12)",
+};
+
+const colorDrawerItem = {
+  width: "100%",
+  position: "relative",
+  display: "grid",
+  gridTemplateColumns: "7px minmax(0, 1fr) auto",
+  alignItems: "center",
+  gap: 12,
+  textAlign: "left",
+  borderRadius: 18,
+  padding: "14px 14px 14px 0",
+  marginBottom: 10,
+  cursor: "pointer",
+  fontWeight: 950,
+  overflow: "hidden",
+  transition: "transform .16s ease, box-shadow .16s ease, border-color .16s ease",
+  textShadow: "0 2px 10px rgba(0,0,0,.30)",
+  letterSpacing: ".01em",
+  backdropFilter: "blur(18px) saturate(155%)",
+  WebkitBackdropFilter: "blur(18px) saturate(155%)",
+};
+
+const coachDrawerItem = {
+  width: "100%",
+  position: "relative",
+  display: "grid",
+  gridTemplateColumns: "7px minmax(0, 1fr) auto",
+  alignItems: "center",
+  gap: 12,
+  textAlign: "left",
+  borderRadius: 20,
+  padding: "14px 14px 14px 0",
+  marginBottom: 10,
+  cursor: "pointer",
+  fontWeight: 950,
+  overflow: "hidden",
+  transition: "transform .16s ease, box-shadow .16s ease, border-color .16s ease, filter .16s ease",
+  transform: "translateZ(0)",
+  backdropFilter: "blur(18px) saturate(155%)",
+  WebkitBackdropFilter: "blur(18px) saturate(155%)",
+};
+
+const successBox = {
+  ...liquidGlassPanel,
+  border: "1px solid rgba(34,197,94,.34)",
+  color: "#bbf7d0",
+  fontWeight: 950,
+};
+
+
+
+const errorBox = {
+  ...liquidGlassPanel,
+  border: "1px solid rgba(248,113,113,.34)",
+  color: "#fecaca",
+  fontWeight: 950,
+};
+
 const healthGood = {
   ...liquidGlassPanel,
   border: "1px solid rgba(34,197,94,.32)",
   color: "#bbf7d0",
-  fontWeight: 900,
+  fontWeight: 950,
 };
 
 const healthWarn = {
