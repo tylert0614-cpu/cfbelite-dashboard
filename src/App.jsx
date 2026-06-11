@@ -1049,7 +1049,7 @@ function CoachProfile({ user, teams, assignments, results, allAmericans, awards,
 
   return <section style={profileCard}>
     <div style={profileHero}><div><div style={eyebrow}>Coach Profile</div><h2 style={profileName}>{user.discord_username}</h2><p style={mutedText}>Current Team: {currentTeam?.name || "Unassigned"}</p></div></div>
-    <div style={statsGrid}><Stat title="Career Record" value={`${stats?.wins||0}-${stats?.losses||0}`}/><Stat title="National Titles" value={stats?.nattys||0}/><Stat title="Conference Titles" value={stats?.confTitles||0}/><Stat title="Top 25 Wins" value={stats?.top25Wins||0}/><Stat title="Awards" value={stats?.awards||0}/><Stat title="All-Americans" value={stats?.allAmericans||0}/><Stat title="Heismans" value={stats?.heismans||0}/><Stat title="Prestige" value={(stats?.prestige||0).toFixed(1)}/></div>
+    <div style={statsGrid}><Stat title="Career Record" value={`${stats?.wins||0}-${stats?.losses||0}`}/><Stat title="National Titles" value={stats?.nattys||0}/><Stat title="Conference Titles" value={stats?.confTitles||0}/><Stat title="Top 25 Wins" value={stats?.top25Wins||0}/><Stat title="Awards" value={stats?.awards||0}/><Stat title="All-Americans" value={stats?.allAmericans||0}/><Stat title="Heismans" value={stats?.heismans||0}/></div>
     <CoachTimelineTable timeline={timeline} teams={teams} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions}/>
     <Results rows={coachResults} deleteResult={()=>{}} search="" setSearch={()=>{}}/>
     <RecognitionTable title="All-Americans" headers={["Player","Position","Team","Year","Type"]} rows={coachAA.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year,r.type]}))}/>
@@ -1741,23 +1741,135 @@ function Awards({ rows, teams, addRow, updateRow, deleteRow, rankings, drafts, s
   );
 }
 function Heismans({ rows, teams, addRow, updateRow, deleteRow, drafts, setDrafts, saveDraft, getDraft }) {
-  return <section style={card}><div style={sectionTop}><h2 style={sectionTitle}>Heisman Winners</h2><button onClick={addRow} style={button}>Add</button></div><Table headers={["Player","Team","Position","Year","Save",""]}>{rows.map((r)=>{const d=getDraft(drafts,r);return <tr key={r.id} style={trStyle}>
-    <td style={td}><input value={d.player_name} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),player_name:e.target.value}})} style={input}/></td>
-    <td style={td}><select value={d.team_id} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),team_id:e.target.value}})} style={input}>{teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}</select></td>
-    <td style={td}><select value={d.position} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),position:e.target.value}})} style={input}>{POSITIONS.map((p)=><option key={p}>{p}</option>)}</select></td>
-    <td style={td}><select value={String(d.season_year)} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),season_year:e.target.value}})} style={input}>{YEARS.map((y)=><option key={y}>{y}</option>)}</select></td>
-    <td style={td}><button onClick={()=>saveDraft("heisman_winners",r.id,drafts[r.id], ["season_year"])} style={button}>Save</button></td>
-    <td style={td}><DeleteButton onClick={()=>deleteRow("heisman_winners",r.id)}/></td>
-  </tr>})}</Table></section>;
+  return (
+    <section style={card}>
+      <div style={sectionTop}>
+        <div>
+          <h2 style={sectionTitle}>Heisman Winners</h2>
+          <p style={mutedText}>Mobile-friendly editable cards with player, team, position, and year.</p>
+        </div>
+        <button onClick={addRow} style={button}>Add</button>
+      </div>
+
+      <div style={recognitionGrid}>
+        {rows.map((r) => {
+          const d = getDraft(drafts, r);
+          const team = teams.find((t) => t.id === d.team_id);
+          return (
+            <div key={r.id} style={recognitionCard}>
+              <div style={recognitionHeader}>
+                <div>
+                  <div style={recognitionKicker}>Heisman Trophy Winner</div>
+                  <div style={recognitionPlayer}>{d.player_name || "New Player"}</div>
+                  <div style={recognitionMeta}>{d.position || "Position"} • {d.season_year || "Year"}</div>
+                </div>
+                <div style={recognitionTeamBadge}>
+                  <TeamLabel team={team} name={team?.name || "Team"} />
+                </div>
+              </div>
+
+              <div style={recognitionFormGrid}>
+                <label style={fieldLabel}>
+                  Player
+                  <input value={d.player_name || ""} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),player_name:e.target.value}})} style={input}/>
+                </label>
+
+                <label style={fieldLabel}>
+                  Team
+                  <select value={d.team_id || ""} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),team_id:e.target.value}})} style={input}>
+                    {teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </label>
+
+                <label style={fieldLabel}>
+                  Position
+                  <select value={d.position || "QB"} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),position:e.target.value}})} style={input}>
+                    {POSITIONS.map((p)=><option key={p}>{p}</option>)}
+                  </select>
+                </label>
+
+                <label style={fieldLabel}>
+                  Year
+                  <select value={String(d.season_year || "")} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),season_year:e.target.value}})} style={input}>
+                    {YEARS.map((y)=><option key={y}>{y}</option>)}
+                  </select>
+                </label>
+              </div>
+
+              <div style={recognitionActions}>
+                <button onClick={()=>saveDraft("heisman_winners",r.id,drafts[r.id], ["season_year"])} style={button}>Save</button>
+                <DeleteButton onClick={()=>deleteRow("heisman_winners",r.id)}/>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
 function NationalChampions({ rows, teams, users, addRow, updateRow, deleteRow, drafts, setDrafts, saveDraft, getDraft }) {
-  return <section style={card}><div style={sectionTop}><h2 style={sectionTitle}>National Champions</h2><button onClick={addRow} style={button}>Add</button></div><Table headers={["Team","Discord User","Year","Save",""]}>{rows.map((r)=>{const d=getDraft(drafts,r);return <tr key={r.id} style={trStyle}>
-    <td style={td}><select value={d.team_id} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),team_id:e.target.value}})} style={input}>{teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}</select></td>
-    <td style={td}><select value={d.discord_user_id || ""} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),discord_user_id:e.target.value}})} style={input}><option value="">Select Discord User</option>{users.map((u)=><option key={u.id} value={u.id}>{u.discord_username}</option>)}</select></td>
-    <td style={td}><select value={String(d.season_year)} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),season_year:e.target.value}})} style={input}>{YEARS.map((y)=><option key={y}>{y}</option>)}</select></td>
-    <td style={td}><button onClick={()=>saveDraft("national_champions",r.id,drafts[r.id], ["season_year"])} style={button}>Save</button></td>
-    <td style={td}><DeleteButton onClick={()=>deleteRow("national_champions",r.id)}/></td>
-  </tr>})}</Table></section>;
+  return (
+    <section style={card}>
+      <div style={sectionTop}>
+        <div>
+          <h2 style={sectionTitle}>National Champions</h2>
+          <p style={mutedText}>Mobile-friendly championship cards with team, Discord user, and year.</p>
+        </div>
+        <button onClick={addRow} style={button}>Add</button>
+      </div>
+
+      <div style={recognitionGrid}>
+        {rows.map((r) => {
+          const d = getDraft(drafts, r);
+          const team = teams.find((t) => t.id === d.team_id);
+          const user = users.find((u) => u.id === d.discord_user_id);
+          return (
+            <div key={r.id} style={recognitionCard}>
+              <div style={recognitionHeader}>
+                <div>
+                  <div style={recognitionKicker}>National Champion</div>
+                  <div style={recognitionPlayer}>{team?.name || "Team TBD"}</div>
+                  <div style={recognitionMeta}>{user?.discord_username || "Unassigned"} • {d.season_year || "Year"}</div>
+                </div>
+                <div style={recognitionTeamBadge}>
+                  <TeamLabel team={team} name={team?.name || "Team"} />
+                </div>
+              </div>
+
+              <div style={recognitionFormGrid}>
+                <label style={fieldLabel}>
+                  Team
+                  <select value={d.team_id || ""} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),team_id:e.target.value}})} style={input}>
+                    {teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </label>
+
+                <label style={fieldLabel}>
+                  Discord User
+                  <select value={d.discord_user_id || ""} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),discord_user_id:e.target.value || null}})} style={input}>
+                    <option value="">Select Discord User</option>
+                    {users.map((u)=><option key={u.id} value={u.id}>{u.discord_username}</option>)}
+                  </select>
+                </label>
+
+                <label style={fieldLabel}>
+                  Year
+                  <select value={String(d.season_year || "")} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),season_year:e.target.value}})} style={input}>
+                    {YEARS.map((y)=><option key={y}>{y}</option>)}
+                  </select>
+                </label>
+              </div>
+
+              <div style={recognitionActions}>
+                <button onClick={()=>saveDraft("national_champions",r.id,drafts[r.id], ["season_year"])} style={button}>Save</button>
+                <DeleteButton onClick={()=>deleteRow("national_champions",r.id)}/>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
 function DraftOrder({ rows, users, updateRow, drafts, setDrafts, saveDraft, getDraft }) { return <section style={card}><h2 style={sectionTitle}>CFBElite 27 Draft Order</h2><Table headers={["Pick","Team Name","Discord User","Save"]}>{rows.map((r)=>{const d=getDraft(drafts,r);return <tr key={r.id} style={trStyle}><td style={teamCell}>#{r.pick_number}</td><td style={td}><input value={d.team_name||""} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),team_name:e.target.value}})} style={input}/></td><td style={td}><select value={d.discord_user_id||""} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),discord_user_id:e.target.value}})} style={input}><option value="">Select User</option>{users.map((u)=><option key={u.id} value={u.id}>{u.discord_username}</option>)}</select></td><td style={td}><button onClick={()=>saveDraft("draft_order_27",r.id,drafts[r.id])} style={button}>Save</button></td></tr>})}</Table></section>; }
 function Playoff({ rows, teams, updateRow, drafts, setDrafts, saveDraft, getDraft }) { return <section style={card}><h2 style={sectionTitle}>College Football Playoff Bracket</h2><div style={bracketGrid}>{["First Round","Quarterfinals","Semifinals","National Championship"].map((round)=><div key={round}><h3>{round}</h3>{rows.filter((g)=>g.round===round).map((g)=>{const d=getDraft(drafts,g);return <div key={g.id} style={gameCard}><input value={d.bowl_name||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),bowl_name:e.target.value}})} placeholder="Bowl" style={input}/><input value={d.top_seed||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),top_seed:e.target.value}})} placeholder="Top Seed" style={input}/><select value={d.top_team_id||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),top_team_id:e.target.value}})} style={input}><option value="">Top Team</option>{teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}</select><b style={{textAlign:"center"}}>VS</b><input value={d.bottom_seed||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),bottom_seed:e.target.value}})} placeholder="Bottom Seed" style={input}/><select value={d.bottom_team_id||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),bottom_team_id:e.target.value}})} style={input}><option value="">Bottom Team</option>{teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}</select><input value={d.score||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),score:e.target.value}})} placeholder="Score" style={input}/><button onClick={()=>saveDraft("playoff_games",g.id,drafts[g.id])} style={button}>Save Game</button></div>})}</div>)}</div></section>; }
