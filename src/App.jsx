@@ -1049,7 +1049,7 @@ function CoachProfile({ user, teams, assignments, results, allAmericans, awards,
 
   return <section style={profileCard}>
     <div style={profileHero}><div><div style={eyebrow}>Coach Profile</div><h2 style={profileName}>{user.discord_username}</h2><p style={mutedText}>Current Team: {currentTeam?.name || "Unassigned"}</p></div></div>
-    <div style={statsGrid}><Stat title="Career Record" value={`${stats?.wins||0}-${stats?.losses||0}`}/><Stat title="National Titles" value={stats?.nattys||0}/><Stat title="Conference Titles" value={stats?.confTitles||0}/><Stat title="Top 25 Wins" value={stats?.top25Wins||0}/><Stat title="Awards" value={stats?.awards||0}/><Stat title="All-Americans" value={stats?.allAmericans||0}/><Stat title="Heismans" value={stats?.heismans||0}/></div>
+    <div style={statsGrid}><Stat title="Career Record" value={`${stats?.wins||0}-${stats?.losses||0}`}/><Stat title="National Titles" value={stats?.nattys||0}/><Stat title="Conference Titles" value={stats?.confTitles||0}/><Stat title="Top 25 Wins" value={stats?.top25Wins||0}/><Stat title="Awards" value={stats?.awards||0}/><Stat title="All-Americans" value={stats?.allAmericans||0}/><Stat title="Heismans" value={stats?.heismans||0}/><Stat title="Prestige" value={(stats?.prestige||0).toFixed(1)}/></div>
     <CoachTimelineTable timeline={timeline} teams={teams} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions}/>
     <Results rows={coachResults} deleteResult={()=>{}} search="" setSearch={()=>{}}/>
     <RecognitionTable title="All-Americans" headers={["Player","Position","Team","Year","Type"]} rows={coachAA.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year,r.type]}))}/>
@@ -1083,7 +1083,36 @@ function CoachHallOfFame({ users, teams, assignments, results, allAmericans, awa
 function CoachHofCard({ row, teams, assignments }) {
   const activeAssignment = assignments.find((a)=>a.discord_user_id===row.userId && a.status==="Active");
   const team = teams.find((t)=>t.id===activeAssignment?.team_id);
-  return <div style={hofCard}><div style={hofTopClean}><div style={hofIconWrap}><span style={hofIcon}>🎧</span>{team && <span style={hofMiniLogo}><HofTeamIcon team={team}/></span>}</div><div style={{minWidth:0}}><div style={eyebrow}>Coach Hall of Fame</div><h3 style={hofName}>{row.discord}</h3><div style={mutedText}>{team?.name || row.activeTeamsText}</div></div></div><div style={hofScoreBand}><span>HOF Score</span><b style={hofScoreBandB}>{Math.round(row.rawPrestige)}</b></div><div style={hofReason}>{row.hofCriteria.reasons.join(" • ")}</div><div style={hofChips}><Chip label="Career" value={`${row.wins}-${row.losses}`}/><Chip label="Nattys" value={row.nattys}/><Chip label="Conf" value={row.confTitles}/><Chip label="Top 25" value={row.top25Wins}/><Chip label="Bowl" value={`${row.bowlWins}-${row.bowlLosses}`}/><Chip label="Heisman" value={row.heismans}/><Chip label="Awards" value={row.awards}/><Chip label="All-Americans" value={row.allAmericans}/></div></div>;
+
+  return (
+    <div style={hofCardClean}>
+      <div style={hofCardHeader}>
+        <div style={{ minWidth: 0 }}>
+          <div style={eyebrow}>Coach Hall of Fame</div>
+          <h3 style={hofNameClean}>{row.discord}</h3>
+          <div style={hofSubText}>{team?.name || row.activeTeamsText || "No active team"}</div>
+        </div>
+
+        <div style={hofScoreBox}>
+          <span>HOF Score</span>
+          <b>{Math.round(row.rawPrestige)}</b>
+        </div>
+      </div>
+
+      <div style={hofReasonClean}>{row.hofCriteria.reasons.join(" • ")}</div>
+
+      <div style={hofChips}>
+        <Chip label="Career" value={`${row.wins}-${row.losses}`}/>
+        <Chip label="Nattys" value={row.nattys}/>
+        <Chip label="Conf" value={row.confTitles}/>
+        <Chip label="Top 25" value={row.top25Wins}/>
+        <Chip label="Bowl" value={`${row.bowlWins}-${row.bowlLosses}`}/>
+        <Chip label="Heisman" value={row.heismans}/>
+        <Chip label="Awards" value={row.awards}/>
+        <Chip label="All-Americans" value={row.allAmericans}/>
+      </div>
+    </div>
+  );
 }
 function Chip({ label, value }) { return <div style={chip}><b>{value}</b><span>{label}</span></div>; }
 function HofTeamIcon({ team }) { const url = getHelmetUrl(team); return url ? <img src={url} alt="" style={hofTeamImg}/> : <span style={hofIcon}>🏈</span>; }
@@ -1124,42 +1153,122 @@ function PlayerHallOfFame({ teams, assignments, results, allAmericans, awards, h
   const rows = playerHallRows(teams, assignments, results, allAmericans, awards, heismans, nationalChampions);
   return <section style={card}><h2 style={sectionTitle}>Player Hall of Fame</h2><p style={mutedText}>Players qualify automatically by tougher benchmarks: Heisman plus supporting accolades, 3 major awards, 4 All-American selections, elite title-season accolades, or 60+ HOF score.</p>{rows.length ? <div style={hofGrid}>{rows.map((row)=><PlayerHofCard key={row.key} row={row} team={teams.find((t)=>t.id===row.teamId)}/>)}</div> : <div style={miniRow}>No players have met Hall of Fame criteria yet.</div>}</section>;
 }
-function PlayerHofCard({ row, team }) { return <div style={hofCard}><div style={hofTopClean}><div style={hofIconWrap}>{team ? <HofTeamIcon team={team}/> : <span style={hofIcon}>🏈</span>}</div><div style={{minWidth:0}}><div style={eyebrow}>Player Hall of Fame</div><h3 style={hofName}>{row.player}</h3><div style={mutedText}>{row.position} · {team?.name || "Unknown Team"}</div></div></div><div style={hofScoreBand}><span>HOF Score</span><b style={hofScoreBandB}>{row.score}</b></div><div style={hofReason}>{row.reasons.join(" • ")}</div><div style={hofChips}><Chip label="Heisman" value={row.heismans.length}/><Chip label="Awards" value={row.awards.length}/><Chip label="All-Americans" value={row.allAmericans.length}/><Chip label="Nattys" value={row.nattys}/><Chip label="Conf" value={row.confTitles}/></div><div style={accoladeList}>{[...row.heismans, ...row.awards, ...row.allAmericans].slice(0,8).map((x,i)=><div key={i} style={miniRow}>{x}</div>)}</div></div>; }
-
-function Header({ loading, reload }) {
+function PlayerHofCard({ row, team }) {
   return (
-    <header style={heroBanner}>
-      <img src="/cfbelite-banner.png" alt="CFBElite 27 Dynasty" style={heroBannerImage} />
-      <div style={heroOverlay} />
+    <div style={hofCardClean}>
+      <div style={hofCardHeader}>
+        <div style={{ minWidth: 0 }}>
+          <div style={eyebrow}>Player Hall of Fame</div>
+          <h3 style={hofNameClean}>{row.player}</h3>
+          <div style={hofSubText}>{row.position} · {team?.name || "Unknown Team"}</div>
+        </div>
 
-      <div style={heroContent}>
-        <button onClick={reload} style={statusBox}>
-          {loading ? "Loading..." : "LIVE DATABASE"}
-        </button>
+        <div style={hofScoreBox}>
+          <span>HOF Score</span>
+          <b>{row.score}</b>
+        </div>
       </div>
-    </header>
+
+      <div style={hofReasonClean}>{row.reasons.join(" • ")}</div>
+
+      <div style={hofChips}>
+        <Chip label="Heisman" value={row.heismans.length}/>
+        <Chip label="Awards" value={row.awards.length}/>
+        <Chip label="All-Americans" value={row.allAmericans.length}/>
+        <Chip label="Nattys" value={row.nattys}/>
+        <Chip label="Conf" value={row.confTitles}/>
+      </div>
+
+      <div style={accoladeList}>
+        {[...row.heismans, ...row.awards, ...row.allAmericans].slice(0,8).map((x,i)=>
+          <div key={i} style={miniRow}>{x}</div>
+        )}
+      </div>
+    </div>
   );
 }
 function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reorderTabs }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const groups = [
+    { title: "Main", keys: ["dashboard", "allTimeStandings"] },
+    { title: "League History", keys: ["coachHOF", "playerHOF", "h2h"] },
+    { title: "Recognition", keys: ["allAmericans", "awards", "heismans", "nationalChampions"] },
+    { title: "Admin", keys: ["assignments"] },
+  ];
+
+  const tabMap = new Map(tabs);
+  const usedKeys = new Set(groups.flatMap((group) => group.keys));
+  const coachTabs = tabs.filter(([key]) => key.startsWith("coach-"));
+  const otherTabs = tabs.filter(([key]) => !usedKeys.has(key) && !key.startsWith("coach-"));
+
+  function handleSelect(key) {
+    setActiveTab(key);
+    setMenuOpen(false);
+  }
+
+  function NavButton({ tabKey, label }) {
+    return (
+      <button
+        type="button"
+        onClick={() => handleSelect(tabKey)}
+        style={activeTab === tabKey ? drawerItemActive : drawerItem}
+      >
+        <span>{label}</span>
+      </button>
+    );
+  }
+
   return (
-    <div style={tabScroller}>
-      <div style={tabRow}>
-        {tabs.map(([key,label])=>(
-          <button
-            key={key}
-            draggable
-            onDragStart={()=>setDraggedTab(key)}
-            onDragOver={(event)=>event.preventDefault()}
-            onDrop={()=>reorderTabs(key)}
-            onClick={()=>setActiveTab(key)}
-            title="Drag tabs left or right to rearrange. The order saves for everyone."
-            style={activeTab===key?activeTabStyle:tabStyle}
-          >
-            {label}
-          </button>
-        ))}
+    <>
+      <div style={navShell}>
+        <button type="button" onClick={() => setMenuOpen(true)} style={hamburgerButton}>
+          ☰ Menu
+        </button>
+        <div style={activePagePill}>
+          {tabMap.get(activeTab) || "Dashboard"}
+        </div>
       </div>
-    </div>
+
+      {menuOpen && (
+        <div style={drawerOverlay} onClick={() => setMenuOpen(false)}>
+          <aside style={drawerPanel} onClick={(event) => event.stopPropagation()}>
+            <div style={drawerHeader}>
+              <div>
+                <div style={drawerTitle}>CFBElite 27</div>
+                <div style={drawerSubtitle}>League Navigation</div>
+              </div>
+              <button type="button" onClick={() => setMenuOpen(false)} style={drawerClose}>×</button>
+            </div>
+
+            <div style={drawerContent}>
+              {groups.map((group) => (
+                <div key={group.title} style={drawerGroup}>
+                  <div style={drawerGroupTitle}>{group.title}</div>
+                  {group.keys
+                    .filter((key) => tabMap.has(key))
+                    .map((key) => <NavButton key={key} tabKey={key} label={tabMap.get(key)} />)}
+                </div>
+              ))}
+
+              {otherTabs.length > 0 && (
+                <div style={drawerGroup}>
+                  <div style={drawerGroupTitle}>Other</div>
+                  {otherTabs.map(([key, label]) => <NavButton key={key} tabKey={key} label={label} />)}
+                </div>
+              )}
+
+              <div style={drawerGroup}>
+                <div style={drawerGroupTitle}>Coach Profiles</div>
+                {coachTabs.length ? coachTabs.map(([key, label]) => (
+                  <NavButton key={key} tabKey={key} label={label} />
+                )) : <div style={drawerEmpty}>No active coach profiles yet.</div>}
+              </div>
+            </div>
+          </aside>
+        </div>
+      )}
+    </>
   );
 }
 function Stats({ currentYear, setCurrentYear, currentWeek, setCurrentWeek, teams, assignments, saveSettings }) {
@@ -1741,135 +1850,23 @@ function Awards({ rows, teams, addRow, updateRow, deleteRow, rankings, drafts, s
   );
 }
 function Heismans({ rows, teams, addRow, updateRow, deleteRow, drafts, setDrafts, saveDraft, getDraft }) {
-  return (
-    <section style={card}>
-      <div style={sectionTop}>
-        <div>
-          <h2 style={sectionTitle}>Heisman Winners</h2>
-          <p style={mutedText}>Mobile-friendly editable cards with player, team, position, and year.</p>
-        </div>
-        <button onClick={addRow} style={button}>Add</button>
-      </div>
-
-      <div style={recognitionGrid}>
-        {rows.map((r) => {
-          const d = getDraft(drafts, r);
-          const team = teams.find((t) => t.id === d.team_id);
-          return (
-            <div key={r.id} style={recognitionCard}>
-              <div style={recognitionHeader}>
-                <div>
-                  <div style={recognitionKicker}>Heisman Trophy Winner</div>
-                  <div style={recognitionPlayer}>{d.player_name || "New Player"}</div>
-                  <div style={recognitionMeta}>{d.position || "Position"} • {d.season_year || "Year"}</div>
-                </div>
-                <div style={recognitionTeamBadge}>
-                  <TeamLabel team={team} name={team?.name || "Team"} />
-                </div>
-              </div>
-
-              <div style={recognitionFormGrid}>
-                <label style={fieldLabel}>
-                  Player
-                  <input value={d.player_name || ""} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),player_name:e.target.value}})} style={input}/>
-                </label>
-
-                <label style={fieldLabel}>
-                  Team
-                  <select value={d.team_id || ""} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),team_id:e.target.value}})} style={input}>
-                    {teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
-                </label>
-
-                <label style={fieldLabel}>
-                  Position
-                  <select value={d.position || "QB"} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),position:e.target.value}})} style={input}>
-                    {POSITIONS.map((p)=><option key={p}>{p}</option>)}
-                  </select>
-                </label>
-
-                <label style={fieldLabel}>
-                  Year
-                  <select value={String(d.season_year || "")} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),season_year:e.target.value}})} style={input}>
-                    {YEARS.map((y)=><option key={y}>{y}</option>)}
-                  </select>
-                </label>
-              </div>
-
-              <div style={recognitionActions}>
-                <button onClick={()=>saveDraft("heisman_winners",r.id,drafts[r.id], ["season_year"])} style={button}>Save</button>
-                <DeleteButton onClick={()=>deleteRow("heisman_winners",r.id)}/>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
+  return <section style={card}><div style={sectionTop}><h2 style={sectionTitle}>Heisman Winners</h2><button onClick={addRow} style={button}>Add</button></div><Table headers={["Player","Team","Position","Year","Save",""]}>{rows.map((r)=>{const d=getDraft(drafts,r);return <tr key={r.id} style={trStyle}>
+    <td style={td}><input value={d.player_name} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),player_name:e.target.value}})} style={input}/></td>
+    <td style={td}><select value={d.team_id} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),team_id:e.target.value}})} style={input}>{teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}</select></td>
+    <td style={td}><select value={d.position} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),position:e.target.value}})} style={input}>{POSITIONS.map((p)=><option key={p}>{p}</option>)}</select></td>
+    <td style={td}><select value={String(d.season_year)} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),season_year:e.target.value}})} style={input}>{YEARS.map((y)=><option key={y}>{y}</option>)}</select></td>
+    <td style={td}><button onClick={()=>saveDraft("heisman_winners",r.id,drafts[r.id], ["season_year"])} style={button}>Save</button></td>
+    <td style={td}><DeleteButton onClick={()=>deleteRow("heisman_winners",r.id)}/></td>
+  </tr>})}</Table></section>;
 }
 function NationalChampions({ rows, teams, users, addRow, updateRow, deleteRow, drafts, setDrafts, saveDraft, getDraft }) {
-  return (
-    <section style={card}>
-      <div style={sectionTop}>
-        <div>
-          <h2 style={sectionTitle}>National Champions</h2>
-          <p style={mutedText}>Mobile-friendly championship cards with team, Discord user, and year.</p>
-        </div>
-        <button onClick={addRow} style={button}>Add</button>
-      </div>
-
-      <div style={recognitionGrid}>
-        {rows.map((r) => {
-          const d = getDraft(drafts, r);
-          const team = teams.find((t) => t.id === d.team_id);
-          const user = users.find((u) => u.id === d.discord_user_id);
-          return (
-            <div key={r.id} style={recognitionCard}>
-              <div style={recognitionHeader}>
-                <div>
-                  <div style={recognitionKicker}>National Champion</div>
-                  <div style={recognitionPlayer}>{team?.name || "Team TBD"}</div>
-                  <div style={recognitionMeta}>{user?.discord_username || "Unassigned"} • {d.season_year || "Year"}</div>
-                </div>
-                <div style={recognitionTeamBadge}>
-                  <TeamLabel team={team} name={team?.name || "Team"} />
-                </div>
-              </div>
-
-              <div style={recognitionFormGrid}>
-                <label style={fieldLabel}>
-                  Team
-                  <select value={d.team_id || ""} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),team_id:e.target.value}})} style={input}>
-                    {teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
-                </label>
-
-                <label style={fieldLabel}>
-                  Discord User
-                  <select value={d.discord_user_id || ""} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),discord_user_id:e.target.value || null}})} style={input}>
-                    <option value="">Select Discord User</option>
-                    {users.map((u)=><option key={u.id} value={u.id}>{u.discord_username}</option>)}
-                  </select>
-                </label>
-
-                <label style={fieldLabel}>
-                  Year
-                  <select value={String(d.season_year || "")} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),season_year:e.target.value}})} style={input}>
-                    {YEARS.map((y)=><option key={y}>{y}</option>)}
-                  </select>
-                </label>
-              </div>
-
-              <div style={recognitionActions}>
-                <button onClick={()=>saveDraft("national_champions",r.id,drafts[r.id], ["season_year"])} style={button}>Save</button>
-                <DeleteButton onClick={()=>deleteRow("national_champions",r.id)}/>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
+  return <section style={card}><div style={sectionTop}><h2 style={sectionTitle}>National Champions</h2><button onClick={addRow} style={button}>Add</button></div><Table headers={["Team","Discord User","Year","Save",""]}>{rows.map((r)=>{const d=getDraft(drafts,r);return <tr key={r.id} style={trStyle}>
+    <td style={td}><select value={d.team_id} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),team_id:e.target.value}})} style={input}>{teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}</select></td>
+    <td style={td}><select value={d.discord_user_id || ""} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),discord_user_id:e.target.value}})} style={input}><option value="">Select Discord User</option>{users.map((u)=><option key={u.id} value={u.id}>{u.discord_username}</option>)}</select></td>
+    <td style={td}><select value={String(d.season_year)} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),season_year:e.target.value}})} style={input}>{YEARS.map((y)=><option key={y}>{y}</option>)}</select></td>
+    <td style={td}><button onClick={()=>saveDraft("national_champions",r.id,drafts[r.id], ["season_year"])} style={button}>Save</button></td>
+    <td style={td}><DeleteButton onClick={()=>deleteRow("national_champions",r.id)}/></td>
+  </tr>})}</Table></section>;
 }
 function DraftOrder({ rows, users, updateRow, drafts, setDrafts, saveDraft, getDraft }) { return <section style={card}><h2 style={sectionTitle}>CFBElite 27 Draft Order</h2><Table headers={["Pick","Team Name","Discord User","Save"]}>{rows.map((r)=>{const d=getDraft(drafts,r);return <tr key={r.id} style={trStyle}><td style={teamCell}>#{r.pick_number}</td><td style={td}><input value={d.team_name||""} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),team_name:e.target.value}})} style={input}/></td><td style={td}><select value={d.discord_user_id||""} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),discord_user_id:e.target.value}})} style={input}><option value="">Select User</option>{users.map((u)=><option key={u.id} value={u.id}>{u.discord_username}</option>)}</select></td><td style={td}><button onClick={()=>saveDraft("draft_order_27",r.id,drafts[r.id])} style={button}>Save</button></td></tr>})}</Table></section>; }
 function Playoff({ rows, teams, updateRow, drafts, setDrafts, saveDraft, getDraft }) { return <section style={card}><h2 style={sectionTitle}>College Football Playoff Bracket</h2><div style={bracketGrid}>{["First Round","Quarterfinals","Semifinals","National Championship"].map((round)=><div key={round}><h3>{round}</h3>{rows.filter((g)=>g.round===round).map((g)=>{const d=getDraft(drafts,g);return <div key={g.id} style={gameCard}><input value={d.bowl_name||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),bowl_name:e.target.value}})} placeholder="Bowl" style={input}/><input value={d.top_seed||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),top_seed:e.target.value}})} placeholder="Top Seed" style={input}/><select value={d.top_team_id||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),top_team_id:e.target.value}})} style={input}><option value="">Top Team</option>{teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}</select><b style={{textAlign:"center"}}>VS</b><input value={d.bottom_seed||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),bottom_seed:e.target.value}})} placeholder="Bottom Seed" style={input}/><select value={d.bottom_team_id||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),bottom_team_id:e.target.value}})} style={input}><option value="">Bottom Team</option>{teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}</select><input value={d.score||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),score:e.target.value}})} placeholder="Score" style={input}/><button onClick={()=>saveDraft("playoff_games",g.id,drafts[g.id])} style={button}>Save Game</button></div>})}</div>)}</div></section>; }
@@ -1971,7 +1968,6 @@ const profileCard={...card,background:"linear-gradient(135deg, rgba(49,46,129,.8
 const profileHero={display:"flex",alignItems:"center",justifyContent:"space-between",gap:20,flexWrap:"wrap",marginBottom:20};
 const eyebrow={color:"#facc15",textTransform:"uppercase",letterSpacing:".12em",fontSize:12,fontWeight:950};
 const profileName={fontSize:"clamp(36px, 5vw, 64px)",margin:"6px 0",fontWeight:950,letterSpacing:"-.05em"};
-const hofGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(420px, 1fr))",gap:24,marginTop:24};
 const hofCard={background:"linear-gradient(160deg, rgba(88,28,135,.72), rgba(15,23,42,.95) 45%, rgba(69,10,10,.85))",border:"1px solid rgba(250,204,21,.28)",borderRadius:26,padding:24,boxShadow:"0 24px 70px rgba(0,0,0,.38)",minHeight:260,overflow:"hidden"};
 const hofTop={display:"grid",gridTemplateColumns:"86px minmax(0,1fr) 120px",gap:16,alignItems:"center"};
 const hofTopClean={display:"grid",gridTemplateColumns:"86px minmax(0,1fr)",gap:18,alignItems:"center"};
@@ -2040,4 +2036,206 @@ const heroSubtitle = {
   marginTop: 10,
   fontSize: "clamp(15px, 2vw, 22px)",
   color: "rgba(255,255,255,.86)",
+};
+
+
+const hofGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+  gap: 16,
+  width: "100%",
+  maxWidth: "100%",
+};
+
+
+const navShell = {
+  position: "sticky",
+  top: 0,
+  zIndex: 20,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+  marginBottom: 18,
+  padding: "10px 0",
+  backdropFilter: "blur(12px)",
+};
+
+const hamburgerButton = {
+  border: "1px solid rgba(250,204,21,.34)",
+  background: "linear-gradient(135deg, rgba(88,28,135,.95), rgba(15,23,42,.96))",
+  color: "#fff",
+  borderRadius: 14,
+  padding: "12px 16px",
+  fontWeight: 900,
+  cursor: "pointer",
+  boxShadow: "0 12px 30px rgba(0,0,0,.28)",
+};
+
+const activePagePill = {
+  border: "1px solid rgba(255,255,255,.12)",
+  background: "rgba(15,23,42,.76)",
+  color: "rgba(255,255,255,.86)",
+  borderRadius: 999,
+  padding: "10px 14px",
+  fontSize: 13,
+  fontWeight: 800,
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  maxWidth: "60vw",
+};
+
+const drawerOverlay = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 999,
+  background: "rgba(0,0,0,.62)",
+  backdropFilter: "blur(4px)",
+};
+
+const drawerPanel = {
+  width: "min(390px, 92vw)",
+  height: "100%",
+  background: "linear-gradient(180deg, #140821, #111827 45%, #050816)",
+  borderRight: "1px solid rgba(250,204,21,.25)",
+  boxShadow: "24px 0 70px rgba(0,0,0,.45)",
+  color: "#fff",
+  display: "flex",
+  flexDirection: "column",
+};
+
+const drawerHeader = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+  padding: "20px 18px",
+  borderBottom: "1px solid rgba(255,255,255,.10)",
+};
+
+const drawerTitle = {
+  fontSize: 22,
+  fontWeight: 950,
+  letterSpacing: "-.5px",
+};
+
+const drawerSubtitle = {
+  marginTop: 3,
+  color: "rgba(255,255,255,.62)",
+  fontSize: 12,
+  textTransform: "uppercase",
+  letterSpacing: ".12em",
+};
+
+const drawerClose = {
+  width: 38,
+  height: 38,
+  borderRadius: 12,
+  border: "1px solid rgba(255,255,255,.16)",
+  background: "rgba(255,255,255,.08)",
+  color: "#fff",
+  fontSize: 26,
+  lineHeight: "34px",
+  cursor: "pointer",
+};
+
+const drawerContent = {
+  padding: "14px",
+  overflowY: "auto",
+};
+
+const drawerGroup = {
+  marginBottom: 18,
+};
+
+const drawerGroupTitle = {
+  color: "#facc15",
+  fontSize: 11,
+  fontWeight: 950,
+  letterSpacing: ".14em",
+  textTransform: "uppercase",
+  margin: "8px 8px",
+};
+
+const drawerItem = {
+  width: "100%",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  textAlign: "left",
+  border: "1px solid rgba(255,255,255,.08)",
+  background: "rgba(255,255,255,.045)",
+  color: "rgba(255,255,255,.86)",
+  borderRadius: 13,
+  padding: "12px 13px",
+  marginBottom: 8,
+  cursor: "pointer",
+  fontWeight: 800,
+};
+
+const drawerItemActive = {
+  ...drawerItem,
+  color: "#111827",
+  background: "linear-gradient(135deg, #facc15, #f59e0b)",
+  border: "1px solid rgba(250,204,21,.85)",
+};
+
+const drawerEmpty = {
+  padding: 12,
+  color: "rgba(255,255,255,.56)",
+  fontSize: 13,
+};
+
+const hofCardClean = {
+  width: "100%",
+  maxWidth: "100%",
+  boxSizing: "border-box",
+  overflow: "hidden",
+  background: "linear-gradient(160deg, rgba(88,28,135,.72), rgba(15,23,42,.96) 50%, rgba(69,10,10,.72))",
+  border: "1px solid rgba(250,204,21,.28)",
+  borderRadius: 22,
+  padding: 18,
+  boxShadow: "0 18px 48px rgba(0,0,0,.34)",
+};
+
+const hofCardHeader = {
+  display: "flex",
+  alignItems: "flex-start",
+  justifyContent: "space-between",
+  gap: 14,
+  width: "100%",
+};
+
+const hofNameClean = {
+  margin: "6px 0 4px",
+  fontSize: "clamp(22px, 5vw, 34px)",
+  lineHeight: 1.05,
+  fontWeight: 950,
+  color: "#fff",
+  wordBreak: "break-word",
+};
+
+const hofSubText = {
+  color: "rgba(255,255,255,.72)",
+  fontSize: 13,
+  lineHeight: 1.35,
+};
+
+const hofScoreBox = {
+  flex: "0 0 auto",
+  minWidth: 84,
+  borderRadius: 16,
+  padding: "10px 12px",
+  background: "rgba(250,204,21,.12)",
+  border: "1px solid rgba(250,204,21,.32)",
+  textAlign: "center",
+  color: "#fef3c7",
+};
+
+const hofReasonClean = {
+  marginTop: 14,
+  color: "rgba(255,255,255,.76)",
+  fontSize: 13,
+  lineHeight: 1.45,
 };
