@@ -1126,7 +1126,7 @@ function PlayerHallOfFame({ teams, assignments, results, allAmericans, awards, h
 }
 function PlayerHofCard({ row, team }) { return <div style={hofCard}><div style={hofTopClean}><div style={hofIconWrap}>{team ? <HofTeamIcon team={team}/> : <span style={hofIcon}>🏈</span>}</div><div style={{minWidth:0}}><div style={eyebrow}>Player Hall of Fame</div><h3 style={hofName}>{row.player}</h3><div style={mutedText}>{row.position} · {team?.name || "Unknown Team"}</div></div></div><div style={hofScoreBand}><span>HOF Score</span><b style={hofScoreBandB}>{row.score}</b></div><div style={hofReason}>{row.reasons.join(" • ")}</div><div style={hofChips}><Chip label="Heisman" value={row.heismans.length}/><Chip label="Awards" value={row.awards.length}/><Chip label="All-Americans" value={row.allAmericans.length}/><Chip label="Nattys" value={row.nattys}/><Chip label="Conf" value={row.confTitles}/></div><div style={accoladeList}>{[...row.heismans, ...row.awards, ...row.allAmericans].slice(0,8).map((x,i)=><div key={i} style={miniRow}>{x}</div>)}</div></div>; }
 
-function Header({ loading, reload }) { return <header style={header}><div><h1 style={title}>CFBElite 27 Dashboard</h1><p style={subtitle}>Live Supabase League Management System</p></div><button onClick={reload} style={statusBox}>{loading ? "Loading..." : "LIVE DATABASE"}</button></header>; }
+function Header({ loading, reload }) { return <header style={header}><div style={brandWrap}><img src="/cfbelite27-logo.png" alt="CFBElite 27 Dynasty" style={headerLogo}/><p style={subtitle}>Live Supabase League Management System</p></div><button onClick={reload} style={statusBox}>{loading ? "Loading..." : "LIVE DATABASE"}</button></header>; }
 function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reorderTabs }) {
   return (
     <div style={tabScroller}>
@@ -1644,26 +1644,88 @@ function TeamAssets({ teams, saveTeamAssets }) {
 function H2H({ results, search, setSearch }) { const rows=getDirectedH2HRows(results).filter((r)=>JSON.stringify(r).toLowerCase().includes(search.toLowerCase())).sort((a,b)=>a.user.localeCompare(b.user)||a.opp.localeCompare(b.opp)); return <section style={card}><div style={sectionTop}><div><h2 style={sectionTitle}>User vs User H2H</h2><p style={mutedText}>All-time across every recorded season. Current streak is based on the most recent meetings between the two users.</p></div><SearchBox value={search} onChange={setSearch}/></div><Table headers={["User","Opponent","W","L","Record","Current Streak"]}>{rows.map((r)=><tr key={`${r.user}-${r.opp}`} style={trStyle}><td style={teamCell}>{r.user}</td><td style={td}>{r.opp}</td><td style={td}>{r.w}</td><td style={td}>{r.l}</td><td style={td}>{r.w}-{r.l}</td><td style={td}>{r.streak}</td></tr>)}</Table></section>; }
 function Rankings({ title, rows }) { return <div style={miniCard}><h3>{title}</h3>{rows.map((r,i)=><div key={r.team} style={miniRow}>#{i+1} {r.team}: <b>{r.total}</b></div>)}</div>; }
 function AllAmericans({ rows, teams, addRow, updateRow, deleteRow, rankings, drafts, setDrafts, saveDraft, getDraft }) {
-  return <section style={card}><div style={sectionTop}><h2 style={sectionTitle}>All-Americans</h2><button onClick={addRow} style={button}>Add</button></div><div style={twoColWide}><div><Table headers={["Type","Player","Team","Position","Year","Save",""]}>{rows.map((r)=>{const d=getDraft(drafts,r);return <tr key={r.id} style={trStyle}>
-    <td style={td}><select value={d.type} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),type:e.target.value}})} style={input}>{ALL_AMERICAN_TYPES.map((x)=><option key={x}>{x}</option>)}</select></td>
-    <td style={td}><input value={d.player_name} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),player_name:e.target.value}})} style={input}/></td>
-    <td style={td}><select value={d.team_id} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),team_id:e.target.value}})} style={input}>{teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}</select></td>
-    <td style={td}><select value={d.position} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),position:e.target.value}})} style={input}>{POSITIONS.map((p)=><option key={p}>{p}</option>)}</select></td>
-    <td style={td}><select value={String(d.season_year)} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),season_year:e.target.value}})} style={input}>{YEARS.map((y)=><option key={y}>{y}</option>)}</select></td>
-    <td style={td}><button onClick={()=>saveDraft("all_americans",r.id,drafts[r.id], ["season_year"])} style={button}>Save</button></td>
-    <td style={td}><DeleteButton onClick={()=>deleteRow("all_americans",r.id)}/></td>
-  </tr>})}</Table></div></div></section>;
+  return (
+    <section style={card}>
+      <div style={sectionTop}>
+        <div>
+          <h2 style={sectionTitle}>All-Americans</h2>
+          <p style={mutedText}>Mobile-friendly editable cards. Each card saves back to the All-Americans table.</p>
+        </div>
+        <button onClick={addRow} style={button}>Add</button>
+      </div>
+      <div style={recognitionGrid}>
+        {rows.map((r) => {
+          const d = getDraft(drafts, r);
+          const team = teams.find((t) => t.id === d.team_id);
+          return (
+            <div key={r.id} style={recognitionCard}>
+              <div style={recognitionHeader}>
+                <div>
+                  <div style={recognitionKicker}>{d.type || "All-American"}</div>
+                  <div style={recognitionPlayer}>{d.player_name || "New Player"}</div>
+                  <div style={recognitionMeta}>{d.position || "Position"} • {d.season_year || "Year"}</div>
+                </div>
+                <div style={recognitionTeamBadge}><TeamLabel team={team} name={team?.name || "Team"} /></div>
+              </div>
+              <div style={recognitionFormGrid}>
+                <label style={fieldLabel}>Type<select value={d.type} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),type:e.target.value}})} style={input}>{ALL_AMERICAN_TYPES.map((x)=><option key={x}>{x}</option>)}</select></label>
+                <label style={fieldLabel}>Player<input value={d.player_name} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),player_name:e.target.value}})} style={input}/></label>
+                <label style={fieldLabel}>Team<select value={d.team_id} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),team_id:e.target.value}})} style={input}>{teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
+                <label style={fieldLabel}>Position<select value={d.position} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),position:e.target.value}})} style={input}>{POSITIONS.map((p)=><option key={p}>{p}</option>)}</select></label>
+                <label style={fieldLabel}>Year<select value={String(d.season_year)} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),season_year:e.target.value}})} style={input}>{YEARS.map((y)=><option key={y}>{y}</option>)}</select></label>
+              </div>
+              <div style={recognitionActions}>
+                <button onClick={()=>saveDraft("all_americans",r.id,drafts[r.id], ["season_year"])} style={button}>Save</button>
+                <DeleteButton onClick={()=>deleteRow("all_americans",r.id)}/>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
 function Awards({ rows, teams, addRow, updateRow, deleteRow, rankings, drafts, setDrafts, saveDraft, getDraft }) {
-  return <section style={card}><div style={sectionTop}><h2 style={sectionTitle}>Awards</h2><button onClick={addRow} style={button}>Add</button></div><div style={twoColWide}><div><Table headers={["Award","Team","Player","Position","Year","Save",""]}>{rows.map((r)=>{const d=getDraft(drafts,r);return <tr key={r.id} style={trStyle}>
-    <td style={td}><select value={d.award_name} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),award_name:e.target.value}})} style={input}>{AWARD_NAMES.map((a)=><option key={a}>{a}</option>)}</select></td>
-    <td style={td}><select value={d.team_id} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),team_id:e.target.value}})} style={input}>{teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}</select></td>
-    <td style={td}><input value={d.player_name} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),player_name:e.target.value}})} style={input}/></td>
-    <td style={td}><select value={d.position} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),position:e.target.value}})} style={input}>{POSITIONS.map((p)=><option key={p}>{p}</option>)}</select></td>
-    <td style={td}><select value={String(d.season_year)} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),season_year:e.target.value}})} style={input}>{YEARS.map((y)=><option key={y}>{y}</option>)}</select></td>
-    <td style={td}><button onClick={()=>saveDraft("awards",r.id,drafts[r.id], ["season_year"])} style={button}>Save</button></td>
-    <td style={td}><DeleteButton onClick={()=>deleteRow("awards",r.id)}/></td>
-  </tr>})}</Table></div></div></section>;
+  return (
+    <section style={card}>
+      <div style={sectionTop}>
+        <div>
+          <h2 style={sectionTitle}>Awards</h2>
+          <p style={mutedText}>Mobile-friendly editable cards with award, player, team, position, and year.</p>
+        </div>
+        <button onClick={addRow} style={button}>Add</button>
+      </div>
+      <div style={recognitionGrid}>
+        {rows.map((r) => {
+          const d = getDraft(drafts, r);
+          const team = teams.find((t) => t.id === d.team_id);
+          return (
+            <div key={r.id} style={recognitionCard}>
+              <div style={recognitionHeader}>
+                <div>
+                  <div style={recognitionKicker}>{d.award_name || "Award"}</div>
+                  <div style={recognitionPlayer}>{d.player_name || "New Player"}</div>
+                  <div style={recognitionMeta}>{d.position || "Position"} • {d.season_year || "Year"}</div>
+                </div>
+                <div style={recognitionTeamBadge}><TeamLabel team={team} name={team?.name || "Team"} /></div>
+              </div>
+              <div style={recognitionFormGrid}>
+                <label style={fieldLabel}>Award<select value={d.award_name} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),award_name:e.target.value}})} style={input}>{AWARD_NAMES.map((a)=><option key={a}>{a}</option>)}</select></label>
+                <label style={fieldLabel}>Player<input value={d.player_name} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),player_name:e.target.value}})} style={input}/></label>
+                <label style={fieldLabel}>Team<select value={d.team_id} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),team_id:e.target.value}})} style={input}>{teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
+                <label style={fieldLabel}>Position<select value={d.position} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),position:e.target.value}})} style={input}>{POSITIONS.map((p)=><option key={p}>{p}</option>)}</select></label>
+                <label style={fieldLabel}>Year<select value={String(d.season_year)} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),season_year:e.target.value}})} style={input}>{YEARS.map((y)=><option key={y}>{y}</option>)}</select></label>
+              </div>
+              <div style={recognitionActions}>
+                <button onClick={()=>saveDraft("awards",r.id,drafts[r.id], ["season_year"])} style={button}>Save</button>
+                <DeleteButton onClick={()=>deleteRow("awards",r.id)}/>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
 function Heismans({ rows, teams, addRow, updateRow, deleteRow, drafts, setDrafts, saveDraft, getDraft }) {
   return <section style={card}><div style={sectionTop}><h2 style={sectionTitle}>Heisman Winners</h2><button onClick={addRow} style={button}>Add</button></div><Table headers={["Player","Team","Position","Year","Save",""]}>{rows.map((r)=>{const d=getDraft(drafts,r);return <tr key={r.id} style={trStyle}>
@@ -1712,7 +1774,9 @@ function DeleteButton({ onClick }) { return <button onClick={onClick} style={del
 
 const page={minHeight:"100vh",width:"100%",background:"radial-gradient(circle at top left, #2e1065 0, #0f1020 34%, #050509 100%)",color:"white",overflowX:"hidden",fontFamily:"Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"};
 const container={width:"100%",maxWidth:"none",margin:0,padding:"clamp(14px, 2vw, 28px)",boxSizing:"border-box"};
-const header={display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,flexWrap:"wrap",gap:20,background:"linear-gradient(135deg, rgba(88,28,135,.55), rgba(15,23,42,.8))",border:"1px solid rgba(250,204,21,.35)",borderRadius:28,padding:24,boxShadow:"0 24px 80px rgba(0,0,0,.35)"};
+const header={display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,flexWrap:"wrap",gap:20,background:"linear-gradient(135deg, rgba(88,28,135,.55), rgba(15,23,42,.8))",border:"1px solid rgba(250,204,21,.35)",borderRadius:28,padding:"clamp(14px, 2vw, 24px)",boxShadow:"0 24px 80px rgba(0,0,0,.35)"};
+const brandWrap={display:"flex",flexDirection:"column",alignItems:"flex-start",gap:8,minWidth:0};
+const headerLogo={width:"clamp(170px, 28vw, 340px)",height:"auto",display:"block",objectFit:"contain",filter:"drop-shadow(0 16px 32px rgba(0,0,0,.45))"};
 const title={fontSize:"clamp(34px, 5vw, 64px)",fontWeight:950,margin:0,color:"#fff7ed",letterSpacing:"-.04em",textShadow:"0 0 28px rgba(250,204,21,.18)"};
 const subtitle={marginTop:8,color:"#d6d3d1",fontSize:16};
 const statusBox={background:"linear-gradient(135deg,#facc15,#b45309)",border:"1px solid #fde68a",padding:"12px 20px",borderRadius:999,fontWeight:900,color:"#111827",cursor:"pointer",boxShadow:"0 10px 30px rgba(250,204,21,.18)"};
@@ -1751,6 +1815,16 @@ const twoColWide={display:"grid",gridTemplateColumns:"minmax(0, 3fr) minmax(280p
 const miniCard={background:"rgba(7,7,12,.72)",border:"1px solid rgba(250,204,21,.14)",borderRadius:18,padding:18};
 const miniRow={borderBottom:"1px solid rgba(255,255,255,.08)",padding:"10px 0",color:"#e4e4e7"};
 const miniTitle={marginTop:0,color:"#facc15"};
+const recognitionGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(min(100%, 360px), 1fr))",gap:18,marginTop:22};
+const recognitionCard={background:"linear-gradient(180deg, rgba(30,27,75,.72), rgba(7,7,12,.9))",border:"1px solid rgba(250,204,21,.18)",borderRadius:22,padding:18,boxShadow:"0 14px 40px rgba(0,0,0,.28)",overflow:"hidden"};
+const recognitionHeader={display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:14,borderBottom:"1px solid rgba(255,255,255,.08)",paddingBottom:14,marginBottom:14,flexWrap:"wrap"};
+const recognitionKicker={color:"#facc15",fontSize:12,fontWeight:950,textTransform:"uppercase",letterSpacing:".08em",marginBottom:6};
+const recognitionPlayer={fontSize:22,fontWeight:950,color:"#fff7ed",lineHeight:1.05};
+const recognitionMeta={color:"#d6d3d1",fontSize:13,marginTop:6};
+const recognitionTeamBadge={fontSize:13,color:"#fde68a",maxWidth:220};
+const recognitionFormGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(min(100%, 190px), 1fr))",gap:12};
+const recognitionActions={display:"flex",justifyContent:"flex-end",gap:10,marginTop:14,flexWrap:"wrap"};
+const fieldLabel={display:"grid",gap:6,color:"#c4b5fd",fontSize:11,fontWeight:900,textTransform:"uppercase",letterSpacing:".06em"};
 const teamLabel={display:"inline-flex",alignItems:"center",gap:10};
 const helmetIcon={width:30,height:30,objectFit:"contain",borderRadius:8,background:"rgba(255,255,255,.08)",padding:2};
 const helmetFallback={fontSize:22,lineHeight:1};
