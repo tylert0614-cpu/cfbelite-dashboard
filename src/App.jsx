@@ -1051,7 +1051,41 @@ function CoachProfile({ user, teams, assignments, results, allAmericans, awards,
     <div style={profileHero}><div><div style={eyebrow}>Coach Profile</div><h2 style={profileName}>{user.discord_username}</h2><p style={mutedText}>Current Team: {currentTeam?.name || "Unassigned"}</p></div></div>
     <div style={statsGrid}><Stat title="Career Record" value={`${stats?.wins||0}-${stats?.losses||0}`}/><Stat title="National Titles" value={stats?.nattys||0}/><Stat title="Conference Titles" value={stats?.confTitles||0}/><Stat title="Top 25 Wins" value={stats?.top25Wins||0}/><Stat title="Awards" value={stats?.awards||0}/><Stat title="All-Americans" value={stats?.allAmericans||0}/><Stat title="Heismans" value={stats?.heismans||0}/></div>
     <CoachTimelineTable timeline={timeline} teams={teams} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions}/>
-    <Results rows={coachResults} deleteResult={(id)=>deleteRow("game_results", id)} search="" setSearch={()=>{}}/>
+    <section style={card}>
+      <div style={sectionTop}>
+        <div>
+          <h2 style={sectionTitle}>Coach Results</h2>
+          <p style={mutedText}>All recorded games for this Discord user. Use delete only to correct an input error.</p>
+        </div>
+      </div>
+      <Table headers={["Year", "Week", "Team 1", "User 1", "Score", "Team 2", "User 2", "Tags", "Delete"]}>
+        {coachResults.map((row) => (
+          <tr key={row.id} style={trStyle}>
+            <td style={td}>{row.season_year}</td>
+            <td style={td}>{row.week}</td>
+            <td style={teamCell}><TeamLabel team={row.team_1} /></td>
+            <td style={td}>{row.user_1?.discord_username || "—"}</td>
+            <td style={td}>{row.team_1_score}-{row.team_2_score}</td>
+            <td style={teamCell}><TeamLabel team={row.team_2} /></td>
+            <td style={td}>{row.user_2?.discord_username || "—"}</td>
+            <td style={td}>{row.tags?.join(", ") || "—"}</td>
+            <td style={td}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm("Delete this result? This will remove it from Supabase and update all standings.")) {
+                    deleteRow("game_results", row.id);
+                  }
+                }}
+                style={dangerButton}
+              >
+                Delete
+              </button>
+            </td>
+          </tr>
+        ))}
+      </Table>
+    </section>
     <RecognitionTable title="All-Americans" headers={["Player","Position","Team","Year","Type"]} rows={coachAA.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year,r.type]}))}/>
     <RecognitionTable title="Award Winners" headers={["Player","Position","Team","Year","Award"]} rows={coachAwards.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year,r.award_name]}))}/>
     <RecognitionTable title="Heisman Winners" headers={["Player","Position","Team","Year"]} rows={coachHeismans.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year]}))}/>
@@ -2252,4 +2286,15 @@ const hofReasonClean = {
   color: "rgba(255,255,255,.76)",
   fontSize: 13,
   lineHeight: 1.45,
+};
+
+
+const dangerButton = {
+  border: "1px solid rgba(248,113,113,.45)",
+  background: "rgba(127,29,29,.75)",
+  color: "#fecaca",
+  borderRadius: 10,
+  padding: "8px 10px",
+  fontWeight: 900,
+  cursor: "pointer",
 };
