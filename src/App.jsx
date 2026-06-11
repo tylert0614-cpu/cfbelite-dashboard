@@ -1283,7 +1283,10 @@ function HeadlineTicker({ teams, users, assignments, results, allResults, allAme
   if (heisman) lines.push(`${heisman.player_name} headlines the Heisman board`);
   if (!lines.length) lines.push("Enter results to generate dynasty headlines");
 
-  return <div style={tickerWrap}><div style={tickerContent}>{lines.concat(lines).map((line,index)=><span key={index}>📰 {line}</span>)}</div></div>;
+  return <div style={tickerWrap}>
+    <style>{`@keyframes cfbeliteTicker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }`}</style>
+    <div style={tickerContent}>{lines.concat(lines).map((line,index)=><span key={index}>📰 {line}</span>)}</div>
+  </div>;
 }
 
 function QuickJump({ teams, users, setActiveTab }) {
@@ -1858,7 +1861,7 @@ function ComputerRankings({ teams, results, currentWeek, sortState, setSortState
   const previousRankMap = new Map(previousRows.map((row) => [row.team.id, row.rank]));
   const activeSort = sortState?.key ? sortState : { key: "score", direction: "desc" };
   const rows = [...baseRows].sort((a,b)=>compareForSort(a,b,activeSort.key,activeSort.direction));
-  return <section style={card}><div style={sectionTop}><div><h2 style={sectionTitle}>CFBElite Computer Rankings</h2><p style={mutedText}>Automated 32-user ranking. Formula: record, SOR, quality wins, scoring margin, wins, and opponent user ELO tier strength. Movement compares current rank to the rank through the previous league week.</p></div></div><div style={mobileCardGrid}>{rows.slice(0,12).map((row)=><div key={row.team.id} style={rankingMobileCard}><div style={leaderRow}><b>#{row.rank} {row.teamName}</b><span>{row.score}</span></div><div style={mutedText}>{row.wins}-{row.losses} • SOR {row.sor.toFixed ? row.sor.toFixed(1) : row.sor} • QW {row.qw}</div></div>)}</div><Table headers={["#","Move",<SortButton label="Team" sortKey="teamName" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="Record" sortKey="record" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="QW" sortKey="qw" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="Avg PF" sortKey="avgPf" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="Avg PA" sortKey="avgPa" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="SOR" sortKey="sor" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="Score" sortKey="score" sortState={activeSort} setSortState={setSortState}/>]}>{rows.map((row)=><tr key={row.team.id} style={trStyle}><td style={rankCell}>#{row.rank}</td><td style={td}><MovementBadge currentRank={row.rank} previousRank={previousRankMap.get(row.team.id)}/></td><td style={teamCell}><TeamLabel team={row.team}/></td><td style={td}>{row.wins}-{row.losses}</td><td style={td}>{row.qw}</td><td style={td}>{row.avgPf.toFixed(1)}</td><td style={td}>{row.avgPa.toFixed(1)}</td><td style={td}>{row.sor.toFixed(1)}</td><td style={scoreCell}>{row.score.toFixed(1)}</td></tr>)}</Table></section>;
+  return <section style={card}><div style={sectionTop}><div><h2 style={sectionTitle}>CFBElite Computer Rankings</h2><p style={mutedText}>Automated 32-user ranking. Formula: record, SOR, quality wins, scoring margin, wins, and opponent user ELO tier strength. Movement compares current rank to the rank through the previous league week.</p></div></div><Table headers={["#","Move",<SortButton label="Team" sortKey="teamName" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="Record" sortKey="record" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="QW" sortKey="qw" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="Avg PF" sortKey="avgPf" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="Avg PA" sortKey="avgPa" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="SOR" sortKey="sor" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="Score" sortKey="score" sortState={activeSort} setSortState={setSortState}/>]}>{rows.map((row)=><tr key={row.team.id} style={trStyle}><td style={rankCell}>#{row.rank}</td><td style={td}><MovementBadge currentRank={row.rank} previousRank={previousRankMap.get(row.team.id)}/></td><td style={teamCell}><TeamLabel team={row.team}/></td><td style={td}>{row.wins}-{row.losses}</td><td style={td}>{row.qw}</td><td style={td}>{row.avgPf.toFixed(1)}</td><td style={td}>{row.avgPa.toFixed(1)}</td><td style={td}>{row.sor.toFixed(1)}</td><td style={scoreCell}>{row.score.toFixed(1)}</td></tr>)}</Table></section>;
 }
 
 function DashboardRecognition({ allAmericanRows, awardRows }) {
@@ -2224,14 +2227,50 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
     setMenuOpen(false);
   }
 
+  function navThemeFor(tabKey) {
+    const themes = {
+      dashboard: ["#581c87", "#facc15", "#ffffff"],
+      commissionerCenter: ["#7f1d1d", "#f97316", "#ffffff"],
+      weeklyMedia: ["#1e3a8a", "#38bdf8", "#ffffff"],
+      weeklyMatchups: ["#064e3b", "#34d399", "#ffffff"],
+      recruitingRankings: ["#365314", "#bef264", "#ffffff"],
+      dynastyTimeline: ["#312e81", "#a78bfa", "#ffffff"],
+      dynastyRecords: ["#713f12", "#fbbf24", "#ffffff"],
+      rivalries: ["#881337", "#fb7185", "#ffffff"],
+      powerIndex: ["#111827", "#facc15", "#ffffff"],
+      eloRankings: ["#0f172a", "#22d3ee", "#ffffff"],
+      conferencePower: ["#14532d", "#4ade80", "#ffffff"],
+      coachHOF: ["#78350f", "#f59e0b", "#ffffff"],
+      playerHOF: ["#4c1d95", "#c4b5fd", "#ffffff"],
+      h2h: ["#164e63", "#67e8f9", "#ffffff"],
+      allAmericans: ["#1d4ed8", "#ffffff", "#facc15"],
+      awards: ["#92400e", "#facc15", "#ffffff"],
+      heismans: ["#854d0e", "#fde68a", "#ffffff"],
+      nationalChampions: ["#7f1d1d", "#facc15", "#ffffff"],
+      assignments: ["#374151", "#d1d5db", "#ffffff"],
+    };
+    return themes[tabKey] || ["#111827", "#facc15", "#ffffff"];
+  }
+
   function NavButton({ tabKey, label }) {
+    const [primary, accent, textColor] = navThemeFor(tabKey);
+    const active = activeTab === tabKey;
+
     return (
       <button
         type="button"
         onClick={() => handleSelect(tabKey)}
-        style={activeTab === tabKey ? drawerItemActive : drawerItem}
+        style={{
+          ...colorDrawerItem,
+          background: `linear-gradient(135deg, ${primary}, rgba(15,23,42,.96))`,
+          border: `1px solid ${active ? accent : `${accent}77`}`,
+          boxShadow: active ? `0 0 0 1px ${accent}66, 0 0 24px ${accent}44` : "0 10px 24px rgba(0,0,0,.18)",
+          color: textColor,
+        }}
       >
+        <span style={{ ...colorDrawerStripe, background: accent }} />
         <span>{label}</span>
+        {active && <span style={activeSpark}>●</span>}
       </button>
     );
   }
@@ -3560,11 +3599,13 @@ const tickerWrap = {
 
 const tickerContent = {
   display: "flex",
+  width: "max-content",
   gap: 28,
   padding: "12px 16px",
   whiteSpace: "nowrap",
   color: "#fef3c7",
   fontWeight: 900,
+  animation: "cfbeliteTicker 28s linear infinite",
 };
 
 const quickJumpCard = {
@@ -3725,4 +3766,30 @@ const healthWarn = {
   color: "#fef3c7",
   display: "grid",
   gap: 8,
+};
+
+
+const colorDrawerItem = {
+  width: "100%",
+  position: "relative",
+  display: "grid",
+  gridTemplateColumns: "7px minmax(0, 1fr) auto",
+  alignItems: "center",
+  gap: 12,
+  textAlign: "left",
+  borderRadius: 16,
+  padding: "13px 14px 13px 0",
+  marginBottom: 9,
+  cursor: "pointer",
+  fontWeight: 950,
+  overflow: "hidden",
+  transition: "transform .16s ease, box-shadow .16s ease, border-color .16s ease",
+  textShadow: "0 2px 10px rgba(0,0,0,.30)",
+};
+
+const colorDrawerStripe = {
+  width: 7,
+  height: "100%",
+  minHeight: 42,
+  borderRadius: "0 999px 999px 0",
 };
