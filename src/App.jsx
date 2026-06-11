@@ -1126,7 +1126,23 @@ function PlayerHallOfFame({ teams, assignments, results, allAmericans, awards, h
 }
 function PlayerHofCard({ row, team }) { return <div style={hofCard}><div style={hofTopClean}><div style={hofIconWrap}>{team ? <HofTeamIcon team={team}/> : <span style={hofIcon}>🏈</span>}</div><div style={{minWidth:0}}><div style={eyebrow}>Player Hall of Fame</div><h3 style={hofName}>{row.player}</h3><div style={mutedText}>{row.position} · {team?.name || "Unknown Team"}</div></div></div><div style={hofScoreBand}><span>HOF Score</span><b style={hofScoreBandB}>{row.score}</b></div><div style={hofReason}>{row.reasons.join(" • ")}</div><div style={hofChips}><Chip label="Heisman" value={row.heismans.length}/><Chip label="Awards" value={row.awards.length}/><Chip label="All-Americans" value={row.allAmericans.length}/><Chip label="Nattys" value={row.nattys}/><Chip label="Conf" value={row.confTitles}/></div><div style={accoladeList}>{[...row.heismans, ...row.awards, ...row.allAmericans].slice(0,8).map((x,i)=><div key={i} style={miniRow}>{x}</div>)}</div></div>; }
 
-function Header({ loading, reload }) { return <header style={header}><div style={brandWrap}><img src="/cfbelite27-logo.png" alt="CFBElite 27 Dynasty" style={headerLogo}/><p style={subtitle}>Live Supabase League Management System</p></div><button onClick={reload} style={statusBox}>{loading ? "Loading..." : "LIVE DATABASE"}</button></header>; }
+function Header({ loading, reload }) {
+  return (
+    <header style={heroBanner}>
+      <img src="/cfbelite-banner.png" alt="CFBElite 27 Dynasty" style={heroBannerImage} />
+      <div style={heroOverlay} />
+      <div style={heroContent}>
+        <div>
+          <h1 style={heroTitle}>CFBElite 27 Dynasty</h1>
+          <p style={heroSubtitle}>Live Supabase League Management System</p>
+        </div>
+        <button onClick={reload} style={statusBox}>
+          {loading ? "Loading..." : "LIVE DATABASE"}
+        </button>
+      </div>
+    </header>
+  );
+}
 function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reorderTabs }) {
   return (
     <div style={tabScroller}>
@@ -1863,3 +1879,56 @@ const hofScoreSpan={color:"#c4b5fd"};
 const hofChips={display:"flex",gap:10,flexWrap:"wrap",marginTop:22};
 const chip={display:"grid",gap:2,background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.12)",borderRadius:999,padding:"8px 12px",fontSize:12};
 const accoladeList={marginTop:16};
+
+
+const heroBanner = {
+  position: "relative",
+  minHeight: 300,
+  borderRadius: 28,
+  overflow: "hidden",
+  border: "1px solid rgba(255,199,44,.45)",
+  marginBottom: 22,
+  background: "#080814",
+  boxShadow: "0 20px 50px rgba(0,0,0,.45)",
+};
+
+const heroBannerImage = {
+  position: "absolute",
+  inset: 0,
+  width: "100%",
+  height: "100%",
+  objectFit: "cover",
+  objectPosition: "center",
+  opacity: 0.35,
+};
+
+const heroOverlay = {
+  position: "absolute",
+  inset: 0,
+  background: "linear-gradient(90deg, rgba(20,8,45,.92), rgba(20,8,45,.62), rgba(5,5,15,.88))",
+};
+
+const heroContent = {
+  position: "relative",
+  zIndex: 2,
+  minHeight: 300,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 24,
+  padding: "34px 42px",
+};
+
+const heroTitle = {
+  margin: 0,
+  fontSize: "clamp(34px, 5vw, 72px)",
+  fontWeight: 900,
+  letterSpacing: "-2px",
+  color: "#fff",
+};
+
+const heroSubtitle = {
+  marginTop: 10,
+  fontSize: "clamp(15px, 2vw, 22px)",
+  color: "rgba(255,255,255,.86)",
+};
