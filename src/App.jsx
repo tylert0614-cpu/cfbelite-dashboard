@@ -1131,11 +1131,8 @@ function Header({ loading, reload }) {
     <header style={heroBanner}>
       <img src="/cfbelite-banner.png" alt="CFBElite 27 Dynasty" style={heroBannerImage} />
       <div style={heroOverlay} />
+
       <div style={heroContent}>
-        <div>
-          <h1 style={heroTitle}>CFBElite 27 Dynasty</h1>
-          <p style={heroSubtitle}>Live Supabase League Management System</p>
-        </div>
         <button onClick={reload} style={statusBox}>
           {loading ? "Loading..." : "LIVE DATABASE"}
         </button>
@@ -1899,13 +1896,13 @@ const heroBannerImage = {
   height: "100%",
   objectFit: "cover",
   objectPosition: "center",
-  opacity: 0.35,
+  opacity: 0.82,
 };
 
 const heroOverlay = {
   position: "absolute",
   inset: 0,
-  background: "linear-gradient(90deg, rgba(20,8,45,.92), rgba(20,8,45,.62), rgba(5,5,15,.88))",
+  background: "linear-gradient(90deg, rgba(20,8,45,.18), rgba(20,8,45,.10), rgba(5,5,15,.22))",
 };
 
 const heroContent = {
@@ -1913,8 +1910,8 @@ const heroContent = {
   zIndex: 2,
   minHeight: 300,
   display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
+  alignItems: "flex-start",
+  justifyContent: "flex-end",
   gap: 24,
   padding: "34px 42px",
 };
