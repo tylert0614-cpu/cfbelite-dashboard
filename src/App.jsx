@@ -621,7 +621,20 @@ export default function App() {
     if (insertError) { setError(insertError.message); return; }
     setNewResult({ ...EMPTY_RESULT, season_year: Number(currentYear), week: currentWeek }); await loadData();
   }
-  async function deleteRow(table, id) { const { error: deleteError } = await supabase.from(table).delete().eq("id", id); if (deleteError) setError(deleteError.message); await loadData(); }
+  async function deleteRow(table, id) {
+  const { error: deleteError } = await supabase
+    .from(table)
+    .delete()
+    .eq("id", id);
+
+  if (deleteError) {
+    setError(`Delete failed from ${table}: ${deleteError.message}`);
+    return;
+  }
+
+  setError(`Deleted row from ${table}.`);
+  await loadData();
+}
   async function updateRow(table, id, field, value) { const { error: updateError } = await supabase.from(table).update({ [field]: value === "" ? null : value }).eq("id", id); if (updateError) setError(updateError.message); else setError(""); await loadData(); }
   async function updateLeagueSetting(field, value) {
     const payload = {
