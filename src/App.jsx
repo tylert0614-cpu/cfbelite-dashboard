@@ -1187,6 +1187,20 @@ function PlayerHofCard({ row, team }) {
     </div>
   );
 }
+function Header({ loading, reload }) {
+  return (
+    <header style={heroBanner}>
+      <img src="/cfbelite-banner.png" alt="CFBElite 27 Dynasty" style={heroBannerImage} />
+      <div style={heroOverlay} />
+
+      <div style={heroContent}>
+        <button onClick={reload} style={statusBox}>
+          {loading ? "Loading..." : "LIVE DATABASE"}
+        </button>
+      </div>
+    </header>
+  );
+}
 function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reorderTabs }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
