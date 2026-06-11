@@ -110,14 +110,14 @@ function getTeamSecondary(team) {
 function teamPageTheme(team) {
   const primary = getTeamPrimary(team);
   const secondary = getTeamSecondary(team);
-  const logo = team?.logo_url || team?.helmet_url || "";
+  const accent = team?.accent_color || secondary || "#facc15";
   return {
-    ...card,
+    ...profileCard,
     position: "relative",
     overflow: "hidden",
-    border: `1px solid ${secondary}66`,
-    background: `linear-gradient(140deg, ${primary}ee, rgba(15,23,42,.96) 48%, rgba(2,6,23,.98))`,
-    color: secondary,
+    border: `1px solid ${accent}66`,
+    background: `linear-gradient(145deg, ${primary}f2 0%, rgba(15,23,42,.94) 44%, ${secondary}33 100%)`,
+    boxShadow: `0 24px 70px rgba(0,0,0,.38), inset 0 0 0 1px ${accent}22`,
   };
 }
 
@@ -1988,7 +1988,11 @@ function CoachProfile({ user, teams, assignments, results, allAmericans, awards,
   const coachStats = getCoachStats(usersFallback(user), teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
   const stats = coachStats.find((row)=>row.userId === user.id) || { wins:0, losses:0, nattys:0, confTitles:0, top25Wins:0, awards:0, allAmericans:0, heismans:0, prestige:0 };
   const activeAssignment = assignments.find((a)=>a.discord_user_id===user.id && a.status==="Active");
-  const currentTeam = teams.find((t)=>t.id===activeAssignment?.team_id);
+  const currentTeam =
+    teams.find((t)=>t.id===activeAssignment?.team_id) ||
+    activeAssignment?.teams ||
+    activeAssignment?.team ||
+    null;
   const timeline = assignments.filter((a)=>a.discord_user_id===user.id).sort((a,b)=>Number(a.start_year||0)-Number(b.start_year||0));
   const coachResults = results.filter((result) => {
     const team1UserId = result.team_1_user_id || coachForTeamYear(result.team_1_id, result.season_year, assignments)?.discord_user_id;
@@ -2002,8 +2006,32 @@ function CoachProfile({ user, teams, assignments, results, allAmericans, awards,
   const coachTier = userTierFromElo(coachEloRow?.elo || 1500, 1);
   const currentSeasonRecord = currentTeam ? recordFromResults(currentTeam.id, results.filter((row)=>String(row.season_year) === String(new Date().getFullYear()))) : { wins:0, losses:0 };
 
-  return <section style={profileCard}>
-    <div style={profileHero}><div><div style={eyebrow}>Coach Profile</div><h2 style={profileName}>{user.discord_username}</h2><p style={mutedText}>Current Team: {currentTeam?.name || "Unassigned"}</p></div></div>
+  const primary = getTeamPrimary(currentTeam);
+  const secondary = getTeamSecondary(currentTeam);
+  const accent = currentTeam?.accent_color || secondary || "#facc15";
+  const teamThemedProfile = currentTeam ? teamPageTheme(currentTeam) : profileCard;
+
+  return <section style={teamThemedProfile}>
+    <div style={{
+      ...profileHero,
+      border: `1px solid ${accent}55`,
+      background: `linear-gradient(135deg, ${primary}cc, rgba(2,6,23,.48))`,
+      boxShadow: `0 16px 44px ${primary}55`,
+    }}>
+      <div>
+        <div style={{...eyebrow, color: accent}}>Coach Profile</div>
+        <h2 style={profileName}>{user.discord_username}</h2>
+        <p style={{...mutedText, color:"rgba(255,255,255,.82)"}}>Current Team: {currentTeam?.name || "Unassigned"}</p>
+      </div>
+      <div style={{
+        border:`1px solid ${accent}55`,
+        background:`${accent}22`,
+        color: accent,
+        borderRadius: 999,
+        padding:"8px 12px",
+        fontWeight: 950,
+      }}>{currentTeam?.conference || "CFBElite"}</div>
+    </div>
     <div style={statsGrid}><Stat title="Career Record" value={`${stats?.wins||0}-${stats?.losses||0}`}/><Stat title="National Titles" value={stats?.nattys||0}/><Stat title="Conference Titles" value={stats?.confTitles||0}/><Stat title="Top 25 Wins" value={stats?.top25Wins||0}/><Stat title="Awards" value={stats?.awards||0}/><Stat title="All-Americans" value={stats?.allAmericans||0}/><Stat title="Heismans" value={stats?.heismans||0}/></div>
     <CoachTimelineTable timeline={timeline} teams={teams} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions}/>
     <Results rows={coachResults} deleteResult={()=>{}} search="" setSearch={()=>{}}/>
@@ -2228,28 +2256,15 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
   }
 
   function navThemeFor(tabKey) {
-    const themes = {
-      dashboard: ["#581c87", "#facc15", "#ffffff"],
-      commissionerCenter: ["#7f1d1d", "#f97316", "#ffffff"],
-      weeklyMedia: ["#1e3a8a", "#38bdf8", "#ffffff"],
-      weeklyMatchups: ["#064e3b", "#34d399", "#ffffff"],
-      recruitingRankings: ["#365314", "#bef264", "#ffffff"],
-      dynastyTimeline: ["#312e81", "#a78bfa", "#ffffff"],
-      dynastyRecords: ["#713f12", "#fbbf24", "#ffffff"],
-      rivalries: ["#881337", "#fb7185", "#ffffff"],
-      powerIndex: ["#111827", "#facc15", "#ffffff"],
-      eloRankings: ["#0f172a", "#22d3ee", "#ffffff"],
-      conferencePower: ["#14532d", "#4ade80", "#ffffff"],
-      coachHOF: ["#78350f", "#f59e0b", "#ffffff"],
-      playerHOF: ["#4c1d95", "#c4b5fd", "#ffffff"],
-      h2h: ["#164e63", "#67e8f9", "#ffffff"],
-      allAmericans: ["#1d4ed8", "#ffffff", "#facc15"],
-      awards: ["#92400e", "#facc15", "#ffffff"],
-      heismans: ["#854d0e", "#fde68a", "#ffffff"],
-      nationalChampions: ["#7f1d1d", "#facc15", "#ffffff"],
-      assignments: ["#374151", "#d1d5db", "#ffffff"],
-    };
-    return themes[tabKey] || ["#111827", "#facc15", "#ffffff"];
+    const premium = ["#20114f", "#facc15", "#ffffff"];
+    const admin = ["#2a123f", "#f97316", "#ffffff"];
+    const recognition = ["#111827", "#c4b5fd", "#ffffff"];
+    const ranking = ["#0f172a", "#22d3ee", "#ffffff"];
+
+    if (["commissionerCenter", "assignments", "weeklyMatchups"].includes(tabKey)) return admin;
+    if (["eloRankings", "conferencePower", "powerIndex"].includes(tabKey)) return ranking;
+    if (["coachHOF", "playerHOF", "allAmericans", "awards", "heismans", "nationalChampions"].includes(tabKey)) return recognition;
+    return premium;
   }
 
   function NavButton({ tabKey, label }) {
@@ -3785,6 +3800,7 @@ const colorDrawerItem = {
   overflow: "hidden",
   transition: "transform .16s ease, box-shadow .16s ease, border-color .16s ease",
   textShadow: "0 2px 10px rgba(0,0,0,.30)",
+  letterSpacing: ".01em",
 };
 
 const colorDrawerStripe = {
