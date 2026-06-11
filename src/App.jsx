@@ -455,6 +455,9 @@ export default function App() {
   const [draftDraftOrder, setDraftDraftOrder] = useState({});
   const [draftPlayoff, setDraftPlayoff] = useState({});
   const [teamChange, setTeamChange] = useState({ discord_user_id: "", new_team_id: "", start_year: 2029 });
+  const [resultFilters, setResultFilters] = useState({ season: "", week: "", team: "", user: "", search: "" });
+  const [editingResultId, setEditingResultId] = useState(null);
+  const [editingResultDraft, setEditingResultDraft] = useState({});
 
   const teamOptions = useMemo(() => [...teams].sort((a, b) => a.name.localeCompare(b.name)), [teams]);
   const userOptions = useMemo(() => [...users].sort((a, b) => a.discord_username.localeCompare(b.discord_username)), [users]);
@@ -519,7 +522,7 @@ export default function App() {
     await saveCommissionerRankings(next);
   }
 
-  const baseTabs = [["dashboard","Dashboard"],["allTimeStandings","All-Time User Standings"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["assignments","Users/Team Assignments"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...activeCoachUsers.map((user) => [`coach-${user.id}`, user.discord_username])];
+  const baseTabs = [["dashboard","Dashboard"],["allTimeStandings","All-Time User Standings"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["commissionerTools","Commissioner Tools"],["editResults","Edit Results"],["deleteResults","Delete Results"],["recalculate","Recalculate"],["integrityCheck","Integrity Check"],["assignments","Users/Team Assignments"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...activeCoachUsers.map((user) => [`coach-${user.id}`, user.discord_username])];
   const tabs = useMemo(() => {
     const tabMap = new Map(baseTabs);
     const ordered = tabOrder
@@ -621,20 +624,60 @@ export default function App() {
     if (insertError) { setError(insertError.message); return; }
     setNewResult({ ...EMPTY_RESULT, season_year: Number(currentYear), week: currentWeek }); await loadData();
   }
-  async function deleteRow(table, id) {
-  const { error: deleteError } = await supabase
-    .from(table)
-    .delete()
-    .eq("id", id);
 
-  if (deleteError) {
-    setError(`Delete failed from ${table}: ${deleteError.message}`);
-    return;
+  async function updateGameResult(id, draft) {
+    const payload = {
+      season_year: Number(draft.season_year),
+      week: draft.week,
+      team_1_id: draft.team_1_id,
+      team_2_id: draft.team_2_id,
+      team_1_user_id: draft.team_1_user_id || null,
+      team_2_user_id: draft.team_2_user_id || null,
+      team_1_score: scoreNumber(draft.team_1_score),
+      team_2_score: scoreNumber(draft.team_2_score),
+      team_1_rank: draft.team_1_rank ? Number(draft.team_1_rank) : null,
+      team_2_rank: draft.team_2_rank ? Number(draft.team_2_rank) : null,
+      tags: Array.isArray(draft.tags)
+        ? draft.tags
+        : String(draft.tags || "User vs User").split(",").map((tag) => tag.trim()).filter(Boolean),
+    };
+
+    if (!payload.team_1_id || !payload.team_2_id || payload.team_1_score === null || payload.team_2_score === null) {
+      setError("Edit failed: both teams and both scores are required.");
+      return;
+    }
+
+    const { error: updateError } = await supabase.from("game_results").update(payload).eq("id", id);
+
+    if (updateError) {
+      setError(`Result update failed: ${updateError.message}`);
+      return;
+    }
+
+    setEditingResultId(null);
+    setEditingResultDraft({});
+    setError("Result updated successfully.");
+    await loadData();
+  }
+  async function deleteRow(table, id) {
+    const { error: deleteError } = await supabase
+      .from(table)
+      .delete()
+      .eq("id", id);
+
+    if (deleteError) {
+      setError(`Delete failed from ${table}: ${deleteError.message}`);
+      return;
+    }
+
+    if (table === "game_results") {
+      setResults((prev) => prev.filter((row) => row.id !== id));
+    }
+
+    setError("Deleted successfully.");
+    await loadData();
   }
 
-  setError(`Deleted row from ${table}.`);
-  await loadData();
-}
   async function updateRow(table, id, field, value) { const { error: updateError } = await supabase.from(table).update({ [field]: value === "" ? null : value }).eq("id", id); if (updateError) setError(updateError.message); else setError(""); await loadData(); }
   async function updateLeagueSetting(field, value) {
     const payload = {
@@ -828,6 +871,11 @@ export default function App() {
 
   return <div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={errorBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} draggedTab={draggedTab} setDraggedTab={setDraggedTab} reorderTabs={reorderTabs}/>
     {activeTab === "dashboard" && <><Stats currentYear={currentYear} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} currentWeek={currentWeek} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} teams={activeTeamOptions} assignments={assignments} saveSettings={saveLeagueSettings}/><LeaguePulse teams={activeTeamOptions} results={currentYearResults} allAmericans={allAmericans} awards={awards} currentYear={currentYear}/><ComputerRankings teams={activeTeamOptions} results={currentYearResults} currentWeek={currentWeek} sortState={userSort} setSortState={setUserSort}/><DashboardRecognition allAmericanRows={rankingRows(activeTeamOptions, allAmericans)} awardRows={rankingRows(activeTeamOptions, awards)}/><RecentActivity results={currentYearResults} allAmericans={allAmericans} awards={awards} heismans={heismans} champions={nationalChampions}/><RecordResult newResult={newResult} setNewResult={setNewResult} teams={activeTeamOptions} users={userOptions} assignments={assignments} submitResult={submitResult}/></>}
+    {activeTab === "commissionerTools" && <CommissionerTools setActiveTab={setActiveTab}/>}
+    {activeTab === "editResults" && <EditResults rows={results} teams={teamOptions} users={userOptions} assignments={assignments} filters={resultFilters} setFilters={setResultFilters} editingResultId={editingResultId} setEditingResultId={setEditingResultId} editingResultDraft={editingResultDraft} setEditingResultDraft={setEditingResultDraft} updateGameResult={updateGameResult}/>}
+    {activeTab === "deleteResults" && <DeleteResults rows={results} teams={teamOptions} users={userOptions} assignments={assignments} filters={resultFilters} setFilters={setResultFilters} deleteRow={deleteRow}/>}
+    {activeTab === "recalculate" && <RecalculateTools teams={activeTeamOptions} results={results} currentYearResults={currentYearResults}/>}
+    {activeTab === "integrityCheck" && <IntegrityCheck teams={teamOptions} users={userOptions} assignments={assignments} results={results}/>}
     {activeTab === "allTimeStandings" && <AllTimeUserStandings users={userOptions} teams={teamOptions} assignments={assignments} results={results} sortState={commissionerSort} setSortState={setCommissionerSort}/>}    
     {activeTab === "coachHOF" && <CoachHallOfFame users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} deleteRow={deleteRow}/>}    
     {activeTab === "playerHOF" && <PlayerHallOfFame teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions}/>}    
@@ -841,6 +889,221 @@ export default function App() {
   </div></div>;
 }
 
+
+
+
+function getResultUserIds(row, assignments) {
+  return {
+    team1UserId: row.team_1_user_id || coachForTeamYear(row.team_1_id, row.season_year, assignments)?.discord_user_id || "",
+    team2UserId: row.team_2_user_id || coachForTeamYear(row.team_2_id, row.season_year, assignments)?.discord_user_id || "",
+  };
+}
+
+function resultMatchesFilters(row, filters, assignments) {
+  const searchText = String(filters.search || "").toLowerCase();
+  const { team1UserId, team2UserId } = getResultUserIds(row, assignments);
+  const searchable = JSON.stringify(row).toLowerCase();
+
+  if (filters.season && String(row.season_year) !== String(filters.season)) return false;
+  if (filters.week && row.week !== filters.week) return false;
+  if (filters.team && row.team_1_id !== filters.team && row.team_2_id !== filters.team) return false;
+  if (filters.user && team1UserId !== filters.user && team2UserId !== filters.user) return false;
+  if (searchText && !searchable.includes(searchText)) return false;
+  return true;
+}
+
+function ResultFilters({ filters, setFilters, rows, teams, users }) {
+  const seasons = [...new Set(rows.map((row) => String(row.season_year)).filter(Boolean))].sort((a,b)=>Number(b)-Number(a));
+
+  return (
+    <div style={filterGrid}>
+      <select value={filters.season} onChange={(e)=>setFilters({...filters, season:e.target.value})} style={input}>
+        <option value="">All Seasons</option>
+        {seasons.map((season)=><option key={season} value={season}>{season}</option>)}
+      </select>
+
+      <select value={filters.week} onChange={(e)=>setFilters({...filters, week:e.target.value})} style={input}>
+        <option value="">All Weeks</option>
+        {WEEKS.map((week)=><option key={week} value={week}>{week}</option>)}
+      </select>
+
+      <select value={filters.team} onChange={(e)=>setFilters({...filters, team:e.target.value})} style={input}>
+        <option value="">All Teams</option>
+        {teams.map((team)=><option key={team.id} value={team.id}>{team.name}</option>)}
+      </select>
+
+      <select value={filters.user} onChange={(e)=>setFilters({...filters, user:e.target.value})} style={input}>
+        <option value="">All Discord Users</option>
+        {users.map((user)=><option key={user.id} value={user.id}>{user.discord_username}</option>)}
+      </select>
+
+      <input value={filters.search} onChange={(e)=>setFilters({...filters, search:e.target.value})} placeholder="Search result data..." style={input}/>
+      <button type="button" onClick={()=>setFilters({ season:"", week:"", team:"", user:"", search:"" })} style={button}>Clear Filters</button>
+    </div>
+  );
+}
+
+function CommissionerTools({ setActiveTab }) {
+  const tools = [
+    { key:"editResults", title:"Edit Results", sub:"Correct scores, rankings, users, weeks, or teams." },
+    { key:"deleteResults", title:"Delete Results", sub:"Remove an incorrect result with confirmation." },
+    { key:"recalculate", title:"Recalculate", sub:"Review automatically calculated records and rankings." },
+    { key:"integrityCheck", title:"Integrity Check", sub:"Find missing users, bad assignments, or duplicate active teams." },
+  ];
+
+  return (
+    <section style={card}>
+      <h2 style={sectionTitle}>Commissioner Tools</h2>
+      <p style={mutedText}>Central control room for correcting results and checking league data health.</p>
+      <div style={toolGrid}>
+        {tools.map((tool)=>(
+          <button key={tool.key} type="button" onClick={()=>setActiveTab(tool.key)} style={toolCard}>
+            <div style={toolTitle}>{tool.title}</div>
+            <div style={mutedText}>{tool.sub}</div>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function EditResults({ rows, teams, users, assignments, filters, setFilters, editingResultId, setEditingResultId, editingResultDraft, setEditingResultDraft, updateGameResult }) {
+  const filtered = rows.filter((row)=>resultMatchesFilters(row, filters, assignments));
+
+  function startEdit(row) {
+    setEditingResultId(row.id);
+    setEditingResultDraft({
+      season_year: row.season_year,
+      week: row.week,
+      team_1_id: row.team_1_id,
+      team_2_id: row.team_2_id,
+      team_1_user_id: row.team_1_user_id || "",
+      team_2_user_id: row.team_2_user_id || "",
+      team_1_score: row.team_1_score,
+      team_2_score: row.team_2_score,
+      team_1_rank: row.team_1_rank || "",
+      team_2_rank: row.team_2_rank || "",
+      tags: Array.isArray(row.tags) ? row.tags.join(", ") : row.tags || "User vs User",
+    });
+  }
+
+  return (
+    <section style={card}>
+      <h2 style={sectionTitle}>Edit Results</h2>
+      <p style={mutedText}>Edit incorrect game results without deleting and re-entering them.</p>
+      <ResultFilters filters={filters} setFilters={setFilters} rows={rows} teams={teams} users={users}/>
+
+      <Table headers={["Season", "Week", "Team 1", "Score", "Team 2", "Users", "Action"]}>
+        {filtered.map((row)=> {
+          const editing = editingResultId === row.id;
+          return (
+            <tr key={row.id} style={trStyle}>
+              <td style={td}>{editing ? <input style={input} value={editingResultDraft.season_year} onChange={(e)=>setEditingResultDraft({...editingResultDraft, season_year:e.target.value})}/> : row.season_year}</td>
+              <td style={td}>{editing ? <select style={input} value={editingResultDraft.week} onChange={(e)=>setEditingResultDraft({...editingResultDraft, week:e.target.value})}>{WEEKS.map((week)=><option key={week}>{week}</option>)}</select> : row.week}</td>
+              <td style={teamCell}>{editing ? <select style={input} value={editingResultDraft.team_1_id} onChange={(e)=>setEditingResultDraft({...editingResultDraft, team_1_id:e.target.value})}>{teams.map((team)=><option key={team.id} value={team.id}>{team.name}</option>)}</select> : <TeamLabel team={row.team_1}/>}</td>
+              <td style={td}>{editing ? <div style={scoreEditWrap}><input style={input} value={editingResultDraft.team_1_score} onChange={(e)=>setEditingResultDraft({...editingResultDraft, team_1_score:e.target.value})}/><input style={input} value={editingResultDraft.team_2_score} onChange={(e)=>setEditingResultDraft({...editingResultDraft, team_2_score:e.target.value})}/></div> : `${row.team_1_score}-${row.team_2_score}`}</td>
+              <td style={teamCell}>{editing ? <select style={input} value={editingResultDraft.team_2_id} onChange={(e)=>setEditingResultDraft({...editingResultDraft, team_2_id:e.target.value})}>{teams.map((team)=><option key={team.id} value={team.id}>{team.name}</option>)}</select> : <TeamLabel team={row.team_2}/>}</td>
+              <td style={td}>{editing ? <div style={scoreEditWrap}><select style={input} value={editingResultDraft.team_1_user_id} onChange={(e)=>setEditingResultDraft({...editingResultDraft, team_1_user_id:e.target.value})}><option value="">Team 1 User</option>{users.map((user)=><option key={user.id} value={user.id}>{user.discord_username}</option>)}</select><select style={input} value={editingResultDraft.team_2_user_id} onChange={(e)=>setEditingResultDraft({...editingResultDraft, team_2_user_id:e.target.value})}><option value="">Team 2 User</option>{users.map((user)=><option key={user.id} value={user.id}>{user.discord_username}</option>)}</select></div> : `${row.user_1?.discord_username || "—"} vs ${row.user_2?.discord_username || "—"}`}</td>
+              <td style={td}>{editing ? <div style={actionRow}><button type="button" onClick={()=>updateGameResult(row.id, editingResultDraft)} style={button}>Save</button><button type="button" onClick={()=>setEditingResultId(null)} style={ghostButton}>Cancel</button></div> : <button type="button" onClick={()=>startEdit(row)} style={button}>Edit</button>}</td>
+            </tr>
+          );
+        })}
+      </Table>
+    </section>
+  );
+}
+
+function DeleteResults({ rows, teams, users, assignments, filters, setFilters, deleteRow }) {
+  const filtered = rows.filter((row)=>resultMatchesFilters(row, filters, assignments));
+
+  return (
+    <section style={card}>
+      <h2 style={sectionTitle}>Delete Results</h2>
+      <p style={mutedText}>Search and delete incorrect results. Deleting a result updates all calculated records after refresh.</p>
+      <ResultFilters filters={filters} setFilters={setFilters} rows={rows} teams={teams} users={users}/>
+
+      <Table headers={["Season", "Week", "Matchup", "Users", "Score", "Delete"]}>
+        {filtered.map((row)=>(
+          <tr key={row.id} style={trStyle}>
+            <td style={td}>{row.season_year}</td>
+            <td style={td}>{row.week}</td>
+            <td style={teamCell}><TeamLabel team={row.team_1}/> <span style={mutedText}>vs</span> <TeamLabel team={row.team_2}/></td>
+            <td style={td}>{row.user_1?.discord_username || "—"} vs {row.user_2?.discord_username || "—"}</td>
+            <td style={scoreCell}>{row.team_1_score}-{row.team_2_score}</td>
+            <td style={td}><button type="button" style={dangerButton} onClick={()=>{
+              const label = `${row.team_1?.name || "Team 1"} ${row.team_1_score}-${row.team_2_score} ${row.team_2?.name || "Team 2"}`;
+              if (window.confirm(`Delete result?\\n\\n${label}\\n${row.season_year} ${row.week}\\n\\nThis updates standings, rankings, H2H, and dashboard metrics.`)) {
+                deleteRow("game_results", row.id);
+              }
+            }}>Delete</button></td>
+          </tr>
+        ))}
+      </Table>
+    </section>
+  );
+}
+
+function RecalculateTools({ teams, results, currentYearResults }) {
+  const currentRows = computerRankingRows(teams, currentYearResults);
+  const allTimeGames = results.length;
+  const currentGames = currentYearResults.length;
+
+  return (
+    <section style={card}>
+      <h2 style={sectionTitle}>Recalculate Records & Rankings</h2>
+      <p style={mutedText}>The dashboard recalculates records, standings, SOR, QW, H2H, and rankings automatically from raw results. Use this page to verify the current calculation set.</p>
+      <div style={statsGrid}>
+        <Stat title="All-Time Results" value={allTimeGames}/>
+        <Stat title="Current-Year Results" value={currentGames}/>
+        <Stat title="#1 Computer Team" value={currentRows[0]?.teamName || "—"}/>
+        <Stat title="#1 Score" value={currentRows[0]?.score?.toFixed ? currentRows[0].score.toFixed(1) : currentRows[0]?.score || "—"}/>
+      </div>
+      <div style={miniCard}>
+        <h3 style={miniTitle}>Auto-Recalculated Metrics</h3>
+        <div style={miniRow}>Records, PF, PA, Avg PF, Avg PA</div>
+        <div style={miniRow}>Quality Wins, Top 25 Wins, SOR</div>
+        <div style={miniRow}>Conference Titles, National Titles, Bowl Records</div>
+        <div style={miniRow}>Computer Rankings and Weekly Movement</div>
+      </div>
+    </section>
+  );
+}
+
+function IntegrityCheck({ teams, users, assignments, results }) {
+  const activeAssignments = assignments.filter((row)=>row.status === "Active");
+  const duplicateTeams = activeAssignments.reduce((map, row)=>{
+    map.set(row.team_id, (map.get(row.team_id) || 0) + 1);
+    return map;
+  }, new Map());
+  const duplicateUsers = activeAssignments.reduce((map, row)=>{
+    map.set(row.discord_user_id, (map.get(row.discord_user_id) || 0) + 1);
+    return map;
+  }, new Map());
+
+  const checks = [
+    { label:"Active coaches are at or under 32", ok: activeAssignments.length <= 32, detail:`${activeAssignments.length} active assignments` },
+    { label:"No team has multiple active users", ok: [...duplicateTeams.values()].every((count)=>count <= 1), detail:`${[...duplicateTeams.values()].filter((count)=>count>1).length} duplicate teams` },
+    { label:"No user has multiple active teams", ok: [...duplicateUsers.values()].every((count)=>count <= 1), detail:`${[...duplicateUsers.values()].filter((count)=>count>1).length} duplicate users` },
+    { label:"All results have two teams", ok: results.every((row)=>row.team_1_id && row.team_2_id), detail:`${results.filter((row)=>!row.team_1_id || !row.team_2_id).length} bad result rows` },
+    { label:"All results have valid scores", ok: results.every((row)=>scoreNumber(row.team_1_score) !== null && scoreNumber(row.team_2_score) !== null), detail:`${results.filter((row)=>scoreNumber(row.team_1_score) === null || scoreNumber(row.team_2_score) === null).length} invalid scores` },
+    { label:"All active assignments have users", ok: activeAssignments.every((row)=>row.discord_user_id), detail:`${activeAssignments.filter((row)=>!row.discord_user_id).length} missing users` },
+  ];
+
+  return (
+    <section style={card}>
+      <h2 style={sectionTitle}>Data Integrity Check</h2>
+      <p style={mutedText}>Quick health check for common data issues that can throw off standings or profiles.</p>
+      <div style={integrityList}>
+        {checks.map((check)=>(
+          <div key={check.label} style={check.ok ? integrityOk : integrityBad}>
+            <b>{check.ok ? "✓" : "⚠"} {check.label}</b>
+            <span>{check.detail}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 function qualityWins(teamId, results) {
   return results.filter((result) => {
@@ -1064,41 +1327,7 @@ function CoachProfile({ user, teams, assignments, results, allAmericans, awards,
     <div style={profileHero}><div><div style={eyebrow}>Coach Profile</div><h2 style={profileName}>{user.discord_username}</h2><p style={mutedText}>Current Team: {currentTeam?.name || "Unassigned"}</p></div></div>
     <div style={statsGrid}><Stat title="Career Record" value={`${stats?.wins||0}-${stats?.losses||0}`}/><Stat title="National Titles" value={stats?.nattys||0}/><Stat title="Conference Titles" value={stats?.confTitles||0}/><Stat title="Top 25 Wins" value={stats?.top25Wins||0}/><Stat title="Awards" value={stats?.awards||0}/><Stat title="All-Americans" value={stats?.allAmericans||0}/><Stat title="Heismans" value={stats?.heismans||0}/></div>
     <CoachTimelineTable timeline={timeline} teams={teams} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions}/>
-    <section style={card}>
-      <div style={sectionTop}>
-        <div>
-          <h2 style={sectionTitle}>Coach Results</h2>
-          <p style={mutedText}>All recorded games for this Discord user. Use delete only to correct an input error.</p>
-        </div>
-      </div>
-      <Table headers={["Year", "Week", "Team 1", "User 1", "Score", "Team 2", "User 2", "Tags", "Delete"]}>
-        {coachResults.map((row) => (
-          <tr key={row.id} style={trStyle}>
-            <td style={td}>{row.season_year}</td>
-            <td style={td}>{row.week}</td>
-            <td style={teamCell}><TeamLabel team={row.team_1} /></td>
-            <td style={td}>{row.user_1?.discord_username || "—"}</td>
-            <td style={td}>{row.team_1_score}-{row.team_2_score}</td>
-            <td style={teamCell}><TeamLabel team={row.team_2} /></td>
-            <td style={td}>{row.user_2?.discord_username || "—"}</td>
-            <td style={td}>{row.tags?.join(", ") || "—"}</td>
-            <td style={td}>
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.confirm("Delete this result? This will remove it from Supabase and update all standings.")) {
-                    deleteRow("game_results", row.id);
-                  }
-                }}
-                style={dangerButton}
-              >
-                Delete
-              </button>
-            </td>
-          </tr>
-        ))}
-      </Table>
-    </section>
+    <Results rows={coachResults} deleteResult={(id)=>deleteRow("game_results", id)} search="" setSearch={()=>{}}/>
     <RecognitionTable title="All-Americans" headers={["Player","Position","Team","Year","Type"]} rows={coachAA.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year,r.type]}))}/>
     <RecognitionTable title="Award Winners" headers={["Player","Position","Team","Year","Award"]} rows={coachAwards.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year,r.award_name]}))}/>
     <RecognitionTable title="Heisman Winners" headers={["Player","Position","Team","Year"]} rows={coachHeismans.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year]}))}/>
@@ -1255,6 +1484,7 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
     { title: "Main", keys: ["dashboard", "allTimeStandings"] },
     { title: "League History", keys: ["coachHOF", "playerHOF", "h2h"] },
     { title: "Recognition", keys: ["allAmericans", "awards", "heismans", "nationalChampions"] },
+    { title: "Commissioner Tools", keys: ["commissionerTools", "editResults", "deleteResults", "recalculate", "integrityCheck"] },
     { title: "Admin", keys: ["assignments"] },
   ];
 
@@ -2302,12 +2532,89 @@ const hofReasonClean = {
 };
 
 
+const filterGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: 10,
+  margin: "14px 0 18px",
+};
+
+const toolGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: 14,
+  marginTop: 18,
+};
+
+const toolCard = {
+  textAlign: "left",
+  border: "1px solid rgba(250,204,21,.24)",
+  background: "linear-gradient(145deg, rgba(88,28,135,.55), rgba(15,23,42,.92))",
+  color: "#fff",
+  borderRadius: 18,
+  padding: 18,
+  cursor: "pointer",
+  boxShadow: "0 14px 35px rgba(0,0,0,.28)",
+};
+
+const toolTitle = {
+  fontSize: 18,
+  fontWeight: 950,
+  marginBottom: 8,
+};
+
+const ghostButton = {
+  border: "1px solid rgba(255,255,255,.18)",
+  background: "rgba(255,255,255,.06)",
+  color: "#fff",
+  borderRadius: 10,
+  padding: "9px 12px",
+  fontWeight: 800,
+  cursor: "pointer",
+};
+
 const dangerButton = {
   border: "1px solid rgba(248,113,113,.45)",
-  background: "rgba(127,29,29,.75)",
+  background: "rgba(127,29,29,.78)",
   color: "#fecaca",
   borderRadius: 10,
-  padding: "8px 10px",
+  padding: "9px 12px",
   fontWeight: 900,
   cursor: "pointer",
+};
+
+const scoreEditWrap = {
+  display: "grid",
+  gap: 8,
+  minWidth: 140,
+};
+
+const actionRow = {
+  display: "flex",
+  gap: 8,
+  flexWrap: "wrap",
+};
+
+const integrityList = {
+  display: "grid",
+  gap: 10,
+  marginTop: 16,
+};
+
+const integrityOk = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 12,
+  border: "1px solid rgba(34,197,94,.26)",
+  background: "rgba(22,101,52,.18)",
+  color: "#bbf7d0",
+  borderRadius: 14,
+  padding: 14,
+};
+
+const integrityBad = {
+  ...integrityOk,
+  border: "1px solid rgba(248,113,113,.35)",
+  background: "rgba(127,29,29,.22)",
+  color: "#fecaca",
 };
