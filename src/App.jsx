@@ -505,6 +505,8 @@ export default function App() {
   const [draftPlayoff, setDraftPlayoff] = useState({});
   const [teamChange, setTeamChange] = useState({ discord_user_id: "", new_team_id: "", start_year: 2029 });
   const [weeklyMatchups, setWeeklyMatchups] = useState([]);
+  const [draftPicks27, setDraftPicks27] = useState([]);
+  const [draftSettings27, setDraftSettings27] = useState({ id: 1, current_pick: 1, timer_minutes: 10, is_live: false });
   const [newWeeklyMatchup, setNewWeeklyMatchup] = useState({
     season_year: 2029,
     week: "Week 1",
@@ -583,7 +585,7 @@ export default function App() {
     await saveCommissionerRankings(next);
   }
 
-  const baseTabs = [["dashboard","Dashboard"],["commissionerCenter","Commissioner Center"],["weeklyMatchups","Weekly Matchups"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["powerIndex","Power Index"],["eloRankings","User ELO"],["conferencePower","Conference Power"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["assignments","Users/Team Assignments"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...activeCoachUsers.map((user) => [`coach-${user.id}`, user.discord_username])];
+  const baseTabs = [["dashboard","Dashboard"],["draftRoom","CFBElite 27 Draft Room"],["commissionerCenter","Commissioner Center"],["weeklyMatchups","Weekly Matchups"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["powerIndex","Power Index"],["eloRankings","User ELO"],["conferencePower","Conference Power"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["assignments","Users/Team Assignments"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...activeCoachUsers.map((user) => [`coach-${user.id}`, user.discord_username])];
   const tabs = useMemo(() => {
     const tabMap = new Map(baseTabs);
     const ordered = tabOrder
@@ -619,7 +621,7 @@ export default function App() {
 
   async function loadData() {
     setLoading(true); setError("");
-    const [teamsRes, settingsRes, tabOrderRes, usersRes, assignmentsRes, standingsRes, rankingsRes, resultsRes, weeklyMatchupsRes, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, historyRes] = await Promise.all([
+    const [teamsRes, settingsRes, tabOrderRes, usersRes, assignmentsRes, standingsRes, rankingsRes, resultsRes, weeklyMatchupsRes, draftPicks27Res, draftSettings27Res, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, historyRes] = await Promise.all([
       supabase.from("teams").select("*").order("name"),
       supabase.from("league_settings").select("*").eq("id", 1).single(),
       supabase.from("dashboard_tab_order").select("*").eq("id", 1).single(),
@@ -629,6 +631,8 @@ export default function App() {
       supabase.from("commissioner_rankings").select("*").order("rank"),
       supabase.from("game_results").select(`*, team_1:teams!game_results_team_1_id_fkey(*), team_2:teams!game_results_team_2_id_fkey(*), user_1:discord_users!game_results_team_1_user_id_fkey(discord_username), user_2:discord_users!game_results_team_2_user_id_fkey(discord_username)`).order("created_at", { ascending: false }),
       supabase.from("weekly_matchups").select(`*, team_1:teams!weekly_matchups_team_1_id_fkey(*), team_2:teams!weekly_matchups_team_2_id_fkey(*), user_1:discord_users!weekly_matchups_team_1_user_id_fkey(discord_username), user_2:discord_users!weekly_matchups_team_2_user_id_fkey(discord_username)`).order("created_at", { ascending: false }),
+      supabase.from("cfb27_draft_picks").select("*, teams(*), discord_users(discord_username)").order("pick_number"),
+      supabase.from("cfb27_draft_settings").select("*").eq("id", 1).single(),
       supabase.from("all_americans").select("*, teams(name)").order("season_year", { ascending: false }).order("created_at", { ascending: false }),
       supabase.from("awards").select("*, teams(name)").order("season_year", { ascending: false }).order("created_at", { ascending: false }),
       supabase.from("heisman_winners").select("*, teams(name)").order("season_year", { ascending: false }).order("created_at", { ascending: false }),
@@ -638,7 +642,7 @@ export default function App() {
       supabase.from("recruiting_classes").select("*, teams(name)").order("season_year", { ascending: false }),
       supabase.from("team_history_records").select("*, teams(name)").order("season_year", { ascending: false }),
     ]);
-    const firstError = [teamsRes, settingsRes, tabOrderRes, usersRes, assignmentsRes, standingsRes, rankingsRes, resultsRes, weeklyMatchupsRes, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, historyRes].find((r) => r.error)?.error;
+    const firstError = [teamsRes, settingsRes, tabOrderRes, usersRes, assignmentsRes, standingsRes, rankingsRes, resultsRes, weeklyMatchupsRes, draftPicks27Res, draftSettings27Res, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, historyRes].find((r) => r.error)?.error;
     if (firstError) setError(firstError.message);
     else {
       if (tabOrderRes.data?.tab_order) setTabOrder(tabOrderRes.data.tab_order);
@@ -677,7 +681,7 @@ export default function App() {
         });
 
       setStandingsOrder([...rankedIds, ...unrankedIds]);
-      setResults(resultsRes.data || []); setWeeklyMatchups(weeklyMatchupsRes.data || []); setAllAmericans(aaRes.data || []); setAwards(awardsRes.data || []); setHeismans(heismanRes.data || []); setNationalChampions(championsRes.data || []); setDraftOrder(draftRes.data || []); setPlayoffGames(playoffRes.data || []); setRecruiting(recruitingRes.data || []);
+      setResults(resultsRes.data || []); setWeeklyMatchups(weeklyMatchupsRes.data || []); setDraftPicks27(draftPicks27Res.data || []); if (draftSettings27Res.data) setDraftSettings27(draftSettings27Res.data); setAllAmericans(aaRes.data || []); setAwards(awardsRes.data || []); setHeismans(heismanRes.data || []); setNationalChampions(championsRes.data || []); setDraftOrder(draftRes.data || []); setPlayoffGames(playoffRes.data || []); setRecruiting(recruitingRes.data || []);
       setHistoryRows(historyRes.data || []);
     }
     setLoading(false);
@@ -988,6 +992,7 @@ export default function App() {
   }
 
   return <><GlobalStyle/><div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={isErrorMessage(error) ? errorBox : successBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} draggedTab={draggedTab} setDraggedTab={setDraggedTab} reorderTabs={reorderTabs} adminUnlocked={adminUnlocked} adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin} teams={teamOptions} assignments={assignments} currentYear={currentYear}/>
+    {activeTab === "draftRoom" && <DraftRoom teams={teamOptions} users={userOptions} picks={draftPicks27} settings={draftSettings27} adminUnlocked={adminUnlocked} startClock={startDraftClock} announcePick={announceDraftPick} revealPick={revealDraftPick} undoPick={undoDraftPick}/>}    
     {activeTab === "dashboard" && <><QuickJump teams={activeTeamOptions} users={activeCoachUsers} setActiveTab={setActiveTab}/><DataHealthAlerts teams={teamOptions} users={userOptions} assignments={assignments} results={results}/><HeadlineTicker teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} currentWeek={currentWeek}/><Stats currentYear={currentYear} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} currentWeek={currentWeek} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} teams={activeTeamOptions} assignments={assignments} saveSettings={saveLeagueSettings}/><LeaguePulse teams={activeTeamOptions} results={currentYearResults} allAmericans={allAmericans} awards={awards} currentYear={currentYear} assignments={assignments} users={userOptions}/><GameOfTheWeekDashboard teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} weeklyMatchups={weeklyMatchups} currentYear={currentYear} currentWeek={currentWeek}/><DynastyHeadlines teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} currentWeek={currentWeek}/><Watchlist teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} currentWeek={currentWeek}/><MilestoneTracker users={userOptions} teams={teamOptions} assignments={assignments} results={results}/><ComputerRankings teams={activeTeamOptions} results={currentYearResults} currentWeek={currentWeek} sortState={userSort} setSortState={setUserSort} assignments={assignments} users={userOptions}/><DashboardRecognition allAmericanRows={rankingRows(activeTeamOptions, allAmericans)} awardRows={rankingRows(activeTeamOptions, awards)}/><RecordResult newResult={newResult} setNewResult={setNewResult} teams={activeTeamOptions} users={userOptions} assignments={assignments} submitResult={submitResult}/></>}
     {activeTab === "eloRankings" && <EloRankings users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
     {activeTab === "dynastyRecords" && <DynastyRecords users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
@@ -1007,7 +1012,7 @@ export default function App() {
     {activeTab === "awards" && <Awards rows={awards} teams={teamOptions} addRow={addAward} updateRow={updateRow} deleteRow={deleteRow} rankings={[]} drafts={draftAwards} setDrafts={setDraftAwards} saveDraft={saveDraft} getDraft={getDraft}/>}    
     {activeTab === "heismans" && <Heismans rows={heismans} teams={teamOptions} addRow={addHeisman} updateRow={updateRow} deleteRow={deleteRow} drafts={draftHeismans} setDrafts={setDraftHeismans} saveDraft={saveDraft} getDraft={getDraft}/>}    
     {activeTab === "nationalChampions" && <NationalChampions rows={nationalChampions} teams={teamOptions} users={userOptions} addRow={addNationalChampion} updateRow={updateRow} deleteRow={deleteRow} drafts={draftChampions} setDrafts={setDraftChampions} saveDraft={saveDraft} getDraft={getDraft}/>}        
-    {selectedCoach && <CoachProfile user={selectedCoach} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
+    {selectedCoach && <CoachProfile user={selectedCoach} users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
   </div></div></>;
 }
 
@@ -1334,15 +1339,21 @@ function QuickJump({ teams, users, setActiveTab }) {
   );
 }
 
-function RivalryBadges({ user, users, allUsers, results, assignments }) {
+function RivalryBadges({ user, users, allUsers = [], results, assignments }) {
   const games = userResultsFor(user.id, results, assignments);
   const map = new Map();
+  const nameForUser = (id) =>
+    allUsers.find((u)=>u.id===id)?.discord_username ||
+    users.find((u)=>u.id===id)?.discord_username ||
+    assignments.find((a)=>a.discord_user_id===id)?.discord_users?.discord_username ||
+    "Unknown User";
+
   games.forEach((result)=>{
     const u1 = result.team_1_user_id || coachForTeamYear(result.team_1_id, result.season_year, assignments)?.discord_user_id;
     const u2 = result.team_2_user_id || coachForTeamYear(result.team_2_id, result.season_year, assignments)?.discord_user_id;
     const opponentId = u1 === user.id ? u2 : u1;
     if (!opponentId) return;
-    if (!map.has(opponentId)) map.set(opponentId, { opponentId, w:0, l:0, pf:0, pa:0, games:0, last:null });
+    if (!map.has(opponentId)) map.set(opponentId, { opponentId, opponentName: nameForUser(opponentId), w:0, l:0, pf:0, pa:0, games:0, last:null });
     const row = map.get(opponentId);
     const isTeam1 = u1 === user.id;
     const forPts = Number(isTeam1 ? result.team_1_score : result.team_2_score) || 0;
@@ -1355,7 +1366,7 @@ function RivalryBadges({ user, users, allUsers, results, assignments }) {
   });
   const rows = [...map.values()].filter((r)=>r.games>=2).sort((a,b)=>b.games-a.games || b.w-a.w).slice(0,4);
   if (!rows.length) return null;
-  return <div style={glassMiniCard}><h3 style={miniTitle}>Rivalry Badges</h3><div style={rivalryBadgeGrid}>{rows.map((r)=><div key={r.opponentId} style={rivalryBadge}><div style={leaderRow}><b>{r.w}-{r.l}</b><span>{r.games} games</span></div><div style={mutedText}>Points: {r.pf}-{r.pa}</div><div style={mutedText}>Last: {r.last?.type || "—"} {r.last ? `${r.last.forPts}-${r.last.againstPts}` : ""}</div></div>)}</div></div>;
+  return <div style={glassMiniCard}><h3 style={miniTitle}>Rivalry Badges</h3><div style={rivalryBadgeGrid}>{rows.map((r)=><div key={r.opponentId} style={rivalryBadge}><div style={leaderRow}><b>{r.opponentName}</b><span>{r.w}-{r.l}</span></div><div style={mutedText}>{r.games} meetings • Points: {r.pf}-{r.pa}</div><div style={mutedText}>Last: {r.last?.type || "—"} {r.last ? `${r.last.forPts}-${r.last.againstPts}` : ""}</div></div>)}</div></div>;
 }
 
 function CoachTimelineEvents({ user, teams, results, allAmericans, awards, heismans, nationalChampions, assignments }) {
@@ -1544,6 +1555,247 @@ function DataHealthAlerts({ teams, users, assignments, results }) {
 
   if (!alerts.length) return <section style={healthGood}>✓ Data health looks good</section>;
   return <section style={healthWarn}><b>Data Health Alerts</b>{alerts.map((alert,index)=><div key={index}>⚠ {alert}</div>)}</section>;
+}
+
+
+const CFB27_DRAFT_CONFERENCES = new Set(["American", "CUSA", "MAC", "Mountain West", "PAC 12", "Pac-12", "Sun Belt"]);
+
+function draftPickCaption(pick, team) {
+  if (!pick || !team) return "";
+  return `🚨 THE PICK IS IN 🚨\n\nWith Pick #${String(pick.pick_number).padStart(2, "0")} in the CFBElite 27 Team Draft...\n\n${pick.discord_username || pick.discord_users?.discord_username} selects the ${team.name}!\n\nWelcome to ${team.conference || "CFBElite"}.`;
+}
+
+function downloadDraftPickGraphic(pick, team) {
+  if (!pick || !team) return;
+  const canvas = document.createElement("canvas");
+  canvas.width = 1200;
+  canvas.height = 675;
+  const ctx = canvas.getContext("2d");
+  const primary = team.primary_color || "#20114f";
+  const secondary = team.secondary_color || "#facc15";
+  const accent = team.accent_color || "#ffffff";
+
+  const grad = ctx.createLinearGradient(0,0,1200,675);
+  grad.addColorStop(0, primary);
+  grad.addColorStop(.52, "#050510");
+  grad.addColorStop(1, secondary);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0,0,1200,675);
+
+  ctx.globalAlpha = .22;
+  ctx.fillStyle = "#ffffff";
+  for (let i=0;i<80;i++) ctx.fillRect(Math.random()*1200, Math.random()*675, 3, 3);
+  ctx.globalAlpha = 1;
+
+  ctx.strokeStyle = secondary;
+  ctx.lineWidth = 4;
+  ctx.strokeRect(34,34,1132,607);
+
+  ctx.fillStyle = "rgba(0,0,0,.40)";
+  ctx.fillRect(70,120,290,390);
+  ctx.strokeStyle = "rgba(255,255,255,.22)";
+  ctx.strokeRect(70,120,290,390);
+
+  ctx.fillStyle = "#fff";
+  ctx.font = "900 42px Inter, Arial";
+  ctx.fillText("CFBELITE 27 TEAM DRAFT", 72, 82);
+
+  ctx.fillStyle = accent;
+  ctx.font = "900 46px Inter, Arial";
+  ctx.fillText("THE PICK IS IN", 430, 150);
+
+  ctx.fillStyle = "#fff";
+  ctx.font = "900 52px Inter, Arial";
+  ctx.fillText((pick.discord_username || pick.discord_users?.discord_username || "USER").toUpperCase(), 430, 235);
+
+  ctx.fillStyle = accent;
+  ctx.font = "900 34px Inter, Arial";
+  ctx.fillText("SELECTS", 430, 292);
+
+  ctx.fillStyle = "#fff";
+  ctx.font = "900 86px Inter, Arial";
+  ctx.fillText(team.name.toUpperCase().replace(" ", " "), 430, 390);
+
+  ctx.fillStyle = "#fff";
+  ctx.font = "900 64px Inter, Arial";
+  ctx.fillText("PICK", 110, 185);
+  ctx.font = "1000 170px Inter, Arial";
+  ctx.fillText(String(pick.pick_number).padStart(2, "0"), 105, 390);
+
+  ctx.fillStyle = secondary;
+  ctx.font = "900 40px Inter, Arial";
+  ctx.fillText(team.conference || "CFBElite", 430, 475);
+
+  ctx.fillStyle = "#fff";
+  ctx.font = "900 32px Inter, Arial";
+  ctx.fillText("#CFBELITE27", 72, 610);
+
+  const link = document.createElement("a");
+  link.download = `cfbelite27-pick-${String(pick.pick_number).padStart(2, "0")}.png`;
+  link.href = canvas.toDataURL("image/png");
+  link.click();
+}
+
+function DraftCountdown({ pick, settings }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  if (!pick?.timer_started_at) return <span>Clock not started</span>;
+  const minutes = Number(pick.timer_minutes || settings?.timer_minutes || 10);
+  const end = new Date(pick.timer_started_at).getTime() + minutes * 60 * 1000;
+  const remaining = Math.max(0, end - now);
+  const m = Math.floor(remaining / 60000);
+  const s = Math.floor((remaining % 60000) / 1000);
+  return <span>{String(m).padStart(2,"0")}:{String(s).padStart(2,"0")}</span>;
+}
+
+
+function draftConferenceCounts(picks, teams) {
+  const counts = {};
+  picks.forEach((pick) => {
+    if (!pick.team_id || pick.status !== "picked") return;
+    const team = teams.find((item)=>item.id === pick.team_id) || pick.teams;
+    const conference = team?.conference;
+    if (!conference) return;
+    counts[conference] = (counts[conference] || 0) + 1;
+  });
+  return counts;
+}
+
+function lockedDraftConferences(picks, teams) {
+  const counts = draftConferenceCounts(picks, teams);
+  const conferencesAtSix = Object.entries(counts)
+    .filter(([, count]) => count >= 6)
+    .map(([conference]) => conference);
+
+  const locked = new Set();
+
+  // First two conferences to reach six users are capped at six.
+  conferencesAtSix.slice(0, 2).forEach((conference) => locked.add(conference));
+
+  // After two conferences have reached six, all other conferences cap at five.
+  if (conferencesAtSix.length >= 2) {
+    Object.entries(counts)
+      .filter(([conference, count]) => !locked.has(conference) && count >= 5)
+      .forEach(([conference]) => locked.add(conference));
+  }
+
+  return locked;
+}
+
+function draftConferenceLimitFor(conference, lockedConferences, counts) {
+  if (lockedConferences.has(conference)) return counts[conference] >= 6 ? 6 : 5;
+  return null;
+}
+
+function DraftRoom({ teams, users, picks, settings, adminUnlocked, startClock, announcePick, revealPick, undoPick }) {
+  const [selectedTeamId, setSelectedTeamId] = useState("");
+  const [teamSearch, setTeamSearch] = useState("");
+  const sortedPicks = [...picks].sort((a,b)=>Number(a.pick_number)-Number(b.pick_number));
+  const conferenceCounts = draftConferenceCounts(sortedPicks, teams);
+  const lockedConferences = lockedDraftConferences(sortedPicks, teams);
+  const pickedTeamIds = new Set(sortedPicks.filter((pick)=>pick.team_id && pick.status === "picked").map((pick)=>pick.team_id));
+  const reservedTeamIds = new Set(sortedPicks.filter((pick)=>pick.team_id).map((pick)=>pick.team_id));
+  const currentPick = sortedPicks.find((pick)=>Number(pick.pick_number) === Number(settings?.current_pick)) || sortedPicks.find((pick)=>!pick.team_id || pick.status === "pick_is_in") || sortedPicks[0];
+  const selectedTeam = teams.find((team)=>team.id === selectedTeamId);
+  const availableTeams = teams
+    .filter((team)=>CFB27_DRAFT_CONFERENCES.has(team.conference))
+    .filter((team)=>!lockedConferences.has(team.conference))
+    .filter((team)=>!reservedTeamIds.has(team.id))
+    .filter((team)=>!teamSearch || team.name.toLowerCase().includes(teamSearch.toLowerCase()) || String(team.conference || "").toLowerCase().includes(teamSearch.toLowerCase()))
+    .sort((a,b)=>a.name.localeCompare(b.name));
+  const pickedTeam = teams.find((team)=>team.id === currentPick?.team_id) || currentPick?.teams;
+  const latestPick = [...sortedPicks].reverse().find((pick)=>pick.team_id && pick.status === "picked");
+  const latestTeam = latestPick ? teams.find((team)=>team.id === latestPick.team_id) || latestPick.teams : null;
+
+  return (
+    <section style={draftRoomWrap}>
+      <div style={draftHero}>
+        <div>
+          <div style={eyebrow}>CFBElite 27 Draft Room</div>
+          <h2 style={draftHeroTitle}>The Board Is Live</h2>
+          <p style={mutedText}>Public draft room for the CFB 27 team selection draft. Available teams are limited to American, CUSA, MAC, Mountain West, PAC 12, and Sun Belt. Picks can be staged as “Pick Is In” before the team is revealed to the board.</p>
+        </div>
+        <div style={onClockCard}>
+          <div style={eyebrow}>{currentPick?.status === "pick_is_in" ? "The Pick Is In" : "On The Clock"}</div>
+          <div style={draftClockPick}>Pick #{String(currentPick?.pick_number || 1).padStart(2,"0")}</div>
+          <div style={draftClockUser}>{currentPick?.discord_username || currentPick?.discord_users?.discord_username || "User TBD"}</div>
+          <div style={draftTimer}>{currentPick?.status === "pick_is_in" ? "Waiting Reveal" : <DraftCountdown pick={currentPick} settings={settings}/>}</div>
+        </div>
+      </div>
+
+      <div style={glassMiniCard}>
+        <h3 style={miniTitle}>Conference Draft Caps</h3>
+        <div style={draftConferenceGrid}>
+          {[...CFB27_DRAFT_CONFERENCES].map((conference)=>{
+            const count = conferenceCounts[conference] || 0;
+            const locked = lockedConferences.has(conference);
+            const cap = locked ? (count >= 6 ? 6 : 5) : "Open";
+            return <div key={conference} style={{...draftConferenceTile, borderColor: locked ? "rgba(248,113,113,.45)" : "rgba(255,255,255,.16)"}}>
+              <b>{conference}</b>
+              <span>{count} selected</span>
+              <small>{locked ? `Locked at ${cap}` : "Available"}</small>
+            </div>;
+          })}
+        </div>
+      </div>
+
+      {adminUnlocked && (
+        <div style={glassMiniCard}>
+          <h3 style={miniTitle}>Commissioner Controls</h3><p style={mutedText}>Conference cap rule active: first two conferences to 6 users lock at 6. After that, all remaining conferences lock once they hit 5 users.</p>
+          <div style={filterGrid}>
+            <select style={input} value={selectedTeamId} onChange={(e)=>setSelectedTeamId(e.target.value)}>
+              <option value="">Select Team For Pick #{currentPick?.pick_number}</option>
+              {availableTeams.map((team)=><option key={team.id} value={team.id}>{team.name} · {team.conference}</option>)}
+            </select>
+            <button style={button} onClick={()=>startClock(currentPick?.pick_number)}>Start / Reset Clock</button>
+            <button style={button} onClick={()=>announcePick(currentPick?.pick_number, selectedTeamId)}>Pick Is In</button>
+            {currentPick?.status === "pick_is_in" && <button style={button} onClick={()=>revealPick(currentPick?.pick_number)}>Reveal / Post to Board</button>}
+          </div>
+        </div>
+      )}
+
+      {latestPick && latestTeam && (
+        <div style={pickAnnouncementCard}>
+          <div style={eyebrow}>Latest Pick</div>
+          <h3 style={pickAnnouncementTitle}>Pick #{String(latestPick.pick_number).padStart(2,"0")} · {latestPick.discord_username || latestPick.discord_users?.discord_username}</h3>
+          <p style={pickTeamLine}>{latestTeam.name}</p>
+          <div style={actionRow}>
+            <button style={button} onClick={()=>navigator.clipboard?.writeText(draftPickCaption(latestPick, latestTeam))}>Copy Discord Caption</button>
+            <button style={button} onClick={()=>downloadDraftPickGraphic(latestPick, latestTeam)}>Download Pick Graphic</button>
+          </div>
+        </div>
+      )}
+
+      <div style={twoCol}>
+        <div style={glassMiniCard}>
+          <h3 style={miniTitle}>Draft Board</h3>
+          <div style={draftBoardGrid}>
+            {sortedPicks.map((pick)=>{
+              const team = teams.find((t)=>t.id===pick.team_id) || pick.teams;
+              const publicTeamVisible = pick.status === "picked";
+              return <div key={pick.pick_number} style={{...draftPickTile, borderColor: publicTeamVisible ? (team?.accent_color || "rgba(255,255,255,.16)") : "rgba(255,255,255,.16)"}}>
+                <div style={leaderRow}><b>#{String(pick.pick_number).padStart(2,"0")}</b><span>{pick.status === "pick_is_in" ? "PICK IS IN" : (pick.status || "pending")}</span></div>
+                <div style={draftTileUser}>{pick.discord_username || pick.discord_users?.discord_username}</div>
+                <div style={publicTeamVisible && team ? draftTileTeam : mutedText}>{publicTeamVisible && team ? team.name : (pick.status === "pick_is_in" ? "Team hidden until reveal" : "On deck")}</div>
+                {adminUnlocked && pick.team_id && <button style={ghostButton} onClick={()=>undoPick(pick.pick_number)}>Undo</button>}
+              </div>;
+            })}
+          </div>
+        </div>
+
+        <div style={glassMiniCard}>
+          <h3 style={miniTitle}>Available Teams · {availableTeams.length}</h3>
+          <input style={input} value={teamSearch} onChange={(e)=>setTeamSearch(e.target.value)} placeholder="Search available teams or conference..." />
+          <div style={availableTeamGrid}>
+            {availableTeams.map((team)=><div key={team.id} style={{...availableTeamTile, borderColor: team.accent_color || "rgba(255,255,255,.16)", background:`linear-gradient(145deg, ${team.primary_color || "#111827"}88, rgba(255,255,255,.04))`}}><b>{team.name}</b><span>{team.conference}</span></div>)}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 }
 
 function AdminLocked({ adminCodeInput, setAdminCodeInput, unlockAdmin }) {
@@ -2019,7 +2271,7 @@ function top25RecruitingClassesForCoach(user, recruiting, assignments) {
   }).length;
 }
 
-function CoachProfile({ user, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting }) {
+function CoachProfile({ user, users = [], teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting }) {
   const coachStats = getCoachStats(usersFallback(user), teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
   const stats = coachStats.find((row)=>row.userId === user.id) || { wins:0, losses:0, nattys:0, confTitles:0, top25Wins:0, awards:0, allAmericans:0, heismans:0, prestige:0 };
   const activeAssignment = assignments.find((a)=>a.discord_user_id===user.id && a.status==="Active");
@@ -2068,7 +2320,7 @@ function CoachProfile({ user, teams, assignments, results, allAmericans, awards,
     <div style={statsGrid}><Stat title="Career Record" value={`${stats?.wins||0}-${stats?.losses||0}`}/><Stat title="National Titles" value={stats?.nattys||0}/><Stat title="Conference Titles" value={stats?.confTitles||0}/><Stat title="Top 25 Wins" value={stats?.top25Wins||0}/><Stat title="Awards" value={stats?.awards||0}/><Stat title="All-Americans" value={stats?.allAmericans||0}/><Stat title="Heismans" value={stats?.heismans||0}/><Stat title="Top 25 Recruiting Classes" value={top25RecruitingClassesForCoach(user, recruiting, assignments)}/></div>
     <CoachTimelineTable timeline={timeline} teams={teams} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions}/>
     <Results rows={coachResults} deleteResult={()=>{}} search="" setSearch={()=>{}}/>
-    <RivalryBadges user={user} users={usersFallback(user)} allUsers={[]} results={results} assignments={assignments}/><BestWorstPanel user={user} results={results} assignments={assignments}/><CoachTimelineEvents user={user} teams={teams} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} assignments={assignments}/><RecognitionTable title="All-Americans" headers={["Player","Position","Team","Year","Type"]} rows={coachAA.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year,r.type]}))}/>
+    <RivalryBadges user={user} users={usersFallback(user)} allUsers={users} results={results} assignments={assignments}/><BestWorstPanel user={user} results={results} assignments={assignments}/><CoachTimelineEvents user={user} teams={teams} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} assignments={assignments}/><RecognitionTable title="All-Americans" headers={["Player","Position","Team","Year","Type"]} rows={coachAA.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year,r.type]}))}/>
     <RecognitionTable title="Award Winners" headers={["Player","Position","Team","Year","Award"]} rows={coachAwards.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year,r.award_name]}))}/>
     <RecognitionTable title="Heisman Winners" headers={["Player","Position","Team","Year"]} rows={coachHeismans.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year]}))}/>
   </section>;
@@ -2092,9 +2344,9 @@ function coachHofCriteria(row) {
 function CoachHallOfFame({ users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting }) {
   const rows = getCoachStats(users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting)
     .map((row)=>({ ...row, hofCriteria: coachHofCriteria(row) }))
-    .filter((row)=>row.hofCriteria.qualifies)
+    .filter((row)=>row.hofCriteria.qualifies && row.rawPrestige >= 95)
     .sort((a,b)=>b.rawPrestige-a.rawPrestige || b.wins-a.wins);
-  return <section style={currentTeam ? teamPageTheme(currentTeam) : card}><TeamWatermark team={currentTeam}/><h2 style={sectionTitle}>Coach Hall of Fame</h2><p style={mutedText}>Coaches qualify automatically by meeting tougher benchmarks: 2 national titles, 1 title plus 3 conference titles, 50 career wins, 20 Top 25 wins, 100+ HOF score, or 25+ major accolades with 25+ wins.</p>{rows.length ? <div style={hofGrid}>{rows.map((row)=><CoachHofCard key={row.userId || row.discord} row={row} teams={teams} assignments={assignments}/>)}</div> : <div style={miniRow}>No coaches have met Hall of Fame criteria yet.</div>}</section>;
+  return <section style={card}><h2 style={sectionTitle}>Coach Hall of Fame</h2><p style={mutedText}>Coaches qualify automatically by meeting tougher benchmarks: 2 national titles, 1 title plus 3 conference titles, 50 career wins, 20 Top 25 wins, 100+ HOF score, or 25+ major accolades with 25+ wins.</p>{rows.length ? <div style={hofGrid}>{rows.map((row)=><CoachHofCard key={row.userId || row.discord} row={row} teams={teams} assignments={assignments}/>)}</div> : <div style={miniRow}>No coaches have met Hall of Fame criteria yet.</div>}</section>;
 }
 
 
@@ -2210,7 +2462,7 @@ function playerHallRows(teams, assignments, results, allAmericans, awards, heism
   return [...map.values()].filter((r)=>(r.heismans.length >= 1 && (r.awards.length >= 1 || r.allAmericans.length >= 2)) || r.awards.length >= 3 || r.allAmericans.length >= 4 || (r.nattys >= 1 && (r.heismans.length || r.awards.length >= 2 || r.allAmericans.length >= 3)) || r.score >= 60).sort((a,b)=>b.score-a.score || a.player.localeCompare(b.player));
 }
 function PlayerHallOfFame({ teams, assignments, results, allAmericans, awards, heismans, nationalChampions }) {
-  const rows = playerHallRows(teams, assignments, results, allAmericans, awards, heismans, nationalChampions);
+  const rows = playerHallRows(teams, assignments, results, allAmericans, awards, heismans, nationalChampions).filter((row)=>row.score >= 80);
   return <section style={card}><h2 style={sectionTitle}>Player Hall of Fame</h2><p style={mutedText}>Players qualify automatically by tougher benchmarks: Heisman plus supporting accolades, 3 major awards, 4 All-American selections, elite title-season accolades, or 60+ HOF score.</p>{rows.length ? <div style={hofGrid}>{rows.map((row)=><PlayerHofCard key={row.key} row={row} team={teams.find((t)=>t.id===row.teamId)}/>)}</div> : <div style={miniRow}>No players have met Hall of Fame criteria yet.</div>}</section>;
 }
 function PlayerHofCard({ row, team }) {
@@ -2334,7 +2586,7 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
   const [menuOpen, setMenuOpen] = useState(false);
 
   const groups = [
-    { title: "Main", keys: ["dashboard", "allTimeStandings"] },
+    { title: "Main", keys: ["dashboard", "draftRoom"] },
     { title: "Media", keys: [ "weeklyMatchups", "recruitingRankings", "dynastyTimeline"] },
     { title: "Dynasty Legacy", keys: ["dynastyRecords", "rivalries", "powerIndex",  "coachingTree"] },
     { title: "Rankings", keys: ["eloRankings", "conferencePower"] },
@@ -3693,7 +3945,7 @@ const tickerContent = {
   whiteSpace: "nowrap",
   color: "#fef3c7",
   fontWeight: 900,
-  animation: "cfbeliteTicker 52s linear infinite",
+  animation: "cfbeliteTicker 85s linear infinite",
 };
 
 
@@ -3838,7 +4090,7 @@ const teamProfileHeroClean = {
   borderRadius: 0,
   padding: "4px 0 22px",
   display: "grid",
-  gridTemplateColumns: "minmax(0, 1fr) auto",
+  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
   gap: 18,
   alignItems: "start",
   marginBottom: 18,
@@ -3907,26 +4159,27 @@ const teamProfileSubline = {
 };
 
 const badgeRow = {
-  display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(112px, 1fr))",
+  display: "flex",
+  flexWrap: "wrap",
   gap: 10,
-  justifyContent: "end",
-  minWidth: 280,
+  justifyContent: "flex-end",
+  alignItems: "center",
+  maxWidth: 520,
 };
 
 const teamBadgeBubble = {
-  minWidth: 112,
+  minWidth: 118,
   textAlign: "center",
-  border: "1px solid rgba(255,255,255,.24)",
+  border: "1px solid rgba(255,255,255,.26)",
   borderRadius: 999,
-  padding: "10px 13px",
+  padding: "9px 12px",
   color: "#fff",
-  background: "linear-gradient(145deg, rgba(255,255,255,.18), rgba(255,255,255,.07))",
+  background: "rgba(255,255,255,.15)",
   fontWeight: 950,
   fontSize: 12,
-  backdropFilter: "blur(16px) saturate(155%)",
-  WebkitBackdropFilter: "blur(16px) saturate(155%)",
-  boxShadow: "inset 0 1px 0 rgba(255,255,255,.22), 0 10px 28px rgba(0,0,0,.18)",
+  backdropFilter: "blur(14px) saturate(140%)",
+  WebkitBackdropFilter: "blur(14px) saturate(140%)",
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,.20)",
 };
 
 
@@ -4080,3 +4333,208 @@ const healthWarn = {
   display: "grid",
   gap: 8,
 };
+  async function startDraftClock(pickNumber = draftSettings27.current_pick) {
+    const now = new Date().toISOString();
+    const { error: pickError } = await supabase
+      .from("cfb27_draft_picks")
+      .update({ timer_started_at: now, timer_minutes: draftSettings27.timer_minutes || 10, status: "on_clock" })
+      .eq("pick_number", pickNumber);
+    const { error: settingsError } = await supabase
+      .from("cfb27_draft_settings")
+      .upsert({ id: 1, current_pick: pickNumber, timer_minutes: draftSettings27.timer_minutes || 10, is_live: true, updated_at: now }, { onConflict: "id" });
+    if (pickError || settingsError) setError(`Draft clock failed: ${(pickError || settingsError).message}`);
+    await loadData();
+  }
+
+  async function announceDraftPick(pickNumber, teamId) {
+    if (!pickNumber || !teamId) {
+      setError("Select a pick and team before staging the pick.");
+      return;
+    }
+    const now = new Date().toISOString();
+    const { error: pickError } = await supabase
+      .from("cfb27_draft_picks")
+      .update({ team_id: teamId, picked_at: now, status: "pick_is_in" })
+      .eq("pick_number", pickNumber);
+
+    if (pickError) {
+      setError(`Draft pick failed: ${pickError.message}`);
+      return;
+    }
+
+    setError("Pick is in. The team is hidden from the public board until you reveal it.");
+    await loadData();
+  }
+
+  async function revealDraftPick(pickNumber) {
+    const now = new Date().toISOString();
+    const nextPick = Number(pickNumber) + 1;
+
+    const { error: revealError } = await supabase
+      .from("cfb27_draft_picks")
+      .update({ status: "picked" })
+      .eq("pick_number", pickNumber);
+
+    const { error: settingsError } = await supabase
+      .from("cfb27_draft_settings")
+      .upsert({ id: 1, current_pick: nextPick, is_live: true, updated_at: now }, { onConflict: "id" });
+
+    if (revealError || settingsError) {
+      setError(`Draft reveal failed: ${(revealError || settingsError).message}`);
+      return;
+    }
+
+    await supabase
+      .from("cfb27_draft_picks")
+      .update({ timer_started_at: now, timer_minutes: draftSettings27.timer_minutes || 10, status: "on_clock" })
+      .eq("pick_number", nextPick);
+
+    setError("Pick revealed. Next user is now on the clock.");
+    await loadData();
+  }
+
+  async function undoDraftPick(pickNumber) {
+    const { error: undoError } = await supabase
+      .from("cfb27_draft_picks")
+      .update({ team_id: null, picked_at: null, timer_started_at: null, status: "pending" })
+      .eq("pick_number", pickNumber);
+    if (undoError) setError(`Draft undo failed: ${undoError.message}`);
+    await loadData();
+  }
+
+
+
+
+const draftRoomWrap = {
+  display: "grid",
+  gap: 18,
+};
+
+const draftHero = {
+  ...liquidGlassPanel,
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1fr) minmax(260px, 420px)",
+  gap: 18,
+  alignItems: "stretch",
+  background: "radial-gradient(circle at 15% 0%, rgba(250,204,21,.18), transparent 34%), linear-gradient(145deg, rgba(88,28,135,.36), rgba(255,255,255,.055))",
+};
+
+const draftHeroTitle = {
+  margin: "10px 0",
+  color: "#fff",
+  fontSize: "clamp(42px, 8vw, 92px)",
+  lineHeight: .86,
+  letterSpacing: "-.065em",
+  fontWeight: 1000,
+};
+
+const onClockCard = {
+  ...liquidGlassTile,
+  display: "grid",
+  alignContent: "center",
+  gap: 8,
+  textAlign: "center",
+};
+
+const draftClockPick = {
+  color: "#facc15",
+  fontSize: "clamp(24px, 5vw, 46px)",
+  fontWeight: 1000,
+};
+
+const draftClockUser = {
+  color: "#fff",
+  fontSize: "clamp(20px, 4vw, 34px)",
+  fontWeight: 1000,
+  overflowWrap: "anywhere",
+};
+
+const draftTimer = {
+  color: "#fff",
+  fontSize: "clamp(38px, 8vw, 76px)",
+  fontWeight: 1000,
+  letterSpacing: "-.04em",
+};
+
+const pickAnnouncementCard = {
+  ...liquidGlassPanel,
+  background: "linear-gradient(145deg, rgba(250,204,21,.16), rgba(255,255,255,.05))",
+};
+
+const pickAnnouncementTitle = {
+  margin: "8px 0",
+  color: "#fff",
+  fontSize: "clamp(24px, 5vw, 48px)",
+  fontWeight: 1000,
+  letterSpacing: "-.04em",
+};
+
+const pickTeamLine = {
+  margin: 0,
+  color: "#facc15",
+  fontSize: "clamp(28px, 7vw, 68px)",
+  fontWeight: 1000,
+  letterSpacing: "-.06em",
+};
+
+const draftBoardGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+  gap: 12,
+};
+
+const draftPickTile = {
+  ...liquidGlassTile,
+  padding: 14,
+  border: "1px solid rgba(255,255,255,.16)",
+};
+
+const draftTileUser = {
+  color: "#fff",
+  fontWeight: 1000,
+  fontSize: 18,
+  overflowWrap: "anywhere",
+};
+
+const draftTileTeam = {
+  color: "#facc15",
+  fontWeight: 950,
+};
+
+const availableTeamGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+  gap: 10,
+  maxHeight: 720,
+  overflow: "auto",
+};
+
+const availableTeamTile = {
+  border: "1px solid rgba(255,255,255,.16)",
+  borderRadius: 16,
+  padding: 12,
+  display: "grid",
+  gap: 4,
+  color: "#fff",
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,.14)",
+};
+
+
+
+const draftConferenceGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+  gap: 10,
+};
+
+const draftConferenceTile = {
+  border: "1px solid rgba(255,255,255,.16)",
+  background: "linear-gradient(145deg, rgba(255,255,255,.11), rgba(255,255,255,.035))",
+  borderRadius: 16,
+  padding: 12,
+  display: "grid",
+  gap: 4,
+  color: "#fff",
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,.14)",
+};
+
