@@ -518,7 +518,7 @@ export default function App() {
   const [teamChange, setTeamChange] = useState({ discord_user_id: "", new_team_id: "", start_year: 2029 });
   const [weeklyMatchups, setWeeklyMatchups] = useState([]);
   const [draftPicks27, setDraftPicks27] = useState([]);
-  const [draftSettings27, setDraftSettings27] = useState({ id: 1, current_pick: 1, timer_minutes: 10, is_live: false });
+  const [draftSettings27, setDraftSettings27] = useState({ id: 1, current_pick: 1, timer_minutes: 10, is_live: false, paused: false });
   const [newWeeklyMatchup, setNewWeeklyMatchup] = useState({
     season_year: 2029,
     week: "Week 1",
@@ -1004,7 +1004,7 @@ export default function App() {
   }
 
   return <><GlobalStyle/><div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={isErrorMessage(error) ? errorBox : successBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} draggedTab={draggedTab} setDraggedTab={setDraggedTab} reorderTabs={reorderTabs} adminUnlocked={adminUnlocked} adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin} teams={teamOptions} assignments={assignments} currentYear={currentYear}/>
-    {activeTab === "draftRoom" && <DraftRoom teams={teamOptions} users={userOptions} picks={draftPicks27} settings={draftSettings27} adminUnlocked={adminUnlocked} adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin} startClock={startDraftClock} announcePick={announceDraftPick} revealPick={revealDraftPick} undoPick={undoDraftPick}/>}    
+    {activeTab === "draftRoom" && <DraftRoom teams={teamOptions} users={userOptions} picks={draftPicks27} settings={draftSettings27} adminUnlocked={adminUnlocked} adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin} startClock={startDraftClock} pauseClock={pauseDraftClock} resumeClock={resumeDraftClock} announcePick={announceDraftPick} revealPick={revealDraftPick} undoPick={undoDraftPick}/>}    
     {activeTab === "dashboard" && <><QuickJump teams={activeTeamOptions} users={activeCoachUsers} setActiveTab={setActiveTab}/><DataHealthAlerts teams={teamOptions} users={userOptions} assignments={assignments} results={results}/><HeadlineTicker teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} currentWeek={currentWeek}/><Stats currentYear={currentYear} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} currentWeek={currentWeek} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} teams={activeTeamOptions} assignments={assignments} saveSettings={saveLeagueSettings}/><LeaguePulse teams={activeTeamOptions} results={currentYearResults} allAmericans={allAmericans} awards={awards} currentYear={currentYear} assignments={assignments} users={userOptions}/><GameOfTheWeekDashboard teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} weeklyMatchups={weeklyMatchups} currentYear={currentYear} currentWeek={currentWeek}/><DynastyHeadlines teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} currentWeek={currentWeek}/><Watchlist teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} currentWeek={currentWeek}/><MilestoneTracker users={userOptions} teams={teamOptions} assignments={assignments} results={results}/><ComputerRankings teams={activeTeamOptions} results={currentYearResults} currentWeek={currentWeek} sortState={userSort} setSortState={setUserSort} assignments={assignments} users={userOptions}/><DashboardRecognition allAmericanRows={rankingRows(activeTeamOptions, allAmericans)} awardRows={rankingRows(activeTeamOptions, awards)}/><RecordResult newResult={newResult} setNewResult={setNewResult} teams={activeTeamOptions} users={userOptions} assignments={assignments} submitResult={submitResult}/></>}
     {activeTab === "eloRankings" && <EloRankings users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
     {activeTab === "dynastyRecords" && <DynastyRecords users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
@@ -1681,6 +1681,7 @@ function DraftCountdown({ pick, settings }) {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
+  if (settings?.paused) return <span>PAUSED</span>;
   if (!pick?.timer_started_at) return <span>Clock not started</span>;
   const minutes = Number(pick.timer_minutes || settings?.timer_minutes || 10);
   const end = new Date(pick.timer_started_at).getTime() + minutes * 60 * 1000;
@@ -1729,7 +1730,7 @@ function draftConferenceLimitFor(conference, lockedConferences, counts) {
   return null;
 }
 
-function DraftRoom({ teams, users, picks, settings, adminUnlocked, adminCodeInput, setAdminCodeInput, unlockAdmin, startClock, announcePick, revealPick, undoPick }) {
+function DraftRoom({ teams, users, picks, settings, adminUnlocked, adminCodeInput, setAdminCodeInput, unlockAdmin, startClock, pauseClock, resumeClock, announcePick, revealPick, undoPick }) {
   const [selectedTeamId, setSelectedTeamId] = useState("");
   const [teamSearch, setTeamSearch] = useState("");
   const [timerMinutes, setTimerMinutes] = useState(settings?.timer_minutes || 10);
@@ -1769,6 +1770,14 @@ function DraftRoom({ teams, users, picks, settings, adminUnlocked, adminCodeInpu
         </div>
       </div>
 
+      <div style={draftBroadcastBanner}>
+        <div>
+          <div style={eyebrow}>{currentPick?.status === "pick_is_in" ? "The Pick Is In" : "On The Clock"}</div>
+          <div style={draftBroadcastTitle}>Pick #{String(currentPick?.pick_number || 1).padStart(2,"0")} · {currentPick?.discord_username || currentPick?.discord_users?.discord_username || "User TBD"}</div>
+        </div>
+        <div style={draftBroadcastTimer}><DraftCountdown pick={currentPick} settings={settings}/></div>
+      </div>
+
       <div style={glassMiniCard}>
         <h3 style={miniTitle}>Conference Draft Caps</h3>
         <div style={draftConferenceGrid}>
@@ -1798,7 +1807,7 @@ function DraftRoom({ teams, users, picks, settings, adminUnlocked, adminCodeInpu
               {availableTeams.map((team)=><option key={team.id} value={team.id}>{team.name} · {normalizeDraftConference(team.conference)}</option>)}
             </select>
             <input style={input} type="number" min="1" max="60" value={timerMinutes} onChange={(e)=>setTimerMinutes(e.target.value)} placeholder="Clock minutes"/>
-            <button style={button} onClick={()=>{ const started = new Date().toISOString(); setLocalClock({ pick_number: currentPick?.pick_number, timer_started_at: started, timer_minutes: Number(timerMinutes)||10 }); startClock(currentPick?.pick_number, timerMinutes); }}>Start / Reset Clock</button>
+            <button style={button} onClick={()=>{ const started = new Date().toISOString(); setLocalClock({ pick_number: currentPick?.pick_number, timer_started_at: started, timer_minutes: Number(timerMinutes)||10 }); startClock(currentPick?.pick_number, timerMinutes); }}>Start / Reset Clock</button><button style={ghostButton} onClick={pauseClock}>Pause</button><button style={ghostButton} onClick={resumeClock}>Resume</button>
             <button style={button} onClick={()=>announcePick(currentPick?.pick_number, selectedTeamId)}>Pick Is In</button>
             {currentPick?.status === "pick_is_in" && <button style={button} onClick={()=>revealPick(currentPick?.pick_number)}>Reveal / Post to Board</button>}
           </div>
@@ -4415,23 +4424,46 @@ const healthWarn = {
     await loadData();
   }
 
+  async function pauseDraftClock() {
+    const { error: pauseError } = await supabase
+      .from("cfb27_draft_settings")
+      .update({ paused: true, updated_at: new Date().toISOString() })
+      .eq("id", 1);
+
+    if (pauseError) setError(`Pause clock failed: ${pauseError.message}`);
+    setDraftSettings27((prev) => ({ ...prev, paused: true }));
+  }
+
+  async function resumeDraftClock() {
+    const { error: resumeError } = await supabase
+      .from("cfb27_draft_settings")
+      .update({ paused: false, updated_at: new Date().toISOString() })
+      .eq("id", 1);
+
+    if (resumeError) setError(`Resume clock failed: ${resumeError.message}`);
+    setDraftSettings27((prev) => ({ ...prev, paused: false }));
+  }
+
+
   async function announceDraftPick(pickNumber, teamId) {
     if (!pickNumber || !teamId) {
-      setError("Select a pick and team before staging the pick.");
+      setError("Select a team before clicking Pick Is In.");
       return;
     }
     const now = new Date().toISOString();
-    const { error: pickError } = await supabase
+    const { data: updatedPick, error: pickError } = await supabase
       .from("cfb27_draft_picks")
       .update({ team_id: teamId, picked_at: now, status: "pick_is_in" })
-      .eq("pick_number", pickNumber);
+      .eq("pick_number", Number(pickNumber))
+      .select()
+      .single();
 
     if (pickError) {
-      setError(`Draft pick failed: ${pickError.message}`);
+      setError(`Pick Is In failed: ${pickError.message}`);
       return;
     }
 
-    setError("Pick is in. The team is hidden from the public board until you reveal it.");
+    setError(`Pick #${pickNumber} is in. Team is staged and hidden until reveal.`);
     await loadData();
   }
 
@@ -4649,4 +4681,33 @@ const availableTeamGrid = {
   gridAutoRows: "minmax(82px, auto)",
   minHeight: 620,
   overflow: "visible",
+};
+
+
+const draftBroadcastBanner = {
+  ...liquidGlassPanel,
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1fr) auto",
+  alignItems: "center",
+  gap: 18,
+  background: "radial-gradient(circle at 20% 0%, rgba(250,204,21,.22), transparent 34%), linear-gradient(135deg, rgba(49,46,129,.72), rgba(2,6,23,.72))",
+  border: "1px solid rgba(250,204,21,.28)",
+};
+
+const draftBroadcastTitle = {
+  color: "#fff",
+  fontSize: "clamp(28px, 6vw, 68px)",
+  lineHeight: .9,
+  letterSpacing: "-.055em",
+  fontWeight: 1000,
+  overflowWrap: "anywhere",
+};
+
+const draftBroadcastTimer = {
+  color: "#facc15",
+  fontSize: "clamp(38px, 8vw, 86px)",
+  lineHeight: .85,
+  letterSpacing: "-.05em",
+  fontWeight: 1000,
+  textShadow: "0 18px 52px rgba(250,204,21,.20)",
 };
