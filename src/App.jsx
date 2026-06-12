@@ -1885,6 +1885,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
       return pick;
     }));
 
+    setManualPickNumber(nextPick);
     setLocalClock({ pick_number: nextPick, timer_started_at: now, timer_minutes: Number(timerMinutes) || 10 });
     if (revealPick) revealPick(pickNumber);
   }
@@ -2196,7 +2197,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
         <div style={S.eyebrow}>Draft Controls</div>
         <p style={S.muted}>Controls are open. Set the clock, select a team, stage the pick, download/copy the announcement, then reveal it to the public board.</p>
         <div style={S.grid}>
-          <select style={S.input} value={manualPickNumber} onChange={(e) => setManualPickNumber(Number(e.target.value))}>
+          <select title="Manual current pick override" style={S.input} value={manualPickNumber} onChange={(e) => setManualPickNumber(Number(e.target.value))}>
             {sortedPicks.map((pick) => (
               <option style={{color:"#111827", background:"#fff"}} key={pick.pick_number} value={pick.pick_number}>
                 Pick #{String(pick.pick_number).padStart(2, "0")} - {pick.discord_username || pick.discord_users?.discord_username || "User TBD"}
