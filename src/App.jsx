@@ -1006,7 +1006,7 @@ export default function App() {
 
   return <><GlobalStyle/><div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={isErrorMessage(error) ? errorBox : successBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} draggedTab={draggedTab} setDraggedTab={setDraggedTab} reorderTabs={reorderTabs} teams={teamOptions} assignments={assignments} currentYear={currentYear}/>
     {activeTab === "draftRoom" && <DraftRoom teams={teamOptions} users={userOptions} picks={draftPicks27} settings={draftSettings27} startClock={startDraftClock} pauseClock={pauseDraftClock} resumeClock={resumeDraftClock} announcePick={announceDraftPick} revealPick={revealDraftPick} undoPick={undoDraftPick}/>}     
-    {activeTab === "dashboard" && <><QuickJump teams={teamOptions} users={userOptions} setActiveTab={setActiveTab}/><DataHealthAlerts teams={teamOptions} users={userOptions} assignments={assignments} results={results}/><HeadlineTicker teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} currentWeek={currentWeek}/><Stats currentYear={currentYear} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} currentWeek={currentWeek} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} teams={activeTeamOptions} assignments={assignments} saveSettings={saveLeagueSettings}/><LeaguePulse teams={activeTeamOptions} results={currentYearResults} allAmericans={allAmericans} awards={awards} currentYear={currentYear} assignments={assignments} users={userOptions}/><GameOfTheWeekDashboard teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} weeklyMatchups={weeklyMatchups} currentYear={currentYear} currentWeek={currentWeek}/><DynastyHeadlines teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} currentWeek={currentWeek}/><Watchlist teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} currentWeek={currentWeek}/><MilestoneTracker users={userOptions} teams={teamOptions} assignments={assignments} results={results}/><ComputerRankings teams={activeTeamOptions} results={currentYearResults} currentWeek={currentWeek} sortState={userSort} setSortState={setUserSort} assignments={assignments} users={userOptions}/><DashboardRecognition allAmericanRows={rankingRows(activeTeamOptions, allAmericans)} awardRows={rankingRows(activeTeamOptions, awards)}/><RecordResult newResult={newResult} setNewResult={setNewResult} teams={activeTeamOptions} users={userOptions} assignments={assignments} submitResult={submitResult}/></>}
+    {activeTab === "dashboard" && <><QuickJump teams={activeTeamOptions} users={activeCoachUsers} setActiveTab={setActiveTab}/><DataHealthAlerts teams={teamOptions} users={userOptions} assignments={assignments} results={results}/><HeadlineTicker teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} currentWeek={currentWeek}/><Stats currentYear={currentYear} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} currentWeek={currentWeek} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} teams={activeTeamOptions} assignments={assignments} saveSettings={saveLeagueSettings}/><LeaguePulse teams={activeTeamOptions} results={currentYearResults} allAmericans={allAmericans} awards={awards} currentYear={currentYear} assignments={assignments} users={userOptions}/><GameOfTheWeekDashboard teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} weeklyMatchups={weeklyMatchups} currentYear={currentYear} currentWeek={currentWeek}/><DynastyHeadlines teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} currentWeek={currentWeek}/><Watchlist teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} currentWeek={currentWeek}/><MilestoneTracker users={userOptions} teams={teamOptions} assignments={assignments} results={results}/><ComputerRankings teams={activeTeamOptions} results={currentYearResults} currentWeek={currentWeek} sortState={userSort} setSortState={setUserSort} assignments={assignments} users={userOptions}/><DashboardRecognition allAmericanRows={rankingRows(activeTeamOptions, allAmericans)} awardRows={rankingRows(activeTeamOptions, awards)}/><RecordResult newResult={newResult} setNewResult={setNewResult} teams={activeTeamOptions} users={userOptions} assignments={assignments} submitResult={submitResult}/></>}
     {activeTab === "eloRankings" && <EloRankings users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
     {activeTab === "dynastyRecords" && <DynastyRecords users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
     {activeTab === "rivalries" && <Rivalries users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
@@ -1738,11 +1738,21 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
   const [timerMinutes, setTimerMinutes] = useState(settings?.timer_minutes || 10);
   const [localClock, setLocalClock] = useState(null);
   const [tick, setTick] = useState(Date.now());
+  const [localPaused, setLocalPaused] = useState(Boolean(settings?.paused));
+  const [localPicks, setLocalPicks] = useState(picks || []);
 
   useEffect(() => {
     const id = setInterval(() => setTick(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    setLocalPicks(picks || []);
+  }, [picks]);
+
+  useEffect(() => {
+    setLocalPaused(Boolean(settings?.paused));
+  }, [settings?.paused]);
 
   const eligibleTeamNames = new Set([
     "Army Black Knights","Charlotte 49ers","East Carolina Pirates","Florida Atlantic Owls","Memphis Tigers","Navy Midshipmen","North Texas Mean Green","Rice Owls","South Florida Bulls","USF Bulls","Temple Owls","Tulane Green Wave","Tulsa Golden Hurricane","UAB Blazers","UTSA Roadrunners",
@@ -1766,7 +1776,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
   }
 
   const allowedConferences = ["American", "CUSA", "MAC", "Mountain West", "PAC 12", "Sun Belt"];
-  const sortedPicks = [...(picks || [])].sort((a, b) => Number(a.pick_number || 0) - Number(b.pick_number || 0));
+  const sortedPicks = [...(localPicks || [])].sort((a, b) => Number(a.pick_number || 0) - Number(b.pick_number || 0));
   const currentPick =
     sortedPicks.find((pick) => Number(pick.pick_number) === Number(settings?.current_pick || 1)) ||
     sortedPicks.find((pick) => !pick.team_id || pick.status === "pick_is_in") ||
@@ -1816,7 +1826,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
   const latestTeam = latestPick ? teams.find((team) => String(team.id) === String(latestPick.team_id)) || latestPick.teams : null;
 
   function timeLabel() {
-    if (settings?.paused) return "PAUSED";
+    if (localPaused) return "PAUSED";
     const started = displayPick?.timer_started_at;
     if (!started) return "Clock not started";
     const minutes = Number(displayPick?.timer_minutes || settings?.timer_minutes || timerMinutes || 10);
@@ -1837,12 +1847,53 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
     if (startClock) startClock(currentPick?.pick_number, timerMinutes);
   }
 
+  function handlePauseClock() {
+    setLocalPaused(true);
+    if (pauseClock) pauseClock();
+  }
+
+  function handleResumeClock() {
+    setLocalPaused(false);
+    if (resumeClock) resumeClock();
+  }
+
   function handlePickIsIn() {
     if (!selectedTeamId) {
       alert("Select a team first.");
       return;
     }
+
+    const now = new Date().toISOString();
+    setLocalPicks((prev) => (prev || []).map((pick) =>
+      Number(pick.pick_number) === Number(currentPick?.pick_number)
+        ? { ...pick, team_id: selectedTeamId, picked_at: now, status: "pick_is_in" }
+        : pick
+    ));
+
     if (announcePick) announcePick(currentPick?.pick_number, selectedTeamId);
+  }
+
+  function handleRevealPick(pickNumber) {
+    const nextPick = Number(pickNumber) + 1;
+    const now = new Date().toISOString();
+
+    setLocalPicks((prev) => (prev || []).map((pick) => {
+      if (Number(pick.pick_number) === Number(pickNumber)) return { ...pick, status: "picked" };
+      if (Number(pick.pick_number) === nextPick) return { ...pick, timer_started_at: now, timer_minutes: Number(timerMinutes) || 10, status: "on_clock" };
+      return pick;
+    }));
+
+    setLocalClock({ pick_number: nextPick, timer_started_at: now, timer_minutes: Number(timerMinutes) || 10 });
+    if (revealPick) revealPick(pickNumber);
+  }
+
+  function handleUndoPick(pickNumber) {
+    setLocalPicks((prev) => (prev || []).map((pick) =>
+      Number(pick.pick_number) === Number(pickNumber)
+        ? { ...pick, team_id: null, picked_at: null, timer_started_at: null, status: "pending" }
+        : pick
+    ));
+    if (undoPick) undoPick(pickNumber);
   }
 
   function copyCaption(pick, team) {
@@ -2044,17 +2095,21 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
             ))}
           </select>
           <button style={S.button} type="button" onClick={handleStartClock}>Start / Reset Clock</button>
-          <button style={S.ghost} type="button" onClick={() => pauseClock?.()}>Pause Clock</button>
-          <button style={S.ghost} type="button" onClick={() => resumeClock?.()}>Resume Clock</button>
+          <button style={S.ghost} type="button" onClick={handlePauseClock}>Pause Clock</button>
+          <button style={S.ghost} type="button" onClick={handleResumeClock}>Resume Clock</button>
           <button style={S.button} type="button" disabled={!selectedTeamId} onClick={handlePickIsIn}>Pick Is In</button>
-          {stagedPick && <button style={S.button} type="button" onClick={() => revealPick?.(stagedPick.pick_number)}>Reveal / Post to Board</button>}
+          {stagedPick && <button style={S.button} type="button" onClick={() => handleRevealPick(stagedPick.pick_number)}>Reveal / Post to Board</button>}
         </div>
 
         {selectedTeam && (
-          <div style={{ ...S.pickTile, marginTop: 14 }}>
+          <div style={{ ...S.pickTile, marginTop: 14, borderColor: "rgba(250,204,21,.32)" }}>
             <div style={S.eyebrow}>Selected Team Preview</div>
             <div style={{ color: "#facc15", fontSize: 28, fontWeight: 1000 }}>{selectedTeam.name}</div>
             <div style={S.muted}>{cleanConference(selectedTeam.conference)}</div>
+            <div style={S.grid}>
+              <button style={S.button} type="button" onClick={() => copyCaption(currentPick, selectedTeam)}>Copy Discord Caption</button>
+              <button style={S.button} type="button" onClick={() => downloadGraphic(currentPick, selectedTeam)}>Download Pick Graphic</button>
+            </div>
           </div>
         )}
 
@@ -2103,14 +2158,14 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
               const team = teams.find((t) => String(t.id) === String(pick.team_id)) || pick.teams;
               const visible = pick.status === "picked";
               return (
-                <div key={pick.pick_number} style={S.pickTile}>
+                <div key={pick.pick_number} style={{...S.pickTile, background: visible && team ? `linear-gradient(135deg, ${team.primary_color || "#1f2937"}cc, rgba(15,23,42,.88))` : S.pickTile.background, borderColor: visible && team ? (team.accent_color || team.secondary_color || "rgba(255,255,255,.18)") : S.pickTile.border}}>
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
                     <b style={{ color: "#fff" }}>#{String(pick.pick_number).padStart(2, "0")}</b>
                     <span style={{ color: "#facc15", fontWeight: 900 }}>{pick.status === "pick_is_in" ? "PICK IS IN" : (pick.status || "pending")}</span>
                   </div>
                   <div style={{ color: "#fff", fontWeight: 1000 }}>{pick.discord_username || pick.discord_users?.discord_username}</div>
                   <div style={visible && team ? { color: "#facc15", fontWeight: 1000 } : S.muted}>{visible && team ? team.name : (pick.status === "pick_is_in" ? "Team hidden until reveal" : "On deck")}</div>
-                  {pick.team_id && <button style={S.ghost} type="button" onClick={() => undoPick?.(pick.pick_number)}>Undo</button>}
+                  {pick.team_id && <button style={S.ghost} type="button" onClick={() => handleUndoPick(pick.pick_number)}>Undo</button>}
                 </div>
               );
             })}
@@ -2122,9 +2177,13 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
           <input style={{ ...S.input, marginTop: 12 }} value={teamSearch} onChange={(e) => setTeamSearch(e.target.value)} placeholder="Search available teams or conference..." />
           <div style={{ ...S.grid, marginTop: 12 }}>
             {availableTeams.map((team) => (
-              <div key={team.id} style={S.pickTile}>
+              <div key={team.id} style={{
+                ...S.pickTile,
+                background: `linear-gradient(135deg, ${team.primary_color || "#1f2937"}cc, rgba(15,23,42,.88))`,
+                borderColor: team.accent_color || team.secondary_color || "rgba(255,255,255,.18)"
+              }}>
                 <b style={{ color: "#fff" }}>{team.name}</b>
-                <span style={S.muted}>{cleanConference(team.conference)}</span>
+                <span style={{...S.muted, color: team.accent_color || team.secondary_color || "rgba(255,255,255,.72)"}}>{cleanConference(team.conference)}</span>
               </div>
             ))}
           </div>
@@ -4690,6 +4749,7 @@ const healthWarn = {
 
     if (pauseError) setError(`Pause clock failed: ${pauseError.message}`);
     setDraftSettings27((prev) => ({ ...prev, paused: true }));
+    await loadData();
   }
 
   async function resumeDraftClock() {
@@ -4700,6 +4760,7 @@ const healthWarn = {
 
     if (resumeError) setError(`Resume clock failed: ${resumeError.message}`);
     setDraftSettings27((prev) => ({ ...prev, paused: false }));
+    await loadData();
   }
 
 
@@ -4709,12 +4770,10 @@ const healthWarn = {
       return;
     }
     const now = new Date().toISOString();
-    const { data: updatedPick, error: pickError } = await supabase
+    const { error: pickError } = await supabase
       .from("cfb27_draft_picks")
       .update({ team_id: teamId, picked_at: now, status: "pick_is_in" })
-      .eq("pick_number", Number(pickNumber))
-      .select()
-      .single();
+      .eq("pick_number", Number(pickNumber));
 
     if (pickError) {
       setError(`Pick Is In failed: ${pickError.message}`);
