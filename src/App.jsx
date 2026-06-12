@@ -1733,12 +1733,14 @@ function DraftRoom({ teams, users, picks, settings, adminUnlocked, adminCodeInpu
   const [selectedTeamId, setSelectedTeamId] = useState("");
   const [teamSearch, setTeamSearch] = useState("");
   const [timerMinutes, setTimerMinutes] = useState(settings?.timer_minutes || 10);
+  const [localClock, setLocalClock] = useState(null);
   const sortedPicks = [...picks].sort((a,b)=>Number(a.pick_number)-Number(b.pick_number));
   const conferenceCounts = draftConferenceCounts(sortedPicks, teams);
   const lockedConferences = lockedDraftConferences(sortedPicks, teams);
   const pickedTeamIds = new Set(sortedPicks.filter((pick)=>pick.team_id && pick.status === "picked").map((pick)=>pick.team_id));
   const reservedTeamIds = new Set(sortedPicks.filter((pick)=>pick.team_id).map((pick)=>pick.team_id));
-  const currentPick = sortedPicks.find((pick)=>Number(pick.pick_number) === Number(settings?.current_pick)) || sortedPicks.find((pick)=>!pick.team_id || pick.status === "pick_is_in") || sortedPicks[0];
+  const currentPickBase = sortedPicks.find((pick)=>Number(pick.pick_number) === Number(settings?.current_pick)) || sortedPicks.find((pick)=>!pick.team_id || pick.status === "pick_is_in") || sortedPicks[0];
+  const currentPick = localClock && Number(localClock.pick_number) === Number(currentPickBase?.pick_number) ? { ...currentPickBase, timer_started_at: localClock.timer_started_at, timer_minutes: localClock.timer_minutes, status: currentPickBase?.status === "picked" ? "picked" : "on_clock" } : currentPickBase;
   const selectedTeam = teams.find((team)=>String(team.id) === String(selectedTeamId));
   const availableTeams = teams
     .filter((team)=>isDraftEligibleTeam(team))
@@ -1796,21 +1798,27 @@ function DraftRoom({ teams, users, picks, settings, adminUnlocked, adminCodeInpu
               {availableTeams.map((team)=><option key={team.id} value={team.id}>{team.name} · {normalizeDraftConference(team.conference)}</option>)}
             </select>
             <input style={input} type="number" min="1" max="60" value={timerMinutes} onChange={(e)=>setTimerMinutes(e.target.value)} placeholder="Clock minutes"/>
-            <button style={button} onClick={()=>startClock(currentPick?.pick_number, timerMinutes)}>Start / Reset Clock</button>
+            <button style={button} onClick={()=>{ const started = new Date().toISOString(); setLocalClock({ pick_number: currentPick?.pick_number, timer_started_at: started, timer_minutes: Number(timerMinutes)||10 }); startClock(currentPick?.pick_number, timerMinutes); }}>Start / Reset Clock</button>
             <button style={button} onClick={()=>announcePick(currentPick?.pick_number, selectedTeamId)}>Pick Is In</button>
             {currentPick?.status === "pick_is_in" && <button style={button} onClick={()=>revealPick(currentPick?.pick_number)}>Reveal / Post to Board</button>}
           </div>
           <div style={draftAdminHelp}>
-            <b>How it works:</b> Start/Reset Clock begins the timer for the current pick. Select the team from the dropdown, click <b>Pick Is In</b> to stage it privately, then click <b>Reveal / Post to Board</b> after you post the graphic in Discord.
+            <b>Clock:</b> clicking Start / Reset should immediately change the public timer above. If it does not persist after refresh, the Supabase draft table update is failing.<br/><b>How it works:</b> Start/Reset Clock begins the timer for the current pick. Select the team from the dropdown, click <b>Pick Is In</b> to stage it privately, then click <b>Reveal / Post to Board</b> after you post the graphic in Discord.
           </div>
-          {(selectedTeam || (currentPick?.status === "pick_is_in" && pickedTeam)) && (
+          {selectedTeam && (
+            <div style={pickPreviewCard}>
+              <div style={eyebrow}>Selected Team Preview</div>
+              <div style={pickTeamLine}>{selectedTeam.name}</div>
+              <div style={mutedText}>{normalizeDraftConference(selectedTeam.conference)}</div>
+            </div>
+          )}
+          {currentPick?.status === "pick_is_in" && pickedTeam && (
             <div style={pickPreviewCard}>
               <div style={eyebrow}>Commissioner Preview</div>
-              <div style={leaderRow}><b>Pick #{String(currentPick?.pick_number || 1).padStart(2,"0")}</b><span>{currentPick?.discord_username || currentPick?.discord_users?.discord_username}</span></div>
-              <div style={pickTeamLine}>{(selectedTeam || pickedTeam)?.name}</div>
+              <div style={pickTeamLine}>{pickedTeam.name}</div>
               <div style={actionRow}>
-                <button style={button} onClick={()=>navigator.clipboard?.writeText(draftPickCaption(currentPick, selectedTeam || pickedTeam))}>Copy Discord Caption</button>
-                <button style={button} onClick={()=>downloadDraftPickGraphic(currentPick, selectedTeam || pickedTeam)}>Download Pick Graphic</button>
+                <button style={button} onClick={()=>navigator.clipboard?.writeText(draftPickCaption(currentPick, pickedTeam))}>Copy Discord Caption</button>
+                <button style={button} onClick={()=>downloadDraftPickGraphic(currentPick, pickedTeam)}>Download Pick Graphic</button>
               </div>
             </div>
           )}
