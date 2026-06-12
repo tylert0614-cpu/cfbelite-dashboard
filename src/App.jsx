@@ -2165,12 +2165,15 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
     eyebrow: { color: "#facc15", textTransform: "uppercase", letterSpacing: ".16em", fontSize: 12, fontWeight: 1000 },
     muted: { color: "rgba(255,255,255,.72)", lineHeight: 1.45 },
     clock: { color: "#facc15", fontSize: "clamp(42px, 10vw, 88px)", fontWeight: 1000, lineHeight: .9 },
-    grid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 },
+    grid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 },
     input: { width: "100%", border: "1px solid rgba(255,255,255,.16)", background: "rgba(255,255,255,.08)", color: "#fff", borderRadius: 14, padding: "12px 14px", fontWeight: 800 },
-    button: { border: "1px solid rgba(250,204,21,.32)", background: "linear-gradient(135deg, #facc15, #b45309)", color: "#111827", borderRadius: 14, padding: "12px 14px", fontWeight: 1000, cursor: "pointer" },
-    ghost: { border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.08)", color: "#fff", borderRadius: 14, padding: "12px 14px", fontWeight: 900, cursor: "pointer" },
+    button: { border: "1px solid rgba(250,204,21,.32)", background: "linear-gradient(135deg, #facc15, #b45309)", color: "#111827", borderRadius: 14, padding: "12px 14px", fontWeight: 1000, cursor: "pointer", minHeight: 46 },
+    ghost: { border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.08)", color: "#fff", borderRadius: 14, padding: "12px 14px", fontWeight: 900, cursor: "pointer", minHeight: 46 },
     pickTile: { background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.12)", borderRadius: 16, padding: 12, display: "grid", gap: 7 },
-    twoCol: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 18 },
+    activePickRow: { marginTop: 14, border: "1px solid rgba(250,204,21,.38)", background: "rgba(250,204,21,.08)", borderRadius: 16, padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" },
+    activePickTeam: { color: "#facc15", fontSize: "clamp(20px, 5vw, 30px)", fontWeight: 1000, lineHeight: 1.05 },
+    activePickMeta: { color: "rgba(255,255,255,.78)", fontWeight: 900, whiteSpace: "nowrap" },
+    twoCol: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 },
   };
 
   return (
@@ -2215,25 +2218,14 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
           {stagedPick && <button style={S.button} type="button" onClick={() => handleRevealPick(stagedPick.pick_number)}>Reveal / Post to Board</button>}
         </div>
 
-        {selectedTeam && (
-          <div style={{ ...S.pickTile, marginTop: 14, borderColor: "rgba(250,204,21,.32)" }}>
-            <div style={S.eyebrow}>Selected Team Preview</div>
-            <div style={{ color: "#facc15", fontSize: 28, fontWeight: 1000 }}>{selectedTeam.name}</div>
-            <div style={S.muted}>{cleanConference(selectedTeam.conference)}</div>
-            <div style={S.grid}>
-              <button style={S.button} type="button" onClick={() => copyCaption(currentPick, selectedTeam)}>Copy Discord Caption</button>
-              <button style={S.button} type="button" onClick={() => downloadGraphic(currentPick, selectedTeam)}>Download Pick Graphic</button>
+        {(selectedTeam || stagedTeam) && (
+          <div style={S.activePickRow}>
+            <div>
+              <div style={S.eyebrow}>{stagedTeam ? "Pick Is In" : "Selected Team"}</div>
+              <div style={S.activePickTeam}>{(stagedTeam || selectedTeam)?.name}</div>
             </div>
-          </div>
-        )}
-
-        {stagedPick && stagedTeam && (
-          <div style={{ ...S.pickTile, marginTop: 14, borderColor: "rgba(250,204,21,.32)" }}>
-            <div style={S.eyebrow}>Pick Is In Preview</div>
-            <div style={{ color: "#facc15", fontSize: 32, fontWeight: 1000 }}>{stagedTeam.name}</div>
-            <div style={S.grid}>
-              <button style={S.button} onClick={() => copyCaption(stagedPick, stagedTeam)}>Copy Discord Caption</button>
-              <button style={S.button} onClick={() => downloadGraphic(stagedPick, stagedTeam)}>Download Pick Graphic</button>
+            <div style={S.activePickMeta}>
+              Pick #{String((stagedPick || currentPick)?.pick_number || 1).padStart(2, "0")} · {cleanConference((stagedTeam || selectedTeam)?.conference)}
             </div>
           </div>
         )}
@@ -2294,7 +2286,8 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
               <div key={team.id} style={{
                 ...S.pickTile,
                 background: `linear-gradient(135deg, ${team.primary_color || "#1f2937"}cc, rgba(15,23,42,.88))`,
-                borderColor: team.accent_color || team.secondary_color || "rgba(255,255,255,.18)"
+                borderColor: "#ffffff",
+                borderWidth: 1.5
               }}>
                 <b style={{ color: "#fff" }}>{team.name}</b>
                 <span style={{...S.muted, color: team.accent_color || team.secondary_color || "rgba(255,255,255,.72)"}}>{cleanConference(team.conference)}</span>
