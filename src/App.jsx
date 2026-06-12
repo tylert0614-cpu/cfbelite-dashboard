@@ -1006,7 +1006,7 @@ export default function App() {
 
   return <><GlobalStyle/><div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={isErrorMessage(error) ? errorBox : successBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} draggedTab={draggedTab} setDraggedTab={setDraggedTab} reorderTabs={reorderTabs} teams={teamOptions} assignments={assignments} currentYear={currentYear}/>
     {activeTab === "draftRoom" && <DraftRoom teams={teamOptions} users={userOptions} picks={draftPicks27} settings={draftSettings27} startClock={startDraftClock} pauseClock={pauseDraftClock} resumeClock={resumeDraftClock} announcePick={announceDraftPick} revealPick={revealDraftPick} undoPick={undoDraftPick}/>}     
-    {activeTab === "dashboard" && <><QuickJump teams={activeTeamOptions} users={activeCoachUsers} setActiveTab={setActiveTab}/><DataHealthAlerts teams={teamOptions} users={userOptions} assignments={assignments} results={results}/><HeadlineTicker teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} currentWeek={currentWeek}/><Stats currentYear={currentYear} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} currentWeek={currentWeek} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} teams={activeTeamOptions} assignments={assignments} saveSettings={saveLeagueSettings}/><LeaguePulse teams={activeTeamOptions} results={currentYearResults} allAmericans={allAmericans} awards={awards} currentYear={currentYear} assignments={assignments} users={userOptions}/><GameOfTheWeekDashboard teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} weeklyMatchups={weeklyMatchups} currentYear={currentYear} currentWeek={currentWeek}/><DynastyHeadlines teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} currentWeek={currentWeek}/><Watchlist teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} currentWeek={currentWeek}/><MilestoneTracker users={userOptions} teams={teamOptions} assignments={assignments} results={results}/><ComputerRankings teams={activeTeamOptions} results={currentYearResults} currentWeek={currentWeek} sortState={userSort} setSortState={setUserSort} assignments={assignments} users={userOptions}/><DashboardRecognition allAmericanRows={rankingRows(activeTeamOptions, allAmericans)} awardRows={rankingRows(activeTeamOptions, awards)}/><RecordResult newResult={newResult} setNewResult={setNewResult} teams={activeTeamOptions} users={userOptions} assignments={assignments} submitResult={submitResult}/></>}
+    {activeTab === "dashboard" && <><QuickJump teams={teamOptions} users={userOptions} setActiveTab={setActiveTab}/><DataHealthAlerts teams={teamOptions} users={userOptions} assignments={assignments} results={results}/><HeadlineTicker teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} currentWeek={currentWeek}/><Stats currentYear={currentYear} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} currentWeek={currentWeek} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} teams={activeTeamOptions} assignments={assignments} saveSettings={saveLeagueSettings}/><LeaguePulse teams={activeTeamOptions} results={currentYearResults} allAmericans={allAmericans} awards={awards} currentYear={currentYear} assignments={assignments} users={userOptions}/><GameOfTheWeekDashboard teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} weeklyMatchups={weeklyMatchups} currentYear={currentYear} currentWeek={currentWeek}/><DynastyHeadlines teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} currentWeek={currentWeek}/><Watchlist teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} currentWeek={currentWeek}/><MilestoneTracker users={userOptions} teams={teamOptions} assignments={assignments} results={results}/><ComputerRankings teams={activeTeamOptions} results={currentYearResults} currentWeek={currentWeek} sortState={userSort} setSortState={setUserSort} assignments={assignments} users={userOptions}/><DashboardRecognition allAmericanRows={rankingRows(activeTeamOptions, allAmericans)} awardRows={rankingRows(activeTeamOptions, awards)}/><RecordResult newResult={newResult} setNewResult={setNewResult} teams={activeTeamOptions} users={userOptions} assignments={assignments} submitResult={submitResult}/></>}
     {activeTab === "eloRankings" && <EloRankings users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
     {activeTab === "dynastyRecords" && <DynastyRecords users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
     {activeTab === "rivalries" && <Rivalries users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
@@ -1025,6 +1025,7 @@ export default function App() {
     {activeTab === "awards" && <Awards rows={awards} teams={teamOptions} addRow={addAward} updateRow={updateRow} deleteRow={deleteRow} rankings={[]} drafts={draftAwards} setDrafts={setDraftAwards} saveDraft={saveDraft} getDraft={getDraft}/>}    
     {activeTab === "heismans" && <Heismans rows={heismans} teams={teamOptions} addRow={addHeisman} updateRow={updateRow} deleteRow={deleteRow} drafts={draftHeismans} setDrafts={setDraftHeismans} saveDraft={saveDraft} getDraft={getDraft}/>}    
     {activeTab === "nationalChampions" && <NationalChampions rows={nationalChampions} teams={teamOptions} users={userOptions} addRow={addNationalChampion} updateRow={updateRow} deleteRow={deleteRow} drafts={draftChampions} setDrafts={setDraftChampions} saveDraft={saveDraft} getDraft={getDraft}/>}        
+    {selectedTeam && <TeamPage team={selectedTeam} standings={standings.find((row)=>row.team_id===selectedTeam.id)} results={currentYearResults} allResults={results} teams={teamOptions} assignments={assignments} allAmericans={allAmericans} awards={awards} heismans={heismans} recruiting={recruiting} historyRows={historyRows} addRecruiting={addRecruiting} addHistory={addHistory} updateRow={updateRow} deleteRow={deleteRow} newRecruiting={newRecruiting} setNewRecruiting={setNewRecruiting} newHistory={newHistory} setNewHistory={setNewHistory}/>}    
     {selectedCoach && <CoachProfile user={selectedCoach} users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
   </div></div></>;
 }
@@ -1852,63 +1853,152 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
 
   function downloadGraphic(pick, team) {
     if (!pick || !team) return;
+
     const canvas = document.createElement("canvas");
     canvas.width = 1200;
     canvas.height = 675;
     const ctx = canvas.getContext("2d");
-    const primary = team.primary_color || "#20114f";
+
+    const primary = team.primary_color || "#1e3a8a";
     const secondary = team.secondary_color || "#facc15";
     const accent = team.accent_color || "#ffffff";
+    const user = String(pick.discord_username || pick.discord_users?.discord_username || "CFBElite User");
+    const teamName = String(team.name || "Selected Team");
+    const conf = cleanConference(team.conference) || "CFBElite";
 
-    const grad = ctx.createLinearGradient(0, 0, 1200, 675);
-    grad.addColorStop(0, primary);
-    grad.addColorStop(.52, "#050510");
-    grad.addColorStop(1, secondary);
-    ctx.fillStyle = grad;
+    function roundRect(x, y, w, h, r) {
+      const radius = Math.min(r, w / 2, h / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.arcTo(x + w, y, x + w, y + h, radius);
+      ctx.arcTo(x + w, y + h, x, y + h, radius);
+      ctx.arcTo(x, y + h, x, y, radius);
+      ctx.arcTo(x, y, x + w, y, radius);
+      ctx.closePath();
+    }
+
+    function fitText(text, x, y, maxWidth, startSize, minSize, weight = 1000) {
+      let size = startSize;
+      do {
+        ctx.font = `${weight} ${size}px Arial`;
+        if (ctx.measureText(text).width <= maxWidth || size <= minSize) break;
+        size -= 3;
+      } while (size > minSize);
+      ctx.fillText(text, x, y);
+    }
+
+    // Background
+    const bg = ctx.createLinearGradient(0, 0, 1200, 675);
+    bg.addColorStop(0, primary);
+    bg.addColorStop(0.45, "#050713");
+    bg.addColorStop(1, secondary);
+    ctx.fillStyle = bg;
     ctx.fillRect(0, 0, 1200, 675);
 
+    // Dark overlay for contrast
+    const overlay = ctx.createRadialGradient(280, 110, 20, 650, 330, 850);
+    overlay.addColorStop(0, "rgba(255,255,255,.12)");
+    overlay.addColorStop(0.45, "rgba(0,0,0,.20)");
+    overlay.addColorStop(1, "rgba(0,0,0,.60)");
+    ctx.fillStyle = overlay;
+    ctx.fillRect(0, 0, 1200, 675);
+
+    // Subtle stage lights
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.arc(1060, 90, 220, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = secondary;
+    ctx.beginPath();
+    ctx.arc(160, 590, 260, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Outer glass frame
+    roundRect(34, 30, 1132, 615, 32);
+    ctx.fillStyle = "rgba(255,255,255,.045)";
+    ctx.fill();
     ctx.strokeStyle = secondary;
     ctx.lineWidth = 5;
-    ctx.strokeRect(36, 36, 1128, 603);
+    ctx.stroke();
 
-    ctx.fillStyle = "rgba(0,0,0,.38)";
-    ctx.fillRect(70, 120, 300, 405);
-
+    // Header
     ctx.fillStyle = "#ffffff";
-    ctx.font = "900 42px Arial";
-    ctx.fillText("CFBELITE 27 TEAM DRAFT", 72, 82);
-
-    ctx.fillStyle = accent;
-    ctx.font = "900 48px Arial";
-    ctx.fillText("THE PICK IS IN", 430, 150);
-
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "900 52px Arial";
-    ctx.fillText(String(pick.discord_username || pick.discord_users?.discord_username || "USER").toUpperCase(), 430, 235);
-
-    ctx.fillStyle = accent;
-    ctx.font = "900 34px Arial";
-    ctx.fillText("SELECTS", 430, 292);
-
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "900 70px Arial";
-    ctx.fillText(team.name.toUpperCase(), 430, 390);
-
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "900 64px Arial";
-    ctx.fillText("PICK", 110, 190);
-    ctx.font = "900 170px Arial";
-    ctx.fillText(String(pick.pick_number).padStart(2, "0"), 105, 395);
+    ctx.font = "1000 44px Arial";
+    ctx.fillText("CFBELITE 27 TEAM DRAFT", 72, 86);
 
     ctx.fillStyle = secondary;
-    ctx.font = "900 40px Arial";
-    ctx.fillText(cleanConference(team.conference) || "CFBElite", 430, 475);
+    ctx.font = "1000 30px Arial";
+    ctx.fillText("THE PICK IS IN", 830, 84);
+
+    // Left pick card
+    roundRect(70, 128, 310, 410, 22);
+    ctx.fillStyle = "rgba(0,0,0,.46)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,.20)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "1000 66px Arial";
+    ctx.fillText("PICK", 115, 205);
+
+    ctx.font = "1000 175px Arial";
+    ctx.fillText(String(pick.pick_number || 1).padStart(2, "0"), 105, 405);
+
+    ctx.fillStyle = secondary;
+    ctx.font = "1000 31px Arial";
+    ctx.fillText(conf.toUpperCase(), 112, 488);
+
+    // Right content glass
+    roundRect(420, 126, 700, 415, 28);
+    ctx.fillStyle = "rgba(255,255,255,.075)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,.18)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = secondary;
+    ctx.font = "1000 36px Arial";
+    ctx.fillText("SELECTING COACH", 460, 190);
+
+    ctx.fillStyle = "#ffffff";
+    fitText(user.toUpperCase(), 460, 255, 600, 58, 34, 1000);
+
+    ctx.fillStyle = "rgba(255,255,255,.76)";
+    ctx.font = "1000 34px Arial";
+    ctx.fillText("SELECTS", 460, 320);
+
+    ctx.fillStyle = "#ffffff";
+    fitText(teamName.toUpperCase(), 460, 405, 610, 70, 38, 1000);
+
+    // Bottom badge
+    roundRect(460, 454, 260, 58, 29);
+    ctx.fillStyle = "rgba(0,0,0,.35)";
+    ctx.fill();
+    ctx.strokeStyle = secondary;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = secondary;
+    ctx.font = "1000 30px Arial";
+    ctx.fillText(conf.toUpperCase(), 488, 493);
+
+    // Footer
+    ctx.fillStyle = "rgba(255,255,255,.72)";
+    ctx.font = "900 26px Arial";
+    ctx.fillText("CFBElite Dynasty League", 72, 612);
+
+    ctx.fillStyle = secondary;
+    ctx.font = "1000 26px Arial";
+    ctx.fillText("#CFBELITE27", 930, 612);
 
     const link = document.createElement("a");
-    link.download = `cfbelite27-pick-${String(pick.pick_number).padStart(2, "0")}.png`;
+    link.download = `cfbelite27-pick-${String(pick.pick_number || 1).padStart(2, "0")}-${teamName.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.png`;
     link.href = canvas.toDataURL("image/png");
     link.click();
   }
+
 
   const S = {
     page: { display: "grid", gap: 18 },
@@ -1948,9 +2038,9 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
         <div style={S.grid}>
           <input style={S.input} type="number" min="1" max="60" value={timerMinutes} onChange={(e) => setTimerMinutes(e.target.value)} placeholder="Clock minutes" />
           <select style={S.input} value={selectedTeamId} onChange={(e) => setSelectedTeamId(e.target.value)}>
-            <option value="">Select Team For Pick #{displayPick?.pick_number || ""}</option>
+            <option style={{color:"#111827", background:"#fff"}} value="">Select Team For Pick #{displayPick?.pick_number || ""}</option>
             {availableTeams.map((team) => (
-              <option key={team.id} value={team.id}>{team.name} - {cleanConference(team.conference)}</option>
+              <option style={{color:"#111827", background:"#fff"}} key={team.id} value={team.id}>{team.name} - {cleanConference(team.conference)}</option>
             ))}
           </select>
           <button style={S.button} type="button" onClick={handleStartClock}>Start / Reset Clock</button>
