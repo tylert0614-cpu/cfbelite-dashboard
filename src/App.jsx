@@ -1836,7 +1836,20 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
       const q = teamSearch.toLowerCase();
       return !q || team.name.toLowerCase().includes(q) || cleanConference(team.conference).toLowerCase().includes(q);
     })
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => {
+      const confCompare = cleanConference(a.conference).localeCompare(cleanConference(b.conference));
+      if (confCompare !== 0) return confCompare;
+      return a.name.localeCompare(b.name);
+    });
+
+  const availableTeamsByConference = allowedConferences
+    .map((conf) => ({
+      conference: conf,
+      locked: lockedConferences.has(conf),
+      teams: availableTeams.filter((team) => cleanConference(team.conference) === conf),
+      selectedCount: conferenceCounts[conf] || 0,
+    }))
+    .filter((group) => group.teams.length || group.locked || group.selectedCount > 0);
 
   const selectedTeam = teams.find((team) => String(team.id) === String(selectedTeamId));
   const stagedPick = sortedPicks.find((pick) => pick.status === "pick_is_in");
@@ -2184,6 +2197,10 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
     muted: { color: "rgba(255,255,255,.72)", lineHeight: 1.45 },
     clock: { color: "#facc15", fontSize: "clamp(42px, 10vw, 88px)", fontWeight: 1000, lineHeight: .9 },
     grid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 },
+    availableConferenceStack: { display: "grid", gap: 14, marginTop: 14 },
+    availableConferenceGroup: { display: "grid", gap: 10 },
+    availableConferenceHeader: { border: "1px solid rgba(255,255,255,.18)", borderRadius: 14, padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, color: "#ffffff", fontWeight: 1000, fontSize: 13, textTransform: "uppercase", letterSpacing: ".08em" },
+    availableTeamGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 },
     input: { width: "100%", border: "1px solid rgba(255,255,255,.16)", background: "rgba(255,255,255,.08)", color: "#fff", borderRadius: 14, padding: "12px 14px", fontWeight: 800 },
     button: { border: "1px solid rgba(250,204,21,.32)", background: "linear-gradient(135deg, #facc15, #b45309)", color: "#111827", borderRadius: 14, padding: "12px 14px", fontWeight: 1000, cursor: "pointer", minHeight: 46 },
     ghost: { border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.08)", color: "#fff", borderRadius: 14, padding: "12px 14px", fontWeight: 900, cursor: "pointer", minHeight: 46 },
@@ -2309,16 +2326,34 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
         <div style={S.panel}>
           <div style={S.eyebrow}>Available Teams · {availableTeams.length}</div>
           <input style={{ ...S.input, marginTop: 12 }} value={teamSearch} onChange={(e) => setTeamSearch(e.target.value)} placeholder="Search available teams or conference..." />
-          <div style={{ ...S.grid, marginTop: 12 }}>
-            {availableTeams.map((team) => (
-              <div key={team.id} style={{
-                ...S.pickTile,
-                background: `linear-gradient(135deg, ${team.primary_color || "#1f2937"}cc, rgba(15,23,42,.88))`,
-                borderColor: "#ffffff",
-                borderWidth: 1.5
-              }}>
-                <b style={{ color: "#fff" }}>{team.name}</b>
-                <span style={{...S.muted, color: team.accent_color || team.secondary_color || "rgba(255,255,255,.72)"}}>{cleanConference(team.conference)}</span>
+
+          <div style={S.availableConferenceStack}>
+            {availableTeamsByConference.map((group) => (
+              <div key={group.conference} style={S.availableConferenceGroup}>
+                <div style={{
+                  ...S.availableConferenceHeader,
+                  background: group.locked ? "rgba(127,29,29,.76)" : "rgba(255,255,255,.08)",
+                  borderColor: group.locked ? "rgba(248,113,113,.70)" : "rgba(255,255,255,.18)",
+                }}>
+                  <span>{group.locked ? "🔒 " : ""}{group.conference}</span>
+                  <b>{group.locked ? "LOCKED" : `${group.teams.length} Remaining`}</b>
+                </div>
+
+                {!group.locked && (
+                  <div style={S.availableTeamGrid}>
+                    {group.teams.map((team) => (
+                      <div key={team.id} style={{
+                        ...S.pickTile,
+                        background: `linear-gradient(135deg, ${team.primary_color || "#1f2937"}cc, rgba(15,23,42,.88))`,
+                        borderColor: "#ffffff",
+                        borderWidth: 1.5
+                      }}>
+                        <b style={{ color: "#ffffff", fontWeight: 1000 }}>{team.name}</b>
+                        <span style={{ color: "rgba(255,255,255,.82)", fontWeight: 850 }}>{cleanConference(team.conference)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
