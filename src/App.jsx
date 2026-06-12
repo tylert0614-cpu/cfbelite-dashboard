@@ -1740,7 +1740,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
   const [tick, setTick] = useState(Date.now());
   const [localPaused, setLocalPaused] = useState(Boolean(settings?.paused));
   const [localPicks, setLocalPicks] = useState(picks || []);
-  const [manualPickNumber, setManualPickNumber] = useState(settings?.current_pick || 1);
+  const [manualPickNumber, setManualPickNumber] = useState(1);
 
   useEffect(() => {
     const id = setInterval(() => setTick(Date.now()), 1000);
@@ -1779,7 +1779,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
   const allowedConferences = ["American", "CUSA", "MAC", "Mountain West", "PAC 12", "Sun Belt"];
   const sortedPicks = [...(localPicks || [])].sort((a, b) => Number(a.pick_number || 0) - Number(b.pick_number || 0));
   const currentPick =
-    sortedPicks.find((pick) => Number(pick.pick_number) === Number(manualPickNumber || settings?.current_pick || 1)) ||
+    sortedPicks.find((pick) => Number(pick.pick_number) === Number(manualPickNumber || 1)) ||
     sortedPicks.find((pick) => Number(pick.pick_number) === 1) ||
     sortedPicks.find((pick) => !pick.team_id || pick.status === "pick_is_in") ||
     sortedPicks[0] ||
