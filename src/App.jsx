@@ -1807,31 +1807,113 @@ function DraftRoom({ teams, users, picks = [], settings = {}, startClock, pauseC
         <div style={draftBroadcastTimer}><DraftCountdown pick={currentPick} settings={settings}/></div>
       </div>
 
-      <div style={glassMiniCard}>
+      <div style={card}>
         <h3 style={miniTitle}>Commissioner Controls</h3>
+
         {!draftAdminUnlocked ? (
           <div style={filterGrid}>
-            <input style={input} type="password" value={draftAdminCode} onChange={(e)=>setDraftAdminCode(e.target.value)} placeholder="Commissioner code" />
-            <button style={button} onClick={()=>setDraftAdminUnlocked(true)}>Unlock Draft Controls</button>
+            <input
+              style={input}
+              type="password"
+              value={draftAdminCode}
+              onChange={(e) => setDraftAdminCode(e.target.value)}
+              placeholder="Commissioner code"
+            />
+            <button
+              style={button}
+              type="button"
+              onClick={() => setDraftAdminUnlocked(true)}
+            >
+              Unlock Draft Controls
+            </button>
           </div>
         ) : (
-          <div style={{display:"grid", gap:14}}>
-            <div style={filterGrid}>
-              <input style={input} type="number" min="1" max="60" value={timerMinutes} onChange={(e)=>setTimerMinutes(e.target.value)} placeholder="Clock minutes" />
-              <select style={input} value={selectedTeamId} onChange={(e)=>setSelectedTeamId(e.target.value)}>
-                <option value="">Select Team For Pick #{currentPick?.pick_number || ""}</option>
-                {availableTeams.map((team)=><option key={team.id} value={team.id}>{team.name} · {normalizeDraftConference(team.conference)}</option>)}
-              </select>
-              <button style={button} onClick={handleStartClock}>Start / Reset Clock</button>
-              <button style={ghostButton} onClick={()=>pauseClock?.()}>Pause Clock</button>
-              <button style={ghostButton} onClick={()=>resumeClock?.()}>Resume Clock</button>
-              <button style={button} disabled={!selectedTeamId} onClick={handlePickIsIn}>Pick Is In</button>
-              {stagedPick && <button style={button} onClick={()=>revealPick?.(stagedPick.pick_number)}>Reveal / Post to Board</button>}
-            </div>
+          <div style={filterGrid}>
+            <input
+              style={input}
+              type="number"
+              min="1"
+              max="60"
+              value={timerMinutes}
+              onChange={(e) => setTimerMinutes(e.target.value)}
+              placeholder="Clock minutes"
+            />
 
-            {selectedTeam && <div style={pickPreviewCard}><div style={eyebrow}>Selected Team Preview</div><div style={pickTeamLine}>{selectedTeam.name}</div><div style={mutedText}>{normalizeDraftConference(selectedTeam.conference)}</div></div>}
+            <select
+              style={input}
+              value={selectedTeamId}
+              onChange={(e) => setSelectedTeamId(e.target.value)}
+            >
+              <option value="">Select Team For Pick #{currentPick?.pick_number || ""}</option>
+              {availableTeams.map((team) => (
+                <option key={team.id} value={team.id}>
+                  {team.name} - {normalizeDraftConference(team.conference)}
+                </option>
+              ))}
+            </select>
 
-            {stagedPick && stagedTeam && <div style={pickPreviewCard}><div style={eyebrow}>Commissioner Preview</div><div style={pickTeamLine}>{stagedTeam.name}</div><div style={actionRow}><button style={button} onClick={()=>navigator.clipboard?.writeText(draftPickCaption(stagedPick, stagedTeam))}>Copy Discord Caption</button><button style={button} onClick={()=>downloadDraftPickGraphic(stagedPick, stagedTeam)}>Download Pick Graphic</button></div></div>}
+            <button
+              style={button}
+              type="button"
+              onClick={() => {
+                const started = new Date().toISOString();
+                setLocalClock({
+                  pick_number: currentPick?.pick_number,
+                  timer_started_at: started,
+                  timer_minutes: Number(timerMinutes) || 10
+                });
+                if (startClock) startClock(currentPick?.pick_number, timerMinutes);
+              }}
+            >
+              Start / Reset Clock
+            </button>
+
+            <button
+              style={button}
+              type="button"
+              onClick={() => {
+                if (pauseClock) pauseClock();
+              }}
+            >
+              Pause Clock
+            </button>
+
+            <button
+              style={button}
+              type="button"
+              onClick={() => {
+                if (resumeClock) resumeClock();
+              }}
+            >
+              Resume Clock
+            </button>
+
+            <button
+              style={button}
+              type="button"
+              disabled={!selectedTeamId}
+              onClick={() => {
+                if (!selectedTeamId) {
+                  alert("Select a team first.");
+                  return;
+                }
+                if (announcePick) announcePick(currentPick?.pick_number, selectedTeamId);
+              }}
+            >
+              Pick Is In
+            </button>
+
+            {stagedPick && (
+              <button
+                style={button}
+                type="button"
+                onClick={() => {
+                  if (revealPick) revealPick(stagedPick.pick_number);
+                }}
+              >
+                Reveal / Post to Board
+              </button>
+            )}
           </div>
         )}
       </div>
