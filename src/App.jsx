@@ -1917,10 +1917,12 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
     const accent = team.accent_color || "#ffffff";
     const user = String(pick.discord_username || pick.discord_users?.discord_username || "CFBElite User").toUpperCase();
     const teamName = String(team.name || "Selected Team").toUpperCase();
-    const words = teamName.split(" ");
-    const mainWord = words.length >= 2 ? words.slice(0, -1).join(" ") : teamName;
-    const mascotWord = words.length >= 2 ? words[words.length - 1] : "";
+    const parts = teamName.split(" ");
+    const mascot = parts.length > 1 ? parts[parts.length - 1] : "";
+    const school = parts.length > 1 ? parts.slice(0, -1).join(" ") : teamName;
     const conf = cleanConference(team.conference) || "CFBElite";
+    const pickNo = String(pick.pick_number || 1).padStart(2, "0");
+    const initials = teamName.split(" ").map((word) => word[0]).join("").slice(0, 4);
 
     function roundRect(x, y, w, h, r) {
       const radius = Math.min(r, w / 2, h / 2);
@@ -1933,200 +1935,223 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
       ctx.closePath();
     }
 
-    function fitText(text, x, y, maxWidth, startSize, minSize, color = "#fff", weight = 1000) {
+    function fitText(label, x, y, maxWidth, startSize, minSize, color = "#fff", weight = 1000, italic = false) {
       let size = startSize;
       do {
-        ctx.font = `${weight} ${size}px Arial Black, Arial`;
-        if (ctx.measureText(text).width <= maxWidth || size <= minSize) break;
-        size -= 3;
+        ctx.font = `${italic ? "italic " : ""}${weight} ${size}px Arial Black, Impact, Arial`;
+        if (ctx.measureText(label).width <= maxWidth || size <= minSize) break;
+        size -= 2;
       } while (size > minSize);
       ctx.fillStyle = color;
-      ctx.fillText(text, x, y);
+      ctx.fillText(label, x, y);
       return size;
     }
 
-    function drawGrungeDots(color, count) {
+    function drawPaintStroke(x, y, w, h, color, alpha = 0.88) {
+      ctx.save();
+      ctx.globalAlpha = alpha;
       ctx.fillStyle = color;
-      for (let i = 0; i < count; i += 1) {
-        ctx.globalAlpha = Math.random() * 0.16;
-        ctx.fillRect(Math.random() * 1600, Math.random() * 1000, Math.random() * 5 + 1, Math.random() * 5 + 1);
+      ctx.beginPath();
+      ctx.moveTo(x, y + h * .25);
+      ctx.lineTo(x + w * .88, y);
+      ctx.lineTo(x + w, y + h * .58);
+      ctx.lineTo(x + w * .10, y + h);
+      ctx.closePath();
+      ctx.fill();
+      for (let i = 0; i < 12; i++) {
+        ctx.globalAlpha = alpha * .45;
+        ctx.fillRect(x + Math.random() * w, y + Math.random() * h, Math.random() * 140 + 30, Math.random() * 5 + 2);
       }
-      ctx.globalAlpha = 1;
+      ctx.restore();
     }
 
-    // Base stage background
+    function grunge(color, count, alpha) {
+      ctx.save();
+      ctx.fillStyle = color;
+      for (let i = 0; i < count; i++) {
+        ctx.globalAlpha = Math.random() * alpha;
+        const size = Math.random() * 4 + 1;
+        ctx.fillRect(Math.random() * 1600, Math.random() * 1000, size, size);
+      }
+      ctx.restore();
+    }
+
+    // Dark stadium-style background
     const bg = ctx.createLinearGradient(0, 0, 1600, 1000);
-    bg.addColorStop(0, "#050510");
-    bg.addColorStop(0.32, primary);
-    bg.addColorStop(0.62, "#050510");
+    bg.addColorStop(0, "#03030a");
+    bg.addColorStop(.25, primary);
+    bg.addColorStop(.50, "#050510");
+    bg.addColorStop(.78, "#050510");
     bg.addColorStop(1, primary);
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, 1600, 1000);
 
-    // Stadium/spotlight feel
-    ctx.fillStyle = "rgba(0,0,0,.45)";
+    // Crowd/stadium bands
+    ctx.fillStyle = "rgba(255,255,255,.055)";
+    ctx.fillRect(0, 150, 1600, 80);
+    ctx.fillStyle = "rgba(255,255,255,.035)";
+    ctx.fillRect(0, 230, 1600, 64);
+    ctx.fillStyle = "rgba(0,0,0,.60)";
     ctx.fillRect(0, 0, 1600, 1000);
 
-    const light1 = ctx.createRadialGradient(80, 40, 10, 80, 40, 360);
-    light1.addColorStop(0, "rgba(255,255,255,.72)");
-    light1.addColorStop(.18, `${secondary}55`);
-    light1.addColorStop(1, "rgba(255,255,255,0)");
-    ctx.fillStyle = light1;
-    ctx.fillRect(0, 0, 520, 380);
+    // Stadium lights
+    const leftLight = ctx.createRadialGradient(75, 45, 5, 75, 45, 350);
+    leftLight.addColorStop(0, "rgba(255,255,255,.96)");
+    leftLight.addColorStop(.12, `${secondary}66`);
+    leftLight.addColorStop(.40, "rgba(255,255,255,.10)");
+    leftLight.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = leftLight;
+    ctx.fillRect(0, 0, 420, 300);
 
-    const light2 = ctx.createRadialGradient(1510, 50, 10, 1510, 50, 360);
-    light2.addColorStop(0, "rgba(255,255,255,.72)");
-    light2.addColorStop(.18, `${secondary}55`);
-    light2.addColorStop(1, "rgba(255,255,255,0)");
-    ctx.fillStyle = light2;
-    ctx.fillRect(1080, 0, 520, 380);
+    const rightLight = ctx.createRadialGradient(1525, 45, 5, 1525, 45, 350);
+    rightLight.addColorStop(0, "rgba(255,255,255,.96)");
+    rightLight.addColorStop(.12, `${secondary}66`);
+    rightLight.addColorStop(.40, "rgba(255,255,255,.10)");
+    rightLight.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = rightLight;
+    ctx.fillRect(1180, 0, 420, 300);
 
-    drawGrungeDots("#ffffff", 650);
-    drawGrungeDots(secondary, 280);
+    // Smoke / grunge
+    grunge("#ffffff", 800, .20);
+    grunge(secondary, 280, .22);
+    grunge(primary, 550, .30);
 
-    // Main border
-    ctx.strokeStyle = secondary;
-    ctx.lineWidth = 4;
+    // Border
+    ctx.strokeStyle = primary;
+    ctx.lineWidth = 6;
     ctx.strokeRect(14, 14, 1572, 972);
-
-    ctx.strokeStyle = `${primary}`;
-    ctx.lineWidth = 7;
-    ctx.strokeRect(28, 28, 1544, 944);
+    ctx.strokeStyle = secondary;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(32, 32, 1536, 936);
 
     // Top header
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "900 32px Arial";
-    ctx.letterSpacing = "8px";
-    ctx.fillText("C F B E L I T E   2 7", 175, 100);
-    ctx.fillText("T E A M   D R A F T", 1060, 100);
-    ctx.letterSpacing = "0px";
+    ctx.fillStyle = "rgba(255,255,255,.84)";
+    ctx.font = "900 30px Arial";
+    ctx.fillText("C  F  B  E  L  I  T  E     2  7", 170, 100);
+    ctx.fillText("T  E  A  M     D  R  A  F  T", 1050, 100);
 
-    // Center logo-style badge
-    roundRect(610, 38, 380, 170, 28);
-    ctx.fillStyle = "rgba(0,0,0,.72)";
+    // Center crest-like badge
+    roundRect(615, 32, 370, 205, 32);
+    ctx.fillStyle = "rgba(0,0,0,.78)";
     ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,.35)";
+    ctx.strokeStyle = "rgba(255,255,255,.30)";
     ctx.lineWidth = 4;
     ctx.stroke();
 
-    fitText("CFBELITE", 652, 110, 305, 58, 42, "#fff", 1000);
-    fitText("27", 740, 170, 145, 78, 56, secondary, 1000);
-    fitText("DRAFT", 710, 216, 180, 42, 32, "#fff", 1000);
+    fitText("CFBELITE", 668, 112, 275, 55, 42, "#fff");
+    fitText("27", 745, 178, 120, 72, 54, secondary);
+    fitText("DRAFT", 704, 224, 195, 42, 32, "#fff");
 
-    // Pick is in brush bar
-    ctx.fillStyle = primary;
-    ctx.globalAlpha = .82;
-    ctx.fillRect(92, 185, 520, 92);
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = "#fff";
-    ctx.font = "italic 900 54px Arial";
-    ctx.fillText("THE PICK IS IN", 130, 252);
+    // Pick is in brush
+    drawPaintStroke(96, 180, 520, 98, primary, .88);
+    fitText("THE PICK IS IN", 136, 252, 430, 54, 38, "#fff", 1000, true);
 
-    // Pick card
-    roundRect(118, 335, 320, 425, 0);
-    ctx.fillStyle = "rgba(0,0,0,.62)";
-    ctx.fill();
+    // Left pick box
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,.55)";
+    ctx.shadowBlur = 24;
+    ctx.fillStyle = "rgba(0,0,0,.68)";
+    ctx.fillRect(118, 335, 320, 425);
+    ctx.restore();
+
     ctx.strokeStyle = primary;
     ctx.lineWidth = 3;
-    ctx.stroke();
+    ctx.strokeRect(118, 335, 320, 425);
 
-    ctx.fillStyle = "rgba(255,255,255,.10)";
-    ctx.fillRect(118, 335, 320, 85);
+    const pickHeader = ctx.createLinearGradient(118, 335, 438, 335);
+    pickHeader.addColorStop(0, primary);
+    pickHeader.addColorStop(1, "rgba(0,0,0,.55)");
+    ctx.fillStyle = pickHeader;
+    ctx.fillRect(118, 335, 320, 86);
 
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "900 58px Arial";
-    ctx.fillText("PICK", 205, 395);
+    fitText("PICK", 203, 394, 160, 58, 44, "#fff");
+    fitText(pickNo, 142, 705, 265, 230, 170, "#fff");
 
-    ctx.font = "1000 230px Arial Black, Arial";
-    ctx.fillText(String(pick.pick_number || 1).padStart(2, "0"), 145, 700);
-
-    // User banner
-    const userBar = ctx.createLinearGradient(500, 300, 1075, 300);
+    // Main content
+    const userBar = ctx.createLinearGradient(500, 300, 1090, 300);
     userBar.addColorStop(0, primary);
-    userBar.addColorStop(.5, secondary);
+    userBar.addColorStop(.5, `${secondary}`);
     userBar.addColorStop(1, primary);
     ctx.fillStyle = userBar;
-    ctx.fillRect(500, 300, 575, 76);
+    ctx.fillRect(500, 300, 590, 76);
+    fitText(user, 610, 355, 390, 48, 30, "#fff");
 
-    fitText(user, 610, 355, 390, 48, 30, "#fff", 1000);
-
-    // Selects line
     ctx.strokeStyle = primary;
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(515, 425);
-    ctx.lineTo(660, 425);
-    ctx.moveTo(935, 425);
-    ctx.lineTo(1060, 425);
-    ctx.stroke();
-
-    ctx.fillStyle = primary;
-    ctx.font = "italic 900 54px Arial";
-    ctx.fillText("SELECTS", 675, 445);
-
-    // Team name large
-    fitText(mainWord, 545, 610, 570, 136, 58, "#fff", 1000);
-    if (mascotWord) {
-      ctx.fillStyle = primary;
-      ctx.font = "italic 900 78px Arial";
-      fitText(mascotWord, 515, 705, 625, 78, 44, primary, 1000);
-    }
-
-    // Team helmet-placeholder orb / team initials right side
-    const orb = ctx.createRadialGradient(1290, 500, 30, 1290, 500, 310);
-    orb.addColorStop(0, `${secondary}99`);
-    orb.addColorStop(.35, `${primary}ee`);
-    orb.addColorStop(1, "rgba(0,0,0,.50)");
-    ctx.fillStyle = orb;
-    ctx.beginPath();
-    ctx.arc(1290, 520, 250, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = "rgba(255,255,255,.36)";
     ctx.lineWidth = 5;
     ctx.beginPath();
-    ctx.arc(1290, 520, 250, 0, Math.PI * 2);
+    ctx.moveTo(516, 432);
+    ctx.lineTo(655, 432);
+    ctx.moveTo(930, 432);
+    ctx.lineTo(1065, 432);
     ctx.stroke();
 
-    const initials = teamName.split(" ").map((word) => word[0]).join("").slice(0, 4);
-    fitText(initials, 1180, 555, 245, 112, 64, "#fff", 1000);
+    fitText("SELECTS", 672, 449, 250, 58, 42, primary, 1000, true);
 
-    // Smoke/paint under orb
-    ctx.globalAlpha = .55;
+    fitText(school, 525, 610, 605, 124, 56, "#fff");
+    if (mascot) fitText(mascot, 515, 710, 610, 78, 46, primary, 1000, true);
+
+    // Helmet-style team orb on right
+    ctx.save();
+    ctx.translate(1285, 520);
+    const helmetGrad = ctx.createRadialGradient(-75, -95, 20, 0, 0, 300);
+    helmetGrad.addColorStop(0, `${secondary}bb`);
+    helmetGrad.addColorStop(.38, primary);
+    helmetGrad.addColorStop(.83, "#080812");
+    helmetGrad.addColorStop(1, "rgba(0,0,0,.92)");
+    ctx.fillStyle = helmetGrad;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 300, 245, -0.10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,.45)";
+    ctx.lineWidth = 5;
+    ctx.stroke();
+
+    // face mask hint
+    ctx.strokeStyle = "rgba(0,0,0,.72)";
+    ctx.lineWidth = 16;
+    ctx.beginPath();
+    ctx.moveTo(-80, 92);
+    ctx.lineTo(245, 92);
+    ctx.moveTo(15, 130);
+    ctx.lineTo(270, 130);
+    ctx.moveTo(185, 70);
+    ctx.lineTo(250, 165);
+    ctx.stroke();
+
+    fitText(initials, -145, 30, 275, 105, 62, "#fff");
+    ctx.restore();
+
+    // Smoke under helmet
+    ctx.save();
+    ctx.globalAlpha = .65;
     ctx.fillStyle = primary;
-    for (let i = 0; i < 18; i += 1) {
+    for (let i = 0; i < 22; i++) {
       ctx.beginPath();
-      ctx.ellipse(1140 + i * 26, 760 + Math.sin(i) * 12, 70, 22, 0, 0, Math.PI * 2);
+      ctx.ellipse(1020 + i * 24, 790 + Math.sin(i) * 14, 82, 24, 0, 0, Math.PI * 2);
       ctx.fill();
     }
-    ctx.globalAlpha = 1;
+    ctx.restore();
 
     // Conference badge
-    roundRect(650, 770, 300, 86, 24);
-    ctx.fillStyle = "rgba(0,0,0,.55)";
+    roundRect(660, 770, 280, 84, 24);
+    ctx.fillStyle = "rgba(0,0,0,.72)";
     ctx.fill();
     ctx.strokeStyle = secondary;
     ctx.lineWidth = 3;
     ctx.stroke();
-    fitText(conf.toUpperCase(), 700, 827, 205, 43, 25, "#fff", 1000);
+    fitText(conf.toUpperCase(), 700, 827, 200, 42, 26, "#fff");
 
     // Footer
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "900 32px Arial";
-    ctx.fillText("#CFBELITE27", 85, 910);
-
-    ctx.fillStyle = primary;
-    ctx.font = "italic 900 64px Arial";
-    ctx.fillText("WELCOME TO", 1180, 850);
-    fitText(teamName.split(" ").slice(-1)[0] || teamName, 1095, 930, 410, 62, 38, primary, 1000);
-
-    // Five stars
+    fitText("#CFBELITE27", 85, 912, 220, 34, 26, "#fff");
     ctx.fillStyle = secondary;
-    ctx.font = "900 44px Arial";
-    ctx.fillText("★ ★ ★ ★ ★", 335, 918);
+    ctx.font = "900 38px Arial";
+    ctx.fillText("★ ★ ★ ★ ★", 330, 918);
+
+    fitText("WELCOME TO", 1185, 850, 270, 42, 30, "#fff", 1000, true);
+    fitText(mascot || school, 1095, 932, 420, 68, 38, primary, 1000, true);
 
     const link = document.createElement("a");
-    link.download = `cfbelite27-pick-${String(pick.pick_number || 1).padStart(2, "0")}-${teamName.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.png`;
+    link.download = `cfbelite27-pick-${pickNo}-${teamName.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.png`;
     link.href = canvas.toDataURL("image/png");
     link.click();
   }
