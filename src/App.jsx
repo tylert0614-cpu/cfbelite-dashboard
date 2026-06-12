@@ -466,6 +466,18 @@ function SortButton({ label, sortKey, sortState, setSortState }) {
   );
 }
 
+
+function isErrorMessage(message) {
+  const value = String(message || "").toLowerCase();
+  return value.includes("failed") ||
+    value.includes("error") ||
+    value.includes("incorrect") ||
+    value.includes("missing") ||
+    value.includes("required") ||
+    value.includes("not found") ||
+    value.includes("could not");
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [currentYear, setCurrentYear] = useState("2029");
