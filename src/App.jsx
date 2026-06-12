@@ -1004,7 +1004,7 @@ export default function App() {
   }
 
   return <><GlobalStyle/><div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={isErrorMessage(error) ? errorBox : successBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} draggedTab={draggedTab} setDraggedTab={setDraggedTab} reorderTabs={reorderTabs} adminUnlocked={adminUnlocked} adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin} teams={teamOptions} assignments={assignments} currentYear={currentYear}/>
-    {activeTab === "draftRoom" && <DraftRoom teams={teamOptions} users={userOptions} picks={draftPicks27} settings={draftSettings27} adminUnlocked={adminUnlocked} startClock={startDraftClock} announcePick={announceDraftPick} revealPick={revealDraftPick} undoPick={undoDraftPick}/>}    
+    {activeTab === "draftRoom" && <DraftRoom teams={teamOptions} users={userOptions} picks={draftPicks27} settings={draftSettings27} adminUnlocked={adminUnlocked} adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin} startClock={startDraftClock} announcePick={announceDraftPick} revealPick={revealDraftPick} undoPick={undoDraftPick}/>}    
     {activeTab === "dashboard" && <><QuickJump teams={activeTeamOptions} users={activeCoachUsers} setActiveTab={setActiveTab}/><DataHealthAlerts teams={teamOptions} users={userOptions} assignments={assignments} results={results}/><HeadlineTicker teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} currentWeek={currentWeek}/><Stats currentYear={currentYear} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} currentWeek={currentWeek} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} teams={activeTeamOptions} assignments={assignments} saveSettings={saveLeagueSettings}/><LeaguePulse teams={activeTeamOptions} results={currentYearResults} allAmericans={allAmericans} awards={awards} currentYear={currentYear} assignments={assignments} users={userOptions}/><GameOfTheWeekDashboard teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} weeklyMatchups={weeklyMatchups} currentYear={currentYear} currentWeek={currentWeek}/><DynastyHeadlines teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} currentWeek={currentWeek}/><Watchlist teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} currentWeek={currentWeek}/><MilestoneTracker users={userOptions} teams={teamOptions} assignments={assignments} results={results}/><ComputerRankings teams={activeTeamOptions} results={currentYearResults} currentWeek={currentWeek} sortState={userSort} setSortState={setUserSort} assignments={assignments} users={userOptions}/><DashboardRecognition allAmericanRows={rankingRows(activeTeamOptions, allAmericans)} awardRows={rankingRows(activeTeamOptions, awards)}/><RecordResult newResult={newResult} setNewResult={setNewResult} teams={activeTeamOptions} users={userOptions} assignments={assignments} submitResult={submitResult}/></>}
     {activeTab === "eloRankings" && <EloRankings users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
     {activeTab === "dynastyRecords" && <DynastyRecords users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
@@ -1416,7 +1416,7 @@ function ConferencePowerRankings({ teams, users, assignments, results, allResult
   const conferenceMap = new Map();
 
   activeTeams.forEach((team) => {
-    const conference = team.conference || "Unassigned";
+    const conference = normalizeDraftConference(team.conference) || "Unassigned";
     if (!conferenceMap.has(conference)) {
       conferenceMap.set(conference, {
         conference,
@@ -1440,7 +1440,7 @@ function ConferencePowerRankings({ teams, users, assignments, results, allResult
   const rankingMap = new Map(rankingRows.map((row) => [row.team.id, row]));
 
   activeTeams.forEach((team) => {
-    const conference = team.conference || "Unassigned";
+    const conference = normalizeDraftConference(team.conference) || "Unassigned";
     const row = conferenceMap.get(conference);
     const ranking = rankingMap.get(team.id);
     const rec = recordFromResults(team.id, results);
@@ -1570,11 +1570,24 @@ function DataHealthAlerts({ teams, users, assignments, results }) {
 }
 
 
+
+function normalizeDraftConference(conference) {
+  const value = String(conference || "").trim();
+  const upper = value.toUpperCase();
+  if (upper === "PAC-12" || upper === "PAC 12") return "PAC 12";
+  if (upper === "CONFERENCE USA" || upper === "C-USA" || upper === "CUSA") return "CUSA";
+  if (upper === "MOUNTAIN WEST") return "Mountain West";
+  if (upper === "SUN BELT") return "Sun Belt";
+  if (upper === "AMERICAN" || upper === "AAC") return "American";
+  if (upper === "MAC") return "MAC";
+  return value;
+}
+
 const CFB27_DRAFT_CONFERENCES = new Set(["American", "CUSA", "MAC", "Mountain West", "PAC 12", "Pac-12", "Sun Belt"]);
 
 function draftPickCaption(pick, team) {
   if (!pick || !team) return "";
-  return `🚨 THE PICK IS IN 🚨\n\nWith Pick #${String(pick.pick_number).padStart(2, "0")} in the CFBElite 27 Team Draft...\n\n${pick.discord_username || pick.discord_users?.discord_username} selects the ${team.name}!\n\nWelcome to ${team.conference || "CFBElite"}.`;
+  return `🚨 THE PICK IS IN 🚨\n\nWith Pick #${String(pick.pick_number).padStart(2, "0")} in the CFBElite 27 Team Draft...\n\n${pick.discord_username || pick.discord_users?.discord_username} selects the ${team.name}!\n\nWelcome to ${normalizeDraftConference(team.conference) || "CFBElite"}.`;
 }
 
 function downloadDraftPickGraphic(pick, team) {
@@ -1636,7 +1649,7 @@ function downloadDraftPickGraphic(pick, team) {
 
   ctx.fillStyle = secondary;
   ctx.font = "900 40px Inter, Arial";
-  ctx.fillText(team.conference || "CFBElite", 430, 475);
+  ctx.fillText(normalizeDraftConference(team.conference) || "CFBElite", 430, 475);
 
   ctx.fillStyle = "#fff";
   ctx.font = "900 32px Inter, Arial";
@@ -1669,7 +1682,7 @@ function draftConferenceCounts(picks, teams) {
   picks.forEach((pick) => {
     if (!pick.team_id || pick.status !== "picked") return;
     const team = teams.find((item)=>item.id === pick.team_id) || pick.teams;
-    const conference = team?.conference;
+    const conference = normalizeDraftConference(team?.conference);
     if (!conference) return;
     counts[conference] = (counts[conference] || 0) + 1;
   });
@@ -1702,9 +1715,10 @@ function draftConferenceLimitFor(conference, lockedConferences, counts) {
   return null;
 }
 
-function DraftRoom({ teams, users, picks, settings, adminUnlocked, startClock, announcePick, revealPick, undoPick }) {
+function DraftRoom({ teams, users, picks, settings, adminUnlocked, adminCodeInput, setAdminCodeInput, unlockAdmin, startClock, announcePick, revealPick, undoPick }) {
   const [selectedTeamId, setSelectedTeamId] = useState("");
   const [teamSearch, setTeamSearch] = useState("");
+  const [timerMinutes, setTimerMinutes] = useState(settings?.timer_minutes || 10);
   const sortedPicks = [...picks].sort((a,b)=>Number(a.pick_number)-Number(b.pick_number));
   const conferenceCounts = draftConferenceCounts(sortedPicks, teams);
   const lockedConferences = lockedDraftConferences(sortedPicks, teams);
@@ -1713,10 +1727,10 @@ function DraftRoom({ teams, users, picks, settings, adminUnlocked, startClock, a
   const currentPick = sortedPicks.find((pick)=>Number(pick.pick_number) === Number(settings?.current_pick)) || sortedPicks.find((pick)=>!pick.team_id || pick.status === "pick_is_in") || sortedPicks[0];
   const selectedTeam = teams.find((team)=>team.id === selectedTeamId);
   const availableTeams = teams
-    .filter((team)=>CFB27_DRAFT_CONFERENCES.has(team.conference))
-    .filter((team)=>!lockedConferences.has(team.conference))
+    .filter((team)=>CFB27_DRAFT_CONFERENCES.has(normalizeDraftConference(team.conference)))
+    .filter((team)=>!lockedConferences.has(normalizeDraftConference(team.conference)))
     .filter((team)=>!reservedTeamIds.has(team.id))
-    .filter((team)=>!teamSearch || team.name.toLowerCase().includes(teamSearch.toLowerCase()) || String(team.conference || "").toLowerCase().includes(teamSearch.toLowerCase()))
+    .filter((team)=>!teamSearch || team.name.toLowerCase().includes(teamSearch.toLowerCase()) || String(normalizeDraftConference(team.conference) || "").toLowerCase().includes(teamSearch.toLowerCase()))
     .sort((a,b)=>a.name.localeCompare(b.name));
   const pickedTeam = teams.find((team)=>team.id === currentPick?.team_id) || currentPick?.teams;
   const latestPick = [...sortedPicks].reverse().find((pick)=>pick.team_id && pick.status === "picked");
@@ -1745,24 +1759,29 @@ function DraftRoom({ teams, users, picks, settings, adminUnlocked, startClock, a
             const count = conferenceCounts[conference] || 0;
             const locked = lockedConferences.has(conference);
             const cap = locked ? (count >= 6 ? 6 : 5) : "Open";
-            return <div key={conference} style={{...draftConferenceTile, borderColor: locked ? "rgba(248,113,113,.45)" : "rgba(255,255,255,.16)"}}>
+            return <div key={conference} style={locked ? draftConferenceTileLocked : draftConferenceTile}>
               <b>{conference}</b>
               <span>{count} selected</span>
-              <small>{locked ? `Locked at ${cap}` : "Available"}</small>
+              <small>{locked ? `LOCKED at ${cap}` : "Available"}</small>
             </div>;
           })}
         </div>
       </div>
 
-      {adminUnlocked && (
-        <div style={glassMiniCard}>
-          <h3 style={miniTitle}>Commissioner Controls</h3><p style={mutedText}>Conference cap rule active: first two conferences to 6 users lock at 6. After that, all remaining conferences lock once they hit 5 users.</p>
+      <div style={glassMiniCard}>
+        <h3 style={miniTitle}>Commissioner Controls</h3>
+        {!adminUnlocked ? (
+          <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>
+        ) : (
+          <>
+          <p style={mutedText}>Conference cap rule active: first two conferences to 6 users lock at 6. After that, all remaining conferences lock once they hit 5 users.</p>
           <div style={filterGrid}>
             <select style={input} value={selectedTeamId} onChange={(e)=>setSelectedTeamId(e.target.value)}>
               <option value="">Select Team For Pick #{currentPick?.pick_number}</option>
-              {availableTeams.map((team)=><option key={team.id} value={team.id}>{team.name} · {team.conference}</option>)}
+              {availableTeams.map((team)=><option key={team.id} value={team.id}>{team.name} · {normalizeDraftConference(team.conference)}</option>)}
             </select>
-            <button style={button} onClick={()=>startClock(currentPick?.pick_number)}>Start / Reset Clock</button>
+            <input style={input} type="number" min="1" max="60" value={timerMinutes} onChange={(e)=>setTimerMinutes(e.target.value)} placeholder="Clock minutes"/>
+            <button style={button} onClick={()=>startClock(currentPick?.pick_number, timerMinutes)}>Start / Reset Clock</button>
             <button style={button} onClick={()=>announcePick(currentPick?.pick_number, selectedTeamId)}>Pick Is In</button>
             {currentPick?.status === "pick_is_in" && <button style={button} onClick={()=>revealPick(currentPick?.pick_number)}>Reveal / Post to Board</button>}
           </div>
@@ -1780,8 +1799,9 @@ function DraftRoom({ teams, users, picks, settings, adminUnlocked, startClock, a
               </div>
             </div>
           )}
-        </div>
-      )}
+          </>
+        )}
+      </div>
 
       {latestPick && latestTeam && (
         <div style={pickAnnouncementCard}>
@@ -1803,7 +1823,7 @@ function DraftRoom({ teams, users, picks, settings, adminUnlocked, startClock, a
               const team = teams.find((t)=>t.id===pick.team_id) || pick.teams;
               const publicTeamVisible = pick.status === "picked";
               return <div key={pick.pick_number} style={{...draftPickTile, borderColor: publicTeamVisible ? (team?.accent_color || "rgba(255,255,255,.16)") : "rgba(255,255,255,.16)"}}>
-                <div style={leaderRow}><b>#{String(pick.pick_number).padStart(2,"0")}</b><span>{pick.status === "pick_is_in" ? "PICK IS IN" : (pick.status || "pending")}</span></div>
+                <div style={draftPickHeader}><b>#{String(pick.pick_number).padStart(2,"0")}</b><span>{pick.status === "pick_is_in" ? "PICK IS IN" : (pick.status || "pending")}</span></div>
                 <div style={draftTileUser}>{pick.discord_username || pick.discord_users?.discord_username}</div>
                 <div style={(publicTeamVisible || adminUnlocked) && team ? draftTileTeam : mutedText}>{publicTeamVisible && team ? team.name : (adminUnlocked && team ? `Staged: ${team.name}` : (pick.status === "pick_is_in" ? "Team hidden until reveal" : "On deck"))}</div>
                 {adminUnlocked && pick.team_id && <button style={ghostButton} onClick={()=>undoPick(pick.pick_number)}>Undo</button>}
@@ -1816,7 +1836,7 @@ function DraftRoom({ teams, users, picks, settings, adminUnlocked, startClock, a
           <h3 style={miniTitle}>Available Teams · {availableTeams.length}</h3>
           <input style={input} value={teamSearch} onChange={(e)=>setTeamSearch(e.target.value)} placeholder="Search available teams or conference..." />
           <div style={availableTeamGrid}>
-            {availableTeams.map((team)=><div key={team.id} style={{...availableTeamTile, borderColor: team.accent_color || "rgba(255,255,255,.16)", background:`linear-gradient(145deg, ${team.primary_color || "#111827"}88, rgba(255,255,255,.04))`}}><b>{team.name}</b><span>{team.conference}</span></div>)}
+            {availableTeams.map((team)=><div key={team.id} style={{...availableTeamTile, borderColor: team.accent_color || "rgba(255,255,255,.16)", background:`linear-gradient(145deg, ${team.primary_color || "#111827"}88, rgba(255,255,255,.04))`}}><b>{team.name}</b><span>{normalizeDraftConference(team.conference)}</span></div>)}
           </div>
         </div>
       </div>
@@ -4359,15 +4379,15 @@ const healthWarn = {
   display: "grid",
   gap: 8,
 };
-  async function startDraftClock(pickNumber = draftSettings27.current_pick) {
+  async function startDraftClock(pickNumber = draftSettings27.current_pick, timerMinutes = draftSettings27.timer_minutes || 10) {
     const now = new Date().toISOString();
     const { error: pickError } = await supabase
       .from("cfb27_draft_picks")
-      .update({ timer_started_at: now, timer_minutes: draftSettings27.timer_minutes || 10, status: "on_clock" })
+      .update({ timer_started_at: now, timer_minutes: Number(timerMinutes) || 10, status: "on_clock" })
       .eq("pick_number", pickNumber);
     const { error: settingsError } = await supabase
       .from("cfb27_draft_settings")
-      .upsert({ id: 1, current_pick: pickNumber, timer_minutes: draftSettings27.timer_minutes || 10, is_live: true, updated_at: now }, { onConflict: "id" });
+      .upsert({ id: 1, current_pick: pickNumber, timer_minutes: Number(timerMinutes) || 10, is_live: true, updated_at: now }, { onConflict: "id" });
     if (pickError || settingsError) setError(`Draft clock failed: ${(pickError || settingsError).message}`);
     await loadData();
   }
@@ -4527,15 +4547,7 @@ const draftTileTeam = {
   fontWeight: 950,
 };
 
-const availableTeamGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-  gap: 10,
-  alignContent: "start",
-  gridAutoRows: "minmax(82px, auto)",
-  minHeight: 620,
-  overflow: "visible",
-};
+
 
 const availableTeamTile = {
   border: "1px solid rgba(255,255,255,.16)",
@@ -4583,4 +4595,35 @@ const pickPreviewCard = {
   padding: 16,
   display: "grid",
   gap: 10,
+};
+
+
+const draftPickHeader = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 8,
+  color: "rgba(255,255,255,.88)",
+  marginBottom: 8,
+};
+
+const draftConferenceTileLocked = {
+  border: "1px solid rgba(248,113,113,.75)",
+  background: "linear-gradient(145deg, rgba(127,29,29,.86), rgba(69,10,10,.68))",
+  borderRadius: 16,
+  padding: 12,
+  display: "grid",
+  gap: 4,
+  color: "#fff",
+  boxShadow: "0 0 0 1px rgba(248,113,113,.22), 0 18px 48px rgba(127,29,29,.34), inset 0 1px 0 rgba(255,255,255,.14)",
+};
+
+const availableTeamGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+  gap: 10,
+  alignContent: "start",
+  gridAutoRows: "minmax(82px, auto)",
+  minHeight: 620,
+  overflow: "visible",
 };
