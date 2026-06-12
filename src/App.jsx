@@ -1731,46 +1731,109 @@ function draftConferenceLimitFor(conference, lockedConferences, counts) {
   return null;
 }
 
-function DraftRoom({ teams, users, picks = [], settings = {}, startClock, pauseClock, resumeClock, announcePick, revealPick, undoPick }) {
+function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClock, pauseClock, resumeClock, announcePick, revealPick, undoPick }) {
   const [selectedTeamId, setSelectedTeamId] = useState("");
   const [teamSearch, setTeamSearch] = useState("");
   const [timerMinutes, setTimerMinutes] = useState(settings?.timer_minutes || 10);
   const [localClock, setLocalClock] = useState(null);
+  const [tick, setTick] = useState(Date.now());
 
-  const sortedPicks = [...(picks || [])].sort((a,b)=>Number(a.pick_number || 0)-Number(b.pick_number || 0));
-  const currentPickBase =
-    sortedPicks.find((pick)=>Number(pick.pick_number) === Number(settings?.current_pick || 1)) ||
-    sortedPicks.find((pick)=>!pick.team_id || pick.status === "pick_is_in") ||
+  useEffect(() => {
+    const id = setInterval(() => setTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const eligibleTeamNames = new Set([
+    "Army Black Knights","Charlotte 49ers","East Carolina Pirates","Florida Atlantic Owls","Memphis Tigers","Navy Midshipmen","North Texas Mean Green","Rice Owls","South Florida Bulls","USF Bulls","Temple Owls","Tulane Green Wave","Tulsa Golden Hurricane","UAB Blazers","UTSA Roadrunners",
+    "Delaware Fightin’ Blue Hens","FIU Panthers","Jacksonville State Gamecocks","Kennesaw State Owls","Liberty Flames","Middle Tennessee Blue Raiders","Missouri State Bears","New Mexico State Aggies","Sam Houston Bearkats","Western Kentucky Hilltoppers",
+    "Akron Zips","Ball State Cardinals","Bowling Green Falcons","Buffalo Bulls","Central Michigan Chippewas","Eastern Michigan Eagles","Kent State Golden Flashes","Miami (OH) RedHawks","Ohio Bobcats","Sacramento State Hornets","Sacremento State","Toledo Rockets","UMass Minutemen","Western Michigan Broncos",
+    "Air Force Falcons","Hawaii Rainbow Warriors","Nevada Wolf Pack","New Mexico Lobos","North Dakota State","North Dakota State Bison","Northern Illinois Huskies","San Jose State Spartans","UNLV Rebels","UTEP Miners","Wyoming Cowboys",
+    "Boise State Broncos","Colorado State Rams","Fresno State Bulldogs","Oregon State Beavers","San Diego State Aztecs","Texas State Bobcats","Utah State Aggies","Washington State Cougars",
+    "Appalachian State Mountaineers","Arkansas State Red Wolves","Coastal Carolina Chanticleers","Georgia Southern Eagles","Georgia State Panthers","James Madison Dukes","Louisiana Ragin’ Cajuns","Louisiana Tech Bulldogs","Louisiana-Monroe Warhawks","Marshall Thundering Herd","Old Dominion Monarchs","South Alabama Jaguars","Southern Miss Golden Eagles","Troy Trojans"
+  ]);
+
+  function cleanConference(conf) {
+    const value = String(conf || "").trim();
+    const upper = value.toUpperCase();
+    if (upper === "PAC-12" || upper === "PAC 12") return "PAC 12";
+    if (upper === "CONFERENCE USA" || upper === "C-USA" || upper === "CUSA") return "CUSA";
+    if (upper === "MOUNTAIN WEST") return "Mountain West";
+    if (upper === "SUN BELT") return "Sun Belt";
+    if (upper === "AMERICAN" || upper === "AAC") return "American";
+    if (upper === "MAC") return "MAC";
+    return value;
+  }
+
+  const allowedConferences = ["American", "CUSA", "MAC", "Mountain West", "PAC 12", "Sun Belt"];
+  const sortedPicks = [...(picks || [])].sort((a, b) => Number(a.pick_number || 0) - Number(b.pick_number || 0));
+  const currentPick =
+    sortedPicks.find((pick) => Number(pick.pick_number) === Number(settings?.current_pick || 1)) ||
+    sortedPicks.find((pick) => !pick.team_id || pick.status === "pick_is_in") ||
     sortedPicks[0] ||
     { pick_number: 1, discord_username: "User TBD", status: "pending" };
 
-  const currentPick = localClock && Number(localClock.pick_number) === Number(currentPickBase?.pick_number)
-    ? { ...currentPickBase, timer_started_at: localClock.timer_started_at, timer_minutes: localClock.timer_minutes, status: currentPickBase?.status === "picked" ? "picked" : "on_clock" }
-    : currentPickBase;
+  const displayPick = localClock && Number(localClock.pick_number) === Number(currentPick?.pick_number)
+    ? { ...currentPick, timer_started_at: localClock.timer_started_at, timer_minutes: localClock.timer_minutes, status: currentPick.status === "picked" ? "picked" : "on_clock" }
+    : currentPick;
 
-  const pickedTeamIds = new Set(sortedPicks.filter((pick)=>pick.team_id && pick.status === "picked").map((pick)=>pick.team_id));
-  const reservedTeamIds = new Set(sortedPicks.filter((pick)=>pick.team_id).map((pick)=>pick.team_id));
-  const conferenceCounts = draftConferenceCounts(sortedPicks, teams);
-  const lockedConferences = lockedDraftConferences(sortedPicks, teams);
+  const pickedTeamIds = new Set(sortedPicks.filter((pick) => pick.team_id && pick.status === "picked").map((pick) => String(pick.team_id)));
+  const reservedTeamIds = new Set(sortedPicks.filter((pick) => pick.team_id).map((pick) => String(pick.team_id)));
 
-  const availableTeams = (teams || [])
-    .filter((team)=>isDraftEligibleTeam(team))
-    .filter((team)=>CFB27_DRAFT_CONFERENCES.has(normalizeDraftConference(team.conference)))
-    .filter((team)=>!lockedConferences.has(normalizeDraftConference(team.conference)))
-    .filter((team)=>!reservedTeamIds.has(team.id))
-    .filter((team)=>!teamSearch || team.name.toLowerCase().includes(teamSearch.toLowerCase()) || String(normalizeDraftConference(team.conference) || "").toLowerCase().includes(teamSearch.toLowerCase()))
-    .sort((a,b)=>a.name.localeCompare(b.name));
+  const conferenceCounts = {};
+  sortedPicks.forEach((pick) => {
+    if (!pick.team_id || pick.status !== "picked") return;
+    const team = teams.find((t) => String(t.id) === String(pick.team_id)) || pick.teams;
+    const conf = cleanConference(team?.conference);
+    if (!conf) return;
+    conferenceCounts[conf] = (conferenceCounts[conf] || 0) + 1;
+  });
 
-  const selectedTeam = (teams || []).find((team)=>String(team.id) === String(selectedTeamId));
-  const latestPick = [...sortedPicks].reverse().find((pick)=>pick.team_id && pick.status === "picked");
-  const latestTeam = latestPick ? (teams || []).find((team)=>String(team.id) === String(latestPick.team_id)) || latestPick.teams : null;
-  const stagedPick = sortedPicks.find((pick)=>pick.status === "pick_is_in");
-  const stagedTeam = stagedPick ? (teams || []).find((team)=>String(team.id) === String(stagedPick.team_id)) || stagedPick.teams : null;
+  const conferencesAtSix = allowedConferences.filter((conf) => (conferenceCounts[conf] || 0) >= 6);
+  const lockedConferences = new Set();
+  conferencesAtSix.slice(0, 2).forEach((conf) => lockedConferences.add(conf));
+  if (conferencesAtSix.length >= 2) {
+    allowedConferences.forEach((conf) => {
+      if (!lockedConferences.has(conf) && (conferenceCounts[conf] || 0) >= 5) lockedConferences.add(conf);
+    });
+  }
+
+  const availableTeams = teams
+    .filter((team) => eligibleTeamNames.has(team.name))
+    .filter((team) => allowedConferences.includes(cleanConference(team.conference)))
+    .filter((team) => !lockedConferences.has(cleanConference(team.conference)))
+    .filter((team) => !reservedTeamIds.has(String(team.id)))
+    .filter((team) => {
+      const q = teamSearch.toLowerCase();
+      return !q || team.name.toLowerCase().includes(q) || cleanConference(team.conference).toLowerCase().includes(q);
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const selectedTeam = teams.find((team) => String(team.id) === String(selectedTeamId));
+  const stagedPick = sortedPicks.find((pick) => pick.status === "pick_is_in");
+  const stagedTeam = stagedPick ? teams.find((team) => String(team.id) === String(stagedPick.team_id)) || stagedPick.teams : null;
+  const latestPick = [...sortedPicks].reverse().find((pick) => pick.team_id && pick.status === "picked");
+  const latestTeam = latestPick ? teams.find((team) => String(team.id) === String(latestPick.team_id)) || latestPick.teams : null;
+
+  function timeLabel() {
+    if (settings?.paused) return "PAUSED";
+    const started = displayPick?.timer_started_at;
+    if (!started) return "Clock not started";
+    const minutes = Number(displayPick?.timer_minutes || settings?.timer_minutes || timerMinutes || 10);
+    const end = new Date(started).getTime() + minutes * 60 * 1000;
+    const remaining = Math.max(0, end - tick);
+    const m = Math.floor(remaining / 60000);
+    const s = Math.floor((remaining % 60000) / 1000);
+    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  }
 
   function handleStartClock() {
     const started = new Date().toISOString();
-    setLocalClock({ pick_number: currentPick?.pick_number, timer_started_at: started, timer_minutes: Number(timerMinutes) || 10 });
-    startClock?.(currentPick?.pick_number, timerMinutes);
+    setLocalClock({
+      pick_number: currentPick?.pick_number,
+      timer_started_at: started,
+      timer_minutes: Number(timerMinutes) || 10,
+    });
+    if (startClock) startClock(currentPick?.pick_number, timerMinutes);
   }
 
   function handlePickIsIn() {
@@ -1778,185 +1841,202 @@ function DraftRoom({ teams, users, picks = [], settings = {}, startClock, pauseC
       alert("Select a team first.");
       return;
     }
-    announcePick?.(currentPick?.pick_number, selectedTeamId);
+    if (announcePick) announcePick(currentPick?.pick_number, selectedTeamId);
   }
 
+  function copyCaption(pick, team) {
+    if (!pick || !team) return;
+    const caption = `🚨 THE PICK IS IN 🚨\n\nWith Pick #${String(pick.pick_number).padStart(2, "0")} in the CFBElite 27 Team Draft...\n\n${pick.discord_username || pick.discord_users?.discord_username || "A CFBElite user"} selects the ${team.name}!\n\nWelcome to ${cleanConference(team.conference) || "CFBElite"}.`;
+    navigator.clipboard?.writeText(caption);
+  }
+
+  function downloadGraphic(pick, team) {
+    if (!pick || !team) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = 1200;
+    canvas.height = 675;
+    const ctx = canvas.getContext("2d");
+    const primary = team.primary_color || "#20114f";
+    const secondary = team.secondary_color || "#facc15";
+    const accent = team.accent_color || "#ffffff";
+
+    const grad = ctx.createLinearGradient(0, 0, 1200, 675);
+    grad.addColorStop(0, primary);
+    grad.addColorStop(.52, "#050510");
+    grad.addColorStop(1, secondary);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 1200, 675);
+
+    ctx.strokeStyle = secondary;
+    ctx.lineWidth = 5;
+    ctx.strokeRect(36, 36, 1128, 603);
+
+    ctx.fillStyle = "rgba(0,0,0,.38)";
+    ctx.fillRect(70, 120, 300, 405);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "900 42px Arial";
+    ctx.fillText("CFBELITE 27 TEAM DRAFT", 72, 82);
+
+    ctx.fillStyle = accent;
+    ctx.font = "900 48px Arial";
+    ctx.fillText("THE PICK IS IN", 430, 150);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "900 52px Arial";
+    ctx.fillText(String(pick.discord_username || pick.discord_users?.discord_username || "USER").toUpperCase(), 430, 235);
+
+    ctx.fillStyle = accent;
+    ctx.font = "900 34px Arial";
+    ctx.fillText("SELECTS", 430, 292);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "900 70px Arial";
+    ctx.fillText(team.name.toUpperCase(), 430, 390);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "900 64px Arial";
+    ctx.fillText("PICK", 110, 190);
+    ctx.font = "900 170px Arial";
+    ctx.fillText(String(pick.pick_number).padStart(2, "0"), 105, 395);
+
+    ctx.fillStyle = secondary;
+    ctx.font = "900 40px Arial";
+    ctx.fillText(cleanConference(team.conference) || "CFBElite", 430, 475);
+
+    const link = document.createElement("a");
+    link.download = `cfbelite27-pick-${String(pick.pick_number).padStart(2, "0")}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  }
+
+  const S = {
+    page: { display: "grid", gap: 18 },
+    panel: { background: "rgba(15,23,42,.78)", border: "1px solid rgba(255,255,255,.14)", borderRadius: 22, padding: 18, boxShadow: "0 20px 60px rgba(0,0,0,.30)" },
+    hero: { background: "linear-gradient(135deg, rgba(49,46,129,.92), rgba(15,23,42,.88))", border: "1px solid rgba(250,204,21,.28)", borderRadius: 26, padding: 22, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 18, alignItems: "center" },
+    title: { margin: 0, color: "#fff", fontSize: "clamp(38px, 8vw, 78px)", lineHeight: .9, letterSpacing: "-.055em", fontWeight: 1000 },
+    eyebrow: { color: "#facc15", textTransform: "uppercase", letterSpacing: ".16em", fontSize: 12, fontWeight: 1000 },
+    muted: { color: "rgba(255,255,255,.72)", lineHeight: 1.45 },
+    clock: { color: "#facc15", fontSize: "clamp(42px, 10vw, 88px)", fontWeight: 1000, lineHeight: .9 },
+    grid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 },
+    input: { width: "100%", border: "1px solid rgba(255,255,255,.16)", background: "rgba(255,255,255,.08)", color: "#fff", borderRadius: 14, padding: "12px 14px", fontWeight: 800 },
+    button: { border: "1px solid rgba(250,204,21,.32)", background: "linear-gradient(135deg, #facc15, #b45309)", color: "#111827", borderRadius: 14, padding: "12px 14px", fontWeight: 1000, cursor: "pointer" },
+    ghost: { border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.08)", color: "#fff", borderRadius: 14, padding: "12px 14px", fontWeight: 900, cursor: "pointer" },
+    pickTile: { background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.12)", borderRadius: 16, padding: 12, display: "grid", gap: 7 },
+    twoCol: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 18 },
+  };
+
   return (
-    <section style={draftRoomWrap}>
-      <div style={draftHero}>
+    <section style={S.page}>
+      <div style={S.hero}>
         <div>
-          <div style={eyebrow}>CFBElite 27 Draft Room</div>
-          <h2 style={draftHeroTitle}>The Board Is Live</h2>
-          <p style={mutedText}>Available teams are limited to American, CUSA, MAC, Mountain West, PAC 12, and Sun Belt.</p>
+          <div style={S.eyebrow}>CFBElite 27 Draft Room</div>
+          <h2 style={S.title}>The Board Is Live</h2>
+          <p style={S.muted}>Public CFB 27 team draft room. Available teams are limited to American, CUSA, MAC, Mountain West, PAC 12, and Sun Belt.</p>
         </div>
-        <div style={onClockCard}>
-          <div style={eyebrow}>{currentPick?.status === "pick_is_in" ? "The Pick Is In" : "On The Clock"}</div>
-          <div style={draftClockPick}>Pick #{String(currentPick?.pick_number || 1).padStart(2,"0")}</div>
-          <div style={draftClockUser}>{currentPick?.discord_username || currentPick?.discord_users?.discord_username || "User TBD"}</div>
-          <div style={draftTimer}><DraftCountdown pick={currentPick} settings={settings}/></div>
+        <div style={S.panel}>
+          <div style={S.eyebrow}>{displayPick?.status === "pick_is_in" ? "The Pick Is In" : "On The Clock"}</div>
+          <h3 style={{ margin: "8px 0", color: "#fff", fontSize: 30 }}>Pick #{String(displayPick?.pick_number || 1).padStart(2, "0")}</h3>
+          <div style={{ color: "#fff", fontSize: 26, fontWeight: 1000 }}>{displayPick?.discord_username || displayPick?.discord_users?.discord_username || "User TBD"}</div>
+          <div style={S.clock}>{timeLabel()}</div>
         </div>
       </div>
 
-      <div style={draftBroadcastBanner}>
-        <div>
-          <div style={eyebrow}>{currentPick?.status === "pick_is_in" ? "The Pick Is In" : "On The Clock"}</div>
-          <div style={draftBroadcastTitle}>Pick #{String(currentPick?.pick_number || 1).padStart(2,"0")} · {currentPick?.discord_username || currentPick?.discord_users?.discord_username || "User TBD"}</div>
-        </div>
-        <div style={draftBroadcastTimer}><DraftCountdown pick={currentPick} settings={settings}/></div>
-      </div>
-
-      <div style={card}>
-        <h3 style={miniTitle}>Draft Controls</h3>
-        <p style={mutedText}>Controls are open for the draft room. Set the clock, select the team, stage the pick, then reveal it to the board.</p>
-
-        <div style={filterGrid}>
-          <input
-            style={input}
-            type="number"
-            min="1"
-            max="60"
-            value={timerMinutes}
-            onChange={(e) => setTimerMinutes(e.target.value)}
-            placeholder="Clock minutes"
-          />
-
-          <select
-            style={input}
-            value={selectedTeamId}
-            onChange={(e) => setSelectedTeamId(e.target.value)}
-          >
-            <option value="">Select Team For Pick #{currentPick?.pick_number || ""}</option>
+      <div style={S.panel}>
+        <div style={S.eyebrow}>Draft Controls</div>
+        <p style={S.muted}>Controls are open. Set the clock, select a team, stage the pick, download/copy the announcement, then reveal it to the public board.</p>
+        <div style={S.grid}>
+          <input style={S.input} type="number" min="1" max="60" value={timerMinutes} onChange={(e) => setTimerMinutes(e.target.value)} placeholder="Clock minutes" />
+          <select style={S.input} value={selectedTeamId} onChange={(e) => setSelectedTeamId(e.target.value)}>
+            <option value="">Select Team For Pick #{displayPick?.pick_number || ""}</option>
             {availableTeams.map((team) => (
-              <option key={team.id} value={team.id}>
-                {team.name} - {normalizeDraftConference(team.conference)}
-              </option>
+              <option key={team.id} value={team.id}>{team.name} - {cleanConference(team.conference)}</option>
             ))}
           </select>
-
-          <button
-            style={button}
-            type="button"
-            onClick={() => {
-              const started = new Date().toISOString();
-              setLocalClock({
-                pick_number: currentPick?.pick_number,
-                timer_started_at: started,
-                timer_minutes: Number(timerMinutes) || 10
-              });
-              if (startClock) startClock(currentPick?.pick_number, timerMinutes);
-            }}
-          >
-            Start / Reset Clock
-          </button>
-
-          <button
-            style={button}
-            type="button"
-            onClick={() => {
-              if (pauseClock) pauseClock();
-            }}
-          >
-            Pause Clock
-          </button>
-
-          <button
-            style={button}
-            type="button"
-            onClick={() => {
-              if (resumeClock) resumeClock();
-            }}
-          >
-            Resume Clock
-          </button>
-
-          <button
-            style={button}
-            type="button"
-            disabled={!selectedTeamId}
-            onClick={() => {
-              if (!selectedTeamId) {
-                alert("Select a team first.");
-                return;
-              }
-              if (announcePick) announcePick(currentPick?.pick_number, selectedTeamId);
-            }}
-          >
-            Pick Is In
-          </button>
-
-          {stagedPick && (
-            <button
-              style={button}
-              type="button"
-              onClick={() => {
-                if (revealPick) revealPick(stagedPick.pick_number);
-              }}
-            >
-              Reveal / Post to Board
-            </button>
-          )}
+          <button style={S.button} type="button" onClick={handleStartClock}>Start / Reset Clock</button>
+          <button style={S.ghost} type="button" onClick={() => pauseClock?.()}>Pause Clock</button>
+          <button style={S.ghost} type="button" onClick={() => resumeClock?.()}>Resume Clock</button>
+          <button style={S.button} type="button" disabled={!selectedTeamId} onClick={handlePickIsIn}>Pick Is In</button>
+          {stagedPick && <button style={S.button} type="button" onClick={() => revealPick?.(stagedPick.pick_number)}>Reveal / Post to Board</button>}
         </div>
 
         {selectedTeam && (
-          <div style={pickPreviewCard}>
-            <div style={eyebrow}>Selected Team Preview</div>
-            <div style={pickTeamLine}>{selectedTeam.name}</div>
-            <div style={mutedText}>{normalizeDraftConference(selectedTeam.conference)}</div>
+          <div style={{ ...S.pickTile, marginTop: 14 }}>
+            <div style={S.eyebrow}>Selected Team Preview</div>
+            <div style={{ color: "#facc15", fontSize: 28, fontWeight: 1000 }}>{selectedTeam.name}</div>
+            <div style={S.muted}>{cleanConference(selectedTeam.conference)}</div>
           </div>
         )}
 
         {stagedPick && stagedTeam && (
-          <div style={pickPreviewCard}>
-            <div style={eyebrow}>Commissioner Preview</div>
-            <div style={pickTeamLine}>{stagedTeam.name}</div>
-            <div style={actionRow}>
-              <button style={button} onClick={()=>navigator.clipboard?.writeText(draftPickCaption(stagedPick, stagedTeam))}>
-                Copy Discord Caption
-              </button>
-              <button style={button} onClick={()=>downloadDraftPickGraphic(stagedPick, stagedTeam)}>
-                Download Pick Graphic
-              </button>
+          <div style={{ ...S.pickTile, marginTop: 14, borderColor: "rgba(250,204,21,.32)" }}>
+            <div style={S.eyebrow}>Pick Is In Preview</div>
+            <div style={{ color: "#facc15", fontSize: 32, fontWeight: 1000 }}>{stagedTeam.name}</div>
+            <div style={S.grid}>
+              <button style={S.button} onClick={() => copyCaption(stagedPick, stagedTeam)}>Copy Discord Caption</button>
+              <button style={S.button} onClick={() => downloadGraphic(stagedPick, stagedTeam)}>Download Pick Graphic</button>
             </div>
           </div>
         )}
       </div>
 
-      <div style={glassMiniCard}>
-        <h3 style={miniTitle}>Conference Draft Caps</h3>
-        <div style={draftConferenceGrid}>
-          {[...CFB27_DRAFT_CONFERENCES].map((conference)=>{
-            const count = conferenceCounts[conference] || 0;
-            const locked = lockedConferences.has(conference);
-            const cap = locked ? (count >= 6 ? 6 : 5) : "Open";
-            return <div key={conference} style={locked ? draftConferenceTileLocked : draftConferenceTile}><b>{conference}</b><span>{count} selected</span><small>{locked ? `LOCKED at ${cap}` : "Available"}</small></div>;
+      <div style={S.panel}>
+        <div style={S.eyebrow}>Conference Draft Caps</div>
+        <div style={S.grid}>
+          {allowedConferences.map((conf) => {
+            const count = conferenceCounts[conf] || 0;
+            const locked = lockedConferences.has(conf);
+            return (
+              <div key={conf} style={{ ...S.pickTile, background: locked ? "rgba(127,29,29,.75)" : "rgba(255,255,255,.07)", borderColor: locked ? "rgba(248,113,113,.70)" : "rgba(255,255,255,.12)" }}>
+                <b style={{ color: "#fff" }}>{conf}</b>
+                <span style={S.muted}>{count} selected</span>
+                <span style={{ color: locked ? "#fecaca" : "#bbf7d0", fontWeight: 1000 }}>{locked ? "LOCKED" : "Available"}</span>
+              </div>
+            );
           })}
         </div>
       </div>
 
-      {latestPick && latestTeam && <div style={pickAnnouncementCard}><div style={eyebrow}>Latest Pick</div><h3 style={pickAnnouncementTitle}>Pick #{String(latestPick.pick_number).padStart(2,"0")} · {latestPick.discord_username || latestPick.discord_users?.discord_username}</h3><p style={pickTeamLine}>{latestTeam.name}</p></div>}
+      {latestPick && latestTeam && (
+        <div style={S.panel}>
+          <div style={S.eyebrow}>Latest Pick</div>
+          <h3 style={{ margin: "8px 0", color: "#fff", fontSize: 30 }}>Pick #{String(latestPick.pick_number).padStart(2, "0")} · {latestPick.discord_username || latestPick.discord_users?.discord_username}</h3>
+          <div style={{ color: "#facc15", fontSize: 38, fontWeight: 1000 }}>{latestTeam.name}</div>
+        </div>
+      )}
 
-      <div style={twoCol}>
-        <div style={glassMiniCard}>
-          <h3 style={miniTitle}>Draft Board</h3>
-          <div style={draftBoardGrid}>
-            {sortedPicks.map((pick)=>{
-              const team = (teams || []).find((t)=>String(t.id)===String(pick.team_id)) || pick.teams;
-              const publicTeamVisible = pick.status === "picked";
-              return <div key={pick.pick_number} style={draftPickTile}>
-                <div style={draftPickHeader}><b>#{String(pick.pick_number).padStart(2,"0")}</b><span>{pick.status === "pick_is_in" ? "PICK IS IN" : (pick.status || "pending")}</span></div>
-                <div style={draftTileUser}>{pick.discord_username || pick.discord_users?.discord_username}</div>
-                <div style={publicTeamVisible && team ? draftTileTeam : mutedText}>{publicTeamVisible && team ? team.name : (pick.status === "pick_is_in" ? "Team hidden until reveal" : "On deck")}</div>
-                {pick.team_id && <button style={ghostButton} onClick={()=>undoPick?.(pick.pick_number)}>Undo</button>}
-              </div>;
+      <div style={S.twoCol}>
+        <div style={S.panel}>
+          <div style={S.eyebrow}>Draft Board</div>
+          <div style={{ ...S.grid, marginTop: 12 }}>
+            {sortedPicks.map((pick) => {
+              const team = teams.find((t) => String(t.id) === String(pick.team_id)) || pick.teams;
+              const visible = pick.status === "picked";
+              return (
+                <div key={pick.pick_number} style={S.pickTile}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                    <b style={{ color: "#fff" }}>#{String(pick.pick_number).padStart(2, "0")}</b>
+                    <span style={{ color: "#facc15", fontWeight: 900 }}>{pick.status === "pick_is_in" ? "PICK IS IN" : (pick.status || "pending")}</span>
+                  </div>
+                  <div style={{ color: "#fff", fontWeight: 1000 }}>{pick.discord_username || pick.discord_users?.discord_username}</div>
+                  <div style={visible && team ? { color: "#facc15", fontWeight: 1000 } : S.muted}>{visible && team ? team.name : (pick.status === "pick_is_in" ? "Team hidden until reveal" : "On deck")}</div>
+                  {pick.team_id && <button style={S.ghost} type="button" onClick={() => undoPick?.(pick.pick_number)}>Undo</button>}
+                </div>
+              );
             })}
           </div>
         </div>
 
-        <div style={glassMiniCard}>
-          <h3 style={miniTitle}>Available Teams · {availableTeams.length}</h3>
-          <input style={input} value={teamSearch} onChange={(e)=>setTeamSearch(e.target.value)} placeholder="Search available teams or conference..." />
-          <div style={availableTeamGrid}>
-            {availableTeams.map((team)=><div key={team.id} style={availableTeamTile}><b>{team.name}</b><span>{normalizeDraftConference(team.conference)}</span></div>)}
+        <div style={S.panel}>
+          <div style={S.eyebrow}>Available Teams · {availableTeams.length}</div>
+          <input style={{ ...S.input, marginTop: 12 }} value={teamSearch} onChange={(e) => setTeamSearch(e.target.value)} placeholder="Search available teams or conference..." />
+          <div style={{ ...S.grid, marginTop: 12 }}>
+            {availableTeams.map((team) => (
+              <div key={team.id} style={S.pickTile}>
+                <b style={{ color: "#fff" }}>{team.name}</b>
+                <span style={S.muted}>{cleanConference(team.conference)}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
