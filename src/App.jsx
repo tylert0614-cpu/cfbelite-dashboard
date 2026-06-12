@@ -1766,6 +1766,20 @@ function DraftRoom({ teams, users, picks, settings, adminUnlocked, startClock, a
             <button style={button} onClick={()=>announcePick(currentPick?.pick_number, selectedTeamId)}>Pick Is In</button>
             {currentPick?.status === "pick_is_in" && <button style={button} onClick={()=>revealPick(currentPick?.pick_number)}>Reveal / Post to Board</button>}
           </div>
+          <div style={draftAdminHelp}>
+            <b>How it works:</b> Start/Reset Clock begins the timer for the current pick. Select the team from the dropdown, click <b>Pick Is In</b> to stage it privately, then click <b>Reveal / Post to Board</b> after you post the graphic in Discord.
+          </div>
+          {(selectedTeam || (currentPick?.status === "pick_is_in" && pickedTeam)) && (
+            <div style={pickPreviewCard}>
+              <div style={eyebrow}>Commissioner Preview</div>
+              <div style={leaderRow}><b>Pick #{String(currentPick?.pick_number || 1).padStart(2,"0")}</b><span>{currentPick?.discord_username || currentPick?.discord_users?.discord_username}</span></div>
+              <div style={pickTeamLine}>{(selectedTeam || pickedTeam)?.name}</div>
+              <div style={actionRow}>
+                <button style={button} onClick={()=>navigator.clipboard?.writeText(draftPickCaption(currentPick, selectedTeam || pickedTeam))}>Copy Discord Caption</button>
+                <button style={button} onClick={()=>downloadDraftPickGraphic(currentPick, selectedTeam || pickedTeam)}>Download Pick Graphic</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1791,7 +1805,7 @@ function DraftRoom({ teams, users, picks, settings, adminUnlocked, startClock, a
               return <div key={pick.pick_number} style={{...draftPickTile, borderColor: publicTeamVisible ? (team?.accent_color || "rgba(255,255,255,.16)") : "rgba(255,255,255,.16)"}}>
                 <div style={leaderRow}><b>#{String(pick.pick_number).padStart(2,"0")}</b><span>{pick.status === "pick_is_in" ? "PICK IS IN" : (pick.status || "pending")}</span></div>
                 <div style={draftTileUser}>{pick.discord_username || pick.discord_users?.discord_username}</div>
-                <div style={publicTeamVisible && team ? draftTileTeam : mutedText}>{publicTeamVisible && team ? team.name : (pick.status === "pick_is_in" ? "Team hidden until reveal" : "On deck")}</div>
+                <div style={(publicTeamVisible || adminUnlocked) && team ? draftTileTeam : mutedText}>{publicTeamVisible && team ? team.name : (adminUnlocked && team ? `Staged: ${team.name}` : (pick.status === "pick_is_in" ? "Team hidden until reveal" : "On deck"))}</div>
                 {adminUnlocked && pick.team_id && <button style={ghostButton} onClick={()=>undoPick(pick.pick_number)}>Undo</button>}
               </div>;
             })}
@@ -4517,8 +4531,10 @@ const availableTeamGrid = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
   gap: 10,
-  maxHeight: 720,
-  overflow: "auto",
+  alignContent: "start",
+  gridAutoRows: "minmax(82px, auto)",
+  minHeight: 620,
+  overflow: "visible",
 };
 
 const availableTeamTile = {
@@ -4550,3 +4566,21 @@ const draftConferenceTile = {
   boxShadow: "inset 0 1px 0 rgba(255,255,255,.14)",
 };
 
+
+
+const draftAdminHelp = {
+  marginTop: 12,
+  color: "rgba(255,255,255,.72)",
+  lineHeight: 1.45,
+  fontWeight: 750,
+};
+
+const pickPreviewCard = {
+  marginTop: 14,
+  border: "1px solid rgba(250,204,21,.28)",
+  background: "linear-gradient(145deg, rgba(250,204,21,.14), rgba(255,255,255,.045))",
+  borderRadius: 22,
+  padding: 16,
+  display: "grid",
+  gap: 10,
+};
