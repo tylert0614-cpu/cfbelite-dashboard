@@ -1740,6 +1740,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
   const [tick, setTick] = useState(Date.now());
   const [localPaused, setLocalPaused] = useState(Boolean(settings?.paused));
   const [localPicks, setLocalPicks] = useState(picks || []);
+  const [manualPickNumber, setManualPickNumber] = useState(settings?.current_pick || 1);
 
   useEffect(() => {
     const id = setInterval(() => setTick(Date.now()), 1000);
@@ -1778,7 +1779,8 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
   const allowedConferences = ["American", "CUSA", "MAC", "Mountain West", "PAC 12", "Sun Belt"];
   const sortedPicks = [...(localPicks || [])].sort((a, b) => Number(a.pick_number || 0) - Number(b.pick_number || 0));
   const currentPick =
-    sortedPicks.find((pick) => Number(pick.pick_number) === Number(settings?.current_pick || 1)) ||
+    sortedPicks.find((pick) => Number(pick.pick_number) === Number(manualPickNumber || settings?.current_pick || 1)) ||
+    sortedPicks.find((pick) => Number(pick.pick_number) === 1) ||
     sortedPicks.find((pick) => !pick.team_id || pick.status === "pick_is_in") ||
     sortedPicks[0] ||
     { pick_number: 1, discord_username: "User TBD", status: "pending" };
@@ -1906,15 +1908,18 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
     if (!pick || !team) return;
 
     const canvas = document.createElement("canvas");
-    canvas.width = 1200;
-    canvas.height = 675;
+    canvas.width = 1600;
+    canvas.height = 1000;
     const ctx = canvas.getContext("2d");
 
-    const primary = team.primary_color || "#1e3a8a";
+    const primary = team.primary_color || "#2d0b6e";
     const secondary = team.secondary_color || "#facc15";
     const accent = team.accent_color || "#ffffff";
-    const user = String(pick.discord_username || pick.discord_users?.discord_username || "CFBElite User");
-    const teamName = String(team.name || "Selected Team");
+    const user = String(pick.discord_username || pick.discord_users?.discord_username || "CFBElite User").toUpperCase();
+    const teamName = String(team.name || "Selected Team").toUpperCase();
+    const words = teamName.split(" ");
+    const mainWord = words.length >= 2 ? words.slice(0, -1).join(" ") : teamName;
+    const mascotWord = words.length >= 2 ? words[words.length - 1] : "";
     const conf = cleanConference(team.conference) || "CFBElite";
 
     function roundRect(x, y, w, h, r) {
@@ -1928,121 +1933,197 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
       ctx.closePath();
     }
 
-    function fitText(text, x, y, maxWidth, startSize, minSize, weight = 1000) {
+    function fitText(text, x, y, maxWidth, startSize, minSize, color = "#fff", weight = 1000) {
       let size = startSize;
       do {
-        ctx.font = `${weight} ${size}px Arial`;
+        ctx.font = `${weight} ${size}px Arial Black, Arial`;
         if (ctx.measureText(text).width <= maxWidth || size <= minSize) break;
         size -= 3;
       } while (size > minSize);
+      ctx.fillStyle = color;
       ctx.fillText(text, x, y);
+      return size;
     }
 
-    // Background
-    const bg = ctx.createLinearGradient(0, 0, 1200, 675);
-    bg.addColorStop(0, primary);
-    bg.addColorStop(0.45, "#050713");
-    bg.addColorStop(1, secondary);
+    function drawGrungeDots(color, count) {
+      ctx.fillStyle = color;
+      for (let i = 0; i < count; i += 1) {
+        ctx.globalAlpha = Math.random() * 0.16;
+        ctx.fillRect(Math.random() * 1600, Math.random() * 1000, Math.random() * 5 + 1, Math.random() * 5 + 1);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // Base stage background
+    const bg = ctx.createLinearGradient(0, 0, 1600, 1000);
+    bg.addColorStop(0, "#050510");
+    bg.addColorStop(0.32, primary);
+    bg.addColorStop(0.62, "#050510");
+    bg.addColorStop(1, primary);
     ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, 1200, 675);
+    ctx.fillRect(0, 0, 1600, 1000);
 
-    // Dark overlay for contrast
-    const overlay = ctx.createRadialGradient(280, 110, 20, 650, 330, 850);
-    overlay.addColorStop(0, "rgba(255,255,255,.12)");
-    overlay.addColorStop(0.45, "rgba(0,0,0,.20)");
-    overlay.addColorStop(1, "rgba(0,0,0,.60)");
-    ctx.fillStyle = overlay;
-    ctx.fillRect(0, 0, 1200, 675);
+    // Stadium/spotlight feel
+    ctx.fillStyle = "rgba(0,0,0,.45)";
+    ctx.fillRect(0, 0, 1600, 1000);
 
-    // Subtle stage lights
-    ctx.globalAlpha = 0.22;
-    ctx.fillStyle = accent;
-    ctx.beginPath();
-    ctx.arc(1060, 90, 220, 0, Math.PI * 2);
+    const light1 = ctx.createRadialGradient(80, 40, 10, 80, 40, 360);
+    light1.addColorStop(0, "rgba(255,255,255,.72)");
+    light1.addColorStop(.18, `${secondary}55`);
+    light1.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = light1;
+    ctx.fillRect(0, 0, 520, 380);
+
+    const light2 = ctx.createRadialGradient(1510, 50, 10, 1510, 50, 360);
+    light2.addColorStop(0, "rgba(255,255,255,.72)");
+    light2.addColorStop(.18, `${secondary}55`);
+    light2.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = light2;
+    ctx.fillRect(1080, 0, 520, 380);
+
+    drawGrungeDots("#ffffff", 650);
+    drawGrungeDots(secondary, 280);
+
+    // Main border
+    ctx.strokeStyle = secondary;
+    ctx.lineWidth = 4;
+    ctx.strokeRect(14, 14, 1572, 972);
+
+    ctx.strokeStyle = `${primary}`;
+    ctx.lineWidth = 7;
+    ctx.strokeRect(28, 28, 1544, 944);
+
+    // Top header
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "900 32px Arial";
+    ctx.letterSpacing = "8px";
+    ctx.fillText("C F B E L I T E   2 7", 175, 100);
+    ctx.fillText("T E A M   D R A F T", 1060, 100);
+    ctx.letterSpacing = "0px";
+
+    // Center logo-style badge
+    roundRect(610, 38, 380, 170, 28);
+    ctx.fillStyle = "rgba(0,0,0,.72)";
     ctx.fill();
-    ctx.fillStyle = secondary;
-    ctx.beginPath();
-    ctx.arc(160, 590, 260, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(255,255,255,.35)";
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    fitText("CFBELITE", 652, 110, 305, 58, 42, "#fff", 1000);
+    fitText("27", 740, 170, 145, 78, 56, secondary, 1000);
+    fitText("DRAFT", 710, 216, 180, 42, 32, "#fff", 1000);
+
+    // Pick is in brush bar
+    ctx.fillStyle = primary;
+    ctx.globalAlpha = .82;
+    ctx.fillRect(92, 185, 520, 92);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#fff";
+    ctx.font = "italic 900 54px Arial";
+    ctx.fillText("THE PICK IS IN", 130, 252);
+
+    // Pick card
+    roundRect(118, 335, 320, 425, 0);
+    ctx.fillStyle = "rgba(0,0,0,.62)";
     ctx.fill();
+    ctx.strokeStyle = primary;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    ctx.fillStyle = "rgba(255,255,255,.10)";
+    ctx.fillRect(118, 335, 320, 85);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "900 58px Arial";
+    ctx.fillText("PICK", 205, 395);
+
+    ctx.font = "1000 230px Arial Black, Arial";
+    ctx.fillText(String(pick.pick_number || 1).padStart(2, "0"), 145, 700);
+
+    // User banner
+    const userBar = ctx.createLinearGradient(500, 300, 1075, 300);
+    userBar.addColorStop(0, primary);
+    userBar.addColorStop(.5, secondary);
+    userBar.addColorStop(1, primary);
+    ctx.fillStyle = userBar;
+    ctx.fillRect(500, 300, 575, 76);
+
+    fitText(user, 610, 355, 390, 48, 30, "#fff", 1000);
+
+    // Selects line
+    ctx.strokeStyle = primary;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(515, 425);
+    ctx.lineTo(660, 425);
+    ctx.moveTo(935, 425);
+    ctx.lineTo(1060, 425);
+    ctx.stroke();
+
+    ctx.fillStyle = primary;
+    ctx.font = "italic 900 54px Arial";
+    ctx.fillText("SELECTS", 675, 445);
+
+    // Team name large
+    fitText(mainWord, 545, 610, 570, 136, 58, "#fff", 1000);
+    if (mascotWord) {
+      ctx.fillStyle = primary;
+      ctx.font = "italic 900 78px Arial";
+      fitText(mascotWord, 515, 705, 625, 78, 44, primary, 1000);
+    }
+
+    // Team helmet-placeholder orb / team initials right side
+    const orb = ctx.createRadialGradient(1290, 500, 30, 1290, 500, 310);
+    orb.addColorStop(0, `${secondary}99`);
+    orb.addColorStop(.35, `${primary}ee`);
+    orb.addColorStop(1, "rgba(0,0,0,.50)");
+    ctx.fillStyle = orb;
+    ctx.beginPath();
+    ctx.arc(1290, 520, 250, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "rgba(255,255,255,.36)";
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.arc(1290, 520, 250, 0, Math.PI * 2);
+    ctx.stroke();
+
+    const initials = teamName.split(" ").map((word) => word[0]).join("").slice(0, 4);
+    fitText(initials, 1180, 555, 245, 112, 64, "#fff", 1000);
+
+    // Smoke/paint under orb
+    ctx.globalAlpha = .55;
+    ctx.fillStyle = primary;
+    for (let i = 0; i < 18; i += 1) {
+      ctx.beginPath();
+      ctx.ellipse(1140 + i * 26, 760 + Math.sin(i) * 12, 70, 22, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.globalAlpha = 1;
 
-    // Outer glass frame
-    roundRect(34, 30, 1132, 615, 32);
-    ctx.fillStyle = "rgba(255,255,255,.045)";
+    // Conference badge
+    roundRect(650, 770, 300, 86, 24);
+    ctx.fillStyle = "rgba(0,0,0,.55)";
     ctx.fill();
     ctx.strokeStyle = secondary;
-    ctx.lineWidth = 5;
+    ctx.lineWidth = 3;
     ctx.stroke();
-
-    // Header
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "1000 44px Arial";
-    ctx.fillText("CFBELITE 27 TEAM DRAFT", 72, 86);
-
-    ctx.fillStyle = secondary;
-    ctx.font = "1000 30px Arial";
-    ctx.fillText("THE PICK IS IN", 830, 84);
-
-    // Left pick card
-    roundRect(70, 128, 310, 410, 22);
-    ctx.fillStyle = "rgba(0,0,0,.46)";
-    ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,.20)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "1000 66px Arial";
-    ctx.fillText("PICK", 115, 205);
-
-    ctx.font = "1000 175px Arial";
-    ctx.fillText(String(pick.pick_number || 1).padStart(2, "0"), 105, 405);
-
-    ctx.fillStyle = secondary;
-    ctx.font = "1000 31px Arial";
-    ctx.fillText(conf.toUpperCase(), 112, 488);
-
-    // Right content glass
-    roundRect(420, 126, 700, 415, 28);
-    ctx.fillStyle = "rgba(255,255,255,.075)";
-    ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,.18)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    ctx.fillStyle = secondary;
-    ctx.font = "1000 36px Arial";
-    ctx.fillText("SELECTING COACH", 460, 190);
-
-    ctx.fillStyle = "#ffffff";
-    fitText(user.toUpperCase(), 460, 255, 600, 58, 34, 1000);
-
-    ctx.fillStyle = "rgba(255,255,255,.76)";
-    ctx.font = "1000 34px Arial";
-    ctx.fillText("SELECTS", 460, 320);
-
-    ctx.fillStyle = "#ffffff";
-    fitText(teamName.toUpperCase(), 460, 405, 610, 70, 38, 1000);
-
-    // Bottom badge
-    roundRect(460, 454, 260, 58, 29);
-    ctx.fillStyle = "rgba(0,0,0,.35)";
-    ctx.fill();
-    ctx.strokeStyle = secondary;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.fillStyle = secondary;
-    ctx.font = "1000 30px Arial";
-    ctx.fillText(conf.toUpperCase(), 488, 493);
+    fitText(conf.toUpperCase(), 700, 827, 205, 43, 25, "#fff", 1000);
 
     // Footer
-    ctx.fillStyle = "rgba(255,255,255,.72)";
-    ctx.font = "900 26px Arial";
-    ctx.fillText("CFBElite Dynasty League", 72, 612);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "900 32px Arial";
+    ctx.fillText("#CFBELITE27", 85, 910);
 
+    ctx.fillStyle = primary;
+    ctx.font = "italic 900 64px Arial";
+    ctx.fillText("WELCOME TO", 1180, 850);
+    fitText(teamName.split(" ").slice(-1)[0] || teamName, 1095, 930, 410, 62, 38, primary, 1000);
+
+    // Five stars
     ctx.fillStyle = secondary;
-    ctx.font = "1000 26px Arial";
-    ctx.fillText("#CFBELITE27", 930, 612);
+    ctx.font = "900 44px Arial";
+    ctx.fillText("★ ★ ★ ★ ★", 335, 918);
 
     const link = document.createElement("a");
     link.download = `cfbelite27-pick-${String(pick.pick_number || 1).padStart(2, "0")}-${teamName.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.png`;
@@ -2087,6 +2168,13 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
         <div style={S.eyebrow}>Draft Controls</div>
         <p style={S.muted}>Controls are open. Set the clock, select a team, stage the pick, download/copy the announcement, then reveal it to the public board.</p>
         <div style={S.grid}>
+          <select style={S.input} value={manualPickNumber} onChange={(e) => setManualPickNumber(Number(e.target.value))}>
+            {sortedPicks.map((pick) => (
+              <option style={{color:"#111827", background:"#fff"}} key={pick.pick_number} value={pick.pick_number}>
+                Pick #{String(pick.pick_number).padStart(2, "0")} - {pick.discord_username || pick.discord_users?.discord_username || "User TBD"}
+              </option>
+            ))}
+          </select>
           <input style={S.input} type="number" min="1" max="60" value={timerMinutes} onChange={(e) => setTimerMinutes(e.target.value)} placeholder="Clock minutes" />
           <select style={S.input} value={selectedTeamId} onChange={(e) => setSelectedTeamId(e.target.value)}>
             <option style={{color:"#111827", background:"#fff"}} value="">Select Team For Pick #{displayPick?.pick_number || ""}</option>
@@ -2095,6 +2183,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
             ))}
           </select>
           <button style={S.button} type="button" onClick={handleStartClock}>Start / Reset Clock</button>
+          <button style={S.ghost} type="button" onClick={() => setManualPickNumber(Number(manualPickNumber) || 1)}>Set Current Pick</button>
           <button style={S.ghost} type="button" onClick={handlePauseClock}>Pause Clock</button>
           <button style={S.ghost} type="button" onClick={handleResumeClock}>Resume Clock</button>
           <button style={S.button} type="button" disabled={!selectedTeamId} onClick={handlePickIsIn}>Pick Is In</button>
