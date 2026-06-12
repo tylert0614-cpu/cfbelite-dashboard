@@ -1797,41 +1797,104 @@ function DraftRoom({ teams, users, picks, settings, adminUnlocked, adminCodeInpu
       <div style={glassMiniCard}>
         <h3 style={miniTitle}>Commissioner Controls</h3>
         {!adminUnlocked ? (
-          <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>
-        ) : (
-          <>
-          <p style={mutedText}>Conference cap rule active: first two conferences to 6 users lock at 6. After that, all remaining conferences lock once they hit 5 users.</p>
           <div style={filterGrid}>
-            <select style={input} value={selectedTeamId} onChange={(e)=>setSelectedTeamId(e.target.value)}>
-              <option value="">Select Team For Pick #{currentPick?.pick_number}</option>
-              {availableTeams.map((team)=><option key={team.id} value={team.id}>{team.name} · {normalizeDraftConference(team.conference)}</option>)}
-            </select>
-            <input style={input} type="number" min="1" max="60" value={timerMinutes} onChange={(e)=>setTimerMinutes(e.target.value)} placeholder="Clock minutes"/>
-            <button style={button} onClick={()=>{ const started = new Date().toISOString(); setLocalClock({ pick_number: currentPick?.pick_number, timer_started_at: started, timer_minutes: Number(timerMinutes)||10 }); startClock(currentPick?.pick_number, timerMinutes); }}>Start / Reset Clock</button><button style={ghostButton} onClick={pauseClock}>Pause</button><button style={ghostButton} onClick={resumeClock}>Resume</button>
-            <button style={button} onClick={()=>announcePick(currentPick?.pick_number, selectedTeamId)}>Pick Is In</button>
-            {currentPick?.status === "pick_is_in" && <button style={button} onClick={()=>revealPick(currentPick?.pick_number)}>Reveal / Post to Board</button>}
+            <input
+              style={input}
+              type="password"
+              value={adminCodeInput}
+              onChange={(e)=>setAdminCodeInput(e.target.value)}
+              placeholder="Commissioner code"
+            />
+            <button style={button} onClick={unlockAdmin}>Unlock</button>
           </div>
-          <div style={draftAdminHelp}>
-            <b>Clock:</b> clicking Start / Reset should immediately change the public timer above. If it does not persist after refresh, the Supabase draft table update is failing.<br/><b>How it works:</b> Start/Reset Clock begins the timer for the current pick. Select the team from the dropdown, click <b>Pick Is In</b> to stage it privately, then click <b>Reveal / Post to Board</b> after you post the graphic in Discord.
-          </div>
-          {selectedTeam && (
-            <div style={pickPreviewCard}>
-              <div style={eyebrow}>Selected Team Preview</div>
-              <div style={pickTeamLine}>{selectedTeam.name}</div>
-              <div style={mutedText}>{normalizeDraftConference(selectedTeam.conference)}</div>
+        ) : (
+          <div style={{display:"grid", gap:14}}>
+            <p style={mutedText}>Controls unlocked. Set the clock, select the team, stage the pick, then reveal after posting the graphic.</p>
+
+            <div style={filterGrid}>
+              <input
+                style={input}
+                type="number"
+                min="1"
+                max="60"
+                value={timerMinutes}
+                onChange={(e)=>setTimerMinutes(e.target.value)}
+                placeholder="Clock minutes"
+              />
+
+              <select
+                style={input}
+                value={selectedTeamId}
+                onChange={(e)=>setSelectedTeamId(e.target.value)}
+              >
+                <option value="">Select Team For Pick #{currentPick?.pick_number || ""}</option>
+                {availableTeams.map((team)=>(
+                  <option key={team.id} value={team.id}>
+                    {team.name} · {normalizeDraftConference(team.conference)}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                style={button}
+                onClick={()=>{
+                  const started = new Date().toISOString();
+                  setLocalClock({
+                    pick_number: currentPick?.pick_number,
+                    timer_started_at: started,
+                    timer_minutes: Number(timerMinutes) || 10
+                  });
+                  startClock(currentPick?.pick_number, timerMinutes);
+                }}
+              >
+                Start / Reset Clock
+              </button>
+
+              <button style={ghostButton} onClick={pauseClock}>Pause Clock</button>
+              <button style={ghostButton} onClick={resumeClock}>Resume Clock</button>
+
+              <button
+                style={button}
+                disabled={!selectedTeamId}
+                onClick={()=>announcePick(currentPick?.pick_number, selectedTeamId)}
+              >
+                Pick Is In
+              </button>
+
+              {currentPick?.status === "pick_is_in" && (
+                <button style={button} onClick={()=>revealPick(currentPick?.pick_number)}>
+                  Reveal / Post to Board
+                </button>
+              )}
             </div>
-          )}
-          {currentPick?.status === "pick_is_in" && pickedTeam && (
-            <div style={pickPreviewCard}>
-              <div style={eyebrow}>Commissioner Preview</div>
-              <div style={pickTeamLine}>{pickedTeam.name}</div>
-              <div style={actionRow}>
-                <button style={button} onClick={()=>navigator.clipboard?.writeText(draftPickCaption(currentPick, pickedTeam))}>Copy Discord Caption</button>
-                <button style={button} onClick={()=>downloadDraftPickGraphic(currentPick, pickedTeam)}>Download Pick Graphic</button>
+
+            <div style={draftAdminHelp}>
+              <b>Clock:</b> Start / Reset should immediately update the timer above. Pause and Resume control the public countdown.
+            </div>
+
+            {selectedTeam && (
+              <div style={pickPreviewCard}>
+                <div style={eyebrow}>Selected Team Preview</div>
+                <div style={pickTeamLine}>{selectedTeam.name}</div>
+                <div style={mutedText}>{normalizeDraftConference(selectedTeam.conference)}</div>
               </div>
-            </div>
-          )}
-          </>
+            )}
+
+            {currentPick?.status === "pick_is_in" && pickedTeam && (
+              <div style={pickPreviewCard}>
+                <div style={eyebrow}>Commissioner Preview</div>
+                <div style={pickTeamLine}>{pickedTeam.name}</div>
+                <div style={actionRow}>
+                  <button style={button} onClick={()=>navigator.clipboard?.writeText(draftPickCaption(currentPick, pickedTeam))}>
+                    Copy Discord Caption
+                  </button>
+                  <button style={button} onClick={()=>downloadDraftPickGraphic(currentPick, pickedTeam)}>
+                    Download Pick Graphic
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
