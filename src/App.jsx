@@ -1583,6 +1583,20 @@ function normalizeDraftConference(conference) {
   return value;
 }
 
+
+const CFB27_APPROVED_DRAFT_TEAMS = new Set([
+  "Army Black Knights","Charlotte 49ers","East Carolina Pirates","Florida Atlantic Owls","Memphis Tigers","Navy Midshipmen","North Texas Mean Green","Rice Owls","South Florida Bulls","USF Bulls","Temple Owls","Tulane Green Wave","Tulsa Golden Hurricane","UAB Blazers","UTSA Roadrunners",
+  "Delaware Fightin’ Blue Hens","FIU Panthers","Jacksonville State Gamecocks","Kennesaw State Owls","Liberty Flames","Middle Tennessee Blue Raiders","Missouri State Bears","New Mexico State Aggies","Sam Houston Bearkats","Western Kentucky Hilltoppers",
+  "Akron Zips","Ball State Cardinals","Bowling Green Falcons","Buffalo Bulls","Central Michigan Chippewas","Eastern Michigan Eagles","Kent State Golden Flashes","Miami (OH) RedHawks","Ohio Bobcats","Sacramento State Hornets","Sacremento State","Toledo Rockets","UMass Minutemen","Western Michigan Broncos",
+  "Air Force Falcons","Hawaii Rainbow Warriors","Nevada Wolf Pack","New Mexico Lobos","North Dakota State","North Dakota State Bison","Northern Illinois Huskies","San Jose State Spartans","UNLV Rebels","UTEP Miners","Wyoming Cowboys",
+  "Boise State Broncos","Colorado State Rams","Fresno State Bulldogs","Oregon State Beavers","San Diego State Aztecs","Texas State Bobcats","Utah State Aggies","Washington State Cougars",
+  "Appalachian State Mountaineers","Arkansas State Red Wolves","Coastal Carolina Chanticleers","Georgia Southern Eagles","Georgia State Panthers","James Madison Dukes","Louisiana Ragin’ Cajuns","Louisiana Tech Bulldogs","Louisiana-Monroe Warhawks","Marshall Thundering Herd","Old Dominion Monarchs","South Alabama Jaguars","Southern Miss Golden Eagles","Troy Trojans"
+]);
+
+function isDraftEligibleTeam(team) {
+  return CFB27_APPROVED_DRAFT_TEAMS.has(team?.name);
+}
+
 const CFB27_DRAFT_CONFERENCES = new Set(["American", "CUSA", "MAC", "Mountain West", "PAC 12", "Pac-12", "Sun Belt"]);
 
 function draftPickCaption(pick, team) {
@@ -1681,7 +1695,7 @@ function draftConferenceCounts(picks, teams) {
   const counts = {};
   picks.forEach((pick) => {
     if (!pick.team_id || pick.status !== "picked") return;
-    const team = teams.find((item)=>item.id === pick.team_id) || pick.teams;
+    const team = teams.find((item)=>String(item.id) === String(pick.team_id)) || pick.teams;
     const conference = normalizeDraftConference(team?.conference);
     if (!conference) return;
     counts[conference] = (counts[conference] || 0) + 1;
@@ -1725,16 +1739,17 @@ function DraftRoom({ teams, users, picks, settings, adminUnlocked, adminCodeInpu
   const pickedTeamIds = new Set(sortedPicks.filter((pick)=>pick.team_id && pick.status === "picked").map((pick)=>pick.team_id));
   const reservedTeamIds = new Set(sortedPicks.filter((pick)=>pick.team_id).map((pick)=>pick.team_id));
   const currentPick = sortedPicks.find((pick)=>Number(pick.pick_number) === Number(settings?.current_pick)) || sortedPicks.find((pick)=>!pick.team_id || pick.status === "pick_is_in") || sortedPicks[0];
-  const selectedTeam = teams.find((team)=>team.id === selectedTeamId);
+  const selectedTeam = teams.find((team)=>String(team.id) === String(selectedTeamId));
   const availableTeams = teams
+    .filter((team)=>isDraftEligibleTeam(team))
     .filter((team)=>CFB27_DRAFT_CONFERENCES.has(normalizeDraftConference(team.conference)))
     .filter((team)=>!lockedConferences.has(normalizeDraftConference(team.conference)))
     .filter((team)=>!reservedTeamIds.has(team.id))
     .filter((team)=>!teamSearch || team.name.toLowerCase().includes(teamSearch.toLowerCase()) || String(normalizeDraftConference(team.conference) || "").toLowerCase().includes(teamSearch.toLowerCase()))
     .sort((a,b)=>a.name.localeCompare(b.name));
-  const pickedTeam = teams.find((team)=>team.id === currentPick?.team_id) || currentPick?.teams;
+  const pickedTeam = teams.find((team)=>String(team.id) === String(currentPick?.team_id)) || currentPick?.teams;
   const latestPick = [...sortedPicks].reverse().find((pick)=>pick.team_id && pick.status === "picked");
-  const latestTeam = latestPick ? teams.find((team)=>team.id === latestPick.team_id) || latestPick.teams : null;
+  const latestTeam = latestPick ? teams.find((team)=>String(team.id) === String(latestPick.team_id)) || latestPick.teams : null;
 
   return (
     <section style={draftRoomWrap}>
@@ -1820,7 +1835,7 @@ function DraftRoom({ teams, users, picks, settings, adminUnlocked, adminCodeInpu
           <h3 style={miniTitle}>Draft Board</h3>
           <div style={draftBoardGrid}>
             {sortedPicks.map((pick)=>{
-              const team = teams.find((t)=>t.id===pick.team_id) || pick.teams;
+              const team = teams.find((t)=>String(t.id)===String(pick.team_id)) || pick.teams;
               const publicTeamVisible = pick.status === "picked";
               return <div key={pick.pick_number} style={{...draftPickTile, borderColor: publicTeamVisible ? (team?.accent_color || "rgba(255,255,255,.16)") : "rgba(255,255,255,.16)"}}>
                 <div style={draftPickHeader}><b>#{String(pick.pick_number).padStart(2,"0")}</b><span>{pick.status === "pick_is_in" ? "PICK IS IN" : (pick.status || "pending")}</span></div>
