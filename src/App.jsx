@@ -561,6 +561,7 @@ export default function App() {
   const [recruiting, setRecruiting] = useState([]);
   const [historyRows, setHistoryRows] = useState([]);
   const [seasonPlayerStats, setSeasonPlayerStats] = useState([]);
+  const [teamSeasonStats, setTeamSeasonStats] = useState([]);
   const [loading, setLoading] = useState(false);
   const [standingsOrder, setStandingsOrder] = useState([]);
   const [commissionerRankings, setCommissionerRankings] = useState([]);
@@ -668,7 +669,7 @@ export default function App() {
     await saveCommissionerRankings(next);
   }
 
-  const baseTabs = [["dashboard","Dashboard"],["draftRoom","CFBElite 27 Draft Room"],["commissionerCenter","Commissioner Center"],["massDataEntry","Mass Data Entry"],["seasonStats","Season Stats"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["powerIndex","Power Index"],["eloRankings","User ELO"],["conferencePower","Conference Power"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["assignments","Users/Team Assignments"],["resultsManager","Results Manager"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...activeCoachUsers.map((user) => [`coach-${user.id}`, user.discord_username])];
+  const baseTabs = [["dashboard","Dashboard"],["draftRoom","CFBElite 27 Draft Room"],["commissionerCenter","Commissioner Center"],["logoManager","Logo Manager"],["massDataEntry","Mass Data Entry"],["seasonStats","Season Player Stats"],["teamStats","Team Stats"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["powerIndex","Power Index"],["eloRankings","User ELO"],["conferencePower","Conference Power"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["assignments","Users/Team Assignments"],["resultsManager","Results Manager"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...activeCoachUsers.map((user) => [`coach-${user.id}`, user.discord_username])];
   const tabs = useMemo(() => {
     const tabMap = new Map(baseTabs);
     const ordered = tabOrder
@@ -704,7 +705,7 @@ export default function App() {
 
   async function loadData() {
     setLoading(true); setError("");
-    const [teamsRes, settingsRes, tabOrderRes, usersRes, assignmentsRes, standingsRes, rankingsRes, resultsRes, weeklyMatchupsRes, draftPicks27Res, draftSettings27Res, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, seasonStatsRes, historyRes] = await Promise.all([
+    const [teamsRes, settingsRes, tabOrderRes, usersRes, assignmentsRes, standingsRes, rankingsRes, resultsRes, weeklyMatchupsRes, draftPicks27Res, draftSettings27Res, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, seasonStatsRes, teamStatsRes, historyRes] = await Promise.all([
       supabase.from("teams").select("*").order("name"),
       supabase.from("league_settings").select("*").eq("id", 1).single(),
       supabase.from("dashboard_tab_order").select("*").eq("id", 1).single(),
@@ -724,9 +725,10 @@ export default function App() {
       supabase.from("playoff_games").select(`*, top_team:teams!playoff_games_top_team_id_fkey(name), bottom_team:teams!playoff_games_bottom_team_id_fkey(name)`).order("sort_order"),
       supabase.from("recruiting_classes").select("*, teams(name)").order("season_year", { ascending: false }),
       supabase.from("season_player_stats").select("*, teams(name), discord_users(discord_username)").order("season_year", { ascending: false }).order("created_at", { ascending: false }),
+      supabase.from("team_season_stats").select("*, teams(name), discord_users(discord_username)").order("season_year", { ascending: false }).order("created_at", { ascending: false }),
       supabase.from("team_history_records").select("*, teams(name)").order("season_year", { ascending: false }),
     ]);
-    const firstError = [teamsRes, settingsRes, tabOrderRes, usersRes, assignmentsRes, standingsRes, rankingsRes, resultsRes, weeklyMatchupsRes, draftPicks27Res, draftSettings27Res, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, seasonStatsRes, historyRes].find((r) => r.error)?.error;
+    const firstError = [teamsRes, settingsRes, tabOrderRes, usersRes, assignmentsRes, standingsRes, rankingsRes, resultsRes, weeklyMatchupsRes, draftPicks27Res, draftSettings27Res, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, seasonStatsRes, teamStatsRes, historyRes].find((r) => r.error)?.error;
     if (firstError) setError(firstError.message);
     else {
       if (tabOrderRes.data?.tab_order) setTabOrder(tabOrderRes.data.tab_order);
@@ -767,6 +769,7 @@ export default function App() {
       setStandingsOrder([...rankedIds, ...unrankedIds]);
       setResults(resultsRes.data || []); setWeeklyMatchups(weeklyMatchupsRes.data || []); setDraftPicks27(draftPicks27Res.data || []); if (draftSettings27Res.data) setDraftSettings27(draftSettings27Res.data); setAllAmericans(aaRes.data || []); setAwards(awardsRes.data || []); setHeismans(heismanRes.data || []); setNationalChampions(championsRes.data || []); setDraftOrder(draftRes.data || []); setPlayoffGames(playoffRes.data || []); setRecruiting(recruitingRes.data || []);
       setSeasonPlayerStats(seasonStatsRes.data || []);
+      setTeamSeasonStats(teamStatsRes.data || []);
       setHistoryRows(historyRes.data || []);
     }
     setLoading(false);
@@ -1084,11 +1087,13 @@ export default function App() {
     {activeTab === "rivalries" && <Rivalries users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
     {activeTab === "powerIndex" && <DynastyPowerIndex users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}
     {activeTab === "commissionerCenter" && (adminUnlocked ? <CommissionerCenterSafe setActiveTab={setActiveTab} loadData={loadData}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>) }    
+    {activeTab === "logoManager" && <LogoManager teams={teamOptions} updateRow={updateRow}/>}    
     {activeTab === "massDataEntry" && <MassDataEntry teams={teamOptions} users={userOptions} currentYear={currentYear} currentWeek={currentWeek} setError={setError} loadData={loadData}/>}
     {activeTab === "conferencePower" && <ConferencePowerRankings teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
     {activeTab === "weeklyMedia" && <WeeklyMedia teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} weeklyMatchups={weeklyMatchups} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} currentWeek={currentWeek}/>}    
     {activeTab === "weeklyMatchups" && (adminUnlocked ? <WeeklyMatchups rows={weeklyMatchups} newMatchup={newWeeklyMatchup} setNewMatchup={setNewWeeklyMatchup} teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} currentYear={currentYear} currentWeek={currentWeek} addMatchup={addWeeklyMatchup} deleteRow={deleteRow} matchupImportText={matchupImportText} setMatchupImportText={setMatchupImportText} importWeeklyMatchups={importWeeklyMatchups}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>) }    
     {activeTab === "seasonStats" && <SeasonStatsPage rows={seasonPlayerStats} teams={teamOptions} users={userOptions} updateRow={updateRow} deleteRow={deleteRow}/>}    
+    {activeTab === "teamStats" && <TeamStatsPage rows={teamSeasonStats} teams={teamOptions} users={userOptions} deleteRow={deleteRow}/>}    
     {activeTab === "recruitingRankings" && <RecruitingRankings rows={recruiting} teams={teamOptions} users={userOptions} assignments={assignments} currentYear={currentYear} loadData={loadData} deleteRow={deleteRow} updateRow={updateRow}/>}    
     {activeTab === "dynastyTimeline" && <DynastyTimeline results={results} teams={teamOptions} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}
     {activeTab === "coachHOF" && <CoachHallOfFame users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
@@ -1325,20 +1330,97 @@ function DynastyRecords({ users, teams, assignments, results, allAmericans, awar
   );
 }
 
-function ProgramPrestige({ teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting }) {
-  const rows = teams.map((team)=>{
+
+function dynastyPrestigeTier(score) {
+  if (score >= 94) return { stars: "⭐⭐⭐⭐⭐", label: "Blue Blood" };
+  if (score >= 82) return { stars: "⭐⭐⭐⭐", label: "4-Star Program" };
+  if (score >= 66) return { stars: "⭐⭐⭐", label: "3-Star Program" };
+  if (score >= 48) return { stars: "⭐⭐", label: "2-Star Program" };
+  return { stars: "⭐", label: "1-Star Program" };
+}
+
+function dynastyPrestigeRows(teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats = []) {
+  const hofPlayersByTeam = new Map();
+  if (typeof playerHallRows === "function") {
+    try {
+      playerHallRows(teams, assignments, results, allAmericans, awards, heismans, nationalChampions).forEach((row)=>{
+        hofPlayersByTeam.set(row.teamId, (hofPlayersByTeam.get(row.teamId) || 0) + 1);
+      });
+    } catch (e) {}
+  }
+
+  const rawRows = teams.map((team)=>{
     const rec = recordFromResults(team.id, results);
+    const games = rec.wins + rec.losses;
+    const winPct = games ? rec.wins / games : 0;
     const nattys = nationalChampions.filter((row)=>row.team_id===team.id).length + titleCount(team.id, results, "National Championship Week");
-    const conf = titleCount(team.id, results, "Conference Championship Week");
+    const confTitles = titleCount(team.id, results, "Conference Championship Week");
+    const bowl = bowlRecord(team.id, results);
+    const top10 = top10Wins(team.id, results);
     const aa = allAmericans.filter((row)=>row.team_id===team.id).length;
-    const aw = awards.filter((row)=>row.team_id===team.id).length;
-    const hs = heismans.filter((row)=>row.team_id===team.id).length;
-    const bestRecruit = recruiting.filter((row)=>row.team_id===team.id && Number(row.rank)>0).sort((a,b)=>Number(a.rank)-Number(b.rank))[0];
-    const recruitScore = bestRecruit ? Math.max(0, 30 - Number(bestRecruit.rank)) : 0;
-    const score = rec.wins*2 + nattys*40 + conf*18 + hs*15 + aw*5 + aa*2 + recruitScore;
-    return { team, rec, nattys, conf, aa, aw, hs, bestRecruit, score };
-  }).filter((row)=>row.rec.games || row.aa || row.aw || row.nattys || row.bestRecruit).sort((a,b)=>b.score-a.score).slice(0,40);
-  return <section style={card}><h2 style={sectionTitle}>Program Prestige Rating</h2><p style={mutedText}>School-based hidden prestige score using wins, recruiting, awards, All-Americans, Heismans, and championships.</p><Table headers={["#", "Program", "Score", "Record", "Nattys", "Conf", "Recruiting"]}>{rows.map((row,index)=><tr key={row.team.id} style={trStyle}><td style={rankCell}>#{index+1}</td><td style={teamCell}><TeamLabel team={row.team}/></td><td style={scoreCell}>{row.score.toFixed(1)}</td><td style={td}>{row.rec.wins}-{row.rec.losses}</td><td style={td}>{row.nattys}</td><td style={td}>{row.conf}</td><td style={td}>{row.bestRecruit ? `#${row.bestRecruit.rank}` : "—"}</td></tr>)}</Table></section>;
+    const awardCount = awards.filter((row)=>row.team_id===team.id).length;
+    const heismanCount = heismans.filter((row)=>row.team_id===team.id).length;
+    const recruitingRows = recruiting.filter((row)=>row.team_id===team.id && Number(row.rank)>0);
+    const avgRecruitRank = recruitingRows.length ? recruitingRows.reduce((sum,row)=>sum+Number(row.rank),0)/recruitingRows.length : null;
+    const bestRecruitRank = recruitingRows.length ? Math.min(...recruitingRows.map((row)=>Number(row.rank))) : null;
+    const top25Classes = recruitingRows.filter((row)=>Number(row.rank)<=25).length;
+    const teamStats = teamSeasonStats.filter((row)=>row.team_id===team.id);
+    const manualTop10 = teamStats.reduce((sum,row)=>sum+Number(row.top10_wins || 0),0);
+    const manualConf = teamStats.reduce((sum,row)=>sum+Number(row.conference_titles || 0),0);
+    const manualNatty = teamStats.reduce((sum,row)=>sum+Number(row.national_titles || 0),0);
+    const hofPlayers = hofPlayersByTeam.get(team.id) || 0;
+
+    const titleScore = (nattys + manualNatty) * 26 + (confTitles + manualConf) * 10;
+    const winningScore = winPct * 22 + Math.min(rec.wins * .8, 30) + bowl.wins * 2;
+    const eliteWinScore = (top10 + manualTop10) * 4.5;
+    const talentScore = heismanCount * 7 + awardCount * 2.5 + aa * 1.25 + hofPlayers * 7;
+    const recruitingScore = avgRecruitRank ? Math.max(0, 28 - avgRecruitRank * .72) + top25Classes * 1.6 + (bestRecruitRank === 1 ? 8 : bestRecruitRank && bestRecruitRank <= 5 ? 4 : 0) : 0;
+    const longevityScore = Math.min(games * .45, 14);
+
+    const rawScore = titleScore + winningScore + eliteWinScore + talentScore + recruitingScore + longevityScore;
+    return { team, rec, games, winPct, nattys: nattys + manualNatty, confTitles: confTitles + manualConf, top10: top10 + manualTop10, bowl, aa, awardCount, heismanCount, avgRecruitRank, bestRecruitRank, top25Classes, hofPlayers, rawScore };
+  });
+
+  const maxRaw = Math.max(1, ...rawRows.map((row)=>row.rawScore));
+  return rawRows.map((row)=>{
+    const score = Number(Math.min(100, (row.rawScore / maxRaw) * 100).toFixed(1));
+    return { ...row, score, tier: dynastyPrestigeTier(score) };
+  }).sort((a,b)=>b.score-a.score || b.nattys-a.nattys || b.rec.wins-a.rec.wins || a.team.name.localeCompare(b.team.name));
+}
+
+function ProgramPrestige({ teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats = [] }) {
+  const rows = dynastyPrestigeRows(teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats);
+
+  return (
+    <section style={broadcastCard}>
+      <h2 style={sectionTitle}>Dynasty Prestige Engine</h2>
+      <p style={mutedText}>Prestige uses titles, win percentage, Top 10 wins, recruiting average/peaks, Heismans, All-Americans, awards, bowl success, Hall of Fame players, and manually-entered team season stats.</p>
+      <div style={prestigeGrid}>
+        {rows.map((row, index)=>(
+          <div key={row.team.id} style={prestigeCard}>
+            <div style={leaderRow}>
+              <b>#{index + 1}</b>
+              <span style={prestigeTierPill}>{row.tier.stars} {row.tier.label}</span>
+            </div>
+            <div style={prestigeTeamName}><TeamLabel team={row.team}/></div>
+            <div style={prestigeScore}>{row.score}</div>
+            <div style={prestigeMiniGrid}>
+              <span>Record <b>{row.rec.wins}-{row.rec.losses}</b></span>
+              <span>Win % <b>{(row.winPct*100).toFixed(1)}%</b></span>
+              <span>Nattys <b>{row.nattys}</b></span>
+              <span>Conf <b>{row.confTitles}</b></span>
+              <span>Top 10 <b>{row.top10}</b></span>
+              <span>Avg Recruit <b>{row.avgRecruitRank ? `#${row.avgRecruitRank.toFixed(1)}` : "—"}</b></span>
+              <span>Best Recruit <b>{row.bestRecruitRank ? `#${row.bestRecruitRank}` : "—"}</b></span>
+              <span>AA/Awards <b>{row.aa}/{row.awardCount}</b></span>
+              <span>Heisman <b>{row.heismanCount}</b></span>
+              <span>HOF Players <b>{row.hofPlayers}</b></span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function DynastyPowerIndex({ users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting }) {
@@ -2562,17 +2644,69 @@ function weeklyRecapText({ teams, users, assignments, results, weeklyMatchups, c
 
 
 function CommissionerCenterSafe({ setActiveTab, loadData }) {
+  const tools = [
+    ["assignments", "User Assignments", "Manage active/former team assignments"],
+    ["resultsManager", "Results Manager", "Edit or delete game results"],
+    ["massDataEntry", "Mass Data Entry", "Player, team, and recruiting forms"],
+    ["recruitingRankings", "Recruiting Manager", "Edit recruiting classes"],
+    ["awards", "Awards Manager", "Manage award winners"],
+    ["allAmericans", "All-Americans", "Manage All-American records"],
+    ["heismans", "Heisman Winners", "Manage Heisman history"],
+    ["nationalChampions", "National Champions", "Manage national title records"],
+    ["logoManager", "Logo Manager", "Add team logos, helmets, and colors"],
+    ["seasonStats", "Season Player Stats", "Review recorded player stats"],
+    ["teamStats", "Team Stats", "Review recorded team stats"],
+  ];
+
   return (
-    <section style={card}>
-      <h2 style={sectionTitle}>Commissioner Center</h2>
-      <p style={mutedText}>Quick admin links. This safe version prevents the commissioner page from black-screening after unlock.</p>
-      <div style={massFormGrid}>
-        <button style={massFormCard} onClick={() => setActiveTab("assignments")}>Users / Team Assignments</button>
-        <button style={massFormCard} onClick={() => setActiveTab("resultsManager")}>Results Manager</button>
-        <button style={massFormCard} onClick={() => setActiveTab("massDataEntry")}>Mass Data Entry</button>
-        <button style={massFormCard} onClick={() => setActiveTab("recruitingRankings")}>Recruiting Rankings</button>
-        <button style={massFormCard} onClick={() => setActiveTab("seasonStats")}>Season Player Stats</button>
-        <button style={massFormCard} onClick={loadData}>Refresh Dashboard Data</button>
+    <section style={broadcastCard}>
+      <h2 style={sectionTitle}>Commissioner Command Center</h2>
+      <p style={mutedText}>A single control room for league data, cleanup, records, logos, stats, recruiting, and history.</p>
+      <div style={commishGrid}>
+        {tools.map(([key, title, desc])=>(
+          <button key={key} style={commishToolCard} onClick={() => setActiveTab(key)}>
+            <b>{title}</b>
+            <span>{desc}</span>
+          </button>
+        ))}
+        <button style={commishToolCard} onClick={loadData}>
+          <b>Refresh Data</b>
+          <span>Reload all Supabase data</span>
+        </button>
+      </div>
+      <div style={miniCard}>
+        <h3 style={miniTitle}>Data Integrity Checklist</h3>
+        <div style={miniRow}>Confirm every active user has one active team.</div>
+        <div style={miniRow}>Confirm team logos and helmets are filled in Logo Manager.</div>
+        <div style={miniRow}>Confirm every season has recruiting ranks and team stats recorded.</div>
+        <div style={miniRow}>Use Results Manager to clean duplicate or incorrect game results.</div>
+      </div>
+    </section>
+  );
+}
+
+function LogoManager({ teams, updateRow }) {
+  const [searchText, setSearchText] = useState("");
+  const filtered = teams.filter((team)=>team.name.toLowerCase().includes(searchText.toLowerCase()));
+
+  return (
+    <section style={broadcastCard}>
+      <h2 style={sectionTitle}>Team Logo Manager</h2>
+      <p style={mutedText}>Use Supabase Storage public URLs. `logo_url` should be the official school/team logo. `helmet_url` should be the helmet. These power draft tiles, coach menu cards, team pages, search results, and rankings.</p>
+      <SearchBox value={searchText} onChange={setSearchText}/>
+      <div style={logoManagerGrid}>
+        {filtered.map((team)=>(
+          <div key={team.id} style={logoManagerCard}>
+            <div style={logoPreviewBox}>
+              {(team.logo_url || team.helmet_url) ? <img src={team.logo_url || team.helmet_url} alt="" style={logoPreviewImg}/> : <span>No Logo</span>}
+            </div>
+            <b>{team.name}</b>
+            <input style={input} value={team.logo_url || ""} onChange={(e)=>updateRow("teams", team.id, "logo_url", e.target.value)} placeholder="Official Logo URL"/>
+            <input style={input} value={team.helmet_url || ""} onChange={(e)=>updateRow("teams", team.id, "helmet_url", e.target.value)} placeholder="Helmet URL"/>
+            <input style={input} value={team.primary_color || ""} onChange={(e)=>updateRow("teams", team.id, "primary_color", e.target.value)} placeholder="Primary Color #000000"/>
+            <input style={input} value={team.secondary_color || ""} onChange={(e)=>updateRow("teams", team.id, "secondary_color", e.target.value)} placeholder="Secondary Color #ffffff"/>
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -2582,6 +2716,7 @@ function MassDataEntry({ teams, users, currentYear, currentWeek, setError, loadD
   const [activeForm, setActiveForm] = useState("player");
   const [scoreForm, setScoreForm] = useState({ season_year: currentYear, week: currentWeek, team_1_id: "", team_2_id: "", team_1_score: "", team_2_score: "", team_1_rank: "", team_2_rank: "" });
   const [seasonForm, setSeasonForm] = useState({ season_year: currentYear, player_name: "", discord_user_id: "", team_id: "", position: "QB", games: "", pass_yards: "", pass_tds: "", interceptions: "", rush_yards: "", rush_tds: "", receptions: "", rec_yards: "", rec_tds: "", tackles: "", sacks: "", interceptions_def: "", forced_fumbles: "", fumble_recoveries: "" });
+  const [teamForm, setTeamForm] = useState({ season_year: currentYear, team_id: "", discord_user_id: "", games: "", wins: "", losses: "", points_for: "", points_against: "", total_yards: "", pass_yards: "", rush_yards: "", turnovers: "", takeaways: "", sacks: "", top10_wins: "", conference_titles: "", national_titles: "" });
   const [recruitRows, setRecruitRows] = useState([]);
 
   useEffect(() => {
@@ -2665,6 +2800,44 @@ function MassDataEntry({ teams, users, currentYear, currentWeek, setError, loadD
     await loadData();
   }
 
+
+  async function saveTeamStats() {
+    if (!teamForm.team_id) {
+      setError("Select a team before saving team season stats.");
+      return;
+    }
+
+    const payload = {
+      ...teamForm,
+      discord_user_id: teamForm.discord_user_id || null,
+      season_year: Number(teamForm.season_year || currentYear),
+      games: n(teamForm.games),
+      wins: n(teamForm.wins),
+      losses: n(teamForm.losses),
+      points_for: n(teamForm.points_for),
+      points_against: n(teamForm.points_against),
+      total_yards: n(teamForm.total_yards),
+      pass_yards: n(teamForm.pass_yards),
+      rush_yards: n(teamForm.rush_yards),
+      turnovers: n(teamForm.turnovers),
+      takeaways: n(teamForm.takeaways),
+      sacks: n(teamForm.sacks),
+      top10_wins: n(teamForm.top10_wins),
+      conference_titles: n(teamForm.conference_titles),
+      national_titles: n(teamForm.national_titles),
+    };
+
+    const { error } = await supabase.from("team_season_stats").insert(payload);
+    if (error) {
+      setError(`Team season stats save failed: ${error.message}`);
+      return;
+    }
+
+    setTeamForm({ season_year: currentYear, team_id: "", discord_user_id: "", games: "", wins: "", losses: "", points_for: "", points_against: "", total_yards: "", pass_yards: "", rush_yards: "", turnovers: "", takeaways: "", sacks: "", top10_wins: "", conference_titles: "", national_titles: "" });
+    setError("Team season stats saved.");
+    await loadData();
+  }
+
   function updateRecruitRow(index, field, value) {
     setRecruitRows((prev) => prev.map((row, i) => i === index ? { ...row, [field]: value } : row));
   }
@@ -2705,7 +2878,8 @@ function MassDataEntry({ teams, users, currentYear, currentWeek, setError, loadD
 
       <div style={massFormGrid}>
         <button type="button" style={{ ...massFormCard, borderColor: activeForm === "season" ? "#a78bfa" : "rgba(255,255,255,.16)" }} onClick={() => setActiveForm("season")}>📈 Season Player Stats</button>
-        <button type="button" style={{ ...massFormCard, borderColor: activeForm === "recruiting" ? "#a78bfa" : "rgba(255,255,255,.16)" }} onClick={() => setActiveForm("recruiting")}>👥 32-User Recruiting</button>
+        <button type="button" style={{ ...massFormCard, borderColor: activeForm === "teamStats" ? "#a78bfa" : "rgba(255,255,255,.16)" }} onClick={() => setActiveForm("teamStats")}>🏟️ Team Season Stats</button>
+        <button type="button" style={{ ...massFormCard, borderColor: activeForm === "recruiting" ? "#a78bfa" : "rgba(255,255,255,.16)" }} onClick={() => setActiveForm("recruiting")}>👥 Active-Team Recruiting</button>
       </div>
 
       {activeForm === "season" && (
@@ -2726,9 +2900,25 @@ function MassDataEntry({ teams, users, currentYear, currentWeek, setError, loadD
         </div>
       )}
 
+
+      {activeForm === "teamStats" && (
+        <div style={entryPanel}>
+          <h3 style={miniTitle}>Team Season Stats</h3>
+          <div style={entryGrid}>
+            <select style={input} value={teamForm.team_id} onChange={(e) => setTeamForm({ ...teamForm, team_id: e.target.value })}><option value="">Team</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
+            <select style={input} value={teamForm.discord_user_id} onChange={(e) => setTeamForm({ ...teamForm, discord_user_id: e.target.value })}><option value="">Discord User</option>{users.map((user) => <option key={user.id} value={user.id}>{user.discord_username}</option>)}</select>
+            <select style={input} value={teamForm.season_year} onChange={(e) => setTeamForm({ ...teamForm, season_year: e.target.value })}>{YEARS.map((year) => <option key={year}>{year}</option>)}</select>
+            {["games","wins","losses","points_for","points_against","total_yards","pass_yards","rush_yards","turnovers","takeaways","sacks","top10_wins","conference_titles","national_titles"].map((field) => (
+              <input key={field} style={input} value={teamForm[field]} onChange={(e) => setTeamForm({ ...teamForm, [field]: e.target.value })} placeholder={field.replaceAll("_", " ")} />
+            ))}
+          </div>
+          <button style={button} onClick={saveTeamStats}>Save Team Season Stats</button>
+        </div>
+      )}
+
       {activeForm === "recruiting" && (
         <div style={entryPanel}>
-          <h3 style={miniTitle}>32-User Recruiting Form</h3>
+          <h3 style={miniTitle}>Active-Team Recruiting Form</h3>
           <div style={recruitingMassGrid}>
             {recruitRows.map((row, index) => (
               <div key={row.team_id} style={recruitingMassRow}>
@@ -2795,6 +2985,55 @@ function SeasonStatsPage({ rows, teams, users, updateRow, deleteRow }) {
             <td style={td}>{row.forced_fumbles ?? "—"}</td>
             <td style={td}>{row.fumble_recoveries ?? "—"}</td>
             <td style={td}><DeleteButton onClick={()=>deleteRow("season_player_stats", row.id)}/></td>
+          </tr>
+        ))}
+      </Table>
+    </section>
+  );
+}
+
+function TeamStatsPage({ rows, teams, users, deleteRow }) {
+  const [searchText, setSearchText] = useState("");
+  const filtered = rows.filter((row) => {
+    const haystack = [
+      row.teams?.name || teamNameById(row.team_id, teams),
+      row.discord_users?.discord_username,
+      row.season_year,
+    ].join(" ").toLowerCase();
+    return !searchText || haystack.includes(searchText.toLowerCase());
+  });
+
+  return (
+    <section style={card}>
+      <div style={sectionTop}>
+        <div>
+          <h2 style={sectionTitle}>Team Season Stats</h2>
+          <p style={mutedText}>Team-level season stats recorded from Mass Data Entry.</p>
+        </div>
+        <SearchBox value={searchText} onChange={setSearchText}/>
+      </div>
+
+      <Table headers={["Year","Team","Discord User","G","W","L","PF","PA","Total Yds","Pass Yds","Rush Yds","TO","Takeaways","Sacks","Top 10","Conf","Natty",""]}>
+        {filtered.map((row) => (
+          <tr key={row.id} style={trStyle}>
+            <td style={td}>{row.season_year}</td>
+            <td style={teamCell}><TeamLabel team={row.teams || teams.find((team)=>team.id===row.team_id)} /></td>
+            <td style={td}>{row.discord_users?.discord_username || users.find((user)=>user.id===row.discord_user_id)?.discord_username || "—"}</td>
+            <td style={td}>{row.games ?? "—"}</td>
+            <td style={td}>{row.wins ?? "—"}</td>
+            <td style={td}>{row.losses ?? "—"}</td>
+            <td style={td}>{row.points_for ?? "—"}</td>
+            <td style={td}>{row.points_against ?? "—"}</td>
+            <td style={td}>{row.total_yards ?? "—"}</td>
+            <td style={td}>{row.pass_yards ?? "—"}</td>
+            <td style={td}>{row.rush_yards ?? "—"}</td>
+            <td style={td}>{row.turnovers ?? "—"}</td>
+            <td style={td}>{row.takeaways ?? "—"}</td>
+            <td style={td}>{row.sacks ?? "—"}</td>
+            <td style={td}>{row.top10_wins ?? "—"}</td>
+            <td style={td}>{row.conference_titles ?? "—"}</td>
+            <td style={td}>{row.national_titles ?? "—"}</td>
+            <td style={td}><DeleteButton onClick={()=>deleteRow("team_season_stats", row.id)}/></td>
           </tr>
         ))}
       </Table>
@@ -3395,22 +3634,27 @@ function usersFallback(user) { return [user]; }
 function coachHofCriteria(row) {
   const accolades = row.heismans + row.awards + row.allAmericans;
   const winPct = row.games ? row.wins / row.games : 0;
+  const estimatedSeasons = Math.max(row.teamsCoached?.size || 0, Math.ceil((row.games || 0) / 12));
 
   const qualifies =
-    row.nattys >= 3 ||
-    (row.nattys >= 2 && row.wins >= 60 && row.confTitles >= 3) ||
-    (row.nattys >= 1 && row.wins >= 90 && row.confTitles >= 6 && row.top10Wins >= 12) ||
-    (row.wins >= 125 && winPct >= .700 && row.confTitles >= 8 && row.top10Wins >= 18) ||
-    (row.rawPrestige >= 220 && row.wins >= 75 && row.nattys >= 1) ||
-    (accolades >= 55 && row.wins >= 80 && (row.nattys >= 1 || row.confTitles >= 6));
+    estimatedSeasons >= 10 &&
+    winPct >= .700 &&
+    row.rawPrestige >= 220 &&
+    (
+      row.nattys >= 1 ||
+      row.confTitles >= 4 ||
+      row.top10Wins >= 18 ||
+      accolades >= 55
+    );
 
   const reasons = [];
-  if (row.nattys >= 3) reasons.push("3+ National Titles");
-  if (row.nattys >= 2 && row.wins >= 60 && row.confTitles >= 3) reasons.push("2 Titles + 60 Wins + 3 Conf Titles");
-  if (row.nattys >= 1 && row.wins >= 90 && row.confTitles >= 6 && row.top10Wins >= 12) reasons.push("Title + 90 Wins + 6 Conf + 12 Top 10 Wins");
-  if (row.wins >= 125 && winPct >= .700 && row.confTitles >= 8 && row.top10Wins >= 18) reasons.push("125+ Wins with Elite Win %");
-  if (row.rawPrestige >= 220 && row.wins >= 75 && row.nattys >= 1) reasons.push("220+ HOF Score with a Title");
-  if (accolades >= 55 && row.wins >= 80 && (row.nattys >= 1 || row.confTitles >= 6)) reasons.push("55+ Major Accolades with Sustained Winning");
+  if (estimatedSeasons >= 10) reasons.push("10+ Season Résumé");
+  if (winPct >= .700) reasons.push("70%+ Win Percentage");
+  if (row.rawPrestige >= 220) reasons.push("220+ Prestige Score");
+  if (row.nattys >= 1) reasons.push("National Champion");
+  if (row.confTitles >= 4) reasons.push("4+ Conference Titles");
+  if (row.top10Wins >= 18) reasons.push("18+ Top 10 Wins");
+  if (accolades >= 55) reasons.push("55+ Major Accolades");
 
   return { qualifies, reasons };
 }
@@ -3528,29 +3772,29 @@ function playerHallRows(teams, assignments, results, allAmericans, awards, heism
       if (nattyByResult || nattyByEntry) row.nattys += 1;
     });
 
-    row.score = row.heismans.length*42 + row.awards.length*18 + row.allAmericans.length*12 + row.nattys*20 + row.confTitles*8;
+    row.score = row.heismans.length*50 + row.awards.length*20 + row.allAmericans.length*14 + row.nattys*24 + row.confTitles*8;
 
     if (row.heismans.length >= 2) row.reasons.push("2+ Heisman Winners");
     if (row.heismans.length >= 1 && row.awards.length >= 2 && row.allAmericans.length >= 2) row.reasons.push("Heisman + 2 Awards + 2 All-Americans");
     if (row.awards.length >= 5 && row.allAmericans.length >= 2) row.reasons.push("5+ Major Awards with All-American Résumé");
     if (row.allAmericans.length >= 6 && row.awards.length >= 2) row.reasons.push("6+ All-American Selections");
     if (row.nattys >= 2 && (row.heismans.length >= 1 || row.awards.length >= 3 || row.allAmericans.length >= 5)) row.reasons.push("Multi-title era cornerstone");
-    if (row.score >= 125) row.reasons.push("125+ HOF Score");
+    if (row.score >= 150) row.reasons.push("125+ HOF Score");
   });
 
   return [...map.values()]
     .filter((r)=>
       r.heismans.length >= 2 ||
       (r.heismans.length >= 1 && r.awards.length >= 2 && r.allAmericans.length >= 2) ||
-      (r.awards.length >= 5 && r.allAmericans.length >= 2) ||
-      (r.allAmericans.length >= 6 && r.awards.length >= 2) ||
+      (r.awards.length >= 6 && r.allAmericans.length >= 2) ||
+      (r.allAmericans.length >= 7 && r.awards.length >= 2) ||
       (r.nattys >= 2 && (r.heismans.length >= 1 || r.awards.length >= 3 || r.allAmericans.length >= 5)) ||
       r.score >= 125
     )
     .sort((a,b)=>b.score-a.score || a.player.localeCompare(b.player));
 }
 function PlayerHallOfFame({ teams, assignments, results, allAmericans, awards, heismans, nationalChampions }) {
-  const rows = playerHallRows(teams, assignments, results, allAmericans, awards, heismans, nationalChampions).filter((row)=>row.score >= 125);
+  const rows = playerHallRows(teams, assignments, results, allAmericans, awards, heismans, nationalChampions).filter((row)=>row.score >= 150);
   return <section style={card}><h2 style={sectionTitle}>Player Hall of Fame</h2><p style={mutedText}>Player Hall of Fame is reserved for legendary careers only: multiple Heismans, Heisman plus major supporting accolades, dominant multi-award careers, or cornerstone players from championship eras.</p>{rows.length ? <div style={hofGrid}>{rows.map((row)=><PlayerHofCard key={row.key} row={row} team={teams.find((t)=>t.id===row.teamId)}/>)}</div> : <div style={miniRow}>No players have met Hall of Fame criteria yet.</div>}</section>;
 }
 function PlayerHofCard({ row, team }) {
@@ -3675,7 +3919,7 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
 
   const groups = [
     { title: "Main", keys: ["dashboard", "draftRoom"] },
-    { title: "Media", keys: ["massDataEntry", "seasonStats", "recruitingRankings", "dynastyTimeline"] },
+    { title: "Media", keys: ["logoManager", "massDataEntry", "seasonStats", "teamStats", "recruitingRankings", "dynastyTimeline"] },
     { title: "Dynasty Legacy", keys: ["dynastyRecords", "rivalries", "powerIndex",  "coachingTree"] },
     { title: "Rankings", keys: ["eloRankings", "conferencePower"] },
     { title: "League History", keys: ["coachHOF", "playerHOF", "h2h"] },
@@ -5905,13 +6149,7 @@ const bulkTextArea = {
 
 
 
-const broadcastCard = {
-  ...card,
-  borderRadius: 18,
-  border: "1px solid rgba(167,139,250,.26)",
-  background: "linear-gradient(145deg, rgba(15,23,42,.94), rgba(7,10,28,.98))",
-  boxShadow: "0 24px 80px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.07)",
-};
+
 
 const entryPanel = {
   ...liquidGlassPanel,
@@ -5943,4 +6181,112 @@ const recruitingMassRow = {
   padding: 10,
   background: "rgba(255,255,255,.045)",
   color: "#fff",
+};
+
+
+const broadcastCard = {
+  ...card,
+  borderRadius: 20,
+  border: "1px solid rgba(148,163,184,.24)",
+  background: "linear-gradient(145deg, rgba(12,18,40,.965), rgba(5,8,23,.99))",
+  boxShadow: "0 24px 80px rgba(0,0,0,.44), inset 0 1px 0 rgba(255,255,255,.06)",
+};
+
+const commishGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: 14,
+  marginTop: 18,
+  marginBottom: 18,
+};
+
+const commishToolCard = {
+  ...liquidGlassTile,
+  color: "#fff",
+  display: "grid",
+  gap: 8,
+  textAlign: "left",
+  cursor: "pointer",
+  minHeight: 112,
+};
+
+const logoManagerGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+  gap: 14,
+  marginTop: 18,
+};
+
+const logoManagerCard = {
+  ...liquidGlassTile,
+  display: "grid",
+  gap: 10,
+};
+
+const logoPreviewBox = {
+  height: 96,
+  border: "1px solid rgba(255,255,255,.12)",
+  borderRadius: 16,
+  display: "grid",
+  placeItems: "center",
+  background: "rgba(255,255,255,.045)",
+  color: "rgba(255,255,255,.60)",
+  overflow: "hidden",
+};
+
+const logoPreviewImg = {
+  maxWidth: "84%",
+  maxHeight: "84%",
+  objectFit: "contain",
+};
+
+const prestigeGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+  gap: 14,
+  marginTop: 18,
+};
+
+const prestigeCard = {
+  ...liquidGlassTile,
+  display: "grid",
+  gap: 12,
+  minHeight: 230,
+};
+
+const prestigeScore = {
+  color: "#facc15",
+  fontSize: "clamp(42px, 10vw, 72px)",
+  fontWeight: 1000,
+  lineHeight: .85,
+  letterSpacing: "-.07em",
+};
+
+const prestigeTierPill = {
+  border: "1px solid rgba(250,204,21,.34)",
+  background: "rgba(250,204,21,.12)",
+  color: "#fef3c7",
+  borderRadius: 999,
+  padding: "7px 10px",
+  fontSize: 12,
+  fontWeight: 950,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  textAlign: "center",
+};
+
+const prestigeTeamName = {
+  color: "#fff",
+  fontWeight: 1000,
+  fontSize: 18,
+  overflowWrap: "anywhere",
+};
+
+const prestigeMiniGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(105px, 1fr))",
+  gap: 8,
+  color: "rgba(255,255,255,.76)",
+  fontSize: 12,
 };
