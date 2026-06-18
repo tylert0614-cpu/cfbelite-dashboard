@@ -1083,7 +1083,7 @@ export default function App() {
     {activeTab === "dynastyRecords" && <DynastyRecords users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
     {activeTab === "rivalries" && <Rivalries users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
     {activeTab === "powerIndex" && <DynastyPowerIndex users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}
-    {activeTab === "commissionerCenter" && (adminUnlocked ? <CommissionerCenter currentYear={currentYear} currentWeek={currentWeek} setActiveTab={setActiveTab} saveLeagueSettings={saveLeagueSettings} loadData={loadData} teams={teamOptions} users={userOptions} assignments={assignments} results={results} awards={awards} allAmericans={allAmericans} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>) }    
+    {activeTab === "commissionerCenter" && (adminUnlocked ? <CommissionerCenterSafe setActiveTab={setActiveTab} loadData={loadData}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>) }    
     {activeTab === "massDataEntry" && <MassDataEntry teams={teamOptions} users={userOptions} currentYear={currentYear} currentWeek={currentWeek} setError={setError} loadData={loadData}/>}
     {activeTab === "conferencePower" && <ConferencePowerRankings teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
     {activeTab === "weeklyMedia" && <WeeklyMedia teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} weeklyMatchups={weeklyMatchups} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} currentWeek={currentWeek}/>}    
@@ -2401,7 +2401,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
                     <span style={{ color: "#facc15", fontWeight: 900 }}>{pick.status === "pick_is_in" ? "PICK IS IN" : (pick.status || "pending")}</span>
                   </div>
                   <div style={{ color: "#fff", fontWeight: 1000 }}>{pick.discord_username || pick.discord_users?.discord_username}</div>
-                  {visible && team && ((team.logo_url || team.helmet_url) ? <img src={team.logo_url || team.helmet_url} alt="" style={S.tileWatermark}/> : <span style={S.tileLettermark}>{team.name.split(" ").map((x)=>x[0]).join("").slice(0,4)}</span>)}
+                  {visible && team && (team.logo_url || team.helmet_url) && <img src={team.logo_url || team.helmet_url} alt="" style={S.tileWatermark}/>}
                   <div style={visible && team ? { color: "#facc15", fontWeight: 1000, position:"relative", zIndex:1 } : S.muted}>{visible && team ? team.name : (pick.status === "pick_is_in" ? "Team hidden until reveal" : "On deck")}</div>
                   {pick.status === "pick_is_in" && <button style={S.button} type="button" onClick={() => handleRevealPick(pick.pick_number)}>Reveal Pick</button>}
                   {pick.team_id && <button style={S.ghost} type="button" onClick={() => handleUndoPick(pick.pick_number)}>Undo</button>}
@@ -2438,7 +2438,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
                         borderColor: "#ffffff",
                         borderWidth: 1.5
                       }}>
-                        {(team.logo_url || team.helmet_url) ? <img src={team.logo_url || team.helmet_url} alt="" style={S.tileWatermark}/> : <span style={S.tileLettermark}>{team.name.split(" ").map((x)=>x[0]).join("").slice(0,4)}</span>}
+                        {(team.logo_url || team.helmet_url) && <img src={team.logo_url || team.helmet_url} alt="" style={S.tileWatermark}/>}
                         <b style={{ color: "#ffffff", fontWeight: 1000, position:"relative", zIndex:1 }}>{team.name}</b>
                         <span style={{ color: "rgba(255,255,255,.82)", fontWeight: 850, position:"relative", zIndex:1 }}>{cleanConference(team.conference)}</span>
                       </div>
@@ -2561,8 +2561,25 @@ function weeklyRecapText({ teams, users, assignments, results, weeklyMatchups, c
 
 
 
+function CommissionerCenterSafe({ setActiveTab, loadData }) {
+  return (
+    <section style={card}>
+      <h2 style={sectionTitle}>Commissioner Center</h2>
+      <p style={mutedText}>Quick admin links. This safe version prevents the commissioner page from black-screening after unlock.</p>
+      <div style={massFormGrid}>
+        <button style={massFormCard} onClick={() => setActiveTab("assignments")}>Users / Team Assignments</button>
+        <button style={massFormCard} onClick={() => setActiveTab("resultsManager")}>Results Manager</button>
+        <button style={massFormCard} onClick={() => setActiveTab("massDataEntry")}>Mass Data Entry</button>
+        <button style={massFormCard} onClick={() => setActiveTab("recruitingRankings")}>Recruiting Rankings</button>
+        <button style={massFormCard} onClick={() => setActiveTab("seasonStats")}>Season Player Stats</button>
+        <button style={massFormCard} onClick={loadData}>Refresh Dashboard Data</button>
+      </div>
+    </section>
+  );
+}
+
 function MassDataEntry({ teams, users, currentYear, currentWeek, setError, loadData }) {
-  const [activeForm, setActiveForm] = useState("score");
+  const [activeForm, setActiveForm] = useState("player");
   const [scoreForm, setScoreForm] = useState({ season_year: currentYear, week: currentWeek, team_1_id: "", team_2_id: "", team_1_score: "", team_2_score: "", team_1_rank: "", team_2_rank: "" });
   const [seasonForm, setSeasonForm] = useState({ season_year: currentYear, player_name: "", discord_user_id: "", team_id: "", position: "QB", games: "", pass_yards: "", pass_tds: "", interceptions: "", rush_yards: "", rush_tds: "", receptions: "", rec_yards: "", rec_tds: "", tackles: "", sacks: "", interceptions_def: "", forced_fumbles: "", fumble_recoveries: "" });
   const [recruitRows, setRecruitRows] = useState([]);
@@ -2684,30 +2701,12 @@ function MassDataEntry({ teams, users, currentYear, currentWeek, setError, loadD
   return (
     <section style={broadcastCard}>
       <h2 style={sectionTitle}>Mass Data Entry Hub</h2>
-      <p style={mutedText}>Open to everyone. Use clean forms for scores, season player stats, and full recruiting class entry.</p>
+      <p style={mutedText}>Open to everyone. Use clean forms for season player stats and active-user recruiting entry.</p>
 
       <div style={massFormGrid}>
-        <button type="button" style={{ ...massFormCard, borderColor: activeForm === "score" ? "#a78bfa" : "rgba(255,255,255,.16)" }} onClick={() => setActiveForm("score")}>🏈 Single Game Score</button>
         <button type="button" style={{ ...massFormCard, borderColor: activeForm === "season" ? "#a78bfa" : "rgba(255,255,255,.16)" }} onClick={() => setActiveForm("season")}>📈 Season Player Stats</button>
         <button type="button" style={{ ...massFormCard, borderColor: activeForm === "recruiting" ? "#a78bfa" : "rgba(255,255,255,.16)" }} onClick={() => setActiveForm("recruiting")}>👥 32-User Recruiting</button>
       </div>
-
-      {activeForm === "score" && (
-        <div style={entryPanel}>
-          <h3 style={miniTitle}>Single Game Score</h3>
-          <div style={entryGrid}>
-            <select style={input} value={scoreForm.season_year} onChange={(e) => setScoreForm({ ...scoreForm, season_year: e.target.value })}>{YEARS.map((year) => <option key={year}>{year}</option>)}</select>
-            <select style={input} value={scoreForm.week} onChange={(e) => setScoreForm({ ...scoreForm, week: e.target.value })}>{WEEKS.map((week) => <option key={week}>{week}</option>)}</select>
-            <select style={input} value={scoreForm.team_1_id} onChange={(e) => setScoreForm({ ...scoreForm, team_1_id: e.target.value })}><option value="">Team 1</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
-            <input style={input} value={scoreForm.team_1_score} onChange={(e) => setScoreForm({ ...scoreForm, team_1_score: e.target.value })} placeholder="Team 1 Score" />
-            <input style={input} value={scoreForm.team_1_rank} onChange={(e) => setScoreForm({ ...scoreForm, team_1_rank: e.target.value })} placeholder="Team 1 Rank" />
-            <select style={input} value={scoreForm.team_2_id} onChange={(e) => setScoreForm({ ...scoreForm, team_2_id: e.target.value })}><option value="">Team 2</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
-            <input style={input} value={scoreForm.team_2_score} onChange={(e) => setScoreForm({ ...scoreForm, team_2_score: e.target.value })} placeholder="Team 2 Score" />
-            <input style={input} value={scoreForm.team_2_rank} onChange={(e) => setScoreForm({ ...scoreForm, team_2_rank: e.target.value })} placeholder="Team 2 Rank" />
-          </div>
-          <button style={button} onClick={saveScore}>Save Game Score</button>
-        </div>
-      )}
 
       {activeForm === "season" && (
         <div style={entryPanel}>
