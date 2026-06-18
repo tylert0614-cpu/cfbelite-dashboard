@@ -2397,7 +2397,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
                     <span style={{ color: "#facc15", fontWeight: 900 }}>{pick.status === "pick_is_in" ? "PICK IS IN" : (pick.status || "pending")}</span>
                   </div>
                   <div style={{ color: "#fff", fontWeight: 1000 }}>{pick.discord_username || pick.discord_users?.discord_username}</div>
-                  {visible && team?.logo_url && <img src={team.logo_url} alt="" style={S.tileWatermark}/>}
+                  {visible && (team?.logo_url || team?.helmet_url) && <img src={team.logo_url || team.helmet_url} alt="" style={S.tileWatermark}/>}
                   <div style={visible && team ? { color: "#facc15", fontWeight: 1000, position:"relative", zIndex:1 } : S.muted}>{visible && team ? team.name : (pick.status === "pick_is_in" ? "Team hidden until reveal" : "On deck")}</div>
                   {pick.status === "pick_is_in" && <button style={S.button} type="button" onClick={() => handleRevealPick(pick.pick_number)}>Reveal Pick</button>}
                   {pick.team_id && <button style={S.ghost} type="button" onClick={() => handleUndoPick(pick.pick_number)}>Undo</button>}
@@ -2434,7 +2434,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
                         borderColor: "#ffffff",
                         borderWidth: 1.5
                       }}>
-                        {team.logo_url && <img src={team.logo_url} alt="" style={S.tileWatermark}/>}
+                        {(team.logo_url || team.helmet_url) && <img src={team.logo_url || team.helmet_url} alt="" style={S.tileWatermark}/>}
                         <b style={{ color: "#ffffff", fontWeight: 1000, position:"relative", zIndex:1 }}>{team.name}</b>
                         <span style={{ color: "rgba(255,255,255,.82)", fontWeight: 850, position:"relative", zIndex:1 }}>{cleanConference(team.conference)}</span>
                       </div>
@@ -2558,129 +2558,183 @@ function weeklyRecapText({ teams, users, assignments, results, weeklyMatchups, c
 
 
 function MassDataEntry({ teams, users, currentYear, currentWeek, setError, loadData }) {
-  const [activeForm, setActiveForm] = useState("results");
-  const [bulkText, setBulkText] = useState("");
+  const [activeForm, setActiveForm] = useState("score");
+  const [scoreForm, setScoreForm] = useState({ season_year: currentYear, week: currentWeek, team_1_id: "", team_2_id: "", team_1_score: "", team_2_score: "", team_1_rank: "", team_2_rank: "" });
+  const [playerForm, setPlayerForm] = useState({ season_year: currentYear, week: currentWeek, player_name: "", team_id: "", position: "QB", pass_yards: "", pass_tds: "", interceptions: "", rush_yards: "", rush_tds: "", rec_yards: "", rec_tds: "", tackles: "", sacks: "", forced_turnovers: "" });
+  const [recruitRows, setRecruitRows] = useState([]);
 
-  const forms = [
-    { key:"results", title:"Mass Results Entry", icon:"📋", helper:"Paste one game per line: Team A, 31, Team B, 24, Week 0" },
-    { key:"recruiting", title:"Mass Recruiting Rankings", icon:"👥", helper:"Paste: Team, Rank, 5 stars, 4 stars, 3 stars, 2 stars, 1 star" },
-    { key:"allAmericans", title:"Mass All-Americans", icon:"⭐", helper:"Paste: Player, Team, Position, Type" },
-    { key:"awards", title:"Mass Awards", icon:"🏆", helper:"Paste: Player, Team, Position, Award" },
-    { key:"heismans", title:"Mass Heismans", icon:"🎖️", helper:"Paste: Player, Team, Position" },
-    { key:"champions", title:"Mass Champions", icon:"💍", helper:"Paste: Team, Discord User" },
-  ];
+  useEffect(() => {
+    setRecruitRows(teams.map((team) => ({
+      team_id: team.id,
+      team_name: team.name,
+      season_year: currentYear,
+      rank: "",
+      five_stars: "",
+      four_stars: "",
+      three_stars: "",
+      two_stars: "",
+      one_stars: "",
+    })));
+  }, [teams, currentYear]);
 
-  function normalize(value) {
-    return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-  }
+  const n = (value) => value === "" || value === null || value === undefined ? null : Number(value);
 
-  function findTeam(value) {
-    const target = normalize(value);
-    return teams.find((team)=>normalize(team.name) === target || normalize(team.name).includes(target) || target.includes(normalize(team.name)));
-  }
-
-  function findUser(value) {
-    const target = normalize(value);
-    return users.find((user)=>normalize(user.discord_username) === target || normalize(user.discord_username).includes(target) || target.includes(normalize(user.discord_username)));
-  }
-
-  async function submitBulk() {
-    const lines = bulkText.split("\\n").map((line)=>line.trim()).filter(Boolean);
-    if (!lines.length) {
-      setError("Paste at least one row first.");
+  async function saveScore() {
+    if (!scoreForm.team_1_id || !scoreForm.team_2_id || scoreForm.team_1_score === "" || scoreForm.team_2_score === "") {
+      setError("Select both teams and enter both scores.");
       return;
     }
 
-    const rows = [];
-    for (const line of lines) {
-      const cols = line.split(",").map((col)=>col.trim());
-      if (activeForm === "results") {
-        const [team1Name, score1, team2Name, score2, week = currentWeek] = cols;
-        const team1 = findTeam(team1Name);
-        const team2 = findTeam(team2Name);
-        if (team1 && team2 && scoreNumber(score1) !== null && scoreNumber(score2) !== null) {
-          rows.push({ season_year:Number(currentYear), week, team_1_id:team1.id, team_2_id:team2.id, team_1_score:Number(score1), team_2_score:Number(score2), tags:["User vs User"] });
-        }
-      }
+    const { error } = await supabase.from("game_results").insert({
+      season_year: Number(scoreForm.season_year || currentYear),
+      week: scoreForm.week || currentWeek,
+      team_1_id: scoreForm.team_1_id,
+      team_2_id: scoreForm.team_2_id,
+      team_1_score: Number(scoreForm.team_1_score),
+      team_2_score: Number(scoreForm.team_2_score),
+      team_1_rank: n(scoreForm.team_1_rank),
+      team_2_rank: n(scoreForm.team_2_rank),
+      tags: ["User vs User"],
+    });
 
-      if (activeForm === "recruiting") {
-        const [teamName, rank, five=0, four=0, three=0, two=0, one=0] = cols;
-        const team = findTeam(teamName);
-        if (team && Number(rank)>0) {
-          rows.push({ season_year:Number(currentYear), team_id:team.id, rank:Number(rank), five_stars:Number(five)||0, four_stars:Number(four)||0, three_stars:Number(three)||0, two_stars:Number(two)||0, one_stars:Number(one)||0 });
-        }
-      }
-
-      if (activeForm === "allAmericans") {
-        const [player, teamName, position="QB", type="First-Team"] = cols;
-        const team = findTeam(teamName);
-        if (player && team) rows.push({ season_year:Number(currentYear), player_name:player, team_id:team.id, position, type });
-      }
-
-      if (activeForm === "awards") {
-        const [player, teamName, position="QB", award_name=AWARD_NAMES[0]] = cols;
-        const team = findTeam(teamName);
-        if (player && team) rows.push({ season_year:Number(currentYear), player_name:player, team_id:team.id, position, award_name });
-      }
-
-      if (activeForm === "heismans") {
-        const [player, teamName, position="QB"] = cols;
-        const team = findTeam(teamName);
-        if (player && team) rows.push({ season_year:Number(currentYear), player_name:player, team_id:team.id, position });
-      }
-
-      if (activeForm === "champions") {
-        const [teamName, userName] = cols;
-        const team = findTeam(teamName);
-        const user = findUser(userName);
-        if (team) rows.push({ season_year:Number(currentYear), team_id:team.id, discord_user_id:user?.id || null });
-      }
-    }
-
-    if (!rows.length) {
-      setError("No valid rows were matched. Check spelling and comma format.");
+    if (error) {
+      setError(`Score save failed: ${error.message}`);
       return;
     }
 
-    const tableMap = {
-      results: "game_results",
-      recruiting: "recruiting_classes",
-      allAmericans: "all_americans",
-      awards: "awards",
-      heismans: "heisman_winners",
-      champions: "national_champions",
+    setScoreForm({ season_year: currentYear, week: currentWeek, team_1_id: "", team_2_id: "", team_1_score: "", team_2_score: "", team_1_rank: "", team_2_rank: "" });
+    setError("Game score saved.");
+    await loadData();
+  }
+
+  async function savePlayerStats() {
+    if (!playerForm.player_name || !playerForm.team_id) {
+      setError("Enter player name and team.");
+      return;
+    }
+
+    const payload = {
+      ...playerForm,
+      season_year: Number(playerForm.season_year || currentYear),
+      pass_yards: n(playerForm.pass_yards),
+      pass_tds: n(playerForm.pass_tds),
+      interceptions: n(playerForm.interceptions),
+      rush_yards: n(playerForm.rush_yards),
+      rush_tds: n(playerForm.rush_tds),
+      rec_yards: n(playerForm.rec_yards),
+      rec_tds: n(playerForm.rec_tds),
+      tackles: n(playerForm.tackles),
+      sacks: n(playerForm.sacks),
+      forced_turnovers: n(playerForm.forced_turnovers),
     };
 
-    const { error } = await supabase.from(tableMap[activeForm]).insert(rows);
+    const { error } = await supabase.from("game_player_stats").insert(payload);
     if (error) {
-      setError(`Mass entry failed: ${error.message}`);
+      setError(`Player stats save failed: ${error.message}`);
       return;
     }
 
-    setBulkText("");
-    setError(`Imported ${rows.length} row${rows.length === 1 ? "" : "s"} into ${forms.find((form)=>form.key===activeForm)?.title}.`);
+    setPlayerForm({ season_year: currentYear, week: currentWeek, player_name: "", team_id: "", position: "QB", pass_yards: "", pass_tds: "", interceptions: "", rush_yards: "", rush_tds: "", rec_yards: "", rec_tds: "", tackles: "", sacks: "", forced_turnovers: "" });
+    setError("Player stats saved.");
+    await loadData();
+  }
+
+  function updateRecruitRow(index, field, value) {
+    setRecruitRows((prev) => prev.map((row, i) => i === index ? { ...row, [field]: value } : row));
+  }
+
+  async function saveRecruitingRows() {
+    const payload = recruitRows
+      .filter((row) => row.rank !== "")
+      .map((row) => ({
+        team_id: row.team_id,
+        season_year: Number(row.season_year || currentYear),
+        rank: Number(row.rank),
+        five_stars: Number(row.five_stars || 0),
+        four_stars: Number(row.four_stars || 0),
+        three_stars: Number(row.three_stars || 0),
+        two_stars: Number(row.two_stars || 0),
+        one_stars: Number(row.one_stars || 0),
+      }));
+
+    if (!payload.length) {
+      setError("Enter at least one recruiting rank.");
+      return;
+    }
+
+    const { error } = await supabase.from("recruiting_classes").insert(payload);
+    if (error) {
+      setError(`Recruiting save failed: ${error.message}`);
+      return;
+    }
+
+    setError(`Saved ${payload.length} recruiting classes.`);
     await loadData();
   }
 
   return (
     <section style={card}>
       <h2 style={sectionTitle}>Mass Data Entry Hub</h2>
-      <p style={mutedText}>Paste comma-separated rows to enter full weeks, awards, recruiting classes, and championship data faster.</p>
+      <p style={mutedText}>Form-based entry for scores, player stats, and full recruiting classes.</p>
+
       <div style={massFormGrid}>
-        {forms.map((form)=>(
-          <button key={form.key} type="button" onClick={()=>setActiveForm(form.key)} style={{...massFormCard, borderColor: activeForm===form.key ? "#facc15" : "rgba(255,255,255,.16)"}}>
-            <span style={massFormIcon}>{form.icon}</span>
-            <b>{form.title}</b>
-            <small>{form.helper}</small>
-          </button>
-        ))}
+        <button type="button" style={{ ...massFormCard, borderColor: activeForm === "score" ? "#a78bfa" : "rgba(255,255,255,.16)" }} onClick={() => setActiveForm("score")}>🏈 Single Game Score</button>
+        <button type="button" style={{ ...massFormCard, borderColor: activeForm === "player" ? "#a78bfa" : "rgba(255,255,255,.16)" }} onClick={() => setActiveForm("player")}>📊 Player Game Stats</button>
+        <button type="button" style={{ ...massFormCard, borderColor: activeForm === "recruiting" ? "#a78bfa" : "rgba(255,255,255,.16)" }} onClick={() => setActiveForm("recruiting")}>👥 32-User Recruiting</button>
       </div>
-      <div style={miniCard}>
-        <h3 style={miniTitle}>{forms.find((form)=>form.key===activeForm)?.title}</h3>
-        <p style={mutedText}>{forms.find((form)=>form.key===activeForm)?.helper}</p>
-        <textarea style={bulkTextArea} value={bulkText} onChange={(e)=>setBulkText(e.target.value)} placeholder="Paste rows here, one per line..."/>
-        <button style={button} onClick={submitBulk}>Import Rows</button>
-      </div>
+
+      {activeForm === "score" && (
+        <div style={entryPanel}>
+          <h3 style={miniTitle}>Single Game Score</h3>
+          <div style={entryGrid}>
+            <select style={input} value={scoreForm.season_year} onChange={(e) => setScoreForm({ ...scoreForm, season_year: e.target.value })}>{YEARS.map((year) => <option key={year}>{year}</option>)}</select>
+            <select style={input} value={scoreForm.week} onChange={(e) => setScoreForm({ ...scoreForm, week: e.target.value })}>{WEEKS.map((week) => <option key={week}>{week}</option>)}</select>
+            <select style={input} value={scoreForm.team_1_id} onChange={(e) => setScoreForm({ ...scoreForm, team_1_id: e.target.value })}><option value="">Team 1</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
+            <input style={input} value={scoreForm.team_1_score} onChange={(e) => setScoreForm({ ...scoreForm, team_1_score: e.target.value })} placeholder="Team 1 Score" />
+            <input style={input} value={scoreForm.team_1_rank} onChange={(e) => setScoreForm({ ...scoreForm, team_1_rank: e.target.value })} placeholder="Team 1 Rank" />
+            <select style={input} value={scoreForm.team_2_id} onChange={(e) => setScoreForm({ ...scoreForm, team_2_id: e.target.value })}><option value="">Team 2</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
+            <input style={input} value={scoreForm.team_2_score} onChange={(e) => setScoreForm({ ...scoreForm, team_2_score: e.target.value })} placeholder="Team 2 Score" />
+            <input style={input} value={scoreForm.team_2_rank} onChange={(e) => setScoreForm({ ...scoreForm, team_2_rank: e.target.value })} placeholder="Team 2 Rank" />
+          </div>
+          <button style={button} onClick={saveScore}>Save Game Score</button>
+        </div>
+      )}
+
+      {activeForm === "player" && (
+        <div style={entryPanel}>
+          <h3 style={miniTitle}>Player Game Stats</h3>
+          <div style={entryGrid}>
+            <input style={input} value={playerForm.player_name} onChange={(e) => setPlayerForm({ ...playerForm, player_name: e.target.value })} placeholder="Player Name" />
+            <select style={input} value={playerForm.team_id} onChange={(e) => setPlayerForm({ ...playerForm, team_id: e.target.value })}><option value="">Team</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
+            <select style={input} value={playerForm.position} onChange={(e) => setPlayerForm({ ...playerForm, position: e.target.value })}>{POSITIONS.filter((pos) => pos !== "Coach").map((pos) => <option key={pos}>{pos}</option>)}</select>
+            <select style={input} value={playerForm.week} onChange={(e) => setPlayerForm({ ...playerForm, week: e.target.value })}>{WEEKS.map((week) => <option key={week}>{week}</option>)}</select>
+            {["pass_yards","pass_tds","interceptions","rush_yards","rush_tds","rec_yards","rec_tds","tackles","sacks","forced_turnovers"].map((field) => (
+              <input key={field} style={input} value={playerForm[field]} onChange={(e) => setPlayerForm({ ...playerForm, [field]: e.target.value })} placeholder={field.replaceAll("_", " ")} />
+            ))}
+          </div>
+          <button style={button} onClick={savePlayerStats}>Save Player Stats</button>
+        </div>
+      )}
+
+      {activeForm === "recruiting" && (
+        <div style={entryPanel}>
+          <h3 style={miniTitle}>32-User Recruiting Form</h3>
+          <div style={recruitingMassGrid}>
+            {recruitRows.map((row, index) => (
+              <div key={row.team_id} style={recruitingMassRow}>
+                <b>{row.team_name}</b>
+                <input style={input} value={row.rank} onChange={(e) => updateRecruitRow(index, "rank", e.target.value)} placeholder="Rank" />
+                <input style={input} value={row.five_stars} onChange={(e) => updateRecruitRow(index, "five_stars", e.target.value)} placeholder="5★" />
+                <input style={input} value={row.four_stars} onChange={(e) => updateRecruitRow(index, "four_stars", e.target.value)} placeholder="4★" />
+                <input style={input} value={row.three_stars} onChange={(e) => updateRecruitRow(index, "three_stars", e.target.value)} placeholder="3★" />
+                <input style={input} value={row.two_stars} onChange={(e) => updateRecruitRow(index, "two_stars", e.target.value)} placeholder="2★" />
+                <input style={input} value={row.one_stars} onChange={(e) => updateRecruitRow(index, "one_stars", e.target.value)} placeholder="1★" />
+              </div>
+            ))}
+          </div>
+          <button style={button} onClick={saveRecruitingRows}>Save Recruiting Classes</button>
+        </div>
+      )}
     </section>
   );
 }
@@ -3642,7 +3696,7 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
           color: team?.accent_color || "#fff",
         }}
       >
-        {team?.logo_url && <img src={team.logo_url} alt="" style={coachMenuLogoWatermark}/>}
+        {(team?.logo_url || team?.helmet_url) && <img src={team.logo_url || team.helmet_url} alt="" style={coachMenuLogoWatermark}/>}
         <span style={{ ...coachAccentStripe, background: accent }} />
         <span style={coachNavTextWrap}>
           <strong style={coachNavName}>{label}</strong>
@@ -5776,4 +5830,37 @@ const bulkTextArea = {
   minHeight: 220,
   resize: "vertical",
   fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+};
+
+
+const entryPanel = {
+  ...liquidGlassPanel,
+  display: "grid",
+  gap: 16,
+};
+
+const entryGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: 12,
+};
+
+const recruitingMassGrid = {
+  display: "grid",
+  gap: 10,
+  maxHeight: "65vh",
+  overflow: "auto",
+  paddingRight: 4,
+};
+
+const recruitingMassRow = {
+  display: "grid",
+  gridTemplateColumns: "minmax(190px, 1.4fr) repeat(6, minmax(72px, .55fr))",
+  gap: 8,
+  alignItems: "center",
+  border: "1px solid rgba(255,255,255,.12)",
+  borderRadius: 14,
+  padding: 10,
+  background: "rgba(255,255,255,.045)",
+  color: "#fff",
 };
