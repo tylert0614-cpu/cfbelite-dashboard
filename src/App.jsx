@@ -6,7 +6,7 @@ const supabase = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY
 );
 
-const WEEKS = ["Week 1","Week 2","Week 3","Week 4","Week 5","Week 6","Week 7","Week 8","Week 9","Week 10","Week 11","Week 12","Week 13","Week 14","Conference Championship Week","Bowl Week 1","Bowl Week 2","Bowl Week 3","National Championship Week"];
+const WEEKS = ["Week 0","Week 1","Week 2","Week 3","Week 4","Week 5","Week 6","Week 7","Week 8","Week 9","Week 10","Week 11","Week 12","Week 13","Week 14","Conference Championship Week","Bowl Week 1","Bowl Week 2","Bowl Week 3","National Championship Week"];
 function weekIndex(week) { const index = WEEKS.indexOf(week); return index === -1 ? 999 : index; }
 const POSITIONS = ["Coach","QB","RB","WR","TE","LT","LG","C","RG","RT","EDGE","DT","SAM","WILL","MIKE","CB","FS","SS","KR","PR","K","P"];
 const YEARS = Array.from({ length: 25 }, (_, index) => String(2026 + index));
@@ -667,7 +667,7 @@ export default function App() {
     await saveCommissionerRankings(next);
   }
 
-  const baseTabs = [["dashboard","Dashboard"],["draftRoom","CFBElite 27 Draft Room"],["commissionerCenter","Commissioner Center"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["powerIndex","Power Index"],["programPrestige","Program Prestige"],["recruitingDynasty","Recruiting Dynasty"],["eloRankings","User ELO"],["conferencePower","Conference Power"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["assignments","Users/Team Assignments"],["resultsManager","Results Manager"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...activeCoachUsers.map((user) => [`coach-${user.id}`, user.discord_username])];
+  const baseTabs = [["dashboard","Dashboard"],["draftRoom","CFBElite 27 Draft Room"],["commissionerCenter","Commissioner Center"],["massDataEntry","Mass Data Entry"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["powerIndex","Power Index"],["eloRankings","User ELO"],["conferencePower","Conference Power"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["assignments","Users/Team Assignments"],["resultsManager","Results Manager"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...activeCoachUsers.map((user) => [`coach-${user.id}`, user.discord_username])];
   const tabs = useMemo(() => {
     const tabMap = new Map(baseTabs);
     const ordered = tabOrder
@@ -1080,9 +1080,8 @@ export default function App() {
     {activeTab === "dynastyRecords" && <DynastyRecords users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
     {activeTab === "rivalries" && <Rivalries users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
     {activeTab === "powerIndex" && <DynastyPowerIndex users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}
-    {activeTab === "programPrestige" && <ProgramPrestige teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}
-    {activeTab === "recruitingDynasty" && <RecruitingDynasty users={userOptions} teams={teamOptions} assignments={assignments} recruiting={recruiting} updateRow={updateRow}/>}
     {activeTab === "commissionerCenter" && (adminUnlocked ? <CommissionerCenter currentYear={currentYear} currentWeek={currentWeek} setActiveTab={setActiveTab} saveLeagueSettings={saveLeagueSettings} loadData={loadData} teams={teamOptions} users={userOptions} assignments={assignments} results={results} awards={awards} allAmericans={allAmericans} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>) }    
+    {activeTab === "massDataEntry" && (adminUnlocked ? <MassDataEntry teams={teamOptions} users={userOptions} currentYear={currentYear} currentWeek={currentWeek} setError={setError} loadData={loadData}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>) }
     {activeTab === "conferencePower" && <ConferencePowerRankings teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
     {activeTab === "weeklyMedia" && <WeeklyMedia teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} weeklyMatchups={weeklyMatchups} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} currentWeek={currentWeek}/>}    
     {activeTab === "weeklyMatchups" && (adminUnlocked ? <WeeklyMatchups rows={weeklyMatchups} newMatchup={newWeeklyMatchup} setNewMatchup={setNewWeeklyMatchup} teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} currentYear={currentYear} currentWeek={currentWeek} addMatchup={addWeeklyMatchup} deleteRow={deleteRow} matchupImportText={matchupImportText} setMatchupImportText={setMatchupImportText} importWeeklyMatchups={importWeeklyMatchups}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>) }    
@@ -1322,98 +1321,20 @@ function DynastyRecords({ users, teams, assignments, results, allAmericans, awar
   );
 }
 
-
-function prestigeTier(score) {
-  if (score >= 95) return { label: "Blue Blood", emoji: "👑" };
-  if (score >= 88) return { label: "Elite", emoji: "🏆" };
-  if (score >= 78) return { label: "Powerhouse", emoji: "⚡" };
-  if (score >= 68) return { label: "Contender", emoji: "🔥" };
-  if (score >= 58) return { label: "Established", emoji: "📈" };
-  if (score >= 45) return { label: "Rising", emoji: "🌱" };
-  if (score >= 30) return { label: "Building", emoji: "🧱" };
-  return { label: "Rebuilding", emoji: "🔧" };
-}
-
-function programPrestigeRows(teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting) {
-  const years = [...new Set([
-    ...results.map((row)=>row.season_year),
-    ...recruiting.map((row)=>row.season_year),
-    ...allAmericans.map((row)=>row.season_year),
-    ...awards.map((row)=>row.season_year),
-    ...heismans.map((row)=>row.season_year),
-    ...nationalChampions.map((row)=>row.season_year),
-  ].filter(Boolean).map(String))].sort((a,b)=>Number(a)-Number(b));
-
-  const currentYear = Number(years[years.length - 1] || new Date().getFullYear());
-
-  const rawRows = teams.map((team)=>{
-    const rec = recordFromResults(team.id, results);
-    const games = rec.wins + rec.losses;
-    const winPct = games ? rec.wins / games : 0;
-    const nattys = nationalChampions.filter((row)=>row.team_id===team.id).length + titleCount(team.id, results, "National Championship Week");
-    const confTitles = titleCount(team.id, results, "Conference Championship Week");
-    const top10 = top10Wins(team.id, results);
-    const bowl = bowlRecord(team.id, results);
-    const aa = allAmericans.filter((row)=>row.team_id===team.id).length;
-    const awardCount = awards.filter((row)=>row.team_id===team.id).length;
-    const heismanCount = heismans.filter((row)=>row.team_id===team.id).length;
-    const recruitingRows = recruiting.filter((row)=>row.team_id===team.id && Number(row.rank)>0);
-    const top25Classes = recruitingRows.filter((row)=>Number(row.rank)>=1 && Number(row.rank)<=25).length;
-    const avgRecruitRank = recruitingRows.length ? recruitingRows.reduce((sum,row)=>sum+Number(row.rank),0)/recruitingRows.length : null;
-    const bestRecruitRank = recruitingRows.length ? Math.min(...recruitingRows.map((row)=>Number(row.rank))) : null;
-
-    const recentResults = results.filter((row)=>row.team_1_id===team.id || row.team_2_id===team.id).filter((row)=>Number(row.season_year || 0) >= currentYear - 2);
-    const recentRec = recordFromResults(team.id, recentResults);
-    const recentGames = recentRec.wins + recentRec.losses;
-    const recentWinPct = recentGames ? recentRec.wins / recentGames : 0;
-
-    const recruitingScore = avgRecruitRank ? Math.max(0, 24 - (avgRecruitRank * .7)) + top25Classes * 1.2 + (bestRecruitRank === 1 ? 6 : bestRecruitRank && bestRecruitRank <= 5 ? 3 : 0) : 0;
-    const successScore = winPct * 24 + recentWinPct * 12 + Math.min(rec.wins * .75, 28) + top10 * 4.5 + bowl.wins * 2.25;
-    const trophyScore = nattys * 24 + confTitles * 9 + heismanCount * 6 + awardCount * 2.25 + aa * 1.1;
-    const longevityScore = Math.min(games * .45, 15);
-
-    const rawScore = successScore + trophyScore + recruitingScore + longevityScore;
-    return { team, rec, games, winPct, recentWinPct, nattys, confTitles, top10, bowl, aa, awardCount, heismanCount, top25Classes, avgRecruitRank, bestRecruitRank, rawScore };
-  });
-
-  const maxRaw = Math.max(1, ...rawRows.map((row)=>row.rawScore));
-  return rawRows
-    .map((row)=>{
-      const score = Number(Math.min(100, (row.rawScore / maxRaw) * 100).toFixed(1));
-      return { ...row, score, tier: prestigeTier(score) };
-    })
-    .sort((a,b)=>b.score-a.score || b.nattys-a.nattys || b.rec.wins-a.rec.wins || a.team.name.localeCompare(b.team.name));
-}
-
 function ProgramPrestige({ teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting }) {
-  const rows = programPrestigeRows(teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
-
-  return (
-    <section style={card}>
-      <h2 style={sectionTitle}>Program Prestige System</h2>
-      <p style={mutedText}>A 0-100 dynasty prestige score built like real program status: championships, winning, elite wins, recruiting, awards, All-Americans, Heismans, bowl success, and sustained momentum.</p>
-      <div style={prestigeGrid}>
-        {rows.map((row, index)=>(
-          <div key={row.team.id} style={prestigeCard}>
-            <div style={leaderRow}>
-              <b>#{index + 1}</b>
-              <span style={prestigeTierPill}>{row.tier.emoji} {row.tier.label}</span>
-            </div>
-            <div style={prestigeTeamName}><TeamLabel team={row.team}/></div>
-            <div style={prestigeScore}>{row.score}</div>
-            <div style={prestigeMiniGrid}>
-              <span>Record <b>{row.rec.wins}-{row.rec.losses}</b></span>
-              <span>Nattys <b>{row.nattys}</b></span>
-              <span>Conf <b>{row.confTitles}</b></span>
-              <span>Top 10 <b>{row.top10}</b></span>
-              <span>Avg Recruit <b>{row.avgRecruitRank ? `#${row.avgRecruitRank.toFixed(1)}` : "—"}</b></span>
-              <span>AA/Awards <b>{row.aa}/{row.awardCount}</b></span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
+  const rows = teams.map((team)=>{
+    const rec = recordFromResults(team.id, results);
+    const nattys = nationalChampions.filter((row)=>row.team_id===team.id).length + titleCount(team.id, results, "National Championship Week");
+    const conf = titleCount(team.id, results, "Conference Championship Week");
+    const aa = allAmericans.filter((row)=>row.team_id===team.id).length;
+    const aw = awards.filter((row)=>row.team_id===team.id).length;
+    const hs = heismans.filter((row)=>row.team_id===team.id).length;
+    const bestRecruit = recruiting.filter((row)=>row.team_id===team.id && Number(row.rank)>0).sort((a,b)=>Number(a.rank)-Number(b.rank))[0];
+    const recruitScore = bestRecruit ? Math.max(0, 30 - Number(bestRecruit.rank)) : 0;
+    const score = rec.wins*2 + nattys*40 + conf*18 + hs*15 + aw*5 + aa*2 + recruitScore;
+    return { team, rec, nattys, conf, aa, aw, hs, bestRecruit, score };
+  }).filter((row)=>row.rec.games || row.aa || row.aw || row.nattys || row.bestRecruit).sort((a,b)=>b.score-a.score).slice(0,40);
+  return <section style={card}><h2 style={sectionTitle}>Program Prestige Rating</h2><p style={mutedText}>School-based hidden prestige score using wins, recruiting, awards, All-Americans, Heismans, and championships.</p><Table headers={["#", "Program", "Score", "Record", "Nattys", "Conf", "Recruiting"]}>{rows.map((row,index)=><tr key={row.team.id} style={trStyle}><td style={rankCell}>#{index+1}</td><td style={teamCell}><TeamLabel team={row.team}/></td><td style={scoreCell}>{row.score.toFixed(1)}</td><td style={td}>{row.rec.wins}-{row.rec.losses}</td><td style={td}>{row.nattys}</td><td style={td}>{row.conf}</td><td style={td}>{row.bestRecruit ? `#${row.bestRecruit.rank}` : "—"}</td></tr>)}</Table></section>;
 }
 
 function DynastyPowerIndex({ users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting }) {
@@ -2370,7 +2291,6 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
     activePickRow: { marginTop: 14, border: "1px solid rgba(250,204,21,.38)", background: "rgba(250,204,21,.08)", borderRadius: 16, padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" },
     activePickTeam: { color: "#facc15", fontSize: "clamp(20px, 5vw, 30px)", fontWeight: 1000, lineHeight: 1.05 },
     activePickMeta: { color: "rgba(255,255,255,.78)", fontWeight: 900, whiteSpace: "nowrap" },
-    draftStatusBanner: { border: "1px solid rgba(250,204,21,.42)", background: "linear-gradient(135deg, rgba(250,204,21,.16), rgba(15,23,42,.78))", color: "#fff", borderRadius: 18, padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", fontWeight: 1000 },
     twoCol: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 },
   };
 
@@ -2389,13 +2309,6 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
           <div style={S.clock}>{timeLabel()}</div>
         </div>
       </div>
-
-      {(selectedTeam || stagedTeam) && (
-        <div style={S.draftStatusBanner}>
-          <b>{stagedTeam ? "PICK SUBMITTED" : "TEAM SELECTED"}</b>
-          <span>{(stagedTeam || selectedTeam)?.name} · Pick #{String((stagedPick || currentPick)?.pick_number || 1).padStart(2, "0")}</span>
-        </div>
-      )}
 
       <div style={S.panel}>
         <div style={S.eyebrow}>Draft Controls</div>
@@ -2484,7 +2397,8 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
                     <span style={{ color: "#facc15", fontWeight: 900 }}>{pick.status === "pick_is_in" ? "PICK IS IN" : (pick.status || "pending")}</span>
                   </div>
                   <div style={{ color: "#fff", fontWeight: 1000 }}>{pick.discord_username || pick.discord_users?.discord_username}</div>
-                  <div style={visible && team ? { color: "#facc15", fontWeight: 1000 } : S.muted}>{visible && team ? team.name : (pick.status === "pick_is_in" ? "Team hidden until reveal" : "On deck")}</div>
+                  {visible && team?.logo_url && <img src={team.logo_url} alt="" style={S.tileWatermark}/>}
+                  <div style={visible && team ? { color: "#facc15", fontWeight: 1000, position:"relative", zIndex:1 } : S.muted}>{visible && team ? team.name : (pick.status === "pick_is_in" ? "Team hidden until reveal" : "On deck")}</div>
                   {pick.status === "pick_is_in" && <button style={S.button} type="button" onClick={() => handleRevealPick(pick.pick_number)}>Reveal Pick</button>}
                   {pick.team_id && <button style={S.ghost} type="button" onClick={() => handleUndoPick(pick.pick_number)}>Undo</button>}
                 </div>
@@ -2514,12 +2428,15 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
                     {group.teams.map((team) => (
                       <div key={team.id} style={{
                         ...S.pickTile,
+                        position: "relative",
+                        overflow: "hidden",
                         background: `linear-gradient(135deg, ${team.primary_color || "#1f2937"}cc, rgba(15,23,42,.88))`,
                         borderColor: "#ffffff",
                         borderWidth: 1.5
                       }}>
-                        <b style={{ color: "#ffffff", fontWeight: 1000 }}>{team.name}</b>
-                        <span style={{ color: "rgba(255,255,255,.82)", fontWeight: 850 }}>{cleanConference(team.conference)}</span>
+                        {team.logo_url && <img src={team.logo_url} alt="" style={S.tileWatermark}/>}
+                        <b style={{ color: "#ffffff", fontWeight: 1000, position:"relative", zIndex:1 }}>{team.name}</b>
+                        <span style={{ color: "rgba(255,255,255,.82)", fontWeight: 850, position:"relative", zIndex:1 }}>{cleanConference(team.conference)}</span>
                       </div>
                     ))}
                   </div>
@@ -2639,99 +2556,130 @@ function weeklyRecapText({ teams, users, assignments, results, weeklyMatchups, c
 }
 
 
-function RecruitingDynasty({ users, teams, assignments, recruiting, updateRow }) {
-  const coachRows = users.map((user)=>{
-    const rows = recruiting.filter((row)=>{
-      const assignment = coachForTeamYear(row.team_id, row.season_year, assignments);
-      return assignment?.discord_user_id === user.id;
-    });
 
-    const rankedRows = rows.filter((row)=>Number(row.rank)>0);
-    const avgRank = rankedRows.length ? rankedRows.reduce((sum,row)=>sum+Number(row.rank),0)/rankedRows.length : null;
-    const bestRank = rankedRows.length ? Math.min(...rankedRows.map((row)=>Number(row.rank))) : null;
-    const worstRank = rankedRows.length ? Math.max(...rankedRows.map((row)=>Number(row.rank))) : null;
+function MassDataEntry({ teams, users, currentYear, currentWeek, setError, loadData }) {
+  const [activeForm, setActiveForm] = useState("results");
+  const [bulkText, setBulkText] = useState("");
 
-    const stars = rows.reduce((acc,row)=>{
-      acc.five += Number(row.five_stars || 0);
-      acc.four += Number(row.four_stars || 0);
-      acc.three += Number(row.three_stars || 0);
-      acc.two += Number(row.two_stars || 0);
-      acc.one += Number(row.one_stars || 0);
-      return acc;
-    }, { five:0, four:0, three:0, two:0, one:0 });
+  const forms = [
+    { key:"results", title:"Mass Results Entry", icon:"📋", helper:"Paste one game per line: Team A, 31, Team B, 24, Week 0" },
+    { key:"recruiting", title:"Mass Recruiting Rankings", icon:"👥", helper:"Paste: Team, Rank, 5 stars, 4 stars, 3 stars, 2 stars, 1 star" },
+    { key:"allAmericans", title:"Mass All-Americans", icon:"⭐", helper:"Paste: Player, Team, Position, Type" },
+    { key:"awards", title:"Mass Awards", icon:"🏆", helper:"Paste: Player, Team, Position, Award" },
+    { key:"heismans", title:"Mass Heismans", icon:"🎖️", helper:"Paste: Player, Team, Position" },
+    { key:"champions", title:"Mass Champions", icon:"💍", helper:"Paste: Team, Discord User" },
+  ];
 
-    const recruitingRating = stars.five*10 + stars.four*4 + stars.three*1 + stars.two*.25 + stars.one*.1 + (avgRank ? Math.max(0, 30 - avgRank) : 0);
+  function normalize(value) {
+    return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  }
 
-    return {
-      user,
-      rows,
-      totalClasses: rows.length,
-      avgRank,
-      bestRank,
-      worstRank,
-      top10Classes: rankedRows.filter((row)=>Number(row.rank)<=10).length,
-      top25Classes: rankedRows.filter((row)=>Number(row.rank)<=25).length,
-      stars,
-      recruitingRating,
+  function findTeam(value) {
+    const target = normalize(value);
+    return teams.find((team)=>normalize(team.name) === target || normalize(team.name).includes(target) || target.includes(normalize(team.name)));
+  }
+
+  function findUser(value) {
+    const target = normalize(value);
+    return users.find((user)=>normalize(user.discord_username) === target || normalize(user.discord_username).includes(target) || target.includes(normalize(user.discord_username)));
+  }
+
+  async function submitBulk() {
+    const lines = bulkText.split("\\n").map((line)=>line.trim()).filter(Boolean);
+    if (!lines.length) {
+      setError("Paste at least one row first.");
+      return;
+    }
+
+    const rows = [];
+    for (const line of lines) {
+      const cols = line.split(",").map((col)=>col.trim());
+      if (activeForm === "results") {
+        const [team1Name, score1, team2Name, score2, week = currentWeek] = cols;
+        const team1 = findTeam(team1Name);
+        const team2 = findTeam(team2Name);
+        if (team1 && team2 && scoreNumber(score1) !== null && scoreNumber(score2) !== null) {
+          rows.push({ season_year:Number(currentYear), week, team_1_id:team1.id, team_2_id:team2.id, team_1_score:Number(score1), team_2_score:Number(score2), tags:["User vs User"] });
+        }
+      }
+
+      if (activeForm === "recruiting") {
+        const [teamName, rank, five=0, four=0, three=0, two=0, one=0] = cols;
+        const team = findTeam(teamName);
+        if (team && Number(rank)>0) {
+          rows.push({ season_year:Number(currentYear), team_id:team.id, rank:Number(rank), five_stars:Number(five)||0, four_stars:Number(four)||0, three_stars:Number(three)||0, two_stars:Number(two)||0, one_stars:Number(one)||0 });
+        }
+      }
+
+      if (activeForm === "allAmericans") {
+        const [player, teamName, position="QB", type="First-Team"] = cols;
+        const team = findTeam(teamName);
+        if (player && team) rows.push({ season_year:Number(currentYear), player_name:player, team_id:team.id, position, type });
+      }
+
+      if (activeForm === "awards") {
+        const [player, teamName, position="QB", award_name=AWARD_NAMES[0]] = cols;
+        const team = findTeam(teamName);
+        if (player && team) rows.push({ season_year:Number(currentYear), player_name:player, team_id:team.id, position, award_name });
+      }
+
+      if (activeForm === "heismans") {
+        const [player, teamName, position="QB"] = cols;
+        const team = findTeam(teamName);
+        if (player && team) rows.push({ season_year:Number(currentYear), player_name:player, team_id:team.id, position });
+      }
+
+      if (activeForm === "champions") {
+        const [teamName, userName] = cols;
+        const team = findTeam(teamName);
+        const user = findUser(userName);
+        if (team) rows.push({ season_year:Number(currentYear), team_id:team.id, discord_user_id:user?.id || null });
+      }
+    }
+
+    if (!rows.length) {
+      setError("No valid rows were matched. Check spelling and comma format.");
+      return;
+    }
+
+    const tableMap = {
+      results: "game_results",
+      recruiting: "recruiting_classes",
+      allAmericans: "all_americans",
+      awards: "awards",
+      heismans: "heisman_winners",
+      champions: "national_champions",
     };
-  }).filter((row)=>row.totalClasses || row.recruitingRating).sort((a,b)=>b.recruitingRating-a.recruitingRating || (a.avgRank||999)-(b.avgRank||999) || a.user.discord_username.localeCompare(b.user.discord_username));
 
-  const editableRows = recruiting.filter((row)=>row.id).sort((a,b)=>Number(b.season_year||0)-Number(a.season_year||0) || Number(a.rank||999)-Number(b.rank||999));
+    const { error } = await supabase.from(tableMap[activeForm]).insert(rows);
+    if (error) {
+      setError(`Mass entry failed: ${error.message}`);
+      return;
+    }
+
+    setBulkText("");
+    setError(`Imported ${rows.length} row${rows.length === 1 ? "" : "s"} into ${forms.find((form)=>form.key===activeForm)?.title}.`);
+    await loadData();
+  }
 
   return (
     <section style={card}>
-      <h2 style={sectionTitle}>Recruiting Dynasty</h2>
-      <p style={mutedText}>User-based recruiting résumé. Class rank is pulled from recruiting entries; star counts are manually entered per class and follow the coach across team changes.</p>
-
-      <div style={prestigeGrid}>
-        {coachRows.map((row,index)=>(
-          <div key={row.user.id} style={prestigeCard}>
-            <div style={leaderRow}><b>#{index+1}</b><span>{row.user.discord_username}</span></div>
-            <div style={prestigeScore}>{row.recruitingRating.toFixed(1)}</div>
-            <div style={prestigeMiniGrid}>
-              <span>Avg Rank <b>{row.avgRank ? `#${row.avgRank.toFixed(1)}` : "—"}</b></span>
-              <span>Best <b>{row.bestRank ? `#${row.bestRank}` : "—"}</b></span>
-              <span>Worst <b>{row.worstRank ? `#${row.worstRank}` : "—"}</b></span>
-              <span>Top 10 <b>{row.top10Classes}</b></span>
-              <span>Top 25 <b>{row.top25Classes}</b></span>
-              <span>Classes <b>{row.totalClasses}</b></span>
-              <span>5★ <b>{row.stars.five}</b></span>
-              <span>4★ <b>{row.stars.four}</b></span>
-              <span>3★ <b>{row.stars.three}</b></span>
-              <span>2★ <b>{row.stars.two}</b></span>
-              <span>1★ <b>{row.stars.one}</b></span>
-            </div>
-          </div>
+      <h2 style={sectionTitle}>Mass Data Entry Hub</h2>
+      <p style={mutedText}>Paste comma-separated rows to enter full weeks, awards, recruiting classes, and championship data faster.</p>
+      <div style={massFormGrid}>
+        {forms.map((form)=>(
+          <button key={form.key} type="button" onClick={()=>setActiveForm(form.key)} style={{...massFormCard, borderColor: activeForm===form.key ? "#facc15" : "rgba(255,255,255,.16)"}}>
+            <span style={massFormIcon}>{form.icon}</span>
+            <b>{form.title}</b>
+            <small>{form.helper}</small>
+          </button>
         ))}
       </div>
-
       <div style={miniCard}>
-        <h3 style={miniTitle}>Manual Star Count Entry</h3>
-        <p style={mutedText}>Use these fields after adding a class rank to log how many recruits of each star level were signed.</p>
-        <div style={mobileList}>
-          {editableRows.map((row)=>(
-            <div key={row.id} style={managerCard}>
-              <div style={leaderRow}>
-                <b>{row.season_year} · #{row.rank || "—"}</b>
-                <span>{row.teams?.name || teamNameById(row.team_id, teams)}</span>
-              </div>
-              <div style={starGrid}>
-                {[
-                  ["five_stars", "5★"],
-                  ["four_stars", "4★"],
-                  ["three_stars", "3★"],
-                  ["two_stars", "2★"],
-                  ["one_stars", "1★"],
-                ].map(([field,label])=>(
-                  <label key={field} style={starInputWrap}>
-                    <span>{label}</span>
-                    <input style={input} value={row[field] ?? ""} onChange={(e)=>updateRow?.("recruiting_classes", row.id, field, e.target.value)} placeholder="0"/>
-                  </label>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+        <h3 style={miniTitle}>{forms.find((form)=>form.key===activeForm)?.title}</h3>
+        <p style={mutedText}>{forms.find((form)=>form.key===activeForm)?.helper}</p>
+        <textarea style={bulkTextArea} value={bulkText} onChange={(e)=>setBulkText(e.target.value)} placeholder="Paste rows here, one per line..."/>
+        <button style={button} onClick={submitBulk}>Import Rows</button>
       </div>
     </section>
   );
@@ -3270,7 +3218,7 @@ function CoachRings({ stats, superlatives }) {
 
 function CoachProfile({ user, users = [], teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting }) {
   const coachStats = getCoachStats(usersFallback(user), teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
-  const stats = coachStats.find((row)=>row.userId === user.id) || { wins:0, losses:0, nattys:0, confTitles:0, top25Wins:0, top10Wins:0, awards:0, allAmericans:0, heismans:0, prestige:0 };
+  const stats = coachStats.find((row)=>row.userId === user.id) || { wins:0, losses:0, nattys:0, confTitles:0, top25Wins:0, awards:0, allAmericans:0, heismans:0, prestige:0 };
   const activeAssignment = assignments.find((a)=>a.discord_user_id===user.id && a.status==="Active");
   const currentTeam =
     teams.find((t)=>t.id===activeAssignment?.team_id) ||
@@ -3610,8 +3558,8 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
 
   const groups = [
     { title: "Main", keys: ["dashboard", "draftRoom"] },
-    { title: "Media", keys: [  "recruitingRankings", "dynastyTimeline"] },
-    { title: "Dynasty Legacy", keys: ["dynastyRecords", "rivalries", "powerIndex", "programPrestige", "recruitingDynasty"] },
+    { title: "Media", keys: ["massDataEntry", "recruitingRankings", "dynastyTimeline"] },
+    { title: "Dynasty Legacy", keys: ["dynastyRecords", "rivalries", "powerIndex",  "coachingTree"] },
     { title: "Rankings", keys: ["eloRankings", "conferencePower"] },
     { title: "League History", keys: ["coachHOF", "playerHOF", "h2h"] },
     { title: "Recognition", keys: ["allAmericans", "awards", "heismans", "nationalChampions"] },
@@ -3686,12 +3634,15 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
         onClick={() => handleSelect(tabKey)}
         style={{
           ...coachDrawerItem,
+          position: "relative",
+          overflow: "hidden",
           background: `linear-gradient(135deg, ${primary}ee, rgba(15,23,42,.96))`,
           border: `1px solid ${active ? accent : secondary}88`,
           boxShadow: active ? `0 0 0 1px ${accent}55, 0 0 24px ${accent}44` : `0 10px 24px rgba(0,0,0,.20)`,
           color: team?.accent_color || "#fff",
         }}
       >
+        {team?.logo_url && <img src={team.logo_url} alt="" style={coachMenuLogoWatermark}/>}
         <span style={{ ...coachAccentStripe, background: accent }} />
         <span style={coachNavTextWrap}>
           <strong style={coachNavName}>{label}</strong>
@@ -3767,9 +3718,15 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
   );
 }
 function Stats({ currentYear, setCurrentYear, currentWeek, setCurrentWeek, teams, assignments, saveSettings }) {
+  const validTeamIds = new Set(teams.map((team)=>team.id));
   const activeCoaches = new Set(
     assignments
-      .filter((assignment) => assignment.status === "Active" && assignment.discord_user_id)
+      .filter((assignment) =>
+        assignment.status === "Active" &&
+        assignment.discord_user_id &&
+        assignment.team_id &&
+        validTeamIds.has(assignment.team_id)
+      )
       .map((assignment) => assignment.discord_user_id)
   ).size;
 
@@ -4385,11 +4342,8 @@ function TeamPage({ team, standings, results, allResults, teams, assignments, al
   const teamSectionTitle = { ...sectionTitle, color: secondaryColor };
   const teamCoachBanner = { ...coachBanner, color: secondaryColor, border: `1px solid ${secondaryColor}` };
   const teamCoachNameStyle = { ...coachNameStyle, color: secondaryColor };
-  const prestigeRow = programPrestigeRows(teams, assignments, allResults, allAmericans, awards, heismans, [], recruiting).find((row)=>row.team.id===team.id);
-  const nattys = titleCount(team.id, allResults, "National Championship Week");
-  const confTitles = titleCount(team.id, allResults, "Conference Championship Week");
 
-  return <section style={teamPageStyle}><h2 style={teamSectionTitle}><TeamLabel team={team} /></h2><div style={programPrestigeHero}><div><div style={eyebrow}>Program Prestige</div><div style={prestigeScore}>{prestigeRow?.score ?? "0.0"}</div><div style={prestigeTierPill}>{prestigeRow?.tier?.emoji || "🔧"} {prestigeRow?.tier?.label || "Rebuilding"}</div></div><div style={programRingRow}><span>🏆 {nattys} Nattys</span><span>💍 {confTitles} Conf Titles</span><span>🎯 {top10Wins(team.id, allResults)} Top 10 Wins</span></div></div><div style={teamCoachBanner}><div><div style={statTitle}>Current Discord User / Coach</div><div style={teamCoachNameStyle}>{coachName}</div></div><div><div style={statTitle}>Program Page</div><div style={mutedText}>Team history and coach profile combined.</div></div></div><div style={statsGrid}><Stat title="Overall" value={`${stat.wins??0}-${stat.losses??0}`}/><Stat title="Avg PF" value={rec.avgPf}/><Stat title="Avg PA" value={rec.avgPa}/><Stat title="Top 25" value={top25Wins(team.id, results)}/><Stat title="Top 25 Class" value={recruiting.filter((r)=>Number(r.rank) >= 1 && Number(r.rank) <= 25).length}/><Stat title="Awards" value={awards.length}/><Stat title="All-Americans" value={allAmericans.length}/><Stat title="Heismans" value={heismans.length}/><Stat title="Conf Titles" value={titleCount(team.id, results, "Conference Championship Week")}/><Stat title="Nattys" value={titleCount(team.id, results, "National Championship Week")}/><Stat title="Bowl" value={`${bowl.wins}-${bowl.losses}`}/><Stat title="SOR" value={strengthOfResult(team.id, teams, allResults)}/></div><div style={twoCol}><div style={miniCard}><h3>Recruiting Rankings</h3><div style={formGrid}><input placeholder="Year" value={newRecruiting.season_year} onChange={(e)=>setNewRecruiting({...newRecruiting,season_year:e.target.value})} style={input}/><input placeholder="Rank" value={newRecruiting.rank} onChange={(e)=>setNewRecruiting({...newRecruiting,rank:e.target.value})} style={input}/><button onClick={()=>addRecruiting(team.id)} style={button}>Add</button></div>{recruiting.map((r)=><div key={r.id} style={miniRow}>{r.season_year}: #{r.rank} <DeleteButton onClick={()=>deleteRow("recruiting_classes",r.id)}/></div>)}</div><div style={miniCard}><h3>History</h3><div style={formGrid}><input placeholder="Year" value={newHistory.season_year} onChange={(e)=>setNewHistory({...newHistory,season_year:e.target.value})} style={input}/><input placeholder="Record" value={newHistory.record} onChange={(e)=>setNewHistory({...newHistory,record:e.target.value})} style={input}/><button onClick={()=>addHistory(team.id)} style={button}>Add</button></div>{historyRows.map((r)=><div key={r.id} style={miniRow}><input value={r.season_year} onChange={(e)=>updateRow("team_history_records",r.id,"season_year",Number(e.target.value))} style={smallInput}/><input value={r.record || ""} onChange={(e)=>updateRow("team_history_records",r.id,"record",e.target.value)} style={smallInput}/><DeleteButton onClick={()=>deleteRow("team_history_records",r.id)}/></div>)}</div></div><Results rows={results} deleteResult={()=>{}} search="" setSearch={()=>{}}/><div style={twoCol}><MiniList title="All-Americans" rows={allAmericans.map((r)=>`${r.player_name} — ${r.type}, ${r.position}, ${r.season_year}`)}/><MiniList title="Awards" rows={awards.map((r)=>`${r.player_name} — ${r.award_name}, ${r.position}, ${r.season_year}`)}/><MiniList title="Heisman Winners" rows={heismans.map((r)=>`${r.player_name} — ${r.position}, ${r.season_year}`)}/></div></section>;
+  return <section style={teamPageStyle}><h2 style={teamSectionTitle}><TeamLabel team={team} /></h2><div style={teamCoachBanner}><div><div style={statTitle}>Current Discord User / Coach</div><div style={teamCoachNameStyle}>{coachName}</div></div><div><div style={statTitle}>Program Page</div><div style={mutedText}>Team history and coach profile combined.</div></div></div><div style={statsGrid}><Stat title="Overall" value={`${stat.wins??0}-${stat.losses??0}`}/><Stat title="Avg PF" value={rec.avgPf}/><Stat title="Avg PA" value={rec.avgPa}/><Stat title="Top 25" value={top25Wins(team.id, results)}/><Stat title="Top 25 Class" value={recruiting.filter((r)=>Number(r.rank) >= 1 && Number(r.rank) <= 25).length}/><Stat title="Awards" value={awards.length}/><Stat title="All-Americans" value={allAmericans.length}/><Stat title="Heismans" value={heismans.length}/><Stat title="Conf Titles" value={titleCount(team.id, results, "Conference Championship Week")}/><Stat title="Nattys" value={titleCount(team.id, results, "National Championship Week")}/><Stat title="Bowl" value={`${bowl.wins}-${bowl.losses}`}/><Stat title="SOR" value={strengthOfResult(team.id, teams, allResults)}/></div><div style={twoCol}><div style={miniCard}><h3>Recruiting Rankings</h3><div style={formGrid}><input placeholder="Year" value={newRecruiting.season_year} onChange={(e)=>setNewRecruiting({...newRecruiting,season_year:e.target.value})} style={input}/><input placeholder="Rank" value={newRecruiting.rank} onChange={(e)=>setNewRecruiting({...newRecruiting,rank:e.target.value})} style={input}/><button onClick={()=>addRecruiting(team.id)} style={button}>Add</button></div>{recruiting.map((r)=><div key={r.id} style={miniRow}>{r.season_year}: #{r.rank} <DeleteButton onClick={()=>deleteRow("recruiting_classes",r.id)}/></div>)}</div><div style={miniCard}><h3>History</h3><div style={formGrid}><input placeholder="Year" value={newHistory.season_year} onChange={(e)=>setNewHistory({...newHistory,season_year:e.target.value})} style={input}/><input placeholder="Record" value={newHistory.record} onChange={(e)=>setNewHistory({...newHistory,record:e.target.value})} style={input}/><button onClick={()=>addHistory(team.id)} style={button}>Add</button></div>{historyRows.map((r)=><div key={r.id} style={miniRow}><input value={r.season_year} onChange={(e)=>updateRow("team_history_records",r.id,"season_year",Number(e.target.value))} style={smallInput}/><input value={r.record || ""} onChange={(e)=>updateRow("team_history_records",r.id,"record",e.target.value)} style={smallInput}/><DeleteButton onClick={()=>deleteRow("team_history_records",r.id)}/></div>)}</div></div><Results rows={results} deleteResult={()=>{}} search="" setSearch={()=>{}}/><div style={twoCol}><MiniList title="All-Americans" rows={allAmericans.map((r)=>`${r.player_name} — ${r.type}, ${r.position}, ${r.season_year}`)}/><MiniList title="Awards" rows={awards.map((r)=>`${r.player_name} — ${r.award_name}, ${r.position}, ${r.season_year}`)}/><MiniList title="Heisman Winners" rows={heismans.map((r)=>`${r.player_name} — ${r.position}, ${r.season_year}`)}/></div></section>;
 }
 function MiniList({ title, rows }) { return <div style={miniCard}><h3>{title}</h3>{rows.map((r,i)=><div key={i} style={miniRow}>{r}</div>)}</div>; }
 function Table({ headers, children }) { return <div style={{overflowX:"auto",marginTop:20}}><table style={table}><thead><tr>{headers.map((h, index)=><th key={typeof h === "string" ? h : index} style={th}>{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div>; }
@@ -5783,84 +5737,43 @@ const dangerButton = {
 };
 
 
-const prestigeGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-  gap: 14,
-  marginTop: 18,
+const coachMenuLogoWatermark = {
+  position: "absolute",
+  right: 12,
+  top: "50%",
+  transform: "translateY(-50%)",
+  width: 74,
+  height: 74,
+  objectFit: "contain",
+  opacity: .20,
+  pointerEvents: "none",
+  zIndex: 0,
 };
 
-const prestigeCard = {
-  ...liquidGlassTile,
+const massFormGrid = {
   display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
   gap: 12,
-  minHeight: 220,
+  marginTop: 18,
+  marginBottom: 18,
 };
 
-const prestigeScore = {
-  color: "#facc15",
-  fontSize: "clamp(42px, 10vw, 72px)",
-  fontWeight: 1000,
-  lineHeight: .85,
-  letterSpacing: "-.07em",
-};
-
-const prestigeTierPill = {
-  border: "1px solid rgba(250,204,21,.34)",
-  background: "rgba(250,204,21,.12)",
-  color: "#fef3c7",
-  borderRadius: 999,
-  padding: "7px 10px",
-  fontSize: 12,
-  fontWeight: 950,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  textAlign: "center",
-};
-
-const prestigeTeamName = {
+const massFormCard = {
+  ...liquidGlassTile,
   color: "#fff",
-  fontWeight: 1000,
-  fontSize: 18,
-  overflowWrap: "anywhere",
-};
-
-const prestigeMiniGrid = {
+  textAlign: "left",
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(105px, 1fr))",
   gap: 8,
-  color: "rgba(255,255,255,.76)",
-  fontSize: 12,
+  cursor: "pointer",
 };
 
-const programPrestigeHero = {
-  ...liquidGlassPanel,
-  marginBottom: 16,
-  display: "grid",
-  gridTemplateColumns: "minmax(0, .8fr) minmax(0, 1.2fr)",
-  gap: 16,
-  alignItems: "center",
+const massFormIcon = {
+  fontSize: 28,
 };
 
-const programRingRow = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-  gap: 10,
-  color: "#fff",
-  fontWeight: 950,
-};
-
-const starGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(92px, 1fr))",
-  gap: 10,
-};
-
-const starInputWrap = {
-  display: "grid",
-  gap: 6,
-  color: "rgba(255,255,255,.78)",
-  fontSize: 12,
-  fontWeight: 900,
+const bulkTextArea = {
+  ...input,
+  minHeight: 220,
+  resize: "vertical",
+  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
 };
