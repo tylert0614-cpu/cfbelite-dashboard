@@ -36,6 +36,14 @@ function top25Wins(teamId, results) {
     return team1Won || team2Won;
   }).length;
 }
+
+function top10Wins(teamId, results) {
+  return results.filter((r) => {
+    const team1Won = r.team_1_id === teamId && Number(r.team_1_score) > Number(r.team_2_score) && Number(r.team_2_rank) >= 1 && Number(r.team_2_rank) <= 10;
+    const team2Won = r.team_2_id === teamId && Number(r.team_2_score) > Number(r.team_1_score) && Number(r.team_1_rank) >= 1 && Number(r.team_1_rank) <= 10;
+    return team1Won || team2Won;
+  }).length;
+}
 function titleCount(teamId, results, week) { return results.filter((r) => r.week === week && ((r.team_1_id === teamId && r.team_1_score > r.team_2_score) || (r.team_2_id === teamId && r.team_2_score > r.team_1_score))).length; }
 function bowlRecord(teamId, results) { return recordFromResults(teamId, results.filter((r) => ["Bowl Week 1","Bowl Week 2","Bowl Week 3","National Championship Week"].includes(r.week))); }
 function rankingRows(teams, rows, field = "team_id") { return teams.map((t) => ({ team: t.name, total: rows.filter((r) => r[field] === t.id).length })).sort((a,b) => b.total - a.total || a.team.localeCompare(b.team)); }
@@ -217,6 +225,7 @@ function getCoachStats(users, teams, assignments, results, allAmericans, awards,
       pf: 0,
       pa: 0,
       top25Wins: 0,
+      top10Wins: 0,
       confTitles: 0,
       nattysFromResults: 0,
       nattysRecorded: 0,
@@ -244,6 +253,7 @@ function getCoachStats(users, teams, assignments, results, allAmericans, awards,
         pf: 0,
         pa: 0,
         top25Wins: 0,
+        top10Wins: 0,
         confTitles: 0,
         nattysFromResults: 0,
         nattysRecorded: 0,
@@ -284,6 +294,7 @@ function getCoachStats(users, teams, assignments, results, allAmericans, awards,
       if (team1) team1.wins += 1;
       if (team2) team2.losses += 1;
       if (team1 && Number(result.team_2_rank) >= 1 && Number(result.team_2_rank) <= 25) team1.top25Wins += 1;
+      if (team1 && Number(result.team_2_rank) >= 1 && Number(result.team_2_rank) <= 10) team1.top10Wins += 1;
       if (result.week === "Conference Championship Week" && team1) team1.confTitles += 1;
       if (result.week === "National Championship Week" && team1) team1.nattysFromResults += 1;
       if (isBowl) { if (team1) team1.bowlWins += 1; if (team2) team2.bowlLosses += 1; }
@@ -291,6 +302,7 @@ function getCoachStats(users, teams, assignments, results, allAmericans, awards,
       if (team2) team2.wins += 1;
       if (team1) team1.losses += 1;
       if (team2 && Number(result.team_1_rank) >= 1 && Number(result.team_1_rank) <= 25) team2.top25Wins += 1;
+      if (team2 && Number(result.team_1_rank) >= 1 && Number(result.team_1_rank) <= 10) team2.top10Wins += 1;
       if (result.week === "Conference Championship Week" && team2) team2.confTitles += 1;
       if (result.week === "National Championship Week" && team2) team2.nattysFromResults += 1;
       if (isBowl) { if (team2) team2.bowlWins += 1; if (team1) team1.bowlLosses += 1; }
@@ -354,28 +366,80 @@ function recordBookRows(users, teams, assignments, results, allAmericans, awards
     return {
       label: team.name,
       wins: rec.wins,
+      losses: rec.losses,
       games: rec.games,
+      winPct: rec.games ? rec.wins / rec.games : 0,
       avgPf: Number(rec.avgPf),
-      top25: top25Wins(team.id, results),
+      avgPa: Number(rec.avgPa),
+      top10: top10Wins(team.id, results),
       conf: titleCount(team.id, results, "Conference Championship Week"),
       nattys: titleCount(team.id, results, "National Championship Week"),
+      bowlWins: bowlRecord(team.id, results).wins,
+      allAmericans: allAmericans.filter((row)=>row.team_id===team.id).length,
+      awards: awards.filter((row)=>row.team_id===team.id).length,
+      heismans: heismans.filter((row)=>row.team_id===team.id).length,
+      top25Classes: recruiting.filter((row)=>row.team_id===team.id && Number(row.rank)>=1 && Number(row.rank)<=25).length,
+      bestRecruiting: recruiting.filter((row)=>row.team_id===team.id && Number(row.rank)>0).sort((a,b)=>Number(a.rank)-Number(b.rank))[0]?.rank || null,
       sor: Number(strengthOfResult(team.id, teams, results)) || 0,
     };
   });
 
-  const best = (rows, key, label, formatter = (value) => value) => {
-    const row = [...rows].sort((a, b) => Number(b[key] || 0) - Number(a[key] || 0))[0];
-    return { record: label, holder: row?.discord || row?.label || "—", value: row ? formatter(row[key], row) : "—" };
+  const seasonRows = [];
+  teams.forEach((team) => {
+    [...new Set(results.map((row)=>row.season_year).filter(Boolean))].forEach((year) => {
+      const rec = recordFromResults(team.id, results, year);
+      seasonRows.push({
+        label: `${team.name} (${year})`,
+        wins: rec.wins,
+        losses: rec.losses,
+        winPct: rec.games ? rec.wins / rec.games : 0,
+        top10: top10Wins(team.id, results.filter((row)=>String(row.season_year)===String(year))),
+        avgPf: Number(rec.avgPf),
+      });
+    });
+  });
+
+  const tiedBest = (rows, key, label, formatter = (value) => value, minValue = 1) => {
+    const validRows = rows.filter((row)=>Number(row[key] || 0) >= minValue);
+    if (!validRows.length) return { record: label, holders: ["—"], value: "—" };
+    const bestValue = Math.max(...validRows.map((row)=>Number(row[key] || 0)));
+    const tiedRows = validRows
+      .filter((row)=>Number(row[key] || 0) === bestValue)
+      .sort((a,b)=>String(a.discord || a.label).localeCompare(String(b.discord || b.label)));
+    return {
+      record: label,
+      holders: tiedRows.map((row)=>row.discord || row.label || "—"),
+      value: formatter(bestValue, tiedRows[0]),
+    };
   };
 
   return [
-    best(coachRows, "wins", "All-time most wins by Discord user"),
-    best(coachRows, "nattys", "Most national titles"),
-    best(coachRows, "confTitles", "Most conference titles"),
-    best(coachRows, "top25Wins", "Most Top 25 wins"),
-    best(coachRows, "heismans", "Most Heisman winners"),
-    best(teamRows, "avgPf", "Highest Avg PF", (value) => Number(value).toFixed(1)),
-    best(teamRows, "top25", "Most Top 25 wins", (value) => Number(value)),
+    tiedBest(coachRows, "wins", "Most Career Wins"),
+    tiedBest(coachRows, "nattys", "Most National Championships"),
+    tiedBest(coachRows, "confTitles", "Most Conference Championships"),
+    tiedBest(coachRows, "top10Wins", "Most Top 10 Wins"),
+    tiedBest(coachRows, "bowlWins", "Most Bowl Wins"),
+    tiedBest(coachRows, "heismans", "Most Heisman Winners"),
+    tiedBest(coachRows, "awards", "Most Awards"),
+    tiedBest(coachRows, "allAmericans", "Most All-Americans"),
+    tiedBest(coachRows, "top25Classes", "Most Top 25 Recruiting Classes"),
+    tiedBest(coachRows, "winPct", "Highest Career Win %", (value)=>`${(value*100).toFixed(1)}%`, 0.001),
+
+    tiedBest(teamRows, "wins", "Program: Most Wins"),
+    tiedBest(teamRows, "nattys", "Program: Most National Championships"),
+    tiedBest(teamRows, "conf", "Program: Most Conference Championships"),
+    tiedBest(teamRows, "top10", "Program: Most Top 10 Wins"),
+    tiedBest(teamRows, "bowlWins", "Program: Most Bowl Wins"),
+    tiedBest(teamRows, "heismans", "Program: Most Heismans"),
+    tiedBest(teamRows, "awards", "Program: Most Awards"),
+    tiedBest(teamRows, "allAmericans", "Program: Most All-Americans"),
+    tiedBest(teamRows, "top25Classes", "Program: Most Top 25 Recruiting Classes"),
+    tiedBest(teamRows, "winPct", "Program: Highest Win %", (value)=>`${(value*100).toFixed(1)}%`, 0.001),
+    tiedBest(teamRows.filter((row)=>row.bestRecruiting), "bestRecruiting", "Program: Best Recruiting Class Rank", (value)=>`#${value}`, 1),
+
+    tiedBest(seasonRows, "wins", "Single Season: Most Wins"),
+    tiedBest(seasonRows, "top10", "Single Season: Most Top 10 Wins"),
+    tiedBest(seasonRows, "avgPf", "Single Season: Highest Avg PF", (value)=>Number(value).toFixed(1), 0.001),
   ];
 }
 
@@ -1227,15 +1291,27 @@ function Rivalries({ users, teams, assignments, results }) {
 }
 
 function DynastyRecords({ users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting }) {
-  const coachRows = getCoachStats(users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
-  const records = [
-    ["Most Career Wins", coachRows.sort((a,b)=>b.wins-a.wins)[0]?.discord, coachRows.sort((a,b)=>b.wins-a.wins)[0]?.wins],
-    ["Most National Titles", coachRows.sort((a,b)=>b.nattys-a.nattys)[0]?.discord, coachRows.sort((a,b)=>b.nattys-a.nattys)[0]?.nattys],
-    ["Most Heismans", coachRows.sort((a,b)=>b.heismans-a.heismans)[0]?.discord, coachRows.sort((a,b)=>b.heismans-a.heismans)[0]?.heismans],
-    ["Most Awards", coachRows.sort((a,b)=>b.awards-a.awards)[0]?.discord, coachRows.sort((a,b)=>b.awards-a.awards)[0]?.awards],
-    ["Most All-Americans", coachRows.sort((a,b)=>b.allAmericans-a.allAmericans)[0]?.discord, coachRows.sort((a,b)=>b.allAmericans-a.allAmericans)[0]?.allAmericans],
-  ];
-  return <section style={card}><h2 style={sectionTitle}>CFBElite Dynasty Records</h2><div style={twoCol}>{records.map(([record, holder, value])=><div key={record} style={miniCard}><div style={statTitle}>{record}</div><div style={pulseValue}>{holder || "—"}</div><div style={mutedText}>{value ?? "—"}</div></div>)}</div></section>;
+  const records = recordBookRows(users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
+
+  return (
+    <section style={card}>
+      <h2 style={sectionTitle}>CFBElite Dynasty Records</h2>
+      <p style={mutedText}>Ties are shown together. Top 10 wins are used instead of Top 10 wins to keep elite wins meaningful in a 32-user league.</p>
+      <div style={recordGrid}>
+        {records.map((row)=>(
+          <div key={row.record} style={recordCard}>
+            <div style={statTitle}>{row.record}</div>
+            <div style={recordValue}>{row.value ?? "—"}</div>
+            <div style={recordHolders}>
+              {(row.holders || [row.holder || "—"]).map((holder)=>(
+                <span key={`${row.record}-${holder}`} style={recordHolderPill}>{holder}</span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function ProgramPrestige({ teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting }) {
@@ -2836,6 +2912,57 @@ function top25RecruitingClassesForCoach(user, recruiting, assignments) {
   }).length;
 }
 
+
+function coachSuperlatives(user, users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting) {
+  const rows = getCoachStats(users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
+  const current = rows.find((row)=>row.userId === user.id);
+  if (!current) return [];
+
+  const sortedBy = (key) => [...rows].filter((row)=>Number(row[key]||0)>0).sort((a,b)=>Number(b[key]||0)-Number(a[key]||0));
+  const badges = [];
+
+  if (current.nattys >= 3) badges.push("🏆 Dynasty Legend");
+  else if (current.nattys >= 1) badges.push("🏆 National Champion");
+
+  if (sortedBy("top10Wins")[0]?.userId === user.id) badges.push("🎯 Big Game Hunter");
+  if (sortedBy("confTitles")[0]?.userId === user.id) badges.push("👑 Conference King");
+  if (sortedBy("top25Classes")[0]?.userId === user.id) badges.push("🧲 Elite Recruiter");
+  if (sortedBy("allAmericans")[0]?.userId === user.id) badges.push("⭐ Talent Developer");
+  if (sortedBy("awards")[0]?.userId === user.id) badges.push("🏅 Trophy Collector");
+  if (sortedBy("heismans")[0]?.userId === user.id) badges.push("🎖 Heisman Coach");
+
+  if (!badges.length && current.wins > 0) badges.push("📈 Program Builder");
+  return badges.slice(0, 6);
+}
+
+function CoachRings({ stats, superlatives }) {
+  const rings = [
+    { label: "National Championships", icon: "🏆", value: stats?.nattys || 0 },
+    { label: "Conference Championships", icon: "💍", value: stats?.confTitles || 0 },
+    { label: "Heisman Winners", icon: "🎖️", value: stats?.heismans || 0 },
+    { label: "Top 10 Wins", icon: "🎯", value: stats?.top10Wins || 0 },
+  ];
+
+  return (
+    <div style={coachRingsPanel}>
+      <div style={coachRingGrid}>
+        {rings.map((ring)=>(
+          <div key={ring.label} style={coachRingTile}>
+            <div style={coachRingIcons}>{ring.value > 0 ? Array.from({length: Math.min(Number(ring.value), 6)}, (_,i)=><span key={i}>{ring.icon}</span>) : <span>—</span>}</div>
+            <div style={coachRingValue}>{ring.value}</div>
+            <div style={statTitle}>{ring.label}</div>
+          </div>
+        ))}
+      </div>
+      <div style={superlativeRow}>
+        {(superlatives?.length ? superlatives : ["Building résumé"]).map((badge)=>(
+          <span key={badge} style={superlativePill}>{badge}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function CoachProfile({ user, users = [], teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting }) {
   const coachStats = getCoachStats(usersFallback(user), teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
   const stats = coachStats.find((row)=>row.userId === user.id) || { wins:0, losses:0, nattys:0, confTitles:0, top25Wins:0, awards:0, allAmericans:0, heismans:0, prestige:0 };
@@ -2856,6 +2983,7 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
   const coachHeismans = rowsForCoachUser(heismans, user, assignments);
   const coachEloRow = userEloRows(usersFallback(user), assignments, results).find((row)=>row.user.id === user.id);
   const coachTier = userTierFromElo(coachEloRow?.elo || 1500, 1);
+  const superlatives = coachSuperlatives(user, users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
   const currentSeasonRecord = currentTeam ? recordFromResults(currentTeam.id, results.filter((row)=>String(row.season_year) === String(new Date().getFullYear()))) : { wins:0, losses:0 };
 
   const primary = getTeamPrimary(currentTeam);
@@ -2882,7 +3010,8 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
         <span style={teamBadgeBubble}>{coachTier.label}</span>
       </div>
     </div>
-    <div style={statsGrid}><Stat title="Career Record" value={`${stats?.wins||0}-${stats?.losses||0}`}/><Stat title="National Titles" value={stats?.nattys||0}/><Stat title="Conference Titles" value={stats?.confTitles||0}/><Stat title="Top 25 Wins" value={stats?.top25Wins||0}/><Stat title="Awards" value={stats?.awards||0}/><Stat title="All-Americans" value={stats?.allAmericans||0}/><Stat title="Heismans" value={stats?.heismans||0}/><Stat title="Top 25 Recruiting Classes" value={top25RecruitingClassesForCoach(user, recruiting, assignments)}/></div>
+    <CoachRings stats={stats} superlatives={superlatives}/>
+    <div style={statsGrid}><Stat title="Career Record" value={`${stats?.wins||0}-${stats?.losses||0}`}/><Stat title="National Titles" value={stats?.nattys||0}/><Stat title="Conference Titles" value={stats?.confTitles||0}/><Stat title="Top 10 Wins" value={stats?.top10Wins||0}/><Stat title="Awards" value={stats?.awards||0}/><Stat title="All-Americans" value={stats?.allAmericans||0}/><Stat title="Heismans" value={stats?.heismans||0}/><Stat title="Top 25 Recruiting Classes" value={top25RecruitingClassesForCoach(user, recruiting, assignments)}/></div>
     <CoachTimelineTable timeline={timeline} teams={teams} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions}/>
     <Results rows={coachResults} deleteResult={()=>{}} search="" setSearch={()=>{}}/>
     <RivalryBadges user={user} users={usersFallback(user)} allUsers={users} results={results} assignments={assignments}/><BestWorstPanel user={user} results={results} assignments={assignments}/><CoachTimelineEvents user={user} teams={teams} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} assignments={assignments}/><RecognitionTable title="All-Americans" headers={["Player","Position","Team","Year","Type"]} rows={coachAA.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year,r.type]}))}/>
@@ -2911,7 +3040,7 @@ function CoachHallOfFame({ users, teams, assignments, results, allAmericans, awa
     .map((row)=>({ ...row, hofCriteria: coachHofCriteria(row) }))
     .filter((row)=>row.hofCriteria.qualifies && row.rawPrestige >= 95)
     .sort((a,b)=>b.rawPrestige-a.rawPrestige || b.wins-a.wins);
-  return <section style={card}><h2 style={sectionTitle}>Coach Hall of Fame</h2><p style={mutedText}>Coaches qualify automatically by meeting tougher benchmarks: 2 national titles, 1 title plus 3 conference titles, 50 career wins, 20 Top 25 wins, 100+ HOF score, or 25+ major accolades with 25+ wins.</p>{rows.length ? <div style={hofGrid}>{rows.map((row)=><CoachHofCard key={row.userId || row.discord} row={row} teams={teams} assignments={assignments}/>)}</div> : <div style={miniRow}>No coaches have met Hall of Fame criteria yet.</div>}</section>;
+  return <section style={card}><h2 style={sectionTitle}>Coach Hall of Fame</h2><p style={mutedText}>Coaches qualify automatically by meeting tougher benchmarks: 2 national titles, 1 title plus 3 conference titles, 50 career wins, 20 Top 10 wins, 100+ HOF score, or 25+ major accolades with 25+ wins.</p>{rows.length ? <div style={hofGrid}>{rows.map((row)=><CoachHofCard key={row.userId || row.discord} row={row} teams={teams} assignments={assignments}/>)}</div> : <div style={miniRow}>No coaches have met Hall of Fame criteria yet.</div>}</section>;
 }
 
 
@@ -5197,4 +5326,100 @@ const draftBroadcastTimer = {
   letterSpacing: "-.05em",
   fontWeight: 1000,
   textShadow: "0 18px 52px rgba(250,204,21,.20)",
+};
+
+
+const recordGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+  gap: 14,
+  marginTop: 18,
+};
+
+const recordCard = {
+  ...liquidGlassTile,
+  display: "grid",
+  gap: 10,
+  minHeight: 156,
+};
+
+const recordValue = {
+  color: "#facc15",
+  fontWeight: 1000,
+  fontSize: "clamp(28px, 6vw, 48px)",
+  lineHeight: .9,
+  letterSpacing: "-.05em",
+};
+
+const recordHolders = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 7,
+};
+
+const recordHolderPill = {
+  border: "1px solid rgba(255,255,255,.16)",
+  background: "rgba(255,255,255,.08)",
+  color: "#fff",
+  borderRadius: 999,
+  padding: "7px 10px",
+  fontSize: 12,
+  fontWeight: 900,
+  maxWidth: "100%",
+  overflowWrap: "anywhere",
+};
+
+const coachRingsPanel = {
+  ...liquidGlassPanel,
+  marginBottom: 18,
+  padding: 18,
+};
+
+const coachRingGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+  gap: 12,
+};
+
+const coachRingTile = {
+  ...liquidGlassTile,
+  textAlign: "center",
+  display: "grid",
+  gap: 6,
+  alignContent: "center",
+  minHeight: 124,
+};
+
+const coachRingIcons = {
+  minHeight: 28,
+  fontSize: 22,
+  display: "flex",
+  justifyContent: "center",
+  gap: 3,
+  flexWrap: "wrap",
+};
+
+const coachRingValue = {
+  color: "#fff",
+  fontSize: "clamp(30px, 7vw, 56px)",
+  fontWeight: 1000,
+  lineHeight: .88,
+  letterSpacing: "-.06em",
+};
+
+const superlativeRow = {
+  marginTop: 14,
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 8,
+};
+
+const superlativePill = {
+  border: "1px solid rgba(250,204,21,.30)",
+  background: "rgba(250,204,21,.10)",
+  color: "#fef3c7",
+  borderRadius: 999,
+  padding: "9px 12px",
+  fontSize: 12,
+  fontWeight: 950,
 };
