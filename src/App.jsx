@@ -560,6 +560,7 @@ export default function App() {
   const [playoffGames, setPlayoffGames] = useState([]);
   const [recruiting, setRecruiting] = useState([]);
   const [historyRows, setHistoryRows] = useState([]);
+  const [seasonPlayerStats, setSeasonPlayerStats] = useState([]);
   const [loading, setLoading] = useState(false);
   const [standingsOrder, setStandingsOrder] = useState([]);
   const [commissionerRankings, setCommissionerRankings] = useState([]);
@@ -667,7 +668,7 @@ export default function App() {
     await saveCommissionerRankings(next);
   }
 
-  const baseTabs = [["dashboard","Dashboard"],["draftRoom","CFBElite 27 Draft Room"],["commissionerCenter","Commissioner Center"],["massDataEntry","Mass Data Entry"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["powerIndex","Power Index"],["eloRankings","User ELO"],["conferencePower","Conference Power"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["assignments","Users/Team Assignments"],["resultsManager","Results Manager"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...activeCoachUsers.map((user) => [`coach-${user.id}`, user.discord_username])];
+  const baseTabs = [["dashboard","Dashboard"],["draftRoom","CFBElite 27 Draft Room"],["commissionerCenter","Commissioner Center"],["massDataEntry","Mass Data Entry"],["seasonStats","Season Stats"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["powerIndex","Power Index"],["eloRankings","User ELO"],["conferencePower","Conference Power"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["assignments","Users/Team Assignments"],["resultsManager","Results Manager"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...activeCoachUsers.map((user) => [`coach-${user.id}`, user.discord_username])];
   const tabs = useMemo(() => {
     const tabMap = new Map(baseTabs);
     const ordered = tabOrder
@@ -703,7 +704,7 @@ export default function App() {
 
   async function loadData() {
     setLoading(true); setError("");
-    const [teamsRes, settingsRes, tabOrderRes, usersRes, assignmentsRes, standingsRes, rankingsRes, resultsRes, weeklyMatchupsRes, draftPicks27Res, draftSettings27Res, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, historyRes] = await Promise.all([
+    const [teamsRes, settingsRes, tabOrderRes, usersRes, assignmentsRes, standingsRes, rankingsRes, resultsRes, weeklyMatchupsRes, draftPicks27Res, draftSettings27Res, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, seasonStatsRes, historyRes] = await Promise.all([
       supabase.from("teams").select("*").order("name"),
       supabase.from("league_settings").select("*").eq("id", 1).single(),
       supabase.from("dashboard_tab_order").select("*").eq("id", 1).single(),
@@ -722,9 +723,10 @@ export default function App() {
       supabase.from("draft_order_27").select("*, discord_users(discord_username)").order("pick_number"),
       supabase.from("playoff_games").select(`*, top_team:teams!playoff_games_top_team_id_fkey(name), bottom_team:teams!playoff_games_bottom_team_id_fkey(name)`).order("sort_order"),
       supabase.from("recruiting_classes").select("*, teams(name)").order("season_year", { ascending: false }),
+      supabase.from("season_player_stats").select("*, teams(name), discord_users(discord_username)").order("season_year", { ascending: false }).order("created_at", { ascending: false }),
       supabase.from("team_history_records").select("*, teams(name)").order("season_year", { ascending: false }),
     ]);
-    const firstError = [teamsRes, settingsRes, tabOrderRes, usersRes, assignmentsRes, standingsRes, rankingsRes, resultsRes, weeklyMatchupsRes, draftPicks27Res, draftSettings27Res, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, historyRes].find((r) => r.error)?.error;
+    const firstError = [teamsRes, settingsRes, tabOrderRes, usersRes, assignmentsRes, standingsRes, rankingsRes, resultsRes, weeklyMatchupsRes, draftPicks27Res, draftSettings27Res, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, seasonStatsRes, historyRes].find((r) => r.error)?.error;
     if (firstError) setError(firstError.message);
     else {
       if (tabOrderRes.data?.tab_order) setTabOrder(tabOrderRes.data.tab_order);
@@ -764,6 +766,7 @@ export default function App() {
 
       setStandingsOrder([...rankedIds, ...unrankedIds]);
       setResults(resultsRes.data || []); setWeeklyMatchups(weeklyMatchupsRes.data || []); setDraftPicks27(draftPicks27Res.data || []); if (draftSettings27Res.data) setDraftSettings27(draftSettings27Res.data); setAllAmericans(aaRes.data || []); setAwards(awardsRes.data || []); setHeismans(heismanRes.data || []); setNationalChampions(championsRes.data || []); setDraftOrder(draftRes.data || []); setPlayoffGames(playoffRes.data || []); setRecruiting(recruitingRes.data || []);
+      setSeasonPlayerStats(seasonStatsRes.data || []);
       setHistoryRows(historyRes.data || []);
     }
     setLoading(false);
@@ -1073,7 +1076,7 @@ export default function App() {
     }
   }
 
-  return <><GlobalStyle/><div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={isErrorMessage(error) ? errorBox : successBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} draggedTab={draggedTab} setDraggedTab={setDraggedTab} reorderTabs={reorderTabs} teams={teamOptions} assignments={assignments} currentYear={currentYear}/>
+  return <><GlobalStyle/><div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={isErrorMessage(error) ? errorBox : successBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} draggedTab={draggedTab} setDraggedTab={setDraggedTab} reorderTabs={reorderTabs} adminUnlocked={adminUnlocked} adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin} teams={teamOptions} assignments={assignments} currentYear={currentYear}/>
     {activeTab === "draftRoom" && <DraftRoom teams={teamOptions} users={userOptions} picks={draftPicks27} settings={draftSettings27} startClock={startDraftClock} pauseClock={pauseDraftClock} resumeClock={resumeDraftClock} announcePick={announceDraftPick} revealPick={revealDraftPick} undoPick={undoDraftPick}/>}     
     {activeTab === "dashboard" && <><QuickJump teams={activeTeamOptions} users={activeCoachUsers} setActiveTab={setActiveTab}/><DataHealthAlerts teams={teamOptions} users={userOptions} assignments={assignments} results={results}/><HeadlineTicker teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} currentWeek={currentWeek}/><Stats currentYear={currentYear} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} currentWeek={currentWeek} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} teams={activeTeamOptions} assignments={assignments} saveSettings={saveLeagueSettings}/><LeaguePulse teams={activeTeamOptions} results={currentYearResults} allAmericans={allAmericans} awards={awards} currentYear={currentYear} assignments={assignments} users={userOptions}/><DynastyHeadlines teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} currentWeek={currentWeek}/><MilestoneTracker users={userOptions} teams={teamOptions} assignments={assignments} results={results}/><ComputerRankings teams={activeTeamOptions} results={currentYearResults} currentWeek={currentWeek} sortState={userSort} setSortState={setUserSort} assignments={assignments} users={userOptions}/><DashboardRecognition allAmericanRows={rankingRows(activeTeamOptions, allAmericans)} awardRows={rankingRows(activeTeamOptions, awards)}/><RecordResult newResult={newResult} setNewResult={setNewResult} teams={activeTeamOptions} users={userOptions} assignments={assignments} submitResult={submitResult}/></>}
     {activeTab === "eloRankings" && <EloRankings users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
@@ -1081,10 +1084,11 @@ export default function App() {
     {activeTab === "rivalries" && <Rivalries users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
     {activeTab === "powerIndex" && <DynastyPowerIndex users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}
     {activeTab === "commissionerCenter" && (adminUnlocked ? <CommissionerCenter currentYear={currentYear} currentWeek={currentWeek} setActiveTab={setActiveTab} saveLeagueSettings={saveLeagueSettings} loadData={loadData} teams={teamOptions} users={userOptions} assignments={assignments} results={results} awards={awards} allAmericans={allAmericans} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>) }    
-    {activeTab === "massDataEntry" && (adminUnlocked ? <MassDataEntry teams={teamOptions} users={userOptions} currentYear={currentYear} currentWeek={currentWeek} setError={setError} loadData={loadData}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>) }
+    {activeTab === "massDataEntry" && <MassDataEntry teams={teamOptions} users={userOptions} currentYear={currentYear} currentWeek={currentWeek} setError={setError} loadData={loadData}/>}
     {activeTab === "conferencePower" && <ConferencePowerRankings teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
     {activeTab === "weeklyMedia" && <WeeklyMedia teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} weeklyMatchups={weeklyMatchups} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} currentWeek={currentWeek}/>}    
     {activeTab === "weeklyMatchups" && (adminUnlocked ? <WeeklyMatchups rows={weeklyMatchups} newMatchup={newWeeklyMatchup} setNewMatchup={setNewWeeklyMatchup} teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} currentYear={currentYear} currentWeek={currentWeek} addMatchup={addWeeklyMatchup} deleteRow={deleteRow} matchupImportText={matchupImportText} setMatchupImportText={setMatchupImportText} importWeeklyMatchups={importWeeklyMatchups}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>) }    
+    {activeTab === "seasonStats" && <SeasonStatsPage rows={seasonPlayerStats} teams={teamOptions} users={userOptions} updateRow={updateRow} deleteRow={deleteRow}/>}    
     {activeTab === "recruitingRankings" && <RecruitingRankings rows={recruiting} teams={teamOptions} users={userOptions} assignments={assignments} currentYear={currentYear} loadData={loadData} deleteRow={deleteRow} updateRow={updateRow}/>}    
     {activeTab === "dynastyTimeline" && <DynastyTimeline results={results} teams={teamOptions} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}
     {activeTab === "coachHOF" && <CoachHallOfFame users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
@@ -2397,7 +2401,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
                     <span style={{ color: "#facc15", fontWeight: 900 }}>{pick.status === "pick_is_in" ? "PICK IS IN" : (pick.status || "pending")}</span>
                   </div>
                   <div style={{ color: "#fff", fontWeight: 1000 }}>{pick.discord_username || pick.discord_users?.discord_username}</div>
-                  {visible && (team?.logo_url || team?.helmet_url) && <img src={team.logo_url || team.helmet_url} alt="" style={S.tileWatermark}/>}
+                  {visible && team && ((team.logo_url || team.helmet_url) ? <img src={team.logo_url || team.helmet_url} alt="" style={S.tileWatermark}/> : <span style={S.tileLettermark}>{team.name.split(" ").map((x)=>x[0]).join("").slice(0,4)}</span>)}
                   <div style={visible && team ? { color: "#facc15", fontWeight: 1000, position:"relative", zIndex:1 } : S.muted}>{visible && team ? team.name : (pick.status === "pick_is_in" ? "Team hidden until reveal" : "On deck")}</div>
                   {pick.status === "pick_is_in" && <button style={S.button} type="button" onClick={() => handleRevealPick(pick.pick_number)}>Reveal Pick</button>}
                   {pick.team_id && <button style={S.ghost} type="button" onClick={() => handleUndoPick(pick.pick_number)}>Undo</button>}
@@ -2434,7 +2438,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
                         borderColor: "#ffffff",
                         borderWidth: 1.5
                       }}>
-                        {(team.logo_url || team.helmet_url) && <img src={team.logo_url || team.helmet_url} alt="" style={S.tileWatermark}/>}
+                        {(team.logo_url || team.helmet_url) ? <img src={team.logo_url || team.helmet_url} alt="" style={S.tileWatermark}/> : <span style={S.tileLettermark}>{team.name.split(" ").map((x)=>x[0]).join("").slice(0,4)}</span>}
                         <b style={{ color: "#ffffff", fontWeight: 1000, position:"relative", zIndex:1 }}>{team.name}</b>
                         <span style={{ color: "rgba(255,255,255,.82)", fontWeight: 850, position:"relative", zIndex:1 }}>{cleanConference(team.conference)}</span>
                       </div>
@@ -2560,7 +2564,7 @@ function weeklyRecapText({ teams, users, assignments, results, weeklyMatchups, c
 function MassDataEntry({ teams, users, currentYear, currentWeek, setError, loadData }) {
   const [activeForm, setActiveForm] = useState("score");
   const [scoreForm, setScoreForm] = useState({ season_year: currentYear, week: currentWeek, team_1_id: "", team_2_id: "", team_1_score: "", team_2_score: "", team_1_rank: "", team_2_rank: "" });
-  const [playerForm, setPlayerForm] = useState({ season_year: currentYear, week: currentWeek, player_name: "", team_id: "", position: "QB", pass_yards: "", pass_tds: "", interceptions: "", rush_yards: "", rush_tds: "", rec_yards: "", rec_tds: "", tackles: "", sacks: "", forced_turnovers: "" });
+  const [seasonForm, setSeasonForm] = useState({ season_year: currentYear, player_name: "", discord_user_id: "", team_id: "", position: "QB", games: "", pass_yards: "", pass_tds: "", interceptions: "", rush_yards: "", rush_tds: "", receptions: "", rec_yards: "", rec_tds: "", tackles: "", sacks: "", interceptions_def: "", forced_fumbles: "", fumble_recoveries: "" });
   const [recruitRows, setRecruitRows] = useState([]);
 
   useEffect(() => {
@@ -2607,35 +2611,40 @@ function MassDataEntry({ teams, users, currentYear, currentWeek, setError, loadD
     await loadData();
   }
 
-  async function savePlayerStats() {
-    if (!playerForm.player_name || !playerForm.team_id) {
+  async function saveSeasonStats() {
+    if (!seasonForm.player_name || !seasonForm.team_id) {
       setError("Enter player name and team.");
       return;
     }
 
     const payload = {
-      ...playerForm,
-      season_year: Number(playerForm.season_year || currentYear),
-      pass_yards: n(playerForm.pass_yards),
-      pass_tds: n(playerForm.pass_tds),
-      interceptions: n(playerForm.interceptions),
-      rush_yards: n(playerForm.rush_yards),
-      rush_tds: n(playerForm.rush_tds),
-      rec_yards: n(playerForm.rec_yards),
-      rec_tds: n(playerForm.rec_tds),
-      tackles: n(playerForm.tackles),
-      sacks: n(playerForm.sacks),
-      forced_turnovers: n(playerForm.forced_turnovers),
+      ...seasonForm,
+      discord_user_id: seasonForm.discord_user_id || null,
+      season_year: Number(seasonForm.season_year || currentYear),
+      games: n(seasonForm.games),
+      pass_yards: n(seasonForm.pass_yards),
+      pass_tds: n(seasonForm.pass_tds),
+      interceptions: n(seasonForm.interceptions),
+      rush_yards: n(seasonForm.rush_yards),
+      rush_tds: n(seasonForm.rush_tds),
+      receptions: n(seasonForm.receptions),
+      rec_yards: n(seasonForm.rec_yards),
+      rec_tds: n(seasonForm.rec_tds),
+      tackles: n(seasonForm.tackles),
+      sacks: n(seasonForm.sacks),
+      interceptions_def: n(seasonForm.interceptions_def),
+      forced_fumbles: n(seasonForm.forced_fumbles),
+      fumble_recoveries: n(seasonForm.fumble_recoveries),
     };
 
-    const { error } = await supabase.from("game_player_stats").insert(payload);
+    const { error } = await supabase.from("season_player_stats").insert(payload);
     if (error) {
-      setError(`Player stats save failed: ${error.message}`);
+      setError(`Season stats save failed: ${error.message}`);
       return;
     }
 
-    setPlayerForm({ season_year: currentYear, week: currentWeek, player_name: "", team_id: "", position: "QB", pass_yards: "", pass_tds: "", interceptions: "", rush_yards: "", rush_tds: "", rec_yards: "", rec_tds: "", tackles: "", sacks: "", forced_turnovers: "" });
-    setError("Player stats saved.");
+    setSeasonForm({ season_year: currentYear, player_name: "", discord_user_id: "", team_id: "", position: "QB", games: "", pass_yards: "", pass_tds: "", interceptions: "", rush_yards: "", rush_tds: "", receptions: "", rec_yards: "", rec_tds: "", tackles: "", sacks: "", interceptions_def: "", forced_fumbles: "", fumble_recoveries: "" });
+    setError("Season player stats saved.");
     await loadData();
   }
 
@@ -2673,13 +2682,13 @@ function MassDataEntry({ teams, users, currentYear, currentWeek, setError, loadD
   }
 
   return (
-    <section style={card}>
+    <section style={broadcastCard}>
       <h2 style={sectionTitle}>Mass Data Entry Hub</h2>
-      <p style={mutedText}>Form-based entry for scores, player stats, and full recruiting classes.</p>
+      <p style={mutedText}>Open to everyone. Use clean forms for scores, season player stats, and full recruiting class entry.</p>
 
       <div style={massFormGrid}>
         <button type="button" style={{ ...massFormCard, borderColor: activeForm === "score" ? "#a78bfa" : "rgba(255,255,255,.16)" }} onClick={() => setActiveForm("score")}>🏈 Single Game Score</button>
-        <button type="button" style={{ ...massFormCard, borderColor: activeForm === "player" ? "#a78bfa" : "rgba(255,255,255,.16)" }} onClick={() => setActiveForm("player")}>📊 Player Game Stats</button>
+        <button type="button" style={{ ...massFormCard, borderColor: activeForm === "season" ? "#a78bfa" : "rgba(255,255,255,.16)" }} onClick={() => setActiveForm("season")}>📈 Season Player Stats</button>
         <button type="button" style={{ ...massFormCard, borderColor: activeForm === "recruiting" ? "#a78bfa" : "rgba(255,255,255,.16)" }} onClick={() => setActiveForm("recruiting")}>👥 32-User Recruiting</button>
       </div>
 
@@ -2700,19 +2709,21 @@ function MassDataEntry({ teams, users, currentYear, currentWeek, setError, loadD
         </div>
       )}
 
-      {activeForm === "player" && (
+      {activeForm === "season" && (
         <div style={entryPanel}>
-          <h3 style={miniTitle}>Player Game Stats</h3>
+          <h3 style={miniTitle}>Season Player Stats</h3>
           <div style={entryGrid}>
-            <input style={input} value={playerForm.player_name} onChange={(e) => setPlayerForm({ ...playerForm, player_name: e.target.value })} placeholder="Player Name" />
-            <select style={input} value={playerForm.team_id} onChange={(e) => setPlayerForm({ ...playerForm, team_id: e.target.value })}><option value="">Team</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
-            <select style={input} value={playerForm.position} onChange={(e) => setPlayerForm({ ...playerForm, position: e.target.value })}>{POSITIONS.filter((pos) => pos !== "Coach").map((pos) => <option key={pos}>{pos}</option>)}</select>
-            <select style={input} value={playerForm.week} onChange={(e) => setPlayerForm({ ...playerForm, week: e.target.value })}>{WEEKS.map((week) => <option key={week}>{week}</option>)}</select>
-            {["pass_yards","pass_tds","interceptions","rush_yards","rush_tds","rec_yards","rec_tds","tackles","sacks","forced_turnovers"].map((field) => (
-              <input key={field} style={input} value={playerForm[field]} onChange={(e) => setPlayerForm({ ...playerForm, [field]: e.target.value })} placeholder={field.replaceAll("_", " ")} />
+            <input style={input} value={seasonForm.player_name} onChange={(e) => setSeasonForm({ ...seasonForm, player_name: e.target.value })} placeholder="Player Name" />
+            <select style={input} value={seasonForm.discord_user_id} onChange={(e) => setSeasonForm({ ...seasonForm, discord_user_id: e.target.value })}><option value="">Discord User</option>{users.map((user) => <option key={user.id} value={user.id}>{user.discord_username}</option>)}</select>
+            <select style={input} value={seasonForm.team_id} onChange={(e) => setSeasonForm({ ...seasonForm, team_id: e.target.value })}><option value="">Team</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
+            <select style={input} value={seasonForm.position} onChange={(e) => setSeasonForm({ ...seasonForm, position: e.target.value })}>{POSITIONS.filter((pos) => pos !== "Coach").map((pos) => <option key={pos}>{pos}</option>)}</select>
+            <select style={input} value={seasonForm.season_year} onChange={(e) => setSeasonForm({ ...seasonForm, season_year: e.target.value })}>{YEARS.map((year) => <option key={year}>{year}</option>)}</select>
+            <input style={input} value={seasonForm.games} onChange={(e) => setSeasonForm({ ...seasonForm, games: e.target.value })} placeholder="Games" />
+            {["pass_yards","pass_tds","interceptions","rush_yards","rush_tds","receptions","rec_yards","rec_tds","tackles","sacks","interceptions_def","forced_fumbles","fumble_recoveries"].map((field) => (
+              <input key={field} style={input} value={seasonForm[field]} onChange={(e) => setSeasonForm({ ...seasonForm, [field]: e.target.value })} placeholder={field.replaceAll("_", " ")} />
             ))}
           </div>
-          <button style={button} onClick={savePlayerStats}>Save Player Stats</button>
+          <button style={button} onClick={saveSeasonStats}>Save Season Stats</button>
         </div>
       )}
 
@@ -2735,6 +2746,59 @@ function MassDataEntry({ teams, users, currentYear, currentWeek, setError, loadD
           <button style={button} onClick={saveRecruitingRows}>Save Recruiting Classes</button>
         </div>
       )}
+    </section>
+  );
+}
+
+function SeasonStatsPage({ rows, teams, users, updateRow, deleteRow }) {
+  const [searchText, setSearchText] = useState("");
+  const filtered = rows.filter((row) => {
+    const haystack = [
+      row.player_name,
+      row.position,
+      row.teams?.name || teamNameById(row.team_id, teams),
+      row.discord_users?.discord_username,
+      row.season_year,
+    ].join(" ").toLowerCase();
+    return !searchText || haystack.includes(searchText.toLowerCase());
+  });
+
+  return (
+    <section style={broadcastCard}>
+      <div style={sectionTop}>
+        <div>
+          <h2 style={sectionTitle}>Season Player Stats</h2>
+          <p style={mutedText}>ESPN-style season stat tracker for awards, records, and Hall of Fame context.</p>
+        </div>
+        <SearchBox value={searchText} onChange={setSearchText}/>
+      </div>
+
+      <Table headers={["Year","Player","Pos","Discord User","Team","G","Pass Yds","Pass TD","INT","Rush Yds","Rush TD","Rec","Rec Yds","Rec TD","Tkl","Sack","DEF INT","FF","FR",""]}>
+        {filtered.map((row) => (
+          <tr key={row.id} style={trStyle}>
+            <td style={td}>{row.season_year}</td>
+            <td style={td}>{row.player_name}</td>
+            <td style={td}>{row.position}</td>
+            <td style={td}>{row.discord_users?.discord_username || users.find((user)=>user.id===row.discord_user_id)?.discord_username || "—"}</td>
+            <td style={teamCell}><TeamLabel team={row.teams || teams.find((team)=>team.id===row.team_id)} /></td>
+            <td style={td}>{row.games ?? "—"}</td>
+            <td style={td}>{row.pass_yards ?? "—"}</td>
+            <td style={td}>{row.pass_tds ?? "—"}</td>
+            <td style={td}>{row.interceptions ?? "—"}</td>
+            <td style={td}>{row.rush_yards ?? "—"}</td>
+            <td style={td}>{row.rush_tds ?? "—"}</td>
+            <td style={td}>{row.receptions ?? "—"}</td>
+            <td style={td}>{row.rec_yards ?? "—"}</td>
+            <td style={td}>{row.rec_tds ?? "—"}</td>
+            <td style={td}>{row.tackles ?? "—"}</td>
+            <td style={td}>{row.sacks ?? "—"}</td>
+            <td style={td}>{row.interceptions_def ?? "—"}</td>
+            <td style={td}>{row.forced_fumbles ?? "—"}</td>
+            <td style={td}>{row.fumble_recoveries ?? "—"}</td>
+            <td style={td}><DeleteButton onClick={()=>deleteRow("season_player_stats", row.id)}/></td>
+          </tr>
+        ))}
+      </Table>
     </section>
   );
 }
@@ -3612,7 +3676,7 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
 
   const groups = [
     { title: "Main", keys: ["dashboard", "draftRoom"] },
-    { title: "Media", keys: ["massDataEntry", "recruitingRankings", "dynastyTimeline"] },
+    { title: "Media", keys: ["massDataEntry", "seasonStats", "recruitingRankings", "dynastyTimeline"] },
     { title: "Dynasty Legacy", keys: ["dynastyRecords", "rivalries", "powerIndex",  "coachingTree"] },
     { title: "Rankings", keys: ["eloRankings", "conferencePower"] },
     { title: "League History", keys: ["coachHOF", "playerHOF", "h2h"] },
@@ -4403,7 +4467,7 @@ function MiniList({ title, rows }) { return <div style={miniCard}><h3>{title}</h
 function Table({ headers, children }) { return <div style={{overflowX:"auto",marginTop:20}}><table style={table}><thead><tr>{headers.map((h, index)=><th key={typeof h === "string" ? h : index} style={th}>{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div>; }
 function DeleteButton({ onClick }) { return <button onClick={onClick} style={deleteButton}>Delete</button>; }
 
-const page={minHeight:"100vh",width:"100%",background:"radial-gradient(circle at top left, #2e1065 0, #0f1020 34%, #050509 100%)",color:"white",overflowX:"hidden",fontFamily:"Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"};
+const page={minHeight:"100vh",width:"100%",background:"radial-gradient(circle at 18% -12%, rgba(124,58,237,.45), transparent 34%), radial-gradient(circle at 90% 0%, rgba(37,99,235,.25), transparent 30%), linear-gradient(135deg,#050816 0%,#080b1f 46%,#17072f 100%)",color:"white",overflowX:"hidden",fontFamily:"Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"};
 const container={width:"100%",maxWidth:"none",margin:0,padding:"clamp(14px, 2vw, 28px)",boxSizing:"border-box"};
 const header={display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,flexWrap:"wrap",gap:20,background:"linear-gradient(135deg, rgba(88,28,135,.55), rgba(15,23,42,.8))",border:"1px solid rgba(250,204,21,.35)",borderRadius:28,padding:"clamp(14px, 2vw, 24px)",boxShadow:"0 24px 80px rgba(0,0,0,.35)"};
 const brandWrap={display:"flex",flexDirection:"column",alignItems:"flex-start",gap:8,minWidth:0};
@@ -4421,14 +4485,14 @@ const statTitle={color:"#c4b5fd",fontSize:12,marginBottom:10,textTransform:"uppe
 const statValue={fontSize:38,fontWeight:950,color:"#fff7ed"};
 const statInput={...statValue,background:"transparent",color:"white",border:"none",outline:"none",width:"100%"};
 const statSelect={background:"#111827",color:"#fff7ed",border:"1px solid rgba(250,204,21,.25)",borderRadius:12,padding:14,fontSize:24,fontWeight:900,width:"100%"};
-const card={background:"linear-gradient(180deg, rgba(20,20,32,.96), rgba(10,10,18,.98))",border:"1px solid rgba(250,204,21,.18)",borderRadius:26,padding:"clamp(18px, 2vw, 28px)",marginBottom:32,boxShadow:"0 20px 80px rgba(0,0,0,.34)"};
+const card={background:"linear-gradient(145deg, rgba(15,23,42,.94), rgba(7,10,28,.98))",border:"1px solid rgba(167,139,250,.24)",borderRadius:18,padding:"clamp(18px, 2vw, 28px)",marginBottom:28,boxShadow:"0 24px 80px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.07)"};
 const sectionTop={display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"};
 const sectionTitle={fontSize:"clamp(25px, 3vw, 36px)",fontWeight:950,margin:0,color:"#fff7ed",letterSpacing:"-.03em"};
 const formGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))",gap:16,marginTop:20};
-const input={background:"rgba(17,24,39,.92)",border:"1px solid rgba(255,255,255,.12)",color:"#fff7ed",padding:14,borderRadius:12,fontSize:15,width:"100%",boxSizing:"border-box"};
+const input={background:"rgba(9,13,32,.94)",border:"1px solid rgba(167,139,250,.24)",color:"#fff",padding:14,borderRadius:10,fontSize:15,width:"100%",boxSizing:"border-box",outline:"none"};
 const smallInput={...input,width:"120px",marginRight:8};
 const searchInput={...input,maxWidth:320};
-const button={background:"linear-gradient(135deg,#7c3aed,#facc15)",color:"#111827",border:"none",borderRadius:12,padding:14,fontWeight:900,cursor:"pointer"};
+const button={background:"linear-gradient(135deg,#7c3aed,#4f46e5)",color:"#fff",border:"1px solid rgba(255,255,255,.18)",borderRadius:10,padding:14,fontWeight:950,cursor:"pointer",boxShadow:"0 14px 34px rgba(124,58,237,.28)"};
 const sortButton={background:"transparent",border:"none",color:"#c4b5fd",fontSize:13,textTransform:"uppercase",fontWeight:900,cursor:"pointer",padding:0};
 const deleteButton={background:"#7f1d1d",color:"white",border:"1px solid #ef4444",borderRadius:10,padding:"8px 10px",cursor:"pointer"};
 const table={width:"100%",borderCollapse:"separate",borderSpacing:0,minWidth:820};
@@ -5832,6 +5896,23 @@ const bulkTextArea = {
   fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
 };
 
+
+
+
+
+
+
+
+
+
+
+const broadcastCard = {
+  ...card,
+  borderRadius: 18,
+  border: "1px solid rgba(167,139,250,.26)",
+  background: "linear-gradient(145deg, rgba(15,23,42,.94), rgba(7,10,28,.98))",
+  boxShadow: "0 24px 80px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.07)",
+};
 
 const entryPanel = {
   ...liquidGlassPanel,
