@@ -3138,23 +3138,33 @@ function usersFallback(user) { return [user]; }
 
 function coachHofCriteria(row) {
   const accolades = row.heismans + row.awards + row.allAmericans;
-  const qualifies = row.nattys >= 2 || (row.nattys >= 1 && row.confTitles >= 3) || row.wins >= 50 || row.top25Wins >= 20 || row.rawPrestige >= 100 || (accolades >= 25 && row.wins >= 25);
+  const winPct = row.games ? row.wins / row.games : 0;
+
+  const qualifies =
+    row.nattys >= 3 ||
+    (row.nattys >= 2 && row.wins >= 60 && row.confTitles >= 3) ||
+    (row.nattys >= 1 && row.wins >= 90 && row.confTitles >= 6 && row.top10Wins >= 12) ||
+    (row.wins >= 125 && winPct >= .700 && row.confTitles >= 8 && row.top10Wins >= 18) ||
+    (row.rawPrestige >= 220 && row.wins >= 75 && row.nattys >= 1) ||
+    (accolades >= 55 && row.wins >= 80 && (row.nattys >= 1 || row.confTitles >= 6));
+
   const reasons = [];
-  if (row.nattys >= 2) reasons.push("2+ National Titles");
-  if (row.nattys >= 1 && row.confTitles >= 3) reasons.push("Title + 3 Conf Titles");
-  if (row.wins >= 50) reasons.push("50+ Career Wins");
-  if (row.top25Wins >= 20) reasons.push("20+ Top 25 Wins");
-  if (row.rawPrestige >= 100) reasons.push("100+ HOF Score");
-  if (accolades >= 25 && row.wins >= 25) reasons.push("25+ Major Accolades");
+  if (row.nattys >= 3) reasons.push("3+ National Titles");
+  if (row.nattys >= 2 && row.wins >= 60 && row.confTitles >= 3) reasons.push("2 Titles + 60 Wins + 3 Conf Titles");
+  if (row.nattys >= 1 && row.wins >= 90 && row.confTitles >= 6 && row.top10Wins >= 12) reasons.push("Title + 90 Wins + 6 Conf + 12 Top 10 Wins");
+  if (row.wins >= 125 && winPct >= .700 && row.confTitles >= 8 && row.top10Wins >= 18) reasons.push("125+ Wins with Elite Win %");
+  if (row.rawPrestige >= 220 && row.wins >= 75 && row.nattys >= 1) reasons.push("220+ HOF Score with a Title");
+  if (accolades >= 55 && row.wins >= 80 && (row.nattys >= 1 || row.confTitles >= 6)) reasons.push("55+ Major Accolades with Sustained Winning");
+
   return { qualifies, reasons };
 }
 
 function CoachHallOfFame({ users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting }) {
   const rows = getCoachStats(users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting)
     .map((row)=>({ ...row, hofCriteria: coachHofCriteria(row) }))
-    .filter((row)=>row.hofCriteria.qualifies && row.rawPrestige >= 95)
+    .filter((row)=>row.hofCriteria.qualifies && row.rawPrestige >= 180)
     .sort((a,b)=>b.rawPrestige-a.rawPrestige || b.wins-a.wins);
-  return <section style={card}><h2 style={sectionTitle}>Coach Hall of Fame</h2><p style={mutedText}>Coaches qualify automatically by meeting tougher benchmarks: 2 national titles, 1 title plus 3 conference titles, 50 career wins, 20 Top 10 wins, 100+ HOF score, or 25+ major accolades with 25+ wins.</p>{rows.length ? <div style={hofGrid}>{rows.map((row)=><CoachHofCard key={row.userId || row.discord} row={row} teams={teams} assignments={assignments}/>)}</div> : <div style={miniRow}>No coaches have met Hall of Fame criteria yet.</div>}</section>;
+  return <section style={card}><h2 style={sectionTitle}>Coach Hall of Fame</h2><p style={mutedText}>Coach Hall of Fame is intentionally extremely difficult: true dynasty résumés only. Qualifiers require multiple national titles or long-term dominance with elite wins, conference titles, major accolades, and a major HOF score.</p>{rows.length ? <div style={hofGrid}>{rows.map((row)=><CoachHofCard key={row.userId || row.discord} row={row} teams={teams} assignments={assignments}/>)}</div> : <div style={miniRow}>No coaches have met Hall of Fame criteria yet.</div>}</section>;
 }
 
 
@@ -3177,7 +3187,7 @@ function coachHofPointBreakdown(row) {
   return [
     { label: "National Titles", count: row.nattys, points: row.nattys * 30 },
     { label: "Conference Titles", count: row.confTitles, points: row.confTitles * 15 },
-    { label: "Top 25 Wins", count: row.top25Wins, points: row.top25Wins * 4 },
+    { label: "Top 10 Wins", count: row.top10Wins, points: row.top10Wins * 6 },
     { label: "Wins", count: row.wins, points: Number((row.wins * 1.5).toFixed(1)) },
     { label: "Bowl Wins", count: row.bowlWins, points: row.bowlWins * 3 },
     { label: "Heismans", count: row.heismans, points: row.heismans * 12 },
@@ -3248,9 +3258,11 @@ function playerHallRows(teams, assignments, results, allAmericans, awards, heism
     if (year) row.years.add(String(year));
     return row;
   };
+
   allAmericans.forEach((r)=>{ const row=ensure(r.player_name, r.team_id, r.position, r.season_year); row.allAmericans.push(`${r.season_year} ${r.type}`); });
   awards.forEach((r)=>{ const row=ensure(r.player_name, r.team_id, r.position, r.season_year); row.awards.push(`${r.season_year} ${r.award_name}`); });
   heismans.forEach((r)=>{ const row=ensure(r.player_name, r.team_id, r.position, r.season_year); row.heismans.push(`${r.season_year} Heisman`); });
+
   map.forEach((row)=>{
     row.years.forEach((year)=>{
       const conf = results.some((r)=>String(r.season_year)===String(year) && r.week==="Conference Championship Week" && ((r.team_1_id===row.teamId && Number(r.team_1_score)>Number(r.team_2_score)) || (r.team_2_id===row.teamId && Number(r.team_2_score)>Number(r.team_1_score))));
@@ -3259,19 +3271,31 @@ function playerHallRows(teams, assignments, results, allAmericans, awards, heism
       if (conf) row.confTitles += 1;
       if (nattyByResult || nattyByEntry) row.nattys += 1;
     });
-    row.score = row.heismans.length*30 + row.awards.length*12 + row.allAmericans.length*8 + row.nattys*18 + row.confTitles*8;
-    if (row.heismans.length >= 1) row.reasons.push("Heisman Winner");
-    if (row.heismans.length >= 1 && (row.awards.length >= 1 || row.allAmericans.length >= 2)) row.reasons.push("Heisman + Supporting Accolades");
-    if (row.awards.length >= 3) row.reasons.push("3+ Major Awards");
-    if (row.allAmericans.length >= 4) row.reasons.push("4+ All-American Selections");
-    if (row.nattys >= 1 && (row.heismans.length || row.awards.length >= 2 || row.allAmericans.length >= 3)) row.reasons.push("Elite Title Season Accolade");
-    if (row.score >= 32) row.reasons.push("32+ HOF Score");
+
+    row.score = row.heismans.length*42 + row.awards.length*18 + row.allAmericans.length*12 + row.nattys*20 + row.confTitles*8;
+
+    if (row.heismans.length >= 2) row.reasons.push("2+ Heisman Winners");
+    if (row.heismans.length >= 1 && row.awards.length >= 2 && row.allAmericans.length >= 2) row.reasons.push("Heisman + 2 Awards + 2 All-Americans");
+    if (row.awards.length >= 5 && row.allAmericans.length >= 2) row.reasons.push("5+ Major Awards with All-American Résumé");
+    if (row.allAmericans.length >= 6 && row.awards.length >= 2) row.reasons.push("6+ All-American Selections");
+    if (row.nattys >= 2 && (row.heismans.length >= 1 || row.awards.length >= 3 || row.allAmericans.length >= 5)) row.reasons.push("Multi-title era cornerstone");
+    if (row.score >= 125) row.reasons.push("125+ HOF Score");
   });
-  return [...map.values()].filter((r)=>(r.heismans.length >= 1 && (r.awards.length >= 1 || r.allAmericans.length >= 2)) || r.awards.length >= 3 || r.allAmericans.length >= 4 || (r.nattys >= 1 && (r.heismans.length || r.awards.length >= 2 || r.allAmericans.length >= 3)) || r.score >= 60).sort((a,b)=>b.score-a.score || a.player.localeCompare(b.player));
+
+  return [...map.values()]
+    .filter((r)=>
+      r.heismans.length >= 2 ||
+      (r.heismans.length >= 1 && r.awards.length >= 2 && r.allAmericans.length >= 2) ||
+      (r.awards.length >= 5 && r.allAmericans.length >= 2) ||
+      (r.allAmericans.length >= 6 && r.awards.length >= 2) ||
+      (r.nattys >= 2 && (r.heismans.length >= 1 || r.awards.length >= 3 || r.allAmericans.length >= 5)) ||
+      r.score >= 125
+    )
+    .sort((a,b)=>b.score-a.score || a.player.localeCompare(b.player));
 }
 function PlayerHallOfFame({ teams, assignments, results, allAmericans, awards, heismans, nationalChampions }) {
-  const rows = playerHallRows(teams, assignments, results, allAmericans, awards, heismans, nationalChampions).filter((row)=>row.score >= 80);
-  return <section style={card}><h2 style={sectionTitle}>Player Hall of Fame</h2><p style={mutedText}>Players qualify automatically by tougher benchmarks: Heisman plus supporting accolades, 3 major awards, 4 All-American selections, elite title-season accolades, or 60+ HOF score.</p>{rows.length ? <div style={hofGrid}>{rows.map((row)=><PlayerHofCard key={row.key} row={row} team={teams.find((t)=>t.id===row.teamId)}/>)}</div> : <div style={miniRow}>No players have met Hall of Fame criteria yet.</div>}</section>;
+  const rows = playerHallRows(teams, assignments, results, allAmericans, awards, heismans, nationalChampions).filter((row)=>row.score >= 125);
+  return <section style={card}><h2 style={sectionTitle}>Player Hall of Fame</h2><p style={mutedText}>Player Hall of Fame is reserved for legendary careers only: multiple Heismans, Heisman plus major supporting accolades, dominant multi-award careers, or cornerstone players from championship eras.</p>{rows.length ? <div style={hofGrid}>{rows.map((row)=><PlayerHofCard key={row.key} row={row} team={teams.find((t)=>t.id===row.teamId)}/>)}</div> : <div style={miniRow}>No players have met Hall of Fame criteria yet.</div>}</section>;
 }
 function PlayerHofCard({ row, team }) {
   return (
@@ -5445,8 +5469,10 @@ const recordGrid = {
 const recordCard = {
   ...liquidGlassTile,
   display: "grid",
-  gap: 10,
-  minHeight: 156,
+  gap: 12,
+  minHeight: 170,
+  alignContent: "start",
+  textAlign: "center",
 };
 
 const recordValue = {
@@ -5460,19 +5486,28 @@ const recordValue = {
 const recordHolders = {
   display: "flex",
   flexWrap: "wrap",
-  gap: 7,
+  gap: 8,
+  justifyContent: "center",
+  alignItems: "center",
 };
 
 const recordHolderPill = {
-  border: "1px solid rgba(255,255,255,.16)",
-  background: "rgba(255,255,255,.08)",
+  border: "1px solid rgba(255,255,255,.18)",
+  background: "rgba(255,255,255,.09)",
   color: "#fff",
   borderRadius: 999,
-  padding: "7px 10px",
+  padding: "8px 12px",
   fontSize: 12,
-  fontWeight: 900,
+  fontWeight: 950,
   maxWidth: "100%",
+  minHeight: 34,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  textAlign: "center",
+  lineHeight: 1.15,
   overflowWrap: "anywhere",
+  wordBreak: "break-word",
 };
 
 const coachRingsPanel = {
