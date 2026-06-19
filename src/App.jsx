@@ -1620,6 +1620,7 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
   const currentSeasonResults = results.filter((r)=>String(r.season_year)===String(currentYear));
   const rankings = computerRankingRows(teams, currentSeasonResults, assignments, users);
   const prestigeRows = typeof dynastyPrestigeRows === "function" ? dynastyPrestigeRows(teams, assignments, allResults, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats).slice(0,5) : [];
+  const topRecruit = recruiting.filter((row)=>String(row.season_year)===String(currentYear) && Number(row.rank)>0).sort((a,b)=>Number(a.rank)-Number(b.rank))[0];
 
   const rankingDetails = rankings.map((row, index) => {
     const team = teams.find((team)=>team.id===row.team?.id) || row.team || teams.find((team)=>team.name===row.teamName);
@@ -1676,22 +1677,16 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
     return { ...row, rank:index+1, user:userName || "CPU" };
   });
 
-  const firstActive = activeAssignments[0];
-  const firstActiveTeam = firstActive ? teams.find((team)=>team.id===firstActive.team_id) : null;
-  const firstActiveUser = firstActive ? users.find((user)=>user.id===firstActive.discord_user_id)?.discord_username : null;
+  const prestigeLeader = topPrestigeRows[0];
+  const topRecruitTeam = topRecruit ? teams.find((team)=>team.id===topRecruit.team_id) || topRecruit.teams : null;
+  const topRecruitUser = topRecruitTeam ? users.find((user)=>user.id===activeCoachForTeam(topRecruitTeam.id, assignments)?.discord_user_id)?.discord_username : null;
 
   const tileData = [
-    { label:"Active Coaches", value: activeCoachCount, sub: firstActiveTeam ? `${firstActiveTeam.name} — ${firstActiveUser || "Coach"}` : "No active team", team:firstActiveTeam },
+    { label:"Prestige Leader", value: prestigeLeader?.score ?? "—", sub: prestigeLeader ? `${prestigeLeader.team.name} — ${prestigeLeader.user}` : "No prestige yet", team:prestigeLeader?.team },
     { label:"Highest SOR", value: highestSor?.sor || "—", sub: highestSor ? `${highestSor.teamName} — ${highestSor.user}` : "No games yet", team:highestSor?.team },
-    { label:"Top 3 SOR", value:"", sub: topSorRows.length ? topSorRows.map((row)=>`#${row.rank} ${row.teamName} — ${row.user} • ${row.sor}`) : ["No games yet"], team:topSorRows[0]?.team },
-    { label:"Top 3 Prestige", value:"", sub: topPrestigeRows.length ? topPrestigeRows.map((row)=>`#${row.rank} ${row.team.name} — ${row.user} • ${row.score}`) : ["No prestige yet"], team:topPrestigeRows[0]?.team },
+    { label:"Top Recruiter", value: topRecruit ? `#${topRecruit.rank}` : "—", sub: topRecruitTeam ? `${topRecruitTeam.name} — ${topRecruitUser || "CPU"}` : "No class entered", team:topRecruitTeam },
+    { label:"Active Coaches", value: activeCoachCount, sub: "of 32", team:null },
   ];
-
-  const headlineRows = [
-    rankingDetails[0] ? { title: `${rankingDetails[0].teamName} leads the CFBElite Automatic Rankings`, meta: "Rankings Desk" } : null,
-    highestSor ? { title: `${highestSor.teamName} owns the strongest SOR at ${highestSor.sor}`, meta: "Strength of Result" } : null,
-    prestigeRows[0] ? { title: `${prestigeRows[0].team.name} is the current prestige leader`, meta: "Prestige Tracker" } : null,
-  ].filter(Boolean);
 
   const headerCells = [
     ["rank","Rank"],
@@ -1706,12 +1701,18 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
     ["rating","Rating"],
   ];
 
+  const headlineRows = [
+    rankingDetails[0] ? { title: `${rankingDetails[0].teamName} leads the CFBElite Automatic Rankings`, meta: "Rankings Desk" } : null,
+    highestSor ? { title: `${highestSor.teamName} owns the strongest SOR at ${highestSor.sor}`, meta: "Strength of Result" } : null,
+    prestigeLeader ? { title: `${prestigeLeader.team.name} leads prestige at ${prestigeLeader.score}`, meta: "Prestige Tracker" } : null,
+  ].filter(Boolean);
+
   return (
-    <div style={dashboardPro}>
-      <section style={dashboardHeroPro}>
+    <div style={dashboardProV37}>
+      <section style={dashboardHeroV37}>
         <div>
-          <div style={dashboardKickerPro}>CFBELITE 27 • LIVE DATABASE</div>
-          <h1 style={dashboardTitlePro}>Dynasty Headquarters</h1>
+          <div style={dashboardKickerPro}>CFBELITE 27 • DYNASTY HQ</div>
+          <h1 style={dashboardTitleV37}>Dynasty Headquarters</h1>
           <p style={dashboardSubPro}>Season {currentYear} • {currentWeek}</p>
         </div>
         <div style={dashboardControlsPro}>
@@ -1722,75 +1723,81 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
       </section>
 
       <section style={dashboardKpiPro}>
-        {tileData.map((tile,index)=>{
+        {tileData.map((tile)=>{
           const primary = getTeamPrimary(tile.team);
           const secondary = getTeamSecondary(tile.team);
-          const lines = Array.isArray(tile.sub) ? tile.sub : [tile.sub];
           return (
-            <div key={tile.label} style={{...dashboardKpiCardPro, background:`linear-gradient(135deg, ${primary}aa, rgba(2,6,23,.96) 64%, ${secondary}33)`, borderColor:`${secondary}77`}}>
+            <div key={tile.label} style={{...dashboardKpiCardPro, background: tile.team ? `linear-gradient(135deg, ${primary}aa, rgba(2,6,23,.96) 64%, ${secondary}33)` : dashboardKpiCardPro.background, borderColor: tile.team ? `${secondary}77` : "rgba(148,163,184,.16)"}}>
               <span>{tile.label}</span>
-              {tile.value !== "" && <b>{tile.value}</b>}
-              <div style={dashboardTopThreeMini}>{lines.map((line,i)=><small key={i}>{line}</small>)}</div>
+              <b>{tile.value}</b>
+              <small>{tile.sub}</small>
             </div>
           );
         })}
       </section>
 
-      <section style={dashboardFeatureGridPro}>
-        <div style={dashboardRankPanelPro}>
-          <div style={dashboardPanelHeaderPro}>
-            <span>CFBELITE AUTOMATIC RANKINGS</span>
-            <h2>Commissioner Power Table</h2>
-          </div>
-          <div style={dashboardTableHeadPro}>
-            {headerCells.map(([key,label])=>(
-              <button key={key} style={dashboardHeaderButtonPro} onClick={()=>toggleRankingSort(key)}>
-                {label}{rankingSort.key === key ? (rankingSort.direction === "asc" ? " ↑" : " ↓") : ""}
+      <section style={dashboardRankPanelFullV37}>
+        <div style={dashboardPanelHeaderPro}>
+          <span>CFBELITE AUTOMATIC RANKINGS</span>
+          <h2>Commissioner Power Table</h2>
+        </div>
+        <div style={dashboardTableHeadPro}>
+          {headerCells.map(([key,label])=>(
+            <button key={key} style={dashboardHeaderButtonPro} onClick={()=>toggleRankingSort(key)}>
+              {label}{rankingSort.key === key ? (rankingSort.direction === "asc" ? " ↑" : " ↓") : ""}
+            </button>
+          ))}
+        </div>
+        <div style={dashboardRankingListPro}>
+          {sortedRankingDetails.map((row)=>{
+            const team = row.team;
+            const primary = getTeamPrimary(team);
+            const secondary = getTeamSecondary(team);
+            return (
+              <button key={team?.id || row.teamName || row.rank} style={{...dashboardRankRowPro, background:`linear-gradient(100deg, ${primary}70, rgba(15,23,42,.92) 42%, ${secondary}28)`, borderColor:`${secondary}77`}} onClick={()=>team?.id && goToTeam(team.id)}>
+                <em>#{row.rank}</em>
+                <span style={dashboardTeamCellPro}><TeamLogoMark team={team} size={34}/><strong>{row.teamName || team?.name}</strong></span>
+                <span>{row.user}</span>
+                <span>{row.record.wins}</span>
+                <span>{row.record.losses}</span>
+                <span>{row.record.avgPf}</span>
+                <span>{row.record.avgPa}</span>
+                <span>{row.top10}</span>
+                <span>{row.sor}</span>
+                <b>{Number(row.rating || 0).toFixed(1)}</b>
               </button>
-            ))}
-          </div>
-          <div style={dashboardRankingListPro}>
-            {sortedRankingDetails.map((row)=>{
-              const team = row.team;
-              const primary = getTeamPrimary(team);
-              const secondary = getTeamSecondary(team);
-              return (
-                <button key={team?.id || row.teamName || row.rank} style={{...dashboardRankRowPro, background:`linear-gradient(100deg, ${primary}66, rgba(15,23,42,.92) 42%, ${secondary}22)`, borderColor:`${secondary}66`}} onClick={()=>team?.id && goToTeam(team.id)}>
-                  <em>#{row.rank}</em>
-                  <span style={dashboardTeamCellPro}><TeamLogoMark team={team} size={34}/><strong>{row.teamName || team?.name}</strong></span>
-                  <span>{row.user}</span>
-                  <span>{row.record.wins}</span>
-                  <span>{row.record.losses}</span>
-                  <span>{row.record.avgPf}</span>
-                  <span>{row.record.avgPa}</span>
-                  <span>{row.top10}</span>
-                  <span>{row.sor}</span>
-                  <b>{Number(row.rating || 0).toFixed(1)}</b>
-                </button>
-              );
-            })}
+            );
+          })}
+        </div>
+      </section>
+
+      <section style={dashboardBelowGridV37}>
+        <div style={dashboardSmallPanelPro}>
+          <div style={dashboardPanelHeaderPro}><span>TOP 3 SOR</span><h2>Resume Strength</h2></div>
+          <div style={dashboardMiniListPro}>
+            {topSorRows.length ? topSorRows.map((row)=>(
+              <div key={row.rank} style={{...dashboardMiniRowPro, background:`linear-gradient(100deg, ${getTeamPrimary(row.team)}55, rgba(15,23,42,.92), ${getTeamSecondary(row.team)}22)`}}>
+                <span>#{row.rank}</span><TeamLogoMark team={row.team} size={28}/><strong>{row.teamName}<small style={{display:"block", color:"rgba(255,255,255,.65)", fontWeight:800}}>{row.user}</small></strong><b>{row.sor}</b>
+              </div>
+            )) : <p style={mutedText}>No games yet.</p>}
           </div>
         </div>
-
-        <div style={dashboardSideStackPro}>
-          <div style={dashboardSmallPanelPro}>
-            <div style={dashboardPanelHeaderPro}><span>PRESTIGE SPOTLIGHT</span><h2>Top Programs</h2></div>
-            <div style={dashboardMiniListPro}>
-              {prestigeRows.map((row,index)=>(
-                <button key={row.team.id} style={{...dashboardMiniRowPro, background:`linear-gradient(100deg, ${getTeamPrimary(row.team)}55, rgba(15,23,42,.92), ${getTeamSecondary(row.team)}22)`}} onClick={()=>goToTeam(row.team.id)}>
-                  <span>#{index+1}</span><TeamLogoMark team={row.team} size={28}/><strong>{row.team.name}<small style={{display:"block", color:"rgba(255,255,255,.65)", fontWeight:800}}>{topPrestigeRows[index]?.user || "CPU"}</small></strong><b>{row.score}</b>
-                </button>
-              ))}
-            </div>
+        <div style={dashboardSmallPanelPro}>
+          <div style={dashboardPanelHeaderPro}><span>TOP 3 PRESTIGE</span><h2>Program Power</h2></div>
+          <div style={dashboardMiniListPro}>
+            {topPrestigeRows.length ? topPrestigeRows.map((row)=>(
+              <div key={row.team.id} style={{...dashboardMiniRowPro, background:`linear-gradient(100deg, ${getTeamPrimary(row.team)}55, rgba(15,23,42,.92), ${getTeamSecondary(row.team)}22)`}}>
+                <span>#{row.rank}</span><TeamLogoMark team={row.team} size={28}/><strong>{row.team.name}<small style={{display:"block", color:"rgba(255,255,255,.65)", fontWeight:800}}>{row.user}</small></strong><b>{row.score}</b>
+              </div>
+            )) : <p style={mutedText}>No prestige yet.</p>}
           </div>
-
-          <div style={dashboardSmallPanelPro}>
-            <div style={dashboardPanelHeaderPro}><span>DYNASTY HEADLINES</span><h2>The Wire</h2></div>
-            <div style={dashboardNewsListPro}>
-              {headlineRows.length ? headlineRows.map((item,index)=>(
-                <div key={index} style={dashboardNewsRowPro}><span>🏈</span><div><b>{item.title}</b><small>{item.meta}</small></div></div>
-              )) : <div style={mutedText}>No storylines yet. Add results in League Data Center.</div>}
-            </div>
+        </div>
+        <div style={dashboardSmallPanelPro}>
+          <div style={dashboardPanelHeaderPro}><span>DYNASTY HEADLINES</span><h2>The Wire</h2></div>
+          <div style={dashboardNewsListPro}>
+            {headlineRows.length ? headlineRows.map((item,index)=>(
+              <div key={index} style={dashboardNewsRowPro}><span>🏈</span><div><b>{item.title}</b><small>{item.meta}</small></div></div>
+            )) : <div style={mutedText}>No storylines yet. Add results in League Data Center.</div>}
           </div>
         </div>
       </section>
@@ -2721,112 +2728,74 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
     twoCol: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 },
   };
 
+  const recentPicked = [...sortedPicks].filter((pick)=>pick.team_id && pick.status === "picked").slice(-8).reverse();
+
   return (
-    <section style={S.page}>
-      <div style={S.hero}>
-        <div>
-          <div style={S.eyebrow}>CFBElite 27 Draft Room</div>
-          <h2 style={S.title}>The Board Is Live</h2>
-          <p style={S.muted}>Public CFB 27 team draft room. Available teams are limited to American, CUSA, MAC, Mountain West, PAC 12, and Sun Belt.</p>
+    <section style={draftBroadcastPageV37}>
+      <div style={draftOnClockHeroV37}>
+        <div style={draftOnClockMainV37}>
+          <div style={S.eyebrow}>ON THE CLOCK</div>
+          <h1 style={draftOnClockNameV37}>{displayPick?.discord_username || displayPick?.discord_users?.discord_username || "User TBD"}</h1>
+          <div style={draftOnClockMetaV37}>Pick #{String(displayPick?.pick_number || 1).padStart(2, "0")}</div>
         </div>
-        <div style={S.panel}>
-          <div style={S.eyebrow}>{displayPick?.status === "pick_is_in" ? "The Pick Is In" : "On The Clock"}</div>
-          <h3 style={{ margin: "8px 0", color: "#fff", fontSize: 30 }}>Pick #{String(displayPick?.pick_number || 1).padStart(2, "0")}</h3>
-          <div style={{ color: "#fff", fontSize: 26, fontWeight: 1000 }}>{displayPick?.discord_username || displayPick?.discord_users?.discord_username || "User TBD"}</div>
-          <div style={S.clock}>{timeLabel()}</div>
+        <div style={draftTimerCardV37}>
+          <span>{displayPick?.status === "pick_is_in" ? "THE PICK IS IN" : "CLOCK"}</span>
+          <b>{timeLabel()}</b>
         </div>
       </div>
 
-      <div style={S.panel}>
-        <div style={S.eyebrow}>Draft Controls</div>
-        <p style={S.muted}>Controls are open. Set the clock, select a team, stage the pick, download/copy the announcement, then reveal it to the public board.</p>
-        <div style={S.grid}>
-          <select title="Manual current pick override" style={S.input} value={manualPickNumber} onChange={(e) => setManualPickNumber(Number(e.target.value))}>
-            {sortedPicks.map((pick) => (
-              <option style={{color:"#111827", background:"#fff"}} key={pick.pick_number} value={pick.pick_number}>
-                Pick #{String(pick.pick_number).padStart(2, "0")} - {pick.discord_username || pick.discord_users?.discord_username || "User TBD"}
-              </option>
-            ))}
-          </select>
-          <input style={S.input} type="number" min="1" max="60" value={timerMinutes} onChange={(e) => setTimerMinutes(e.target.value)} placeholder="Clock minutes" />
-          <select style={S.input} value={selectedTeamId} onChange={(e) => setSelectedTeamId(e.target.value)}>
-            <option style={{color:"#111827", background:"#fff"}} value="">Select Team For Pick #{displayPick?.pick_number || ""}</option>
-            {availableTeams.map((team) => (
-              <option style={{color:"#111827", background:"#fff"}} key={team.id} value={team.id}>{team.name} - {cleanConference(team.conference)}</option>
-            ))}
-          </select>
-          <button style={S.button} type="button" onClick={handleStartClock}>Start / Reset Clock</button>
-          <button style={S.ghost} type="button" onClick={() => setManualPickNumber(Number(manualPickNumber) || 1)}>Set Current Pick</button>
-          <button style={S.ghost} type="button" onClick={handlePauseClock}>Pause Clock</button>
-          <button style={S.ghost} type="button" onClick={handleResumeClock}>Resume Clock</button>
-          <button style={S.button} type="button" disabled={!selectedTeamId} onClick={handlePickIsIn}>Pick Is In</button>
-        </div>
-
-        {(selectedTeam || stagedTeam) && (
-          <div style={S.activePickRow}>
-            <div>
-              <div style={S.eyebrow}>{stagedTeam ? "Pick Is In" : "Selected Team"}</div>
-              <div style={S.activePickTeam}>{(stagedTeam || selectedTeam)?.name}</div>
-            </div>
-            <div style={S.activePickMeta}>
-              Pick #{String((stagedPick || currentPick)?.pick_number || 1).padStart(2, "0")} · {cleanConference((stagedTeam || selectedTeam)?.conference)}
-            </div>
-          </div>
-        )}
+      <div style={draftTickerV37}>
+        {(recentPicked.length ? recentPicked : sortedPicks.slice(0,8)).map((pick)=> {
+          const team = teams.find((t)=>String(t.id)===String(pick.team_id)) || pick.teams;
+          return <span key={pick.pick_number}>#{pick.pick_number} {pick.discord_username || pick.discord_users?.discord_username || "User TBD"} {team ? `→ ${team.name}` : "on deck"}</span>;
+        })}
       </div>
 
-      <div style={S.panel}>
-        <div style={S.eyebrow}>Conference Draft Caps</div>
-        <div style={S.grid}>
-          {allowedConferences.map((conf) => {
-            const count = conferenceCounts[conf] || 0;
-            const locked = lockedConferences.has(conf);
-            return (
-              <div key={conf} style={{ ...S.pickTile, background: locked ? "rgba(127,29,29,.75)" : "rgba(255,255,255,.07)", borderColor: locked ? "rgba(248,113,113,.70)" : "rgba(255,255,255,.18)" }}>
-                <div style={{display:"flex", justifyContent:"space-between", gap:8, alignItems:"center"}}>
-                  <b style={{ color: "#fff" }}>{conf}</b>
-                  <span style={{ color: locked ? "#fecaca" : "#bbf7d0", fontWeight: 1000, fontSize: 12 }}>{locked ? "LOCKED" : "OPEN"}</span>
-                </div>
-                <span style={S.muted}>{count} selected</span>
-                <div style={S.confPickRows}>
-                  {(conferenceSelections[conf] || []).map((item) => (
-                    <div key={`${conf}-${item.pickNumber}`} style={S.confPickRow}>
-                      <span>#{String(item.pickNumber).padStart(2,"0")} {item.user}</span>
-                      <b>{item.team}</b>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      <div style={draftControlBarV37}>
+        <select title="Manual current pick override" style={S.input} value={manualPickNumber} onChange={(e) => setManualPickNumber(Number(e.target.value))}>
+          {sortedPicks.map((pick) => (
+            <option style={{color:"#111827", background:"#fff"}} key={pick.pick_number} value={pick.pick_number}>
+              Pick #{String(pick.pick_number).padStart(2, "0")} - {pick.discord_username || pick.discord_users?.discord_username || "User TBD"}
+            </option>
+          ))}
+        </select>
+        <input style={S.input} type="number" min="1" max="60" value={timerMinutes} onChange={(e) => setTimerMinutes(e.target.value)} placeholder="Clock minutes" />
+        <select style={S.input} value={selectedTeamId} onChange={(e) => setSelectedTeamId(e.target.value)}>
+          <option style={{color:"#111827", background:"#fff"}} value="">Select Team For Pick #{displayPick?.pick_number || ""}</option>
+          {availableTeams.map((team) => (
+            <option style={{color:"#111827", background:"#fff"}} key={team.id} value={team.id}>{team.name} - {cleanConference(team.conference)}</option>
+          ))}
+        </select>
+        <button style={S.button} type="button" onClick={handleStartClock}>Start / Reset Clock</button>
+        <button style={S.ghost} type="button" onClick={handlePauseClock}>Pause</button>
+        <button style={S.ghost} type="button" onClick={handleResumeClock}>Resume</button>
+        <button style={S.button} type="button" disabled={!selectedTeamId} onClick={handlePickIsIn}>Pick Is In</button>
       </div>
 
-      {latestPick && latestTeam && (
-        <div style={S.panel}>
-          <div style={S.eyebrow}>Latest Pick</div>
-          <h3 style={{ margin: "8px 0", color: "#fff", fontSize: 30 }}>Pick #{String(latestPick.pick_number).padStart(2, "0")} · {latestPick.discord_username || latestPick.discord_users?.discord_username}</h3>
-          <div style={{ color: "#facc15", fontSize: 38, fontWeight: 1000 }}>{latestTeam.name}</div>
+      {(selectedTeam || stagedTeam) && (
+        <div style={pickPreviewCard}>
+          <div style={S.eyebrow}>{stagedTeam ? "Pick Is In" : "Selected Team"}</div>
+          <div style={pickTeamLine}>{(stagedTeam || selectedTeam)?.name}</div>
+          <div style={S.muted}>Pick #{String((stagedPick || currentPick)?.pick_number || 1).padStart(2, "0")} · {cleanConference((stagedTeam || selectedTeam)?.conference)}</div>
         </div>
       )}
 
-      <div style={S.twoCol}>
-        <div style={S.panel}>
+      <section style={draftMainBoardV37}>
+        <div style={draftBoardPanelV37}>
           <div style={S.eyebrow}>Draft Board</div>
-          <div style={{ ...S.grid, marginTop: 12 }}>
+          <div style={draftBoardRowsV37}>
             {sortedPicks.map((pick) => {
               const team = teams.find((t) => String(t.id) === String(pick.team_id)) || pick.teams;
               const visible = pick.status === "picked";
+              const primary = getTeamPrimary(team);
+              const secondary = getTeamSecondary(team);
               return (
-                <div key={pick.pick_number} style={{...S.pickTile, background: visible && team ? `linear-gradient(135deg, ${team.primary_color || "#1f2937"}cc, rgba(15,23,42,.88))` : S.pickTile.background, borderColor: visible && team ? (team.accent_color || team.secondary_color || "rgba(255,255,255,.18)") : S.pickTile.border}}>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                    <b style={{ color: "#fff" }}>#{String(pick.pick_number).padStart(2, "0")}</b>
-                    <span style={{ color: "#facc15", fontWeight: 900 }}>{pick.status === "pick_is_in" ? "PICK IS IN" : (pick.status || "pending")}</span>
-                  </div>
-                  <div style={{ color: "#fff", fontWeight: 1000 }}>{pick.discord_username || pick.discord_users?.discord_username}</div>
-                  {visible && team && (team.logo_url) && <img src={team.logo_url} alt="" style={S.tileWatermark}/>}
-                  <div style={visible && team ? { color: "#facc15", fontWeight: 1000, position:"relative", zIndex:1 } : S.muted}>{visible && team ? team.name : (pick.status === "pick_is_in" ? "Team hidden until reveal" : "On deck")}</div>
-                  {pick.status === "pick_is_in" && <button style={S.button} type="button" onClick={() => handleRevealPick(pick.pick_number)}>Reveal Pick</button>}
+                <div key={pick.pick_number} style={{...draftBoardRowV37, background: visible && team ? `linear-gradient(100deg, ${primary}88, rgba(15,23,42,.94), ${secondary}22)` : draftBoardRowV37.background, borderColor: visible && team ? `${secondary}77` : draftBoardRowV37.borderColor}}>
+                  <b>#{String(pick.pick_number).padStart(2, "0")}</b>
+                  <strong>{pick.discord_username || pick.discord_users?.discord_username || "User TBD"}</strong>
+                  <span>{visible && team ? team.name : (pick.status === "pick_is_in" ? "Team hidden until reveal" : "On deck")}</span>
+                  <em>{pick.status === "pick_is_in" ? "PICK IS IN" : (pick.status || "pending")}</em>
+                  {pick.status === "pick_is_in" && <button style={S.button} type="button" onClick={() => handleRevealPick(pick.pick_number)}>Reveal</button>}
                   {pick.team_id && <button style={S.ghost} type="button" onClick={() => handleUndoPick(pick.pick_number)}>Undo</button>}
                 </div>
               );
@@ -2834,10 +2803,9 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
           </div>
         </div>
 
-        <div style={S.panel}>
+        <aside style={draftAvailablePanelV37}>
           <div style={S.eyebrow}>Available Teams · {availableTeams.length}</div>
           <input style={{ ...S.input, marginTop: 12 }} value={teamSearch} onChange={(e) => setTeamSearch(e.target.value)} placeholder="Search available teams or conference..." />
-
           <div style={S.availableConferenceStack}>
             {availableTeamsByConference.map((group) => (
               <div key={group.conference} style={S.availableConferenceGroup}>
@@ -2849,30 +2817,42 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
                   <span>{group.locked ? "🔒 " : ""}{group.conference}</span>
                   <b>{group.locked ? "LOCKED" : `${group.teams.length} Remaining`}</b>
                 </div>
-
                 {!group.locked && (
-                  <div style={S.availableTeamGrid}>
+                  <div style={draftAvailableGridV37}>
                     {group.teams.map((team) => (
-                      <div key={team.id} style={{
-                        ...S.pickTile,
-                        position: "relative",
-                        overflow: "hidden",
+                      <button key={team.id} style={{
+                        ...draftAvailableTileV37,
                         background: `linear-gradient(135deg, ${team.primary_color || "#1f2937"}cc, rgba(15,23,42,.88))`,
-                        borderColor: "#ffffff",
-                        borderWidth: 1.5
-                      }}>
-                        {(team.logo_url) && <img src={team.logo_url} alt="" style={S.tileWatermark}/>}
-                        <b style={{ color: "#ffffff", fontWeight: 1000, position:"relative", zIndex:1 }}>{team.name}</b>
-                        <span style={{ color: "rgba(255,255,255,.82)", fontWeight: 850, position:"relative", zIndex:1 }}>{cleanConference(team.conference)}</span>
-                      </div>
+                        borderColor: team.secondary_color || "#ffffff",
+                      }} onClick={()=>setSelectedTeamId(team.id)}>
+                        <TeamLogoMark team={team} size={34}/>
+                        <b>{team.name}</b>
+                        <span>{cleanConference(team.conference)}</span>
+                      </button>
                     ))}
                   </div>
                 )}
               </div>
             ))}
           </div>
-        </div>
-      </div>
+        </aside>
+      </section>
+
+      <section style={draftConferenceGrid}>
+        {allowedConferences.map((conf) => {
+          const count = conferenceCounts[conf] || 0;
+          const locked = lockedConferences.has(conf);
+          return (
+            <div key={conf} style={locked ? draftConferenceTileLocked : draftConferenceTile}>
+              <div style={{display:"flex", justifyContent:"space-between", gap:8, alignItems:"center"}}>
+                <b>{conf}</b>
+                <span style={{ color: locked ? "#fecaca" : "#bbf7d0", fontWeight: 1000, fontSize: 12 }}>{locked ? "LOCKED" : "OPEN"}</span>
+              </div>
+              <span style={S.muted}>{count} selected</span>
+            </div>
+          );
+        })}
+      </section>
     </section>
   );
 }
@@ -3885,121 +3865,100 @@ function CoachRings({ stats, superlatives }) {
 }
 
 function CoachProfile({ user, users = [], teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting, seasonPlayerStats = [], teamSeasonStats = [] }) {
-  const coachStats = getCoachStats(usersFallback(user || {}), teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
-  const stats = coachStats.find((row)=>row.userId === user?.id) || { wins:0, losses:0, nattys:0, confTitles:0, top25Wins:0, awards:0, allAmericans:0, heismans:0, prestige:0 };
-  const activeAssignment = assignments.find((a)=>a.discord_user_id===user?.id && a.status==="Active");
-  const currentTeam =
-    teams.find((t)=>t.id===activeAssignment?.team_id) ||
-    activeAssignment?.teams ||
-    activeAssignment?.team ||
-    null;
-  const timeline = assignments.filter((a)=>a.discord_user_id===user?.id).sort((a,b)=>Number(a.start_year||0)-Number(b.start_year||0));
-  const coachResults = results.filter((result) => {
-    const team1UserId = result.team_1_user_id || coachForTeamYear(result.team_1_id, result.season_year, assignments)?.discord_user_id;
-    const team2UserId = result.team_2_user_id || coachForTeamYear(result.team_2_id, result.season_year, assignments)?.discord_user_id;
-    return team1UserId === user?.id || team2UserId === user?.id;
-  });
-  const coachAA = rowsForCoachUser(allAmericans, user || {}, assignments);
-  const coachAwards = rowsForCoachUser(awards, user || {}, assignments);
-  const coachHeismans = rowsForCoachUser(heismans, user || {}, assignments);
-  const coachEloRow = userEloRows(usersFallback(user || {}), assignments, results).find((row)=>row.user?.id === user?.id);
-  const coachTier = userTierFromElo(coachEloRow?.elo || 1500, 1);
-  const coachPlayerStats = (seasonPlayerStats || []).filter((row)=>{
-    if (row.discord_user_id === user?.id) return true;
-    const assignment = coachForTeamYear(row.team_id, row.season_year, assignments);
-    return assignment?.discord_user_id === user?.id;
-  });
-  const coachTeamStats = (teamSeasonStats || []).filter((row)=>{
-    if (row.discord_user_id === user?.id) return true;
-    const assignment = coachForTeamYear(row.team_id, row.season_year, assignments);
-    return assignment?.discord_user_id === user?.id;
-  });
-
-  const coachPrestigeScore = Math.min(100, Math.round((stats?.prestige || stats?.rawPrestige || stats?.totalScore || 0) / 2.5));
-  const coachPrestigeTier = typeof dynastyPrestigeTier === "function" ? dynastyPrestigeTier(coachPrestigeScore) : { stars: "⭐", label: "1-Star Coach" };
-  const superlatives = coachSuperlatives(user || {}, users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
-  const currentSeasonRecord = currentTeam ? recordFromResults(currentTeam.id, results.filter((row)=>String(row.season_year) === String(new Date().getFullYear()))) : { wins:0, losses:0 };
-
+  const safeUser = user || {};
+  const coachStats = getCoachStats(usersFallback(safeUser), teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
+  const stats = coachStats.find((row)=>row.userId === safeUser.id) || { wins:0, losses:0, nattys:0, confTitles:0, top25Wins:0, awards:0, allAmericans:0, heismans:0, prestige:0 };
+  const activeAssignment = assignments.find((a)=>a.discord_user_id===safeUser.id && a.status==="Active");
+  const currentTeam = teams.find((t)=>t.id===activeAssignment?.team_id) || activeAssignment?.teams || null;
   const primary = getTeamPrimary(currentTeam);
   const secondary = getTeamSecondary(currentTeam);
   const accent = currentTeam?.accent_color || secondary || "#facc15";
-  const teamThemedProfile = currentTeam ? {
-    ...profileCard,
-    background: `radial-gradient(circle at top left, ${accent}22, transparent 28%), linear-gradient(155deg, ${primary} 0%, ${primary}e8 34%, rgba(2,6,23,.96) 100%)`,
-    border: `1px solid ${accent}88`,
-    boxShadow: `0 28px 90px ${primary}77, inset 0 0 0 1px ${accent}22`,
-  } : profileCard;
+  const timeline = assignments.filter((a)=>a.discord_user_id===safeUser.id).sort((a,b)=>Number(a.start_year||0)-Number(b.start_year||0));
+  const coachResults = results.filter((result) => {
+    const team1UserId = result.team_1_user_id || coachForTeamYear(result.team_1_id, result.season_year, assignments)?.discord_user_id;
+    const team2UserId = result.team_2_user_id || coachForTeamYear(result.team_2_id, result.season_year, assignments)?.discord_user_id;
+    return team1UserId === safeUser.id || team2UserId === safeUser.id;
+  });
+  const coachAA = rowsForCoachUser(allAmericans, safeUser, assignments);
+  const coachAwards = rowsForCoachUser(awards, safeUser, assignments);
+  const coachHeismans = rowsForCoachUser(heismans, safeUser, assignments);
+  const coachPlayerStats = (seasonPlayerStats || []).filter((row)=>{
+    if (row.discord_user_id === safeUser.id) return true;
+    return coachForTeamYear(row.team_id, row.season_year, assignments)?.discord_user_id === safeUser.id;
+  });
+  const coachTeamStats = (teamSeasonStats || []).filter((row)=>{
+    if (row.discord_user_id === safeUser.id) return true;
+    return coachForTeamYear(row.team_id, row.season_year, assignments)?.discord_user_id === safeUser.id;
+  });
+  const coachRecruiting = (recruiting || []).filter((row)=>coachForTeamYear(row.team_id, row.season_year, assignments)?.discord_user_id === safeUser.id).sort((a,b)=>Number(b.season_year)-Number(a.season_year));
+  const coachPrestigeScore = Math.min(100, Math.round((stats?.prestige || stats?.rawPrestige || stats?.totalScore || 0) / 2.5));
+  const coachPrestigeTier = typeof dynastyPrestigeTier === "function" ? dynastyPrestigeTier(coachPrestigeScore) : { stars: "⭐", label: "1-Star Coach" };
+  const hofPct = Math.min(100, Math.max(0, coachPrestigeScore));
+  const latestTeamStat = coachTeamStats.slice().sort((a,b)=>Number(b.season_year)-Number(a.season_year))[0];
 
-  return <section style={teamThemedProfile}>
-    <div style={{...coachProfileBannerV23, background: `linear-gradient(135deg, ${(currentTeam?.primary_color || "#111827")}dd, rgba(2,6,23,.96))`}}>
-      <div style={coachBannerLogoV23}><TeamLogoMark team={currentTeam} size={108}/></div>
-      <div style={coachBannerMainV23}>
-        <div style={eyebrow}>{currentTeam?.name || "Unassigned"}</div>
-        <h1 style={coachBannerNameV23}>{(user?.discord_username || 'Coach')}</h1>
-        <p style={mutedText}>Head Coach • CFBElite Dynasty</p>
+  return (
+    <section style={coachPageV37}>
+      <div style={{...coachHeroV37, background:`radial-gradient(circle at 12% 0%, ${secondary}44, transparent 30%), linear-gradient(135deg, ${primary}ee, rgba(2,6,23,.97))`, borderColor:`${secondary}77`}}>
+        <div style={coachLogoV37}><TeamLogoMark team={currentTeam} size={118}/></div>
+        <div>
+          <div style={dashboardKickerPro}>{currentTeam?.name || "Future Coach • Unassigned"}</div>
+          <h1 style={coachNameV37}>{safeUser.discord_username || "Coach"}</h1>
+          <p style={coachSubV37}>Sports Reference Profile • 247 Resume • CFBElite Legacy</p>
+        </div>
+        <div style={coachPrestigeV37}>
+          <span>Prestige</span>
+          <b>{coachPrestigeScore}</b>
+          <small>{coachPrestigeTier.stars} {coachPrestigeTier.label}</small>
+        </div>
       </div>
-      <div style={coachPrestigeBoxV23}>
-        <span>Prestige Score</span>
-        <b>{coachPrestigeScore}</b>
-        <small>{coachPrestigeTier.stars} {coachPrestigeTier.label}</small>
+
+      <div style={coachQuickStatsV37}>
+        <Stat title="Career Record" value={`${stats?.wins||0}-${stats?.losses||0}`}/>
+        <Stat title="National Titles" value={stats?.nattys||0}/>
+        <Stat title="Conference Titles" value={stats?.confTitles||0}/>
+        <Stat title="Top 10 Wins" value={stats?.top10Wins||0}/>
+        <Stat title="Awards" value={stats?.awards||0}/>
+        <Stat title="All-Americans" value={stats?.allAmericans||0}/>
       </div>
-    </div>
-    <div style={teamProfileHeroClean}>
-      <div>
-        <div style={{...eyebrow, color: accent, letterSpacing:".18em"}}>Coach Profile</div>
-        <h2 style={teamProfileName}>{(user?.discord_username || 'Coach')}</h2>
-        <p style={teamProfileSubline}><span>Current Team</span><b>{currentTeam?.name || "Unassigned"}</b></p>
-      </div>
-      <div style={badgeRow}>
-        <span style={teamBadgeBubble}>{currentTeam?.conference || "CFBElite"}</span>
-        <span style={teamBadgeBubble}>Record {stats?.wins||0}-{stats?.losses||0}</span>
-        <span style={teamBadgeBubble}>ELO {coachEloRow?.adjustedElo || coachEloRow?.elo || 1500}</span>
-        <span style={teamBadgeBubble}>{coachTier.label}</span>
-      </div>
-    </div>
-    <div style={coachHero2}>
-      <div style={coachHeroLogoBox}>{currentTeam ? <TeamLogoMark team={currentTeam} size={96}/> : "CFB"}</div>
-      <div>
-        <div style={eyebrow}>Coach Profile 2.0</div>
-        <div style={coachHeroName}>{(user?.discord_username || 'Coach')}</div>
-        <div style={mutedText}>Current Team: <b>{currentTeam?.name || "Unassigned"}</b></div>
-      </div>
-      <div style={coachHeroBadges}>
-        <span style={teamBadgeBubble}>{coachPrestigeTier.stars} {coachPrestigeTier.label}</span>
-        <span style={teamBadgeBubble}>Prestige {coachPrestigeScore}</span>
-        <span style={teamBadgeBubble}>{stats?.wins||0}-{stats?.losses||0}</span>
-      </div>
-    </div>
-    <CoachRings stats={stats} superlatives={superlatives}/>
-    <div style={twoCol}>
-      <div style={miniCard}>
-        <h3 style={miniTitle}>Coach Stat Snapshot</h3>
-        <div style={miniRow}>Player stat seasons recorded: <b>{coachPlayerStats.length}</b></div>
-        <div style={miniRow}>Team stat seasons recorded: <b>{coachTeamStats.length}</b></div>
-        <div style={miniRow}>Best team offense: <b>{coachTeamStats.length ? Math.max(...coachTeamStats.map((row)=>Number(row.total_offense || 0))) : "—"}</b></div>
-        <div style={miniRow}>Best total PPG allowed: <b>{coachTeamStats.length ? Math.min(...coachTeamStats.map((row)=>Number(row.total_ppg_allowed || 999)).filter(Boolean)) : "—"}</b></div>
-      </div>
-      <MiniList title="Recent Player Stat Seasons" rows={coachPlayerStats.slice(0,8).map((row)=>`${row.season_year} ${row.player_name} · ${row.position} · ${row.teams?.name || teamNameById(row.team_id, teams)}`)}/>
-    </div>
-    <div style={statsGrid}><Stat title="Career Record" value={`${stats?.wins||0}-${stats?.losses||0}`}/><Stat title="National Titles" value={stats?.nattys||0}/><Stat title="Conference Titles" value={stats?.confTitles||0}/><Stat title="Top 10 Wins" value={stats?.top10Wins||0}/><Stat title="Awards" value={stats?.awards||0}/><Stat title="All-Americans" value={stats?.allAmericans||0}/><Stat title="Heismans" value={stats?.heismans||0}/><Stat title="Top 25 Recruiting Classes" value={top25RecruitingClassesForCoach(user || {}, recruiting, assignments)}/></div>
-    <div style={sportsReferenceGrid}>
-      <div style={miniCard}>
-        <h3 style={miniTitle}>Hall of Fame Progress</h3>
-        <div style={hofProgressTrack}><div style={{...hofProgressFill, width: `${Math.min(100, coachPrestigeScore)}%`}} /></div>
-        <div style={miniRow}>Prestige Requirement: <b>{coachPrestigeScore}/100</b></div>
-        <div style={miniRow}>Career Record: <b>{stats?.wins||0}-{stats?.losses||0}</b></div>
-        <div style={miniRow}>Titles: <b>{stats?.nattys||0} National • {stats?.confTitles||0} Conference</b></div>
-      </div>
-      <MiniList title="Recruiting History" rows={recruiting.filter((row)=>coachForTeamYear(row.team_id,row.season_year,assignments)?.discord_user_id===user?.id).slice(0,8).map((row)=>`${row.season_year}: ${teamNameById(row.team_id,teams)} #${row.rank}`)}/>
-      <MiniList title="Team Stat Seasons" rows={coachTeamStats.slice(0,8).map((row)=>`${row.season_year}: ${teamNameById(row.team_id,teams)} • ${row.points_per_game || "—"} PPG • ${row.total_ppg_allowed || "—"} allowed`)}/>
-      <MiniList title="Player Stat Leaders" rows={coachPlayerStats.slice(0,8).map((row)=>`${row.season_year}: ${row.player_name} • ${row.position}`)}/>
-    </div>
-    <CoachTimelineTable timeline={timeline} teams={teams} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions}/>
-    <Results rows={coachResults} deleteResult={()=>{}} search="" setSearch={()=>{}}/>
-    <RivalryBadges user={user} users={usersFallback(user || {})} allUsers={users} results={results} assignments={assignments}/><BestWorstPanel user={user} results={results} assignments={assignments}/><CoachTimelineEvents user={user} teams={teams} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} assignments={assignments}/><RecognitionTable title="All-Americans" headers={["Player","Position","Team","Year","Type"]} rows={coachAA.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year,r.type]}))}/>
-    <RecognitionTable title="Award Winners" headers={["Player","Position","Team","Year","Award"]} rows={coachAwards.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year,r.award_name]}))}/>
-    <RecognitionTable title="Heisman Winners" headers={["Player","Position","Team","Year"]} rows={coachHeismans.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year]}))}/>
-  </section>;
+
+      <section style={coachGridV37}>
+        <div style={coachPanelV37}>
+          <h3 style={miniTitle}>Hall of Fame Progress</h3>
+          <div style={hofProgressTrack}><div style={{...hofProgressFill, width:`${hofPct}%`}} /></div>
+          <div style={miniRow}>Prestige Requirement: <b>{coachPrestigeScore}/100</b></div>
+          <div style={miniRow}>Titles: <b>{stats?.nattys||0} National • {stats?.confTitles||0} Conference</b></div>
+          <div style={miniRow}>Major Accolades: <b>{(stats?.awards||0)+(stats?.allAmericans||0)+(stats?.heismans||0)}</b></div>
+        </div>
+
+        <div style={coachPanelV37}>
+          <h3 style={miniTitle}>Recruiting History</h3>
+          {coachRecruiting.length ? coachRecruiting.slice(0,8).map((row)=>(
+            <div key={row.id || `${row.season_year}-${row.team_id}`} style={miniRow}>
+              <span>{row.season_year} • {teamNameById(row.team_id, teams)}</span><b>#{row.rank}</b>
+            </div>
+          )) : <p style={mutedText}>No recruiting classes recorded yet.</p>}
+        </div>
+
+        <div style={coachPanelV37}>
+          <h3 style={miniTitle}>Latest Team Stat Season</h3>
+          {latestTeamStat ? <>
+            <div style={miniRow}>Team: <b>{teamNameById(latestTeamStat.team_id, teams)}</b></div>
+            <div style={miniRow}>PPG: <b>{latestTeamStat.points_per_game || "—"}</b></div>
+            <div style={miniRow}>YPG: <b>{latestTeamStat.avg_yards_per_game || "—"}</b></div>
+            <div style={miniRow}>PPG Allowed: <b>{latestTeamStat.total_ppg_allowed || "—"}</b></div>
+          </> : <p style={mutedText}>No team stats recorded yet.</p>}
+        </div>
+
+        <MiniList title="Player Stat Leaders" rows={coachPlayerStats.slice(0,8).map((row)=>`${row.season_year}: ${row.player_name} • ${row.position} • ${teamNameById(row.team_id, teams)}`)}/>
+      </section>
+
+      <CoachTimelineTable timeline={timeline} teams={teams} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions}/>
+      <Results rows={coachResults} deleteResult={()=>{}} search="" setSearch={()=>{}}/>
+      <RecognitionTable title="All-Americans" headers={["Player","Position","Team","Year","Type"]} rows={coachAA.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year,r.type]}))}/>
+      <RecognitionTable title="Award Winners" headers={["Player","Position","Team","Year","Award"]} rows={coachAwards.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year,r.award_name]}))}/>
+      <RecognitionTable title="Heisman Winners" headers={["Player","Position","Team","Year"]} rows={coachHeismans.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year]}))}/>
+    </section>
+  );
 }
 
 function usersFallback(user) { return [user]; }
@@ -8194,4 +8153,240 @@ const dashboardRankRowPro = {
   textAlign: "left",
   cursor: "pointer",
   minWidth: 940,
+};
+
+
+const dashboardProV37 = {
+  display: "grid",
+  gap: 18,
+};
+
+const dashboardHeroV37 = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0,1fr) minmax(260px, 360px)",
+  gap: 18,
+  alignItems: "center",
+  borderRadius: 26,
+  padding: "clamp(26px, 4.4vw, 54px)",
+  border: "1px solid rgba(96,165,250,.24)",
+  background: "radial-gradient(circle at 18% 0%, rgba(96,165,250,.28), transparent 30%), radial-gradient(circle at 88% 0%, rgba(124,58,237,.24), transparent 34%), linear-gradient(135deg, rgba(2,6,23,.98), rgba(8,13,31,.97))",
+  boxShadow: "0 30px 100px rgba(0,0,0,.52), inset 0 1px 0 rgba(255,255,255,.075)",
+};
+
+const dashboardTitleV37 = {
+  margin: "8px 0 8px",
+  color: "#f8fafc",
+  fontSize: "clamp(48px, 7.4vw, 108px)",
+  lineHeight: .84,
+  letterSpacing: "-.075em",
+  fontWeight: 1000,
+};
+
+const dashboardRankPanelFullV37 = {
+  borderRadius: 22,
+  padding: 20,
+  border: "1px solid rgba(96,165,250,.22)",
+  background: "linear-gradient(145deg, rgba(8,13,31,.98), rgba(3,7,18,.99))",
+  boxShadow: "0 28px 90px rgba(0,0,0,.46), inset 0 1px 0 rgba(255,255,255,.06)",
+  overflowX: "auto",
+};
+
+const dashboardBelowGridV37 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))",
+  gap: 16,
+};
+
+const draftBroadcastPageV37 = {
+  display: "grid",
+  gap: 16,
+};
+
+const draftOnClockHeroV37 = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0,1fr) minmax(280px, 520px)",
+  gap: 18,
+  alignItems: "stretch",
+  borderRadius: 26,
+  padding: "clamp(22px, 4vw, 42px)",
+  border: "1px solid rgba(250,204,21,.34)",
+  background: "radial-gradient(circle at 12% 0%, rgba(250,204,21,.22), transparent 30%), radial-gradient(circle at 90% 0%, rgba(37,99,235,.22), transparent 34%), linear-gradient(135deg, rgba(2,6,23,.98), rgba(30,27,75,.92))",
+  boxShadow: "0 30px 100px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.08)",
+};
+
+const draftOnClockMainV37 = {
+  display: "grid",
+  alignContent: "center",
+  gap: 6,
+};
+
+const draftOnClockNameV37 = {
+  margin: 0,
+  color: "#fff",
+  fontSize: "clamp(48px, 8vw, 110px)",
+  lineHeight: .82,
+  letterSpacing: "-.075em",
+  fontWeight: 1000,
+};
+
+const draftOnClockMetaV37 = {
+  color: "#facc15",
+  fontSize: "clamp(24px, 4vw, 48px)",
+  fontWeight: 1000,
+};
+
+const draftTimerCardV37 = {
+  borderRadius: 22,
+  padding: 22,
+  display: "grid",
+  alignContent: "center",
+  gap: 8,
+  background: "rgba(2,6,23,.62)",
+  border: "1px solid rgba(255,255,255,.12)",
+};
+
+const draftTickerV37 = {
+  borderRadius: 16,
+  padding: "12px 16px",
+  display: "flex",
+  gap: 20,
+  overflowX: "auto",
+  background: "linear-gradient(90deg, rgba(250,204,21,.12), rgba(37,99,235,.10))",
+  border: "1px solid rgba(250,204,21,.20)",
+  color: "#f8fafc",
+  fontWeight: 900,
+  whiteSpace: "nowrap",
+};
+
+const draftControlBarV37 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+  gap: 10,
+  padding: 14,
+  borderRadius: 18,
+  background: "rgba(15,23,42,.72)",
+  border: "1px solid rgba(148,163,184,.18)",
+};
+
+const draftMainBoardV37 = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1.15fr) minmax(320px, .85fr)",
+  gap: 16,
+};
+
+const draftBoardPanelV37 = {
+  ...broadcastCard,
+  overflow: "hidden",
+};
+
+const draftAvailablePanelV37 = {
+  ...broadcastCard,
+  overflow: "hidden",
+};
+
+const draftBoardRowsV37 = {
+  display: "grid",
+  gap: 8,
+  marginTop: 12,
+};
+
+const draftBoardRowV37 = {
+  display: "grid",
+  gridTemplateColumns: "58px minmax(130px,.8fr) minmax(160px,1fr) 100px auto auto",
+  gap: 10,
+  alignItems: "center",
+  borderRadius: 14,
+  padding: "11px 12px",
+  background: "rgba(255,255,255,.04)",
+  border: "1px solid rgba(255,255,255,.09)",
+  color: "#fff",
+};
+
+const draftAvailableGridV37 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+  gap: 10,
+  marginTop: 10,
+};
+
+const draftAvailableTileV37 = {
+  minHeight: 94,
+  borderRadius: 16,
+  padding: 12,
+  display: "grid",
+  gap: 5,
+  alignContent: "center",
+  textAlign: "left",
+  color: "#fff",
+  border: "1px solid rgba(255,255,255,.18)",
+  cursor: "pointer",
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,.14), 0 14px 32px rgba(0,0,0,.26)",
+};
+
+const coachPageV37 = {
+  display: "grid",
+  gap: 18,
+};
+
+const coachHeroV37 = {
+  display: "grid",
+  gridTemplateColumns: "auto minmax(0,1fr) minmax(210px,280px)",
+  gap: 22,
+  alignItems: "center",
+  borderRadius: 28,
+  padding: "clamp(22px, 4vw, 42px)",
+  border: "1px solid rgba(255,255,255,.18)",
+  boxShadow: "0 30px 100px rgba(0,0,0,.52), inset 0 1px 0 rgba(255,255,255,.08)",
+};
+
+const coachLogoV37 = {
+  width: 142,
+  height: 142,
+  borderRadius: 26,
+  display: "grid",
+  placeItems: "center",
+  background: "rgba(255,255,255,.08)",
+  border: "1px solid rgba(255,255,255,.14)",
+};
+
+const coachNameV37 = {
+  margin: "6px 0",
+  color: "#fff",
+  fontSize: "clamp(44px, 7.5vw, 96px)",
+  lineHeight: .84,
+  letterSpacing: "-.075em",
+  fontWeight: 1000,
+};
+
+const coachSubV37 = {
+  margin: 0,
+  color: "rgba(226,232,240,.82)",
+  fontWeight: 850,
+};
+
+const coachPrestigeV37 = {
+  display: "grid",
+  gap: 6,
+  textAlign: "center",
+  borderRadius: 20,
+  padding: 18,
+  background: "rgba(2,6,23,.58)",
+  border: "1px solid rgba(255,255,255,.12)",
+};
+
+const coachQuickStatsV37 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: 12,
+};
+
+const coachGridV37 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+  gap: 16,
+};
+
+const coachPanelV37 = {
+  ...broadcastCard,
+  marginBottom: 0,
 };
