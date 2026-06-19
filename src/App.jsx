@@ -1611,15 +1611,15 @@ function BestWorstPanel({ user, results, assignments }) {
 function DashboardRedesign({ teams, users, assignments, results, allResults, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats, currentYear, currentWeek, setCurrentYear, setCurrentWeek, saveSettings, goToTeam, sortState, setSortState }) {
   const activeAssignments = activeAssignmentsForLeague(assignments, teams);
   const activeCoachCount = activeAssignments.length;
+  const rankings = computerRankingRows(teams, results, assignments, users).slice(0,5);
   const prestigeRows = typeof dynastyPrestigeRows === "function" ? dynastyPrestigeRows(teams, assignments, allResults, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats).slice(0,5) : [];
-  const rankings = computerRankingRows(teams, results, assignments, users).slice(0,8);
   const champions = nationalChampions.filter((row)=>String(row.season_year)===String(currentYear)).length;
   const headlineRows = [
-    ...recruiting.filter((r)=>String(r.season_year)===String(currentYear) && Number(r.rank)===1).slice(0,1).map((r)=>({title:`${teamNameById(r.team_id, teams)} lands the #1 recruiting class`, meta:"Recruiting Wire"})),
+    ...recruiting.filter((r)=>String(r.season_year)===String(currentYear) && Number(r.rank)===1).slice(0,1).map((r)=>({title:`${teamNameById(r.team_id, teams)} lands the #1 class`, meta:"Recruiting Wire"})),
     ...prestigeRows.slice(0,2).map((r,index)=>({title:`${r.team.name} holds the #${index+1} prestige spot`, meta:"Prestige Tracker"})),
-    rankings[0] ? {title:`${rankings[0].teamName} leads the CFBElite computer rankings`, meta:"Rankings Desk"} : null,
-    {title:`${results.length} games recorded in ${currentYear}`, meta:"League Database"},
-  ].filter(Boolean).slice(0,5);
+    rankings[0] ? {title:`${rankings[0].teamName} leads the computer rankings`, meta:"Rankings Desk"} : null,
+    {title:`${results.length} games recorded this season`, meta:"Live Database"},
+  ].filter(Boolean).slice(0,4);
 
   const confMap = new Map();
   teams.forEach((team)=>{
@@ -1629,91 +1629,75 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
   });
 
   return (
-    <div style={proPageV26}>
-      <section style={proHeroV26}>
-        <div style={proHeroCopyV26}>
-          <div style={proEyebrowV26}>CFBELITE 27 • LIVE DYNASTY DATABASE</div>
-          <h1 style={proHeroTitleV26}>Dynasty Headquarters</h1>
-          <p style={proHeroMetaV26}>Season {currentYear} • {currentWeek}</p>
+    <div style={v29Dashboard}>
+      <section style={v29Hero}>
+        <div style={v29HeroBrand}>
+          <div style={v29LogoText}>CFBELITE <span>27</span></div>
+          <div style={v29HeroSubLogo}>DYNASTY HEADQUARTERS</div>
         </div>
-        <div style={proHeroControlsV26}>
-          <div>
-            <label style={proLabelV26}>Season</label>
-            <select value={currentYear} onChange={(e)=>setCurrentYear(e.target.value)} style={input}>{YEARS.map((year)=><option key={year}>{year}</option>)}</select>
-          </div>
-          <div>
-            <label style={proLabelV26}>Week</label>
-            <select value={currentWeek} onChange={(e)=>setCurrentWeek(e.target.value)} style={input}>{WEEKS.map((week)=><option key={week}>{week}</option>)}</select>
-          </div>
-          <button style={button} onClick={saveSettings}>Save League Settings</button>
+        <div style={v29HeroControls}>
+          <label style={v29ControlLabel}>Season<select style={v29Select} value={currentYear} onChange={(e)=>setCurrentYear(e.target.value)}>{YEARS.map((year)=><option key={year}>{year}</option>)}</select></label>
+          <label style={v29ControlLabel}>Week<select style={v29Select} value={currentWeek} onChange={(e)=>setCurrentWeek(e.target.value)}>{WEEKS.map((week)=><option key={week}>{week}</option>)}</select></label>
+          <button style={v29SaveButton} onClick={saveSettings}>Save</button>
         </div>
       </section>
 
-      <section style={proKpiGridV26}>
-        <div style={proKpiV26}><span>Total Coaches</span><b>32</b><small>League slots</small></div>
-        <div style={proKpiV26}><span>Active Coaches</span><b>{activeCoachCount}</b><small>Assigned users</small></div>
-        <div style={proKpiV26}><span>Games Played</span><b>{results.length}</b><small>This season</small></div>
-        <div style={proKpiV26}><span>National Champions</span><b>{champions}</b><small>{currentYear}</small></div>
+      <section style={v29KpiGrid}>
+        <div style={v29Kpi}><span>Coaches</span><b>32</b><small>Total</small></div>
+        <div style={v29Kpi}><span>Active Coaches</span><b>{activeCoachCount}</b><small>Active</small></div>
+        <div style={v29Kpi}><span>Games Played</span><b>{results.length}</b><small>This Season</small></div>
+        <div style={v29Kpi}><span>National Champions</span><b>{champions}</b><small>All-Time</small></div>
       </section>
 
-      <section style={proThreeColV26}>
-        <div style={proPanelV26}>
-          <div style={proPanelHeadV26}><div><span>CFBELITE AUTOMATED RANKINGS</span><h2>Computer Top 8</h2></div></div>
-          <div style={proListV26}>
+      <section style={v29ThreeGrid}>
+        <div style={v29Panel}>
+          <div style={v29PanelTitle}><span>CFBELITE Automated Rankings</span><h2>Computer Top 5</h2></div>
+          <div style={v29List}>
             {rankings.map((row,index)=>{
               const team = teams.find((team)=>team.id===row.team?.id) || row.team;
               return (
-                <button key={team?.id || row.teamName || index} style={proRankRowV26} onClick={()=>team?.id && goToTeam(team.id)}>
-                  <em>{index+1}</em>
-                  <TeamLogoMark team={team} size={34}/>
-                  <strong>{row.teamName || team?.name}</strong>
-                  <b>{Number(row.score || row.rating || 0).toFixed(1)}</b>
+                <button key={team?.id || row.teamName || index} style={v29RankRow} onClick={()=>team?.id && goToTeam(team.id)}>
+                  <em>{index+1}</em><TeamLogoMark team={team} size={30}/><strong>{row.teamName || team?.name}</strong><b>{Number(row.score || row.rating || 0).toFixed(1)}</b>
                 </button>
               );
             })}
           </div>
-          <div style={proInsetV26}>
-            <ComputerRankings teams={teams} results={results} currentWeek={currentWeek} sortState={sortState} setSortState={setSortState} assignments={assignments} users={users}/>
-          </div>
+          <button style={v29PanelButton}>Full Rankings</button>
         </div>
 
-        <div style={proPanelV26}>
-          <div style={proPanelHeadV26}><div><span>PRESTIGE SPOTLIGHT</span><h2>Top Programs</h2></div></div>
-          <div style={proListV26}>
+        <div style={v29Panel}>
+          <div style={v29PanelTitle}><span>Prestige Spotlight</span><h2>Top Programs</h2></div>
+          <div style={v29List}>
             {prestigeRows.map((row,index)=>(
-              <button key={row.team.id} style={proRankRowV26} onClick={()=>goToTeam(row.team.id)}>
-                <em>{index+1}</em>
-                <TeamLogoMark team={row.team} size={34}/>
-                <strong>{row.team.name}</strong>
-                <b>{row.score}</b>
+              <button key={row.team.id} style={v29RankRow} onClick={()=>goToTeam(row.team.id)}>
+                <em>{index+1}</em><TeamLogoMark team={row.team} size={30}/><strong>{row.team.name}</strong><b>{row.score}</b>
               </button>
             ))}
           </div>
+          <button style={v29PanelButton}>View Prestige History</button>
         </div>
 
-        <div style={proPanelV26}>
-          <div style={proPanelHeadV26}><div><span>DYNASTY HEADLINES</span><h2>The Wire</h2></div></div>
-          <div style={proNewsV26}>
+        <div style={v29Panel}>
+          <div style={v29PanelTitle}><span>Dynasty Headlines</span><h2>The Wire</h2></div>
+          <div style={v29NewsList}>
             {headlineRows.map((item,index)=>(
-              <div key={index} style={proNewsItemV26}>
-                <span>🏈</span>
-                <div><b>{item.title}</b><small>{item.meta}</small></div>
-              </div>
+              <div key={index} style={v29News}><span>🏈</span><div><b>{item.title}</b><small>{item.meta}</small></div></div>
             ))}
           </div>
+          <button style={v29PanelButton}>View All Headlines</button>
         </div>
       </section>
 
-      <section style={proPanelV26}>
-        <div style={proPanelHeadV26}><div><span>CONFERENCE OVERVIEW</span><h2>League Map</h2></div></div>
-        <div style={proConferenceGridV26}>
+      <section style={v29Panel}>
+        <div style={v29PanelTitle}><span>Conference Overview</span><h2>League Map</h2></div>
+        <div style={v29ConferenceGrid}>
           {[...confMap.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([conf, confTeams])=>{
             const activeTeams = confTeams.filter((team)=>activeAssignments.some((assignment)=>assignment.team_id===team.id));
             const sampleLogoTeam = activeTeams[0] || confTeams[0];
             return (
-              <div key={conf} style={proConferenceCardV26}>
-                <div style={proConferenceLogoV26}><TeamLogoMark team={sampleLogoTeam} size={42}/></div>
-                <div><b>{conf}</b><span>{activeTeams.length} active coaches</span><small>{confTeams.length} teams</small></div>
+              <div key={conf} style={v29ConferenceCard}>
+                <div style={v29ConferenceLogo}><TeamLogoMark team={sampleLogoTeam} size={38}/></div>
+                <div><b>{conf}</b><span>{activeTeams.length} Coaches</span><small>{confTeams.length} Teams</small></div>
               </div>
             );
           })}
@@ -5257,7 +5241,7 @@ function MiniList({ title, rows }) { return <div style={miniCard}><h3>{title}</h
 function Table({ headers, children }) { return <div style={{overflowX:"auto",marginTop:20}}><table style={table}><thead><tr>{headers.map((h, index)=><th key={typeof h === "string" ? h : index} style={th}>{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div>; }
 function DeleteButton({ onClick }) { return <button onClick={onClick} style={deleteButton}>Delete</button>; }
 
-const page={minHeight:"100vh",width:"100%",background:"radial-gradient(circle at 15% -10%, rgba(37,99,235,.18), transparent 28%), radial-gradient(circle at 90% 0%, rgba(124,58,237,.16), transparent 30%), linear-gradient(135deg,#020617 0%,#07111f 48%,#11071f 100%)",color:"white",overflowX:"hidden",fontFamily:"Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"};
+const page={minHeight:"100vh",width:"100%",background:"radial-gradient(circle at 12% -10%, rgba(37,99,235,.20), transparent 30%), radial-gradient(circle at 88% 0%, rgba(124,58,237,.16), transparent 30%), linear-gradient(135deg,#020617 0%,#07111f 48%,#11071f 100%)",color:"white",overflowX:"hidden",fontFamily:"Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"};
 const container={width:"100%",maxWidth:"1680px",margin:"0 auto",padding:"clamp(14px, 2vw, 28px)",boxSizing:"border-box"};
 const header={display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,flexWrap:"wrap",gap:20,background:"linear-gradient(135deg, rgba(88,28,135,.55), rgba(15,23,42,.8))",border:"1px solid rgba(250,204,21,.35)",borderRadius:28,padding:"clamp(14px, 2vw, 24px)",boxShadow:"0 24px 80px rgba(0,0,0,.35)"};
 const brandWrap={display:"flex",flexDirection:"column",alignItems:"flex-start",gap:8,minWidth:0};
@@ -5270,19 +5254,19 @@ const tabRow={display:"flex",gap:8,width:"max-content"};
 const tabStyle={background:"rgba(30,27,75,.65)",color:"#e5e7eb",border:"1px solid rgba(255,255,255,.1)",borderRadius:14,padding:"10px 14px",fontWeight:800,cursor:"pointer",whiteSpace:"nowrap"};
 const activeTabStyle={...tabStyle,background:"linear-gradient(135deg,#6d28d9,#facc15)",border:"1px solid #fde68a",color:"#111827"};
 const statsGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))",gap:20,marginBottom:32};
-const statCard={background:"linear-gradient(145deg, rgba(15,23,42,.94), rgba(3,7,18,.985))",border:"1px solid rgba(96,165,250,.16)",borderRadius:18,padding:"clamp(18px, 2vw, 26px)",boxShadow:"0 18px 55px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.06)",minHeight:128};
+const statCard={background:"linear-gradient(145deg, rgba(15,23,42,.94), rgba(3,7,18,.985))",border:"1px solid rgba(96,165,250,.16)",borderRadius:16,padding:"clamp(16px, 2vw, 22px)",boxShadow:"0 18px 55px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.06)",minHeight:112};
 const statTitle={color:"#c4b5fd",fontSize:12,marginBottom:10,textTransform:"uppercase",letterSpacing:".08em",fontWeight:900};
 const statValue={fontSize:38,fontWeight:950,color:"#fff7ed"};
 const statInput={...statValue,background:"transparent",color:"white",border:"none",outline:"none",width:"100%"};
 const statSelect={background:"#111827",color:"#fff7ed",border:"1px solid rgba(250,204,21,.25)",borderRadius:12,padding:14,fontSize:24,fontWeight:900,width:"100%"};
-const card={background:"linear-gradient(145deg, rgba(8,13,31,.94), rgba(3,7,18,.985))",border:"1px solid rgba(148,163,184,.18)",borderRadius:20,padding:"clamp(18px, 2vw, 28px)",marginBottom:24,boxShadow:"0 24px 80px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.055)"};
+const card={background:"linear-gradient(145deg, rgba(8,13,31,.96), rgba(3,7,18,.99))",border:"1px solid rgba(148,163,184,.18)",borderRadius:18,padding:"clamp(16px, 2vw, 24px)",marginBottom:22,boxShadow:"0 24px 80px rgba(0,0,0,.40), inset 0 1px 0 rgba(255,255,255,.055)"};
 const sectionTop={display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"};
-const sectionTitle={fontSize:"clamp(22px, 2.2vw, 32px)",fontWeight:950,margin:0,color:"#f8fafc",letterSpacing:"-.035em"};
+const sectionTitle={fontSize:"clamp(22px, 2vw, 30px)",fontWeight:950,margin:0,color:"#f8fafc",letterSpacing:"-.035em"};
 const formGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))",gap:16,marginTop:20};
-const input={background:"rgba(2,6,23,.86)",border:"1px solid rgba(148,163,184,.24)",color:"#fff",padding:13,borderRadius:12,fontSize:14,width:"100%",boxSizing:"border-box",outline:"none",boxShadow:"inset 0 1px 0 rgba(255,255,255,.045)"};
+const input={background:"rgba(2,6,23,.86)",border:"1px solid rgba(148,163,184,.24)",color:"#fff",padding:12,borderRadius:10,fontSize:14,width:"100%",boxSizing:"border-box",outline:"none",boxShadow:"inset 0 1px 0 rgba(255,255,255,.045)"};
 const smallInput={...input,width:"120px",marginRight:8};
 const searchInput={...input,maxWidth:320};
-const button={background:"linear-gradient(135deg,#2563eb,#7c3aed)",color:"#fff",border:"1px solid rgba(255,255,255,.14)",borderRadius:12,padding:13,fontWeight:950,cursor:"pointer",boxShadow:"0 14px 34px rgba(37,99,235,.24)"};
+const button={background:"linear-gradient(135deg,#2563eb,#7c3aed)",color:"#fff",border:"1px solid rgba(255,255,255,.14)",borderRadius:10,padding:12,fontWeight:950,cursor:"pointer",boxShadow:"0 14px 34px rgba(37,99,235,.24)"};
 const sortButton={background:"transparent",border:"none",color:"#c4b5fd",fontSize:13,textTransform:"uppercase",fontWeight:900,cursor:"pointer",padding:0};
 const deleteButton={background:"#7f1d1d",color:"white",border:"1px solid #ef4444",borderRadius:10,padding:"8px 10px",cursor:"pointer"};
 const table={width:"100%",borderCollapse:"separate",borderSpacing:0,minWidth:820};
@@ -7709,17 +7693,421 @@ const proConferenceLogoV26 = {
   border: "1px solid rgba(255,255,255,.09)",
 };
 
+
+
+
+
+
+
+
+const mockDashboardV27 = {
+  display: "grid",
+  gap: 16,
+  color: "#f8fafc",
+};
+
+const mockHeroV27 = {
+  position: "relative",
+  minHeight: 154,
+  borderRadius: 18,
+  border: "1px solid rgba(59,130,246,.22)",
+  background: "radial-gradient(circle at 50% 0%, rgba(59,130,246,.26), transparent 32%), linear-gradient(135deg, rgba(2,6,23,.98), rgba(8,13,31,.98))",
+  boxShadow: "0 24px 70px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.07)",
+  overflow: "hidden",
+  display: "grid",
+  gridTemplateColumns: "1fr auto",
+  alignItems: "center",
+  gap: 18,
+  padding: "24px 28px",
+};
+
+const mockHeroCenterV27 = {
+  display: "grid",
+  justifyItems: "center",
+  textAlign: "center",
+  minWidth: 0,
+};
+
+const mockMiniLogoV27 = {
+  color: "#e5e7eb",
+  fontSize: "clamp(30px, 4.2vw, 58px)",
+  fontWeight: 1000,
+  letterSpacing: "-.045em",
+  lineHeight: .9,
+};
+
+const mockHeroTitleV27 = {
+  margin: "5px 0 0",
+  color: "#60a5fa",
+  fontSize: "clamp(18px, 1.9vw, 28px)",
+  fontWeight: 1000,
+  letterSpacing: ".03em",
+  textTransform: "uppercase",
+};
+
+const mockHeroSubtitleV27 = {
+  marginTop: 8,
+  color: "rgba(226,232,240,.78)",
+  fontSize: 14,
+  fontWeight: 900,
+};
+
+const mockHeroControlsV27 = {
+  width: 230,
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: 8,
+  alignSelf: "start",
+};
+
+const mockSelectV27 = {
+  background: "rgba(15,23,42,.86)",
+  border: "1px solid rgba(148,163,184,.22)",
+  color: "#fff",
+  borderRadius: 10,
+  padding: "10px 11px",
+  fontWeight: 850,
+  outline: "none",
+};
+
+const mockPrimaryButtonV27 = {
+  gridColumn: "1 / -1",
+  border: "1px solid rgba(37,99,235,.35)",
+  background: "linear-gradient(135deg,#2563eb,#7c3aed)",
+  color: "#fff",
+  borderRadius: 10,
+  padding: 11,
+  fontWeight: 950,
+  cursor: "pointer",
+};
+
+const mockKpiGridV27 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: 10,
+};
+
+const mockKpiV27 = {
+  minHeight: 94,
+  borderRadius: 14,
+  border: "1px solid rgba(148,163,184,.16)",
+  background: "linear-gradient(145deg, rgba(15,23,42,.92), rgba(3,7,18,.98))",
+  padding: 16,
+  display: "grid",
+  gap: 5,
+  boxShadow: "0 14px 40px rgba(0,0,0,.30)",
+};
+
+const mockMainGridV27 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  gap: 12,
+};
+
+const mockPanelV27 = {
+  borderRadius: 14,
+  border: "1px solid rgba(148,163,184,.16)",
+  background: "linear-gradient(145deg, rgba(8,13,31,.96), rgba(3,7,18,.99))",
+  boxShadow: "0 18px 54px rgba(0,0,0,.36), inset 0 1px 0 rgba(255,255,255,.05)",
+  padding: 14,
+  overflow: "hidden",
+};
+
+const mockPanelHeaderV27 = {
+  display: "grid",
+  gap: 4,
+  marginBottom: 12,
+};
+
+const mockRankingListV27 = {
+  display: "grid",
+  gap: 7,
+};
+
+const mockRankingRowV27 = {
+  width: "100%",
+  border: "1px solid rgba(255,255,255,.08)",
+  background: "rgba(255,255,255,.035)",
+  color: "#fff",
+  borderRadius: 10,
+  padding: "9px 10px",
+  display: "grid",
+  gridTemplateColumns: "24px 34px minmax(0,1fr) auto",
+  gap: 8,
+  alignItems: "center",
+  textAlign: "left",
+  cursor: "pointer",
+};
+
+const mockSecondaryButtonV27 = {
+  width: "100%",
+  marginTop: 10,
+  border: "1px solid rgba(96,165,250,.20)",
+  background: "rgba(15,23,42,.72)",
+  color: "#dbeafe",
+  borderRadius: 10,
+  padding: 10,
+  fontWeight: 900,
+  cursor: "pointer",
+};
+
+const mockNewsStackV27 = {
+  display: "grid",
+  gap: 8,
+};
+
+const mockNewsItemV27 = {
+  display: "grid",
+  gridTemplateColumns: "34px minmax(0,1fr)",
+  gap: 9,
+  alignItems: "center",
+  borderRadius: 10,
+  padding: 10,
+  background: "rgba(255,255,255,.035)",
+  border: "1px solid rgba(255,255,255,.08)",
+};
+
+const mockNewsIconV27 = {
+  width: 30,
+  height: 30,
+  borderRadius: 9,
+  display: "grid",
+  placeItems: "center",
+  background: "rgba(96,165,250,.12)",
+};
+
+const mockConferenceGridV27 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+  gap: 10,
+};
+
+const mockConferenceCardV27 = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  borderRadius: 12,
+  border: "1px solid rgba(255,255,255,.08)",
+  background: "rgba(255,255,255,.035)",
+  padding: 11,
+};
+
+const mockConferenceLogoV27 = {
+  width: 48,
+  height: 48,
+  borderRadius: 12,
+  display: "grid",
+  placeItems: "center",
+  background: "rgba(255,255,255,.055)",
+  border: "1px solid rgba(255,255,255,.08)",
+};
+
+
+const v29Dashboard = {
+  display: "grid",
+  gap: 16,
+};
+
+const v29Hero = {
+  minHeight: 170,
+  borderRadius: 18,
+  border: "1px solid rgba(59,130,246,.24)",
+  background: "radial-gradient(circle at 50% 0%, rgba(59,130,246,.25), transparent 32%), radial-gradient(circle at 95% 0%, rgba(124,58,237,.14), transparent 30%), linear-gradient(135deg, rgba(2,6,23,.98), rgba(8,13,31,.98))",
+  boxShadow: "0 24px 70px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.07)",
+  overflow: "hidden",
+  display: "grid",
+  gridTemplateColumns: "1fr auto",
+  alignItems: "center",
+  gap: 18,
+  padding: "24px 28px",
+};
+
+const v29HeroBrand = {
+  textAlign: "center",
+  display: "grid",
+  gap: 6,
+  justifyItems: "center",
+};
+
+const v29LogoText = {
+  fontSize: "clamp(40px, 5.2vw, 78px)",
+  fontWeight: 1000,
+  letterSpacing: "-.055em",
+  lineHeight: .88,
+  color: "#e5e7eb",
+  textShadow: "0 0 30px rgba(96,165,250,.22)",
+};
+
+const v29HeroSubLogo = {
+  color: "#60a5fa",
+  fontSize: "clamp(18px, 2vw, 29px)",
+  fontWeight: 1000,
+  letterSpacing: ".04em",
+  textTransform: "uppercase",
+};
+
+const v29HeroControls = {
+  width: 246,
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: 8,
+  alignSelf: "start",
+};
+
+const v29ControlLabel = {
+  color: "rgba(255,255,255,.68)",
+  fontSize: 11,
+  fontWeight: 950,
+  textTransform: "uppercase",
+  letterSpacing: ".08em",
+  display: "grid",
+  gap: 5,
+};
+
+const v29Select = {
+  background: "rgba(15,23,42,.86)",
+  border: "1px solid rgba(148,163,184,.22)",
+  color: "#fff",
+  borderRadius: 10,
+  padding: "10px 11px",
+  fontWeight: 850,
+  outline: "none",
+};
+
+const v29SaveButton = {
+  gridColumn: "1 / -1",
+  border: "1px solid rgba(37,99,235,.35)",
+  background: "linear-gradient(135deg,#2563eb,#7c3aed)",
+  color: "#fff",
+  borderRadius: 10,
+  padding: 11,
+  fontWeight: 950,
+  cursor: "pointer",
+};
+
+const v29KpiGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: 10,
+};
+
+const v29Kpi = {
+  minHeight: 94,
+  borderRadius: 14,
+  border: "1px solid rgba(148,163,184,.16)",
+  background: "linear-gradient(145deg, rgba(15,23,42,.92), rgba(3,7,18,.98))",
+  padding: 16,
+  display: "grid",
+  gap: 5,
+  boxShadow: "0 14px 40px rgba(0,0,0,.30)",
+};
+
+const v29ThreeGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  gap: 12,
+};
+
+const v29Panel = {
+  borderRadius: 14,
+  border: "1px solid rgba(148,163,184,.16)",
+  background: "linear-gradient(145deg, rgba(8,13,31,.96), rgba(3,7,18,.99))",
+  boxShadow: "0 18px 54px rgba(0,0,0,.36), inset 0 1px 0 rgba(255,255,255,.05)",
+  padding: 14,
+  overflow: "hidden",
+};
+
+const v29PanelTitle = {
+  display: "grid",
+  gap: 4,
+  marginBottom: 12,
+};
+
+const v29List = {
+  display: "grid",
+  gap: 7,
+};
+
+const v29RankRow = {
+  width: "100%",
+  border: "1px solid rgba(255,255,255,.08)",
+  background: "rgba(255,255,255,.035)",
+  color: "#fff",
+  borderRadius: 10,
+  padding: "9px 10px",
+  display: "grid",
+  gridTemplateColumns: "24px 34px minmax(0,1fr) auto",
+  gap: 8,
+  alignItems: "center",
+  textAlign: "left",
+  cursor: "pointer",
+};
+
+const v29PanelButton = {
+  width: "100%",
+  marginTop: 10,
+  border: "1px solid rgba(96,165,250,.20)",
+  background: "rgba(15,23,42,.72)",
+  color: "#dbeafe",
+  borderRadius: 10,
+  padding: 10,
+  fontWeight: 900,
+  cursor: "pointer",
+};
+
+const v29NewsList = {
+  display: "grid",
+  gap: 8,
+};
+
+const v29News = {
+  display: "grid",
+  gridTemplateColumns: "34px minmax(0,1fr)",
+  gap: 9,
+  alignItems: "center",
+  borderRadius: 10,
+  padding: 10,
+  background: "rgba(255,255,255,.035)",
+  border: "1px solid rgba(255,255,255,.08)",
+};
+
+const v29ConferenceGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+  gap: 10,
+};
+
+const v29ConferenceCard = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  borderRadius: 12,
+  border: "1px solid rgba(255,255,255,.08)",
+  background: "rgba(255,255,255,.035)",
+  padding: 11,
+};
+
+const v29ConferenceLogo = {
+  width: 48,
+  height: 48,
+  borderRadius: 12,
+  display: "grid",
+  placeItems: "center",
+  background: "rgba(255,255,255,.055)",
+  border: "1px solid rgba(255,255,255,.08)",
+};
+
 const liquidGlassTile = {
   background: "linear-gradient(145deg, rgba(15,23,42,.86), rgba(3,7,18,.96))",
   border: "1px solid rgba(148,163,184,.16)",
-  borderRadius: 16,
-  padding: 14,
+  borderRadius: 14,
+  padding: 13,
   boxShadow: "0 16px 44px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.05)",
 };
 
 const broadcastCard = {
   ...card,
-  borderRadius: 20,
+  borderRadius: 18,
   background: "linear-gradient(145deg, rgba(8,13,31,.96), rgba(3,7,18,.99))",
   border: "1px solid rgba(148,163,184,.18)",
   boxShadow: "0 24px 80px rgba(0,0,0,.40), inset 0 1px 0 rgba(255,255,255,.055)",
@@ -7727,7 +8115,7 @@ const broadcastCard = {
 
 const broadcastPageCard = {
   ...card,
-  borderRadius: 20,
+  borderRadius: 18,
   background: "linear-gradient(145deg, rgba(8,13,31,.96), rgba(3,7,18,.99))",
   border: "1px solid rgba(148,163,184,.18)",
   boxShadow: "0 24px 80px rgba(0,0,0,.40), inset 0 1px 0 rgba(255,255,255,.055)",
