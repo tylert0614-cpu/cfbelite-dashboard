@@ -103,8 +103,26 @@ function strengthOfResult(teamId, teams, results) {
   return clampSor(total / games.length).toFixed(1);
 }
 
+
+function cleanConference(value) {
+  const text = String(value || "Independent").trim();
+  const upper = text.toUpperCase();
+  if (!text || text === "—") return "Independent";
+  if (upper === "PAC-12" || upper === "PAC 12") return "PAC 12";
+  if (upper === "CONFERENCE USA" || upper === "C-USA" || upper === "CUSA") return "CUSA";
+  if (upper === "MOUNTAIN WEST") return "Mountain West";
+  if (upper === "SUN BELT") return "Sun Belt";
+  if (upper === "AMERICAN" || upper === "AAC") return "American";
+  if (upper === "MAC") return "MAC";
+  return text
+    .replace(/^conference\s+/i, "")
+    .replace(/\s+conference$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function getHelmetUrl(team) {
-  return team?.helmet_url || team?.helmet || team?.logo_url || team?.logo || team?.image_url || "";
+  return team?.logo_url || team?.logo || team?.image_url || "";
 }
 
 function getTeamPrimary(team) {
@@ -130,7 +148,7 @@ function teamPageTheme(team) {
 }
 
 function TeamWatermark({ team }) {
-  const url = team?.logo_url || team?.helmet_url;
+  const url = team?.logo_url || team?.logo || team?.image_url;
   if (!url) return null;
   return <img src={url} alt="" style={teamWatermark}/>;
 }
@@ -200,7 +218,7 @@ function activeAssignmentsForLeague(assignments, teams) {
 }
 
 function TeamLogoMark({ team, size = 34, faded = false }) {
-  const url = team?.logo_url || team?.helmet_url;
+  const url = team?.logo_url || team?.logo || team?.image_url;
   if (!url) {
     const initials = String(team?.name || "CFB").split(" ").map((part)=>part[0]).join("").slice(0,3).toUpperCase();
     return <span style={{ width:size, height:size, borderRadius:Math.max(8,size*.22), display:"inline-grid", placeItems:"center", background:"rgba(255,255,255,.08)", border:"1px solid rgba(255,255,255,.14)", color:"#fff", fontWeight:1000, fontSize:Math.max(10,size*.28), opacity:faded ? .22 : 1 }}>{initials}</span>;
@@ -764,7 +782,7 @@ export default function App() {
     await saveCommissionerRankings(next);
   }
 
-  const baseTabs = [["dashboard","Dashboard"],["draftRoom","CFBElite 27 Draft Room"],["commissionerCenter","Commissioner Center"],["logoManager","Logo Manager"],["leagueDataCenter","League Data Center"],["massDataEntry","Mass Data Entry"],["seasonStats","Season Player Stats"],["teamStats","Team Stats"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["powerIndex","Power Index"],["eloRankings","User ELO"],["conferencePower","Conference Power"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["assignments","Users/Team Assignments"],["resultsManager","Results Manager"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...activeCoachUsers.map((user) => [`coach-${user.id}`, user.discord_username])];
+  const baseTabs = [["dashboard","Dashboard"],["draftRoom","CFBElite 27 Draft Room"],["commissionerCenter","Commissioner Center"],["logoManager","Team Assets"],["leagueDataCenter","League Data Center"],["seasonStats","Season Player Stats"],["teamStats","Team Stats"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["powerIndex","Power Index"],["eloRankings","User ELO"],["conferencePower","Conference Power"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["assignments","Users/Team Assignments"],["resultsManager","Results Manager"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...activeCoachUsers.map((user) => [`coach-${user.id}`, user.discord_username])];
   const tabs = useMemo(() => {
     const tabMap = new Map(baseTabs);
     const ordered = tabOrder
@@ -956,7 +974,6 @@ export default function App() {
     };
 
     const payload = {
-      helmet_url: clean(draft?.helmet_url ?? team.helmet_url),
       logo_url: clean(draft?.logo_url ?? team.logo_url),
       primary_color: clean(draft?.primary_color ?? team.primary_color),
       secondary_color: clean(draft?.secondary_color ?? team.secondary_color),
@@ -974,7 +991,7 @@ export default function App() {
 
     const { data: verifyRows, error: verifyError } = await supabase
       .from("teams")
-      .select("id, name, helmet_url, logo_url, primary_color, secondary_color")
+      .select("id, name, logo_url, primary_color, secondary_color")
       .eq("id", team.id)
       .limit(1);
 
@@ -986,10 +1003,9 @@ export default function App() {
     const savedRow = verifyRows?.[0];
     const primarySaved = (savedRow?.primary_color || null) === payload.primary_color;
     const secondarySaved = (savedRow?.secondary_color || null) === payload.secondary_color;
-    const helmetSaved = (savedRow?.helmet_url || null) === payload.helmet_url;
     const logoSaved = (savedRow?.logo_url || null) === payload.logo_url;
 
-    if (!savedRow || !primarySaved || !secondarySaved || !helmetSaved || !logoSaved) {
+    if (!savedRow || !primarySaved || !secondarySaved || !logoSaved) {
       setError(`Team asset save did not persist for ${team.name}. Check Supabase RLS/policies for the teams table.`);
       return;
     }
@@ -1187,8 +1203,7 @@ export default function App() {
     {activeTab === "powerIndex" && <DynastyPowerIndex users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}
     {activeTab === "commissionerCenter" && (adminUnlocked ? <CommissionerCenterSafe setActiveTab={setActiveTab} loadData={loadData}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>) }    
     {activeTab === "logoManager" && <LogoManager teams={teamOptions} updateRow={updateRow}/>}    
-    {activeTab === "leagueDataCenter" && <LeagueDataCenter teams={teamOptions} users={userOptions} assignments={assignments} currentYear={currentYear} currentWeek={currentWeek} setError={setError} loadData={loadData}/>}    
-    {activeTab === "massDataEntry" && <MassDataEntry teams={teamOptions} users={userOptions} currentYear={currentYear} currentWeek={currentWeek} setError={setError} loadData={loadData}/>}
+    {activeTab === "leagueDataCenter" && <LeagueDataCenter teams={teamOptions} users={userOptions} assignments={assignments} currentYear={currentYear} currentWeek={currentWeek} setError={setError} loadData={loadData}/>}
     {activeTab === "conferencePower" && <ConferencePowerRankings teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
     {activeTab === "weeklyMedia" && <WeeklyMedia teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} weeklyMatchups={weeklyMatchups} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} currentWeek={currentWeek}/>}    
     {activeTab === "weeklyMatchups" && (adminUnlocked ? <WeeklyMatchups rows={weeklyMatchups} newMatchup={newWeeklyMatchup} setNewMatchup={setNewWeeklyMatchup} teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} currentYear={currentYear} currentWeek={currentWeek} addMatchup={addWeeklyMatchup} deleteRow={deleteRow} matchupImportText={matchupImportText} setMatchupImportText={setMatchupImportText} importWeeklyMatchups={importWeeklyMatchups}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>) }    
@@ -1611,96 +1626,82 @@ function BestWorstPanel({ user, results, assignments }) {
 function DashboardRedesign({ teams, users, assignments, results, allResults, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats, currentYear, currentWeek, setCurrentYear, setCurrentWeek, saveSettings, goToTeam, sortState, setSortState }) {
   const activeAssignments = activeAssignmentsForLeague(assignments, teams);
   const activeCoachCount = activeAssignments.length;
-  const rankings = computerRankingRows(teams, results, assignments, users).slice(0,5);
+  const rankings = computerRankingRows(teams, results, assignments, users).slice(0,8);
   const prestigeRows = typeof dynastyPrestigeRows === "function" ? dynastyPrestigeRows(teams, assignments, allResults, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats).slice(0,5) : [];
   const champions = nationalChampions.filter((row)=>String(row.season_year)===String(currentYear)).length;
+  const gamesThisYear = results.filter((row)=>String(row.season_year)===String(currentYear)).length;
+  const recentResult = results.find((row)=>String(row.season_year)===String(currentYear));
+  const recentWinner = recentResult ? (Number(recentResult.team_1_score || 0) >= Number(recentResult.team_2_score || 0) ? teamNameById(recentResult.team_1_id, teams) : teamNameById(recentResult.team_2_id, teams)) : null;
   const headlineRows = [
-    ...recruiting.filter((r)=>String(r.season_year)===String(currentYear) && Number(r.rank)===1).slice(0,1).map((r)=>({title:`${teamNameById(r.team_id, teams)} lands the #1 class`, meta:"Recruiting Wire"})),
-    ...prestigeRows.slice(0,2).map((r,index)=>({title:`${r.team.name} holds the #${index+1} prestige spot`, meta:"Prestige Tracker"})),
-    rankings[0] ? {title:`${rankings[0].teamName} leads the computer rankings`, meta:"Rankings Desk"} : null,
-    {title:`${results.length} games recorded this season`, meta:"Live Database"},
-  ].filter(Boolean).slice(0,4);
-
-  const confMap = new Map();
-  teams.forEach((team)=>{
-    const conf = cleanConference(team.conference || "Independent");
-    if (!confMap.has(conf)) confMap.set(conf, []);
-    confMap.get(conf).push(team);
-  });
+    rankings[0] ? { title: `${rankings[0].teamName} leads the CFBElite Automatic Rankings`, meta: "Rankings Desk" } : null,
+    prestigeRows[0] ? { title: `${prestigeRows[0].team.name} is the current prestige leader`, meta: "Prestige Tracker" } : null,
+    recentWinner ? { title: `${recentWinner} owns the latest recorded win`, meta: "Final Score Wire" } : null,
+    recruiting.find((r)=>String(r.season_year)===String(currentYear) && Number(r.rank)===1) ? { title: `${teamNameById(recruiting.find((r)=>String(r.season_year)===String(currentYear) && Number(r.rank)===1).team_id, teams)} owns the #1 recruiting class`, meta: "Recruiting Wire" } : null,
+  ].filter(Boolean);
 
   return (
-    <div style={v29Dashboard}>
-      <section style={v29Hero}>
-        <div style={v29HeroBrand}>
-          <div style={v29LogoText}>CFBELITE <span>27</span></div>
-          <div style={v29HeroSubLogo}>DYNASTY HEADQUARTERS</div>
+    <div style={dashboardPro}>
+      <section style={dashboardHeroPro}>
+        <div>
+          <div style={dashboardKickerPro}>CFBELITE 27 • LIVE DATABASE</div>
+          <h1 style={dashboardTitlePro}>Dynasty Headquarters</h1>
+          <p style={dashboardSubPro}>Season {currentYear} • {currentWeek}</p>
         </div>
-        <div style={v29HeroControls}>
+        <div style={dashboardControlsPro}>
           <label style={v29ControlLabel}>Season<select style={v29Select} value={currentYear} onChange={(e)=>setCurrentYear(e.target.value)}>{YEARS.map((year)=><option key={year}>{year}</option>)}</select></label>
           <label style={v29ControlLabel}>Week<select style={v29Select} value={currentWeek} onChange={(e)=>setCurrentWeek(e.target.value)}>{WEEKS.map((week)=><option key={week}>{week}</option>)}</select></label>
           <button style={v29SaveButton} onClick={saveSettings}>Save</button>
         </div>
       </section>
 
-      <section style={v29KpiGrid}>
-        <div style={v29Kpi}><span>Coaches</span><b>32</b><small>Total</small></div>
-        <div style={v29Kpi}><span>Active Coaches</span><b>{activeCoachCount}</b><small>Active</small></div>
-        <div style={v29Kpi}><span>Games Played</span><b>{results.length}</b><small>This Season</small></div>
-        <div style={v29Kpi}><span>National Champions</span><b>{champions}</b><small>All-Time</small></div>
+      <section style={dashboardKpiPro}>
+        <div style={dashboardKpiCardPro}><span>Active Coaches</span><b>{activeCoachCount}</b><small>of 32</small></div>
+        <div style={dashboardKpiCardPro}><span>Games Played</span><b>{gamesThisYear}</b><small>{currentYear}</small></div>
+        <div style={dashboardKpiCardPro}><span>National Champions</span><b>{champions}</b><small>Recorded this season</small></div>
+        <div style={dashboardKpiCardPro}><span>Prestige Leader</span><b>{prestigeRows[0]?.score ?? "—"}</b><small>{prestigeRows[0]?.team?.name || "No leader yet"}</small></div>
       </section>
 
-      <section style={v29ThreeGrid}>
-        <div style={v29Panel}>
-          <div style={v29PanelTitle}><span>CFBELITE Automated Rankings</span><h2>Computer Top 5</h2></div>
-          <div style={v29List}>
+      <section style={dashboardFeatureGridPro}>
+        <div style={dashboardRankPanelPro}>
+          <div style={dashboardPanelHeaderPro}>
+            <span>CFBELITE AUTOMATIC RANKINGS</span>
+            <h2>Commissioner Power Table</h2>
+          </div>
+          <div style={dashboardRankingListPro}>
             {rankings.map((row,index)=>{
               const team = teams.find((team)=>team.id===row.team?.id) || row.team;
               return (
-                <button key={team?.id || row.teamName || index} style={v29RankRow} onClick={()=>team?.id && goToTeam(team.id)}>
-                  <em>{index+1}</em><TeamLogoMark team={team} size={30}/><strong>{row.teamName || team?.name}</strong><b>{Number(row.score || row.rating || 0).toFixed(1)}</b>
+                <button key={team?.id || row.teamName || index} style={dashboardRankRowPro} onClick={()=>team?.id && goToTeam(team.id)}>
+                  <em>{index+1}</em>
+                  <TeamLogoMark team={team} size={36}/>
+                  <strong>{row.teamName || team?.name}</strong>
+                  <b>{Number(row.score || row.rating || 0).toFixed(1)}</b>
                 </button>
               );
             })}
           </div>
-          <button style={v29PanelButton}>Full Rankings</button>
         </div>
 
-        <div style={v29Panel}>
-          <div style={v29PanelTitle}><span>Prestige Spotlight</span><h2>Top Programs</h2></div>
-          <div style={v29List}>
-            {prestigeRows.map((row,index)=>(
-              <button key={row.team.id} style={v29RankRow} onClick={()=>goToTeam(row.team.id)}>
-                <em>{index+1}</em><TeamLogoMark team={row.team} size={30}/><strong>{row.team.name}</strong><b>{row.score}</b>
-              </button>
-            ))}
+        <div style={dashboardSideStackPro}>
+          <div style={dashboardSmallPanelPro}>
+            <div style={dashboardPanelHeaderPro}><span>PRESTIGE SPOTLIGHT</span><h2>Top Programs</h2></div>
+            <div style={dashboardMiniListPro}>
+              {prestigeRows.map((row,index)=>(
+                <button key={row.team.id} style={dashboardMiniRowPro} onClick={()=>goToTeam(row.team.id)}>
+                  <span>#{index+1}</span><TeamLogoMark team={row.team} size={28}/><strong>{row.team.name}</strong><b>{row.score}</b>
+                </button>
+              ))}
+            </div>
           </div>
-          <button style={v29PanelButton}>View Prestige History</button>
-        </div>
 
-        <div style={v29Panel}>
-          <div style={v29PanelTitle}><span>Dynasty Headlines</span><h2>The Wire</h2></div>
-          <div style={v29NewsList}>
-            {headlineRows.map((item,index)=>(
-              <div key={index} style={v29News}><span>🏈</span><div><b>{item.title}</b><small>{item.meta}</small></div></div>
-            ))}
+          <div style={dashboardSmallPanelPro}>
+            <div style={dashboardPanelHeaderPro}><span>DYNASTY HEADLINES</span><h2>The Wire</h2></div>
+            <div style={dashboardNewsListPro}>
+              {headlineRows.length ? headlineRows.map((item,index)=>(
+                <div key={index} style={dashboardNewsRowPro}><span>🏈</span><div><b>{item.title}</b><small>{item.meta}</small></div></div>
+              )) : <div style={mutedText}>No storylines yet. Add results in League Data Center.</div>}
+            </div>
           </div>
-          <button style={v29PanelButton}>View All Headlines</button>
-        </div>
-      </section>
-
-      <section style={v29Panel}>
-        <div style={v29PanelTitle}><span>Conference Overview</span><h2>League Map</h2></div>
-        <div style={v29ConferenceGrid}>
-          {[...confMap.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([conf, confTeams])=>{
-            const activeTeams = confTeams.filter((team)=>activeAssignments.some((assignment)=>assignment.team_id===team.id));
-            const sampleLogoTeam = activeTeams[0] || confTeams[0];
-            return (
-              <div key={conf} style={v29ConferenceCard}>
-                <div style={v29ConferenceLogo}><TeamLogoMark team={sampleLogoTeam} size={38}/></div>
-                <div><b>{conf}</b><span>{activeTeams.length} Coaches</span><small>{confTeams.length} Teams</small></div>
-              </div>
-            );
-          })}
         </div>
       </section>
     </div>
@@ -2733,7 +2734,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
                     <span style={{ color: "#facc15", fontWeight: 900 }}>{pick.status === "pick_is_in" ? "PICK IS IN" : (pick.status || "pending")}</span>
                   </div>
                   <div style={{ color: "#fff", fontWeight: 1000 }}>{pick.discord_username || pick.discord_users?.discord_username}</div>
-                  {visible && team && (team.logo_url || team.helmet_url) && <img src={team.logo_url || team.helmet_url} alt="" style={S.tileWatermark}/>}
+                  {visible && team && (team.logo_url) && <img src={team.logo_url} alt="" style={S.tileWatermark}/>}
                   <div style={visible && team ? { color: "#facc15", fontWeight: 1000, position:"relative", zIndex:1 } : S.muted}>{visible && team ? team.name : (pick.status === "pick_is_in" ? "Team hidden until reveal" : "On deck")}</div>
                   {pick.status === "pick_is_in" && <button style={S.button} type="button" onClick={() => handleRevealPick(pick.pick_number)}>Reveal Pick</button>}
                   {pick.team_id && <button style={S.ghost} type="button" onClick={() => handleUndoPick(pick.pick_number)}>Undo</button>}
@@ -2770,7 +2771,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
                         borderColor: "#ffffff",
                         borderWidth: 1.5
                       }}>
-                        {(team.logo_url || team.helmet_url) && <img src={team.logo_url || team.helmet_url} alt="" style={S.tileWatermark}/>}
+                        {(team.logo_url) && <img src={team.logo_url} alt="" style={S.tileWatermark}/>}
                         <b style={{ color: "#ffffff", fontWeight: 1000, position:"relative", zIndex:1 }}>{team.name}</b>
                         <span style={{ color: "rgba(255,255,255,.82)", fontWeight: 850, position:"relative", zIndex:1 }}>{cleanConference(team.conference)}</span>
                       </div>
@@ -2897,7 +2898,6 @@ function CommissionerCenterSafe({ setActiveTab, loadData }) {
   const tools = [
     ["assignments", "User Assignments", "Manage active/former team assignments"],
     ["resultsManager", "Results Manager", "Edit or delete game results"],
-    ["massDataEntry", "Mass Data Entry", "Player, team, and recruiting forms"],
     ["recruitingRankings", "Recruiting Manager", "Edit recruiting classes"],
     ["awards", "Awards Manager", "Manage award winners"],
     ["allAmericans", "All-Americans", "Manage All-American records"],
@@ -2942,17 +2942,17 @@ function LogoManager({ teams, updateRow }) {
   return (
     <section style={broadcastCard}>
       <h2 style={sectionTitle}>Team Assets Manager</h2>
-      <p style={mutedText}>Paste Supabase Storage public URLs for each school. These assets power dashboard cards, coach profiles, draft room, search, recruiting, records, and prestige pages.</p>
+      <p style={mutedText}>Logos are optional. Add colors first; anywhere a logo is missing, the app uses a clean team initials badge.</p>
       <SearchBox value={searchText} onChange={setSearchText}/>
       <div style={logoManagerGrid}>
         {filtered.map((team)=>(
           <div key={team.id} style={logoManagerCard}>
             <div style={logoPreviewBox}>
-              {(team.logo_url || team.helmet_url) ? <img src={team.logo_url || team.helmet_url} alt="" style={logoPreviewImg}/> : <span>No Logo</span>}
+              {team.logo_url ? <img src={team.logo_url} alt="" style={logoPreviewImg}/> : <span>No Logo</span>}
             </div>
             <b>{team.name}</b>
             <input style={input} value={team.logo_url || ""} onChange={(e)=>updateRow("teams", team.id, "logo_url", e.target.value)} placeholder="Official Logo URL"/>
-            <input style={input} value={team.helmet_url || ""} onChange={(e)=>updateRow("teams", team.id, "helmet_url", e.target.value)} placeholder="Helmet URL"/>
+            
             <input style={input} value={team.primary_color || ""} onChange={(e)=>updateRow("teams", team.id, "primary_color", e.target.value)} placeholder="Primary Color #000000"/>
             <input style={input} value={team.secondary_color || ""} onChange={(e)=>updateRow("teams", team.id, "secondary_color", e.target.value)} placeholder="Secondary Color #ffffff"/>
           </div>
@@ -3103,232 +3103,6 @@ function LeagueDataCenter({ teams, users, assignments, currentYear, currentWeek,
         <select style={input} value={aa.type} onChange={(e)=>setAa({...aa, type:e.target.value})}><option>First-Team</option><option>Second-Team</option><option>Freshman</option></select>
         <select style={input} value={aa.season_year} onChange={(e)=>setAa({...aa, season_year:e.target.value})}>{YEARS.map((year)=><option key={year}>{year}</option>)}</select>
       </div><button style={button} onClick={saveCenterAa}>Save All-American</button></div>}
-    </section>
-  );
-}
-
-function MassDataEntry({ teams, users, currentYear, currentWeek, setError, loadData }) {
-  const [activeForm, setActiveForm] = useState("player");
-  const [scoreForm, setScoreForm] = useState({ season_year: currentYear, week: currentWeek, team_1_id: "", team_2_id: "", team_1_score: "", team_2_score: "", team_1_rank: "", team_2_rank: "" });
-  const [seasonForm, setSeasonForm] = useState({ season_year: currentYear, player_name: "", discord_user_id: "", team_id: "", position: "QB", games: "", pass_yards: "", pass_tds: "", interceptions: "", rush_yards: "", rush_tds: "", receptions: "", rec_yards: "", rec_tds: "", tackles: "", sacks: "", interceptions_def: "", forced_fumbles: "", fumble_recoveries: "" });
-  const [teamForm, setTeamForm] = useState({ season_year: currentYear, team_id: "", discord_user_id: "", points_per_game: "", avg_yards_per_game: "", avg_pass_yards_per_game: "", avg_rush_yards_per_game: "", avg_total_yards_allowed: "", total_ppg_allowed: "", avg_rush_yards_allowed: "", avg_pass_yards_allowed: "", sacks: "", tfls: "", turnovers: "", takeaways: "", turnover_margin: "" });
-  const [recruitRows, setRecruitRows] = useState([]);
-
-  useEffect(() => {
-    setRecruitRows(teams.map((team) => ({
-      team_id: team.id,
-      team_name: team.name,
-      season_year: currentYear,
-      rank: "",
-      five_stars: "",
-      four_stars: "",
-      three_stars: "",
-      two_stars: "",
-      one_stars: "",
-    })));
-  }, [teams, currentYear]);
-
-  const n = (value) => value === "" || value === null || value === undefined ? null : Number(value);
-
-  async function saveScore() {
-    if (!scoreForm.team_1_id || !scoreForm.team_2_id || scoreForm.team_1_score === "" || scoreForm.team_2_score === "") {
-      setError("Select both teams and enter both scores.");
-      return;
-    }
-
-    const { error } = await supabase.from("game_results").insert({
-      season_year: Number(scoreForm.season_year || currentYear),
-      week: scoreForm.week || currentWeek,
-      team_1_id: scoreForm.team_1_id,
-      team_2_id: scoreForm.team_2_id,
-      team_1_score: Number(scoreForm.team_1_score),
-      team_2_score: Number(scoreForm.team_2_score),
-      team_1_rank: n(scoreForm.team_1_rank),
-      team_2_rank: n(scoreForm.team_2_rank),
-      tags: ["User vs User"],
-    });
-
-    if (error) {
-      setError(`Score save failed: ${error.message}`);
-      return;
-    }
-
-    setScoreForm({ season_year: currentYear, week: currentWeek, team_1_id: "", team_2_id: "", team_1_score: "", team_2_score: "", team_1_rank: "", team_2_rank: "" });
-    setError("Game score saved.");
-    await loadData();
-  }
-
-  async function saveSeasonStats() {
-    if (!seasonForm.player_name || !seasonForm.team_id) {
-      setError("Enter player name and team.");
-      return;
-    }
-
-    const payload = {
-      ...seasonForm,
-      discord_user_id: seasonForm.discord_user_id || null,
-      season_year: Number(seasonForm.season_year || currentYear),
-      games: n(seasonForm.games),
-      pass_yards: n(seasonForm.pass_yards),
-      pass_tds: n(seasonForm.pass_tds),
-      interceptions: n(seasonForm.interceptions),
-      rush_yards: n(seasonForm.rush_yards),
-      rush_tds: n(seasonForm.rush_tds),
-      receptions: n(seasonForm.receptions),
-      rec_yards: n(seasonForm.rec_yards),
-      rec_tds: n(seasonForm.rec_tds),
-      tackles: n(seasonForm.tackles),
-      sacks: n(seasonForm.sacks),
-      interceptions_def: n(seasonForm.interceptions_def),
-      forced_fumbles: n(seasonForm.forced_fumbles),
-      fumble_recoveries: n(seasonForm.fumble_recoveries),
-    };
-
-    const { error } = await supabase.from("season_player_stats").insert(payload);
-    if (error) {
-      setError(`Season stats save failed: ${error.message}`);
-      return;
-    }
-
-    setSeasonForm({ season_year: currentYear, player_name: "", discord_user_id: "", team_id: "", position: "QB", games: "", pass_yards: "", pass_tds: "", interceptions: "", rush_yards: "", rush_tds: "", receptions: "", rec_yards: "", rec_tds: "", tackles: "", sacks: "", interceptions_def: "", forced_fumbles: "", fumble_recoveries: "" });
-    setError("Season player stats saved.");
-    await loadData();
-  }
-
-
-  async function saveTeamStats() {
-    if (!teamForm.team_id) {
-      setError("Select a team before saving team season stats.");
-      return;
-    }
-
-    const payload = {
-      ...teamForm,
-      discord_user_id: teamForm.discord_user_id || null,
-      season_year: Number(teamForm.season_year || currentYear),
-      points_per_game: n(teamForm.points_per_game),
-      avg_yards_per_game: n(teamForm.avg_yards_per_game),
-      avg_pass_yards_per_game: n(teamForm.avg_pass_yards_per_game),
-      avg_rush_yards_per_game: n(teamForm.avg_rush_yards_per_game),
-      avg_total_yards_allowed: n(teamForm.avg_total_yards_allowed),
-      total_ppg_allowed: n(teamForm.total_ppg_allowed),
-      avg_rush_yards_allowed: n(teamForm.avg_rush_yards_allowed),
-      avg_pass_yards_allowed: n(teamForm.avg_pass_yards_allowed),
-      sacks: n(teamForm.sacks),
-      tfls: n(teamForm.tfls),
-      turnovers: n(teamForm.turnovers),
-      takeaways: n(teamForm.takeaways),
-      turnover_margin: n(teamForm.turnover_margin),
-    };
-
-    const { error } = await supabase.from("team_season_stats").insert(payload);
-    if (error) {
-      setError(`Team season stats save failed: ${error.message}`);
-      return;
-    }
-
-    setTeamForm({ season_year: currentYear, team_id: "", discord_user_id: "", points_per_game: "", avg_yards_per_game: "", avg_pass_yards_per_game: "", avg_rush_yards_per_game: "", avg_total_yards_allowed: "", total_ppg_allowed: "", avg_rush_yards_allowed: "", avg_pass_yards_allowed: "", sacks: "", tfls: "", turnovers: "", takeaways: "", turnover_margin: "" });
-    setError("Team season stats saved.");
-    await loadData();
-  }
-
-  function updateRecruitRow(index, field, value) {
-    setRecruitRows((prev) => prev.map((row, i) => i === index ? { ...row, [field]: value } : row));
-  }
-
-  async function saveRecruitingRows() {
-    const payload = recruitRows
-      .filter((row) => row.rank !== "")
-      .map((row) => ({
-        team_id: row.team_id,
-        season_year: Number(row.season_year || currentYear),
-        rank: Number(row.rank),
-        five_stars: Number(row.five_stars || 0),
-        four_stars: Number(row.four_stars || 0),
-        three_stars: Number(row.three_stars || 0),
-        two_stars: Number(row.two_stars || 0),
-        one_stars: Number(row.one_stars || 0),
-      }));
-
-    if (!payload.length) {
-      setError("Enter at least one recruiting rank.");
-      return;
-    }
-
-    const { error } = await supabase.from("recruiting_classes").insert(payload);
-    if (error) {
-      setError(`Recruiting save failed: ${error.message}`);
-      return;
-    }
-
-    setError(`Saved ${payload.length} recruiting classes.`);
-    await loadData();
-  }
-
-  return (
-    <section style={broadcastCard}>
-      <h2 style={sectionTitle}>Mass Data Entry Hub</h2>
-      <p style={mutedText}>Open to everyone. Use clean forms for season player stats and active-user recruiting entry.</p>
-
-      <div style={massFormGrid}>
-        <button type="button" style={{ ...massFormCard, borderColor: activeForm === "season" ? "#a78bfa" : "rgba(255,255,255,.16)" }} onClick={() => setActiveForm("season")}>📈 Season Player Stats</button>
-        <button type="button" style={{ ...massFormCard, borderColor: activeForm === "teamStats" ? "#a78bfa" : "rgba(255,255,255,.16)" }} onClick={() => setActiveForm("teamStats")}>🏟️ Team Season Stats</button>
-        <button type="button" style={{ ...massFormCard, borderColor: activeForm === "recruiting" ? "#a78bfa" : "rgba(255,255,255,.16)" }} onClick={() => setActiveForm("recruiting")}>👥 Active-Team Recruiting</button>
-      </div>
-
-      {activeForm === "season" && (
-        <div style={entryPanel}>
-          <h3 style={miniTitle}>Season Player Stats</h3>
-          <div style={entryGrid}>
-            <input style={input} value={seasonForm.player_name} onChange={(e) => setSeasonForm({ ...seasonForm, player_name: e.target.value })} placeholder="Player Name" />
-            <select style={input} value={seasonForm.discord_user_id} onChange={(e) => setSeasonForm({ ...seasonForm, discord_user_id: e.target.value })}><option value="">Discord User</option>{users.map((user) => <option key={user.id} value={user.id}>{user.discord_username}</option>)}</select>
-            <select style={input} value={seasonForm.team_id} onChange={(e) => setSeasonForm({ ...seasonForm, team_id: e.target.value })}><option value="">Team</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
-            <select style={input} value={seasonForm.position} onChange={(e) => setSeasonForm({ ...seasonForm, position: e.target.value })}>{POSITIONS.filter((pos) => pos !== "Coach").map((pos) => <option key={pos}>{pos}</option>)}</select>
-            <select style={input} value={seasonForm.season_year} onChange={(e) => setSeasonForm({ ...seasonForm, season_year: e.target.value })}>{YEARS.map((year) => <option key={year}>{year}</option>)}</select>
-            <input style={input} value={seasonForm.games} onChange={(e) => setSeasonForm({ ...seasonForm, games: e.target.value })} placeholder="Games" />
-            {["pass_yards","pass_tds","interceptions","rush_yards","rush_tds","receptions","rec_yards","rec_tds","tackles","sacks","interceptions_def","forced_fumbles","fumble_recoveries"].map((field) => (
-              <input key={field} style={input} value={seasonForm[field]} onChange={(e) => setSeasonForm({ ...seasonForm, [field]: e.target.value })} placeholder={field.replaceAll("_", " ")} />
-            ))}
-          </div>
-          <button style={button} onClick={saveSeasonStats}>Save Season Stats</button>
-        </div>
-      )}
-
-
-      {activeForm === "teamStats" && (
-        <div style={entryPanel}>
-          <h3 style={miniTitle}>Team Season Stats</h3>
-          <div style={entryGrid}>
-            <select style={input} value={teamForm.team_id} onChange={(e) => setTeamForm({ ...teamForm, team_id: e.target.value })}><option value="">Team</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
-            <select style={input} value={teamForm.discord_user_id} onChange={(e) => setTeamForm({ ...teamForm, discord_user_id: e.target.value })}><option value="">Discord User</option>{users.map((user) => <option key={user.id} value={user.id}>{user.discord_username}</option>)}</select>
-            <select style={input} value={teamForm.season_year} onChange={(e) => setTeamForm({ ...teamForm, season_year: e.target.value })}>{YEARS.map((year) => <option key={year}>{year}</option>)}</select>
-            {["points_per_game","avg_yards_per_game","avg_pass_yards_per_game","avg_rush_yards_per_game","avg_total_yards_allowed","total_ppg_allowed","avg_rush_yards_allowed","avg_pass_yards_allowed","sacks","tfls","turnovers","takeaways","turnover_margin"].map((field) => (
-              <input key={field} style={input} value={teamForm[field]} onChange={(e) => setTeamForm({ ...teamForm, [field]: e.target.value })} placeholder={field.replaceAll("_", " ")} />
-            ))}
-          </div>
-          <button style={button} onClick={saveTeamStats}>Save Team Season Stats</button>
-        </div>
-      )}
-
-      {activeForm === "recruiting" && (
-        <div style={entryPanel}>
-          <h3 style={miniTitle}>Active-Team Recruiting Form</h3>
-          <div style={recruitingMassGrid}>
-            {recruitRows.map((row, index) => (
-              <div key={row.team_id} style={recruitingMassRow}>
-                <b>{row.team_name}</b>
-                <input style={input} value={row.rank} onChange={(e) => updateRecruitRow(index, "rank", e.target.value)} placeholder="Rank" />
-                <input style={input} value={row.five_stars} onChange={(e) => updateRecruitRow(index, "five_stars", e.target.value)} placeholder="5★" />
-                <input style={input} value={row.four_stars} onChange={(e) => updateRecruitRow(index, "four_stars", e.target.value)} placeholder="4★" />
-                <input style={input} value={row.three_stars} onChange={(e) => updateRecruitRow(index, "three_stars", e.target.value)} placeholder="3★" />
-                <input style={input} value={row.two_stars} onChange={(e) => updateRecruitRow(index, "two_stars", e.target.value)} placeholder="2★" />
-                <input style={input} value={row.one_stars} onChange={(e) => updateRecruitRow(index, "one_stars", e.target.value)} placeholder="1★" />
-              </div>
-            ))}
-          </div>
-          <button style={button} onClick={saveRecruitingRows}>Save Recruiting Classes</button>
-        </div>
-      )}
     </section>
   );
 }
@@ -4408,7 +4182,7 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
 
   const groups = [
     { title: "Main", keys: ["dashboard", "draftRoom"] },
-    { title: "Media", keys: ["logoManager", "leagueDataCenter", "massDataEntry", "seasonStats", "teamStats", "recruitingRankings", "dynastyTimeline"] },
+    { title: "Media", keys: ["logoManager", "leagueDataCenter", "seasonStats", "teamStats", "recruitingRankings", "dynastyTimeline"] },
     { title: "Dynasty Legacy", keys: ["dynastyRecords", "rivalries", "powerIndex",  "coachingTree"] },
     { title: "Rankings", keys: ["eloRankings", "conferencePower"] },
     { title: "League History", keys: ["coachHOF", "playerHOF", "h2h"] },
@@ -4492,7 +4266,7 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
           color: team?.accent_color || "#fff",
         }}
       >
-        {(team?.logo_url || team?.helmet_url) && <img src={team.logo_url || team.helmet_url} alt="" style={coachMenuLogoWatermark}/>}
+        {(team?.logo_url) && <img src={team.logo_url} alt="" style={coachMenuLogoWatermark}/>}
         <span style={{ ...coachAccentStripe, background: accent }} />
         <span style={coachNavTextWrap}>
           <strong style={coachNavName}>{label}</strong>
@@ -5045,7 +4819,7 @@ function TeamAssets({ teams, saveTeamAssets }) {
       const next = { ...previous };
       teams.forEach((team) => {
         next[team.id] = {
-          helmet_url: previous[team.id]?.helmet_url ?? team.helmet_url ?? "",
+          legacy_helmet_url: previous[team.id]?.helmet_url ?? team.logo_url ?? "",
           logo_url: previous[team.id]?.logo_url ?? team.logo_url ?? "",
           primary_color: previous[team.id]?.primary_color ?? team.primary_color ?? "",
           secondary_color: previous[team.id]?.secondary_color ?? team.secondary_color ?? "",
@@ -5073,11 +4847,9 @@ function TeamAssets({ teams, saveTeamAssets }) {
           <p style={mutedText}>Paste helmet/logo URLs and team colors for the 32 active league teams. Colors drive each team page background and text.</p>
         </div>
       </div>
-      <Table headers={["Preview", "Team", "Helmet URL", "Logo URL", "Primary Color", "Secondary Color", "Save"]}>
+      <Table headers={["Preview", "Team", "Logo URL", "Primary Color", "Secondary Color", "Save"]}>
         {teams.map((team) => {
-          const draft = drafts[team.id] || {
-            helmet_url: team.helmet_url || "",
-            logo_url: team.logo_url || "",
+          const draft = drafts[team.id] || {            logo_url: team.logo_url || "",
             primary_color: team.primary_color || "",
             secondary_color: team.secondary_color || "",
           };
@@ -5101,90 +4873,66 @@ function TeamAssets({ teams, saveTeamAssets }) {
 
 function H2H({ results, search, setSearch }) { const rows=getDirectedH2HRows(results).filter((r)=>JSON.stringify(r).toLowerCase().includes(search.toLowerCase())).sort((a,b)=>a.user.localeCompare(b.user)||a.opp.localeCompare(b.opp)); return <section style={card}><div style={sectionTop}><div><h2 style={sectionTitle}>User vs User H2H</h2><p style={mutedText}>All-time across every recorded season. Current streak is based on the most recent meetings between the two users.</p></div><SearchBox value={search} onChange={setSearch}/></div><Table headers={["User","Opponent","W","L","Record","Current Streak"]}>{rows.map((r)=><tr key={`${r.user}-${r.opp}`} style={trStyle}><td style={teamCell}>{r.user}</td><td style={td}>{r.opp}</td><td style={td}>{r.w}</td><td style={td}>{r.l}</td><td style={td}>{r.w}-{r.l}</td><td style={td}>{r.streak}</td></tr>)}</Table></section>; }
 function Rankings({ title, rows }) { return <div style={miniCard}><h3>{title}</h3>{rows.map((r,i)=><div key={r.team} style={miniRow}>#{i+1} {r.team}: <b>{r.total}</b></div>)}</div>; }
-function AllAmericans({ rows, teams, addRow, updateRow, deleteRow, rankings, drafts, setDrafts, saveDraft, getDraft }) {
+function AllAmericans({ rows, teams }) {
   return (
     <section style={card}>
       <div style={sectionTop}>
         <div>
           <h2 style={sectionTitle}>All-Americans</h2>
-          <p style={mutedText}>Mobile-friendly editable cards. Each card saves back to the All-Americans table.</p>
+          <p style={mutedText}>Read-only results. Add and edit All-Americans from League Data Center.</p>
         </div>
-        <button onClick={addRow} style={button}>Add</button>
       </div>
       <div style={recognitionGrid}>
-        {rows.map((r) => {
-          const d = getDraft(drafts, r);
-          const team = teams.find((t) => t.id === d.team_id);
+        {rows.length ? rows.map((r) => {
+          const team = teams.find((t) => t.id === r.team_id);
           return (
             <div key={r.id} style={recognitionCard}>
               <div style={recognitionHeader}>
                 <div>
-                  <div style={recognitionKicker}>{d.type || "All-American"}</div>
-                  <div style={recognitionPlayer}>{d.player_name || "New Player"}</div>
-                  <div style={recognitionMeta}>{d.position || "Position"} • {d.season_year || "Year"}</div>
+                  <div style={recognitionKicker}>{r.type || "All-American"}</div>
+                  <div style={recognitionPlayer}>{r.player_name || "Player"}</div>
+                  <div style={recognitionMeta}>{r.position || "Position"} • {r.season_year || "Year"}</div>
                 </div>
                 <div style={recognitionTeamBadge}><TeamLabel team={team} name={team?.name || "Team"} /></div>
               </div>
-              <div style={recognitionFormGrid}>
-                <label style={fieldLabel}>Type<select value={d.type} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),type:e.target.value}})} style={input}>{ALL_AMERICAN_TYPES.map((x)=><option key={x}>{x}</option>)}</select></label>
-                <label style={fieldLabel}>Player<input value={d.player_name} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),player_name:e.target.value}})} style={input}/></label>
-                <label style={fieldLabel}>Team<select value={d.team_id} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),team_id:e.target.value}})} style={input}>{teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
-                <label style={fieldLabel}>Position<select value={d.position} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),position:e.target.value}})} style={input}>{POSITIONS.map((p)=><option key={p}>{p}</option>)}</select></label>
-                <label style={fieldLabel}>Year<select value={String(d.season_year)} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),season_year:e.target.value}})} style={input}>{YEARS.map((y)=><option key={y}>{y}</option>)}</select></label>
-              </div>
-              <div style={recognitionActions}>
-                <button onClick={()=>saveDraft("all_americans",r.id,drafts[r.id], ["season_year"])} style={button}>Save</button>
-                <DeleteButton onClick={()=>deleteRow("all_americans",r.id)}/>
-              </div>
             </div>
           );
-        })}
+        }) : <p style={mutedText}>No All-Americans recorded yet.</p>}
       </div>
     </section>
   );
 }
-function Awards({ rows, teams, addRow, updateRow, deleteRow, rankings, drafts, setDrafts, saveDraft, getDraft }) {
+
+function Awards({ rows, teams }) {
   return (
     <section style={card}>
       <div style={sectionTop}>
         <div>
           <h2 style={sectionTitle}>Awards</h2>
-          <p style={mutedText}>Mobile-friendly editable cards with award, player, team, position, and year.</p>
+          <p style={mutedText}>Read-only results. Add and edit award winners from League Data Center.</p>
         </div>
-        <button onClick={addRow} style={button}>Add</button>
       </div>
       <div style={recognitionGrid}>
-        {rows.map((r) => {
-          const d = getDraft(drafts, r);
-          const team = teams.find((t) => t.id === d.team_id);
+        {rows.length ? rows.map((r) => {
+          const team = teams.find((t) => t.id === r.team_id);
           return (
             <div key={r.id} style={recognitionCard}>
               <div style={recognitionHeader}>
                 <div>
-                  <div style={recognitionKicker}>{d.award_name || "Award"}</div>
-                  <div style={recognitionPlayer}>{d.player_name || "New Player"}</div>
-                  <div style={recognitionMeta}>{d.position || "Position"} • {d.season_year || "Year"}</div>
+                  <div style={recognitionKicker}>{r.award_name || "Award"}</div>
+                  <div style={recognitionPlayer}>{r.player_name || "Player"}</div>
+                  <div style={recognitionMeta}>{r.position || "Position"} • {r.season_year || "Year"}</div>
                 </div>
                 <div style={recognitionTeamBadge}><TeamLabel team={team} name={team?.name || "Team"} /></div>
               </div>
-              <div style={recognitionFormGrid}>
-                <label style={fieldLabel}>Award<select value={d.award_name} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),award_name:e.target.value}})} style={input}>{AWARD_NAMES.map((a)=><option key={a}>{a}</option>)}</select></label>
-                <label style={fieldLabel}>Player<input value={d.player_name} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),player_name:e.target.value}})} style={input}/></label>
-                <label style={fieldLabel}>Team<select value={d.team_id} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),team_id:e.target.value}})} style={input}>{teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
-                <label style={fieldLabel}>Position<select value={d.position} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),position:e.target.value}})} style={input}>{POSITIONS.map((p)=><option key={p}>{p}</option>)}</select></label>
-                <label style={fieldLabel}>Year<select value={String(d.season_year)} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),season_year:e.target.value}})} style={input}>{YEARS.map((y)=><option key={y}>{y}</option>)}</select></label>
-              </div>
-              <div style={recognitionActions}>
-                <button onClick={()=>saveDraft("awards",r.id,drafts[r.id], ["season_year"])} style={button}>Save</button>
-                <DeleteButton onClick={()=>deleteRow("awards",r.id)}/>
-              </div>
             </div>
           );
-        })}
+        }) : <p style={mutedText}>No awards recorded yet.</p>}
       </div>
     </section>
   );
 }
+
 function Heismans({ rows, teams, addRow, updateRow, deleteRow, drafts, setDrafts, saveDraft, getDraft }) {
   return <section style={card}><div style={sectionTop}><h2 style={sectionTitle}>Heisman Winners</h2><button onClick={addRow} style={button}>Add</button></div><Table headers={["Player","Team","Position","Year","Save",""]}>{rows.map((r)=>{const d=getDraft(drafts,r);return <tr key={r.id} style={trStyle}>
     <td style={td}><input value={d.player_name} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),player_name:e.target.value}})} style={input}/></td>
@@ -6210,24 +5958,28 @@ const healthWarn = {
 const draftRoomWrap = {
   display: "grid",
   gap: 18,
+  background: "radial-gradient(circle at 50% -10%, rgba(250,204,21,.10), transparent 28%)",
 };
 
 const draftHero = {
   ...liquidGlassPanel,
   display: "grid",
-  gridTemplateColumns: "minmax(0, 1fr) minmax(260px, 420px)",
+  gridTemplateColumns: "minmax(0, 1.15fr) minmax(280px, .85fr)",
   gap: 18,
   alignItems: "stretch",
-  background: "radial-gradient(circle at 15% 0%, rgba(250,204,21,.18), transparent 34%), linear-gradient(145deg, rgba(88,28,135,.36), rgba(255,255,255,.055))",
+  border: "1px solid rgba(250,204,21,.32)",
+  background: "radial-gradient(circle at 0% 0%, rgba(250,204,21,.22), transparent 28%), radial-gradient(circle at 100% 0%, rgba(37,99,235,.20), transparent 32%), linear-gradient(135deg, rgba(3,7,18,.98), rgba(30,27,75,.92))",
+  boxShadow: "0 28px 90px rgba(0,0,0,.50), inset 0 1px 0 rgba(255,255,255,.08)",
 };
 
 const draftHeroTitle = {
-  margin: "10px 0",
+  margin: "8px 0",
   color: "#fff",
-  fontSize: "clamp(42px, 8vw, 92px)",
-  lineHeight: .86,
-  letterSpacing: "-.065em",
+  fontSize: "clamp(48px, 8vw, 104px)",
+  lineHeight: .82,
+  letterSpacing: "-.075em",
   fontWeight: 1000,
+  textShadow: "0 20px 60px rgba(0,0,0,.35)",
 };
 
 const onClockCard = {
@@ -6235,7 +5987,9 @@ const onClockCard = {
   display: "grid",
   alignContent: "center",
   gap: 8,
-  textAlign: "center",
+  textAlign: "left",
+  border: "1px solid rgba(250,204,21,.28)",
+  background: "linear-gradient(145deg, rgba(15,23,42,.92), rgba(2,6,23,.98))",
 };
 
 const draftClockPick = {
@@ -6252,10 +6006,11 @@ const draftClockUser = {
 };
 
 const draftTimer = {
-  color: "#fff",
-  fontSize: "clamp(38px, 8vw, 76px)",
+  color: "#facc15",
+  fontSize: "clamp(42px, 8vw, 88px)",
   fontWeight: 1000,
-  letterSpacing: "-.04em",
+  letterSpacing: "-.055em",
+  lineHeight: .82,
 };
 
 const pickAnnouncementCard = {
@@ -6281,14 +6036,15 @@ const pickTeamLine = {
 
 const draftBoardGrid = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
   gap: 12,
 };
 
 const draftPickTile = {
   ...liquidGlassTile,
   padding: 14,
-  border: "1px solid rgba(255,255,255,.16)",
+  border: "1px solid rgba(250,204,21,.18)",
+  background: "linear-gradient(145deg, rgba(15,23,42,.94), rgba(3,7,18,.985))",
 };
 
 const draftTileUser = {
@@ -6306,13 +6062,13 @@ const draftTileTeam = {
 
 
 const availableTeamTile = {
-  border: "1px solid rgba(255,255,255,.16)",
-  borderRadius: 16,
-  padding: 12,
+  border: "1px solid rgba(250,204,21,.18)",
+  borderRadius: 18,
+  padding: 14,
   display: "grid",
-  gap: 4,
+  gap: 7,
   color: "#fff",
-  boxShadow: "inset 0 1px 0 rgba(255,255,255,.14)",
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,.14), 0 16px 42px rgba(0,0,0,.28)",
 };
 
 
@@ -6376,10 +6132,10 @@ const draftConferenceTileLocked = {
 
 const availableTeamGrid = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-  gap: 10,
+  gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))",
+  gap: 12,
   alignContent: "start",
-  gridAutoRows: "minmax(82px, auto)",
+  gridAutoRows: "minmax(108px, auto)",
   minHeight: 620,
   overflow: "visible",
 };
@@ -6391,16 +6147,18 @@ const draftBroadcastBanner = {
   gridTemplateColumns: "minmax(0, 1fr) auto",
   alignItems: "center",
   gap: 18,
-  background: "radial-gradient(circle at 20% 0%, rgba(250,204,21,.22), transparent 34%), linear-gradient(135deg, rgba(49,46,129,.72), rgba(2,6,23,.72))",
-  border: "1px solid rgba(250,204,21,.28)",
+  background: "radial-gradient(circle at 20% 0%, rgba(250,204,21,.24), transparent 34%), linear-gradient(135deg, rgba(2,6,23,.96), rgba(15,23,42,.88))",
+  border: "1px solid rgba(250,204,21,.32)",
+  boxShadow: "0 24px 80px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.08)",
 };
 
 const draftBroadcastTitle = {
   color: "#fff",
-  fontSize: "clamp(28px, 6vw, 68px)",
-  lineHeight: .9,
-  letterSpacing: "-.055em",
+  fontSize: "clamp(38px, 7vw, 88px)",
+  lineHeight: .84,
+  letterSpacing: "-.07em",
   fontWeight: 1000,
+  textTransform: "uppercase",
   overflowWrap: "anywhere",
 };
 
@@ -8120,4 +7878,162 @@ const broadcastPageCard = {
   background: "linear-gradient(145deg, rgba(8,13,31,.96), rgba(3,7,18,.99))",
   border: "1px solid rgba(148,163,184,.18)",
   boxShadow: "0 24px 80px rgba(0,0,0,.40), inset 0 1px 0 rgba(255,255,255,.055)",
+};
+
+
+const dashboardPro = {
+  display: "grid",
+  gap: 18,
+};
+
+const dashboardHeroPro = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0,1fr) minmax(260px, 360px)",
+  gap: 18,
+  alignItems: "center",
+  borderRadius: 24,
+  padding: "clamp(24px, 4vw, 44px)",
+  border: "1px solid rgba(96,165,250,.22)",
+  background: "radial-gradient(circle at 18% 0%, rgba(96,165,250,.22), transparent 30%), radial-gradient(circle at 90% 10%, rgba(124,58,237,.20), transparent 32%), linear-gradient(135deg, rgba(2,6,23,.98), rgba(8,13,31,.96))",
+  boxShadow: "0 28px 90px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.07)",
+};
+
+const dashboardKickerPro = {
+  color: "#60a5fa",
+  fontWeight: 1000,
+  letterSpacing: ".15em",
+  textTransform: "uppercase",
+  fontSize: 13,
+};
+
+const dashboardTitlePro = {
+  margin: "8px 0 6px",
+  color: "#f8fafc",
+  fontSize: "clamp(44px, 6.6vw, 94px)",
+  lineHeight: .88,
+  letterSpacing: "-.07em",
+  fontWeight: 1000,
+};
+
+const dashboardSubPro = {
+  margin: 0,
+  color: "rgba(226,232,240,.82)",
+  fontSize: "clamp(18px, 2vw, 27px)",
+  fontWeight: 900,
+};
+
+const dashboardControlsPro = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: 10,
+  padding: 14,
+  borderRadius: 16,
+  background: "rgba(2,6,23,.50)",
+  border: "1px solid rgba(255,255,255,.09)",
+};
+
+const dashboardKpiPro = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+  gap: 12,
+};
+
+const dashboardKpiCardPro = {
+  borderRadius: 18,
+  border: "1px solid rgba(148,163,184,.16)",
+  background: "linear-gradient(145deg, rgba(15,23,42,.94), rgba(3,7,18,.985))",
+  padding: 18,
+  minHeight: 118,
+  display: "grid",
+  gap: 6,
+  boxShadow: "0 18px 55px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.055)",
+};
+
+const dashboardFeatureGridPro = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1.15fr) minmax(320px, .85fr)",
+  gap: 16,
+};
+
+const dashboardRankPanelPro = {
+  borderRadius: 20,
+  padding: 18,
+  border: "1px solid rgba(96,165,250,.18)",
+  background: "linear-gradient(145deg, rgba(8,13,31,.96), rgba(3,7,18,.99))",
+  boxShadow: "0 24px 80px rgba(0,0,0,.40), inset 0 1px 0 rgba(255,255,255,.055)",
+};
+
+const dashboardSideStackPro = {
+  display: "grid",
+  gap: 16,
+};
+
+const dashboardSmallPanelPro = {
+  borderRadius: 20,
+  padding: 16,
+  border: "1px solid rgba(148,163,184,.16)",
+  background: "linear-gradient(145deg, rgba(8,13,31,.96), rgba(3,7,18,.99))",
+  boxShadow: "0 18px 55px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.055)",
+};
+
+const dashboardPanelHeaderPro = {
+  display: "grid",
+  gap: 4,
+  marginBottom: 14,
+};
+
+const dashboardRankingListPro = {
+  display: "grid",
+  gap: 9,
+};
+
+const dashboardRankRowPro = {
+  width: "100%",
+  display: "grid",
+  gridTemplateColumns: "36px 44px minmax(0,1fr) auto",
+  gap: 12,
+  alignItems: "center",
+  border: "1px solid rgba(255,255,255,.09)",
+  borderRadius: 14,
+  padding: "12px 14px",
+  background: "rgba(255,255,255,.04)",
+  color: "#fff",
+  textAlign: "left",
+  cursor: "pointer",
+};
+
+const dashboardMiniListPro = {
+  display: "grid",
+  gap: 8,
+};
+
+const dashboardMiniRowPro = {
+  width: "100%",
+  display: "grid",
+  gridTemplateColumns: "34px 34px minmax(0,1fr) auto",
+  gap: 9,
+  alignItems: "center",
+  border: "1px solid rgba(255,255,255,.08)",
+  borderRadius: 12,
+  padding: 10,
+  background: "rgba(255,255,255,.035)",
+  color: "#fff",
+  textAlign: "left",
+  cursor: "pointer",
+};
+
+const dashboardNewsListPro = {
+  display: "grid",
+  gap: 9,
+};
+
+const dashboardNewsRowPro = {
+  display: "grid",
+  gridTemplateColumns: "34px minmax(0,1fr)",
+  gap: 10,
+  alignItems: "center",
+  borderRadius: 12,
+  padding: 11,
+  background: "rgba(255,255,255,.035)",
+  border: "1px solid rgba(255,255,255,.08)",
 };
