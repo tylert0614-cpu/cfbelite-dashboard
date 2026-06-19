@@ -130,7 +130,7 @@ function teamPageTheme(team) {
 }
 
 function TeamWatermark({ team }) {
-  const url = team?.logo_url || team?.helmet_url;
+  const url = team?.logo_url || team?.logo || team?.image_url;
   if (!url) return null;
   return <img src={url} alt="" style={teamWatermark}/>;
 }
@@ -200,7 +200,7 @@ function activeAssignmentsForLeague(assignments, teams) {
 }
 
 function TeamLogoMark({ team, size = 34, faded = false }) {
-  const url = team?.logo_url || team?.helmet_url;
+  const url = team?.logo_url || team?.logo || team?.image_url;
   if (!url) {
     const initials = String(team?.name || "CFB").split(" ").map((part)=>part[0]).join("").slice(0,3).toUpperCase();
     return <span style={{ width:size, height:size, borderRadius:Math.max(8,size*.22), display:"inline-grid", placeItems:"center", background:"rgba(255,255,255,.08)", border:"1px solid rgba(255,255,255,.14)", color:"#fff", fontWeight:1000, fontSize:Math.max(10,size*.28), opacity:faded ? .22 : 1 }}>{initials}</span>;
@@ -1651,7 +1651,7 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
 
       <section style={v29ThreeGrid}>
         <div style={v29Panel}>
-          <div style={v29PanelTitle}><span>CFBELITE Automated Rankings</span><h2>Computer Top 5</h2></div>
+          <div style={v29PanelTitle}><span>CFBELITE Automated Rankings</span><h2>CFBElite Automatic Rankings</h2></div>
           <div style={v29List}>
             {rankings.map((row,index)=>{
               const team = teams.find((team)=>team.id===row.team?.id) || row.team;
@@ -2151,6 +2151,7 @@ function draftConferenceLimitFor(conference, lockedConferences, counts) {
   return null;
 }
 
+
 function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClock, pauseClock, resumeClock, announcePick, revealPick, undoPick }) {
   const [selectedTeamId, setSelectedTeamId] = useState("");
   const [teamSearch, setTeamSearch] = useState("");
@@ -2160,6 +2161,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
   const [localPaused, setLocalPaused] = useState(Boolean(settings?.paused));
   const [localPicks, setLocalPicks] = useState(picks || []);
   const [manualPickNumber, setManualPickNumber] = useState(1);
+  const [conferenceFilter, setConferenceFilter] = useState("All");
 
   useEffect(() => {
     const id = setInterval(() => setTick(Date.now()), 1000);
@@ -2173,6 +2175,10 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
   useEffect(() => {
     setLocalPaused(Boolean(settings?.paused));
   }, [settings?.paused]);
+
+  useEffect(() => {
+    setTimerMinutes(settings?.timer_minutes || 10);
+  }, [settings?.timer_minutes]);
 
   const eligibleTeamNames = new Set([
     "Army Black Knights","Charlotte 49ers","East Carolina Pirates","Florida Atlantic Owls","Memphis Tigers","Navy Midshipmen","North Texas Mean Green","Rice Owls","South Florida Bulls","USF Bulls","Temple Owls","Tulane Green Wave","Tulsa Golden Hurricane","UAB Blazers","UTSA Roadrunners",
@@ -2192,15 +2198,15 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
     if (upper === "SUN BELT") return "Sun Belt";
     if (upper === "AMERICAN" || upper === "AAC") return "American";
     if (upper === "MAC") return "MAC";
-    return value;
+    return value || "Independent";
   }
 
   const allowedConferences = ["American", "CUSA", "MAC", "Mountain West", "PAC 12", "Sun Belt"];
   const sortedPicks = [...(localPicks || [])].sort((a, b) => Number(a.pick_number || 0) - Number(b.pick_number || 0));
+  const firstOpenPick = sortedPicks.find((pick) => !pick.team_id || pick.status === "pending" || pick.status === "on_clock" || pick.status === "pick_is_in");
   const currentPick =
     sortedPicks.find((pick) => Number(pick.pick_number) === Number(manualPickNumber || 1)) ||
-    sortedPicks.find((pick) => Number(pick.pick_number) === 1) ||
-    sortedPicks.find((pick) => !pick.team_id || pick.status === "pick_is_in") ||
+    firstOpenPick ||
     sortedPicks[0] ||
     { pick_number: 1, discord_username: "User TBD", status: "pending" };
 
@@ -2208,12 +2214,13 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
     ? { ...currentPick, timer_started_at: localClock.timer_started_at, timer_minutes: localClock.timer_minutes, status: currentPick.status === "picked" ? "picked" : "on_clock" }
     : currentPick;
 
-  const pickedTeamIds = new Set(sortedPicks.filter((pick) => pick.team_id && pick.status === "picked").map((pick) => String(pick.team_id)));
+  const pickedPicks = sortedPicks.filter((pick) => pick.team_id && pick.status === "picked");
+  const stagedPick = sortedPicks.find((pick) => pick.status === "pick_is_in");
+  const pickedTeamIds = new Set(pickedPicks.map((pick) => String(pick.team_id)));
   const reservedTeamIds = new Set(sortedPicks.filter((pick) => pick.team_id).map((pick) => String(pick.team_id)));
 
   const conferenceCounts = {};
-  sortedPicks.forEach((pick) => {
-    if (!pick.team_id || pick.status !== "picked") return;
+  pickedPicks.forEach((pick) => {
     const team = teams.find((t) => String(t.id) === String(pick.team_id)) || pick.teams;
     const conf = cleanConference(team?.conference);
     if (!conf) return;
@@ -2229,23 +2236,6 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
     });
   }
 
-  const conferenceSelections = {};
-  allowedConferences.forEach((conf) => {
-    conferenceSelections[conf] = [];
-  });
-
-  sortedPicks.forEach((pick) => {
-    if (!pick.team_id || pick.status !== "picked") return;
-    const pickedTeam = teams.find((team) => String(team.id) === String(pick.team_id)) || pick.teams;
-    const conf = cleanConference(pickedTeam?.conference);
-    if (!conferenceSelections[conf]) return;
-    conferenceSelections[conf].push({
-      pickNumber: pick.pick_number,
-      user: pick.discord_username || pick.discord_users?.discord_username || "User TBD",
-      team: pickedTeam?.name || "Selected Team",
-    });
-  });
-
   const availableTeams = teams
     .filter((team) => eligibleTeamNames.has(team.name))
     .filter((team) => allowedConferences.includes(cleanConference(team.conference)))
@@ -2253,7 +2243,9 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
     .filter((team) => !reservedTeamIds.has(String(team.id)))
     .filter((team) => {
       const q = teamSearch.toLowerCase();
-      return !q || team.name.toLowerCase().includes(q) || cleanConference(team.conference).toLowerCase().includes(q);
+      const conf = cleanConference(team.conference);
+      const conferenceOk = conferenceFilter === "All" || conf === conferenceFilter;
+      return conferenceOk && (!q || team.name.toLowerCase().includes(q) || conf.toLowerCase().includes(q));
     })
     .sort((a, b) => {
       const confCompare = cleanConference(a.conference).localeCompare(cleanConference(b.conference));
@@ -2261,25 +2253,50 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
       return a.name.localeCompare(b.name);
     });
 
-  const availableTeamsByConference = allowedConferences
-    .map((conf) => ({
-      conference: conf,
-      locked: lockedConferences.has(conf),
-      teams: availableTeams.filter((team) => cleanConference(team.conference) === conf),
-      selectedCount: conferenceCounts[conf] || 0,
-    }))
-    .filter((group) => group.teams.length || group.locked || group.selectedCount > 0);
+  const availableTeamsByConference = allowedConferences.map((conf) => ({
+    conference: conf,
+    locked: lockedConferences.has(conf),
+    selectedCount: conferenceCounts[conf] || 0,
+    availableCount: availableTeams.filter((team) => cleanConference(team.conference) === conf).length,
+    teams: availableTeams.filter((team) => cleanConference(team.conference) === conf),
+  }));
 
   const selectedTeam = teams.find((team) => String(team.id) === String(selectedTeamId));
-  const stagedPick = sortedPicks.find((pick) => pick.status === "pick_is_in");
   const stagedTeam = stagedPick ? teams.find((team) => String(team.id) === String(stagedPick.team_id)) || stagedPick.teams : null;
-  const latestPick = [...sortedPicks].reverse().find((pick) => pick.team_id && pick.status === "picked");
+  const latestPick = [...pickedPicks].reverse()[0];
   const latestTeam = latestPick ? teams.find((team) => String(team.id) === String(latestPick.team_id)) || latestPick.teams : null;
+
+  const userName = (pick) => pick?.discord_username || pick?.discord_users?.discord_username || pick?.user || "User TBD";
+  const teamInitials = (team) => String(team?.name || "CFB").split(" ").map((part)=>part[0]).join("").slice(0,4).toUpperCase();
+  const teamPrimary = (team) => team?.primary_color || "#172554";
+  const teamSecondary = (team) => team?.secondary_color || "#60a5fa";
+
+  function DraftBadge({ team, size = 58 }) {
+    const logo = team?.logo_url || team?.logo || team?.image_url;
+    if (logo) return <img src={logo} alt="" style={{ width:size, height:size, objectFit:"contain", position:"relative", zIndex:2 }}/>;
+    return (
+      <span style={{
+        width:size,
+        height:size,
+        borderRadius: Math.max(12, size * .24),
+        display:"grid",
+        placeItems:"center",
+        background:`linear-gradient(135deg, ${teamPrimary(team)}, ${teamSecondary(team)})`,
+        border:"1px solid rgba(255,255,255,.18)",
+        color:"#fff",
+        fontWeight:1000,
+        fontSize:Math.max(13, size*.26),
+        position:"relative",
+        zIndex:2,
+        boxShadow:"inset 0 1px 0 rgba(255,255,255,.18), 0 12px 34px rgba(0,0,0,.28)",
+      }}>{teamInitials(team)}</span>
+    );
+  }
 
   function timeLabel() {
     if (localPaused) return "PAUSED";
     const started = displayPick?.timer_started_at;
-    if (!started) return "Clock not started";
+    if (!started) return "CLOCK READY";
     const minutes = Number(displayPick?.timer_minutes || settings?.timer_minutes || timerMinutes || 10);
     const end = new Date(started).getTime() + minutes * 60 * 1000;
     const remaining = Math.max(0, end - tick);
@@ -2290,11 +2307,8 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
 
   function handleStartClock() {
     const started = new Date().toISOString();
-    setLocalClock({
-      pick_number: currentPick?.pick_number,
-      timer_started_at: started,
-      timer_minutes: Number(timerMinutes) || 10,
-    });
+    setLocalClock({ pick_number: currentPick?.pick_number, timer_started_at: started, timer_minutes: Number(timerMinutes) || 10 });
+    setLocalPaused(false);
     if (startClock) startClock(currentPick?.pick_number, timerMinutes);
   }
 
@@ -2313,29 +2327,27 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
       alert("Select a team first.");
       return;
     }
-
     const now = new Date().toISOString();
     setLocalPicks((prev) => (prev || []).map((pick) =>
       Number(pick.pick_number) === Number(currentPick?.pick_number)
         ? { ...pick, team_id: selectedTeamId, picked_at: now, status: "pick_is_in" }
         : pick
     ));
-
     if (announcePick) announcePick(currentPick?.pick_number, selectedTeamId);
   }
 
   function handleRevealPick(pickNumber) {
     const nextPick = Number(pickNumber) + 1;
     const now = new Date().toISOString();
-
     setLocalPicks((prev) => (prev || []).map((pick) => {
       if (Number(pick.pick_number) === Number(pickNumber)) return { ...pick, status: "picked" };
       if (Number(pick.pick_number) === nextPick) return { ...pick, timer_started_at: now, timer_minutes: Number(timerMinutes) || 10, status: "on_clock" };
       return pick;
     }));
-
+    setSelectedTeamId("");
     setManualPickNumber(nextPick);
     setLocalClock({ pick_number: nextPick, timer_started_at: now, timer_minutes: Number(timerMinutes) || 10 });
+    setLocalPaused(false);
     if (revealPick) revealPick(pickNumber);
   }
 
@@ -2345,442 +2357,372 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
         ? { ...pick, team_id: null, picked_at: null, timer_started_at: null, status: "pending" }
         : pick
     ));
+    setSelectedTeamId("");
     if (undoPick) undoPick(pickNumber);
   }
 
   function copyCaption(pick, team) {
     if (!pick || !team) return;
-    const caption = `🚨 THE PICK IS IN 🚨\n\nWith Pick #${String(pick.pick_number).padStart(2, "0")} in the CFBElite 27 Team Draft...\n\n${pick.discord_username || pick.discord_users?.discord_username || "A CFBElite user"} selects the ${team.name}!\n\nWelcome to ${cleanConference(team.conference) || "CFBElite"}.`;
+    const caption = `🚨 THE PICK IS IN 🚨\n\nWith Pick #${String(pick.pick_number).padStart(2, "0")} in the CFBElite 27 Team Draft...\n\n${userName(pick)} selects ${team.name}!\n\nWelcome to ${cleanConference(team.conference)}.`;
     navigator.clipboard?.writeText(caption);
   }
 
-  function downloadGraphic(pick, team) {
-    if (!pick || !team) return;
-
-    const canvas = document.createElement("canvas");
-    canvas.width = 1600;
-    canvas.height = 1000;
-    const ctx = canvas.getContext("2d");
-
-    const primary = team.primary_color || "#2d0b6e";
-    const secondary = team.secondary_color || "#facc15";
-    const accent = team.accent_color || "#ffffff";
-    const user = String(pick.discord_username || pick.discord_users?.discord_username || "CFBElite User").toUpperCase();
-    const teamName = String(team.name || "Selected Team").toUpperCase();
-    const parts = teamName.split(" ");
-    const mascot = parts.length > 1 ? parts[parts.length - 1] : "";
-    const school = parts.length > 1 ? parts.slice(0, -1).join(" ") : teamName;
-    const conf = cleanConference(team.conference) || "CFBElite";
-    const pickNo = String(pick.pick_number || 1).padStart(2, "0");
-    const initials = teamName.split(" ").map((word) => word[0]).join("").slice(0, 4);
-
-    function roundRect(x, y, w, h, r) {
-      const radius = Math.min(r, w / 2, h / 2);
-      ctx.beginPath();
-      ctx.moveTo(x + radius, y);
-      ctx.arcTo(x + w, y, x + w, y + h, radius);
-      ctx.arcTo(x + w, y + h, x, y + h, radius);
-      ctx.arcTo(x, y + h, x, y, radius);
-      ctx.arcTo(x, y, x + w, y, radius);
-      ctx.closePath();
-    }
-
-    function fitText(label, x, y, maxWidth, startSize, minSize, color = "#fff", weight = 1000, italic = false) {
-      let size = startSize;
-      do {
-        ctx.font = `${italic ? "italic " : ""}${weight} ${size}px Arial Black, Impact, Arial`;
-        if (ctx.measureText(label).width <= maxWidth || size <= minSize) break;
-        size -= 2;
-      } while (size > minSize);
-      ctx.fillStyle = color;
-      ctx.fillText(label, x, y);
-      return size;
-    }
-
-    function drawPaintStroke(x, y, w, h, color, alpha = 0.88) {
-      ctx.save();
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.moveTo(x, y + h * .25);
-      ctx.lineTo(x + w * .88, y);
-      ctx.lineTo(x + w, y + h * .58);
-      ctx.lineTo(x + w * .10, y + h);
-      ctx.closePath();
-      ctx.fill();
-      for (let i = 0; i < 12; i++) {
-        ctx.globalAlpha = alpha * .45;
-        ctx.fillRect(x + Math.random() * w, y + Math.random() * h, Math.random() * 140 + 30, Math.random() * 5 + 2);
-      }
-      ctx.restore();
-    }
-
-    function grunge(color, count, alpha) {
-      ctx.save();
-      ctx.fillStyle = color;
-      for (let i = 0; i < count; i++) {
-        ctx.globalAlpha = Math.random() * alpha;
-        const size = Math.random() * 4 + 1;
-        ctx.fillRect(Math.random() * 1600, Math.random() * 1000, size, size);
-      }
-      ctx.restore();
-    }
-
-    // Dark stadium-style background
-    const bg = ctx.createLinearGradient(0, 0, 1600, 1000);
-    bg.addColorStop(0, "#03030a");
-    bg.addColorStop(.25, primary);
-    bg.addColorStop(.50, "#050510");
-    bg.addColorStop(.78, "#050510");
-    bg.addColorStop(1, primary);
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, 1600, 1000);
-
-    // Crowd/stadium bands
-    ctx.fillStyle = "rgba(255,255,255,.055)";
-    ctx.fillRect(0, 150, 1600, 80);
-    ctx.fillStyle = "rgba(255,255,255,.035)";
-    ctx.fillRect(0, 230, 1600, 64);
-    ctx.fillStyle = "rgba(0,0,0,.60)";
-    ctx.fillRect(0, 0, 1600, 1000);
-
-    // Stadium lights
-    const leftLight = ctx.createRadialGradient(75, 45, 5, 75, 45, 350);
-    leftLight.addColorStop(0, "rgba(255,255,255,.96)");
-    leftLight.addColorStop(.12, `${secondary}66`);
-    leftLight.addColorStop(.40, "rgba(255,255,255,.10)");
-    leftLight.addColorStop(1, "rgba(255,255,255,0)");
-    ctx.fillStyle = leftLight;
-    ctx.fillRect(0, 0, 420, 300);
-
-    const rightLight = ctx.createRadialGradient(1525, 45, 5, 1525, 45, 350);
-    rightLight.addColorStop(0, "rgba(255,255,255,.96)");
-    rightLight.addColorStop(.12, `${secondary}66`);
-    rightLight.addColorStop(.40, "rgba(255,255,255,.10)");
-    rightLight.addColorStop(1, "rgba(255,255,255,0)");
-    ctx.fillStyle = rightLight;
-    ctx.fillRect(1180, 0, 420, 300);
-
-    // Smoke / grunge
-    grunge("#ffffff", 800, .20);
-    grunge(secondary, 280, .22);
-    grunge(primary, 550, .30);
-
-    // Border
-    ctx.strokeStyle = primary;
-    ctx.lineWidth = 6;
-    ctx.strokeRect(14, 14, 1572, 972);
-    ctx.strokeStyle = secondary;
-    ctx.lineWidth = 3;
-    ctx.strokeRect(32, 32, 1536, 936);
-
-    // Top header
-    ctx.fillStyle = "rgba(255,255,255,.84)";
-    ctx.font = "900 30px Arial";
-    ctx.fillText("C  F  B  E  L  I  T  E     2  7", 170, 100);
-    ctx.fillText("T  E  A  M     D  R  A  F  T", 1050, 100);
-
-    // Center crest-like badge
-    roundRect(615, 32, 370, 205, 32);
-    ctx.fillStyle = "rgba(0,0,0,.78)";
-    ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,.30)";
-    ctx.lineWidth = 4;
-    ctx.stroke();
-
-    fitText("CFBELITE", 668, 112, 275, 55, 42, "#fff");
-    fitText("27", 745, 178, 120, 72, 54, secondary);
-    fitText("DRAFT", 704, 224, 195, 42, 32, "#fff");
-
-    // Pick is in brush
-    drawPaintStroke(96, 180, 520, 98, primary, .88);
-    fitText("THE PICK IS IN", 136, 252, 430, 54, 38, "#fff", 1000, true);
-
-    // Left pick box
-    ctx.save();
-    ctx.shadowColor = "rgba(0,0,0,.55)";
-    ctx.shadowBlur = 24;
-    ctx.fillStyle = "rgba(0,0,0,.68)";
-    ctx.fillRect(118, 335, 320, 425);
-    ctx.restore();
-
-    ctx.strokeStyle = primary;
-    ctx.lineWidth = 3;
-    ctx.strokeRect(118, 335, 320, 425);
-
-    const pickHeader = ctx.createLinearGradient(118, 335, 438, 335);
-    pickHeader.addColorStop(0, primary);
-    pickHeader.addColorStop(1, "rgba(0,0,0,.55)");
-    ctx.fillStyle = pickHeader;
-    ctx.fillRect(118, 335, 320, 86);
-
-    fitText("PICK", 203, 394, 160, 58, 44, "#fff");
-    fitText(pickNo, 142, 705, 265, 230, 170, "#fff");
-
-    // Main content
-    const userBar = ctx.createLinearGradient(500, 300, 1090, 300);
-    userBar.addColorStop(0, primary);
-    userBar.addColorStop(.5, `${secondary}`);
-    userBar.addColorStop(1, primary);
-    ctx.fillStyle = userBar;
-    ctx.fillRect(500, 300, 590, 76);
-    fitText(user, 610, 355, 390, 48, 30, "#fff");
-
-    ctx.strokeStyle = primary;
-    ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.moveTo(516, 432);
-    ctx.lineTo(655, 432);
-    ctx.moveTo(930, 432);
-    ctx.lineTo(1065, 432);
-    ctx.stroke();
-
-    fitText("SELECTS", 672, 449, 250, 58, 42, primary, 1000, true);
-
-    fitText(school, 525, 610, 605, 124, 56, "#fff");
-    if (mascot) fitText(mascot, 515, 710, 610, 78, 46, primary, 1000, true);
-
-    // Helmet-style team orb on right
-    ctx.save();
-    ctx.translate(1285, 520);
-    const helmetGrad = ctx.createRadialGradient(-75, -95, 20, 0, 0, 300);
-    helmetGrad.addColorStop(0, `${secondary}bb`);
-    helmetGrad.addColorStop(.38, primary);
-    helmetGrad.addColorStop(.83, "#080812");
-    helmetGrad.addColorStop(1, "rgba(0,0,0,.92)");
-    ctx.fillStyle = helmetGrad;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 300, 245, -0.10, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,.45)";
-    ctx.lineWidth = 5;
-    ctx.stroke();
-
-    // face mask hint
-    ctx.strokeStyle = "rgba(0,0,0,.72)";
-    ctx.lineWidth = 16;
-    ctx.beginPath();
-    ctx.moveTo(-80, 92);
-    ctx.lineTo(245, 92);
-    ctx.moveTo(15, 130);
-    ctx.lineTo(270, 130);
-    ctx.moveTo(185, 70);
-    ctx.lineTo(250, 165);
-    ctx.stroke();
-
-    fitText(initials, -145, 30, 275, 105, 62, "#fff");
-    ctx.restore();
-
-    // Smoke under helmet
-    ctx.save();
-    ctx.globalAlpha = .65;
-    ctx.fillStyle = primary;
-    for (let i = 0; i < 22; i++) {
-      ctx.beginPath();
-      ctx.ellipse(1020 + i * 24, 790 + Math.sin(i) * 14, 82, 24, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
-
-    // Conference badge
-    roundRect(660, 770, 280, 84, 24);
-    ctx.fillStyle = "rgba(0,0,0,.72)";
-    ctx.fill();
-    ctx.strokeStyle = secondary;
-    ctx.lineWidth = 3;
-    ctx.stroke();
-    fitText(conf.toUpperCase(), 700, 827, 200, 42, 26, "#fff");
-
-    // Footer
-    fitText("#CFBELITE27", 85, 912, 220, 34, 26, "#fff");
-    ctx.fillStyle = secondary;
-    ctx.font = "900 38px Arial";
-    ctx.fillText("★ ★ ★ ★ ★", 330, 918);
-
-    fitText("WELCOME TO", 1185, 850, 270, 42, 30, "#fff", 1000, true);
-    fitText(mascot || school, 1095, 932, 420, 68, 38, primary, 1000, true);
-
-    const link = document.createElement("a");
-    link.download = `cfbelite27-pick-${pickNo}-${teamName.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.png`;
-    link.href = canvas.toDataURL("image/png");
-    link.click();
-  }
-
-
-  const S = {
-    page: { display: "grid", gap: 18 },
-    panel: { background: "rgba(15,23,42,.78)", border: "1px solid rgba(255,255,255,.14)", borderRadius: 22, padding: 18, boxShadow: "0 20px 60px rgba(0,0,0,.30)" },
-    hero: { background: "linear-gradient(135deg, rgba(49,46,129,.92), rgba(15,23,42,.88))", border: "1px solid rgba(250,204,21,.28)", borderRadius: 26, padding: 22, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 18, alignItems: "center" },
-    title: { margin: 0, color: "#fff", fontSize: "clamp(38px, 8vw, 78px)", lineHeight: .9, letterSpacing: "-.055em", fontWeight: 1000 },
-    eyebrow: { color: "#facc15", textTransform: "uppercase", letterSpacing: ".16em", fontSize: 12, fontWeight: 1000 },
-    muted: { color: "rgba(255,255,255,.72)", lineHeight: 1.45 },
-    clock: { color: "#facc15", fontSize: "clamp(42px, 10vw, 88px)", fontWeight: 1000, lineHeight: .9 },
-    grid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 },
-    availableConferenceStack: { display: "grid", gap: 14, marginTop: 14 },
-    availableConferenceGroup: { display: "grid", gap: 10 },
-    availableConferenceHeader: { border: "1px solid rgba(255,255,255,.18)", borderRadius: 14, padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, color: "#ffffff", fontWeight: 1000, fontSize: 13, textTransform: "uppercase", letterSpacing: ".08em" },
-    availableTeamGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 },
-    input: { width: "100%", border: "1px solid rgba(255,255,255,.16)", background: "rgba(255,255,255,.08)", color: "#fff", borderRadius: 14, padding: "12px 14px", fontWeight: 800 },
-    button: { border: "1px solid rgba(250,204,21,.32)", background: "linear-gradient(135deg, #facc15, #b45309)", color: "#111827", borderRadius: 14, padding: "12px 14px", fontWeight: 1000, cursor: "pointer", minHeight: 46 },
-    ghost: { border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.08)", color: "#fff", borderRadius: 14, padding: "12px 14px", fontWeight: 900, cursor: "pointer", minHeight: 46 },
-    pickTile: { background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.12)", borderRadius: 16, padding: 12, display: "grid", gap: 7 },
-    activePickRow: { marginTop: 14, border: "1px solid rgba(250,204,21,.38)", background: "rgba(250,204,21,.08)", borderRadius: 16, padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" },
-    activePickTeam: { color: "#facc15", fontSize: "clamp(20px, 5vw, 30px)", fontWeight: 1000, lineHeight: 1.05 },
-    activePickMeta: { color: "rgba(255,255,255,.78)", fontWeight: 900, whiteSpace: "nowrap" },
-    twoCol: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 },
+  const D = {
+    shell: {
+      display:"grid",
+      gap:18,
+    },
+    hero: {
+      position:"relative",
+      overflow:"hidden",
+      borderRadius:24,
+      padding:"clamp(20px, 4vw, 34px)",
+      background:"radial-gradient(circle at 50% 0%, rgba(59,130,246,.28), transparent 34%), radial-gradient(circle at 90% 12%, rgba(124,58,237,.22), transparent 34%), linear-gradient(135deg, rgba(2,6,23,.98), rgba(8,13,31,.98))",
+      border:"1px solid rgba(96,165,250,.24)",
+      boxShadow:"0 28px 90px rgba(0,0,0,.50), inset 0 1px 0 rgba(255,255,255,.07)",
+      display:"grid",
+      gridTemplateColumns:"repeat(auto-fit, minmax(min(100%, 290px), 1fr))",
+      gap:18,
+      alignItems:"center",
+    },
+    heroTitle: {
+      fontSize:"clamp(34px, 6vw, 78px)",
+      lineHeight:.88,
+      letterSpacing:"-.06em",
+      margin:"4px 0",
+      fontWeight:1000,
+    },
+    kicker: {
+      color:"#60a5fa",
+      fontSize:12,
+      fontWeight:1000,
+      letterSpacing:".16em",
+      textTransform:"uppercase",
+    },
+    heroControls: {
+      justifySelf:"end",
+      width:"100%",
+      maxWidth:420,
+      display:"grid",
+      gridTemplateColumns:"repeat(auto-fit, minmax(120px, 1fr))",
+      gap:10,
+      padding:14,
+      borderRadius:18,
+      border:"1px solid rgba(255,255,255,.10)",
+      background:"rgba(2,6,23,.48)",
+    },
+    input: {
+      width:"100%",
+      padding:"11px 12px",
+      borderRadius:10,
+      border:"1px solid rgba(148,163,184,.24)",
+      background:"rgba(2,6,23,.86)",
+      color:"#fff",
+      fontWeight:850,
+      outline:"none",
+    },
+    button: {
+      border:"1px solid rgba(255,255,255,.12)",
+      background:"linear-gradient(135deg,#2563eb,#7c3aed)",
+      color:"#fff",
+      borderRadius:10,
+      padding:"11px 12px",
+      fontWeight:950,
+      cursor:"pointer",
+      boxShadow:"0 14px 34px rgba(37,99,235,.22)",
+    },
+    ghostButton: {
+      border:"1px solid rgba(96,165,250,.22)",
+      background:"rgba(15,23,42,.72)",
+      color:"#dbeafe",
+      borderRadius:10,
+      padding:"10px 11px",
+      fontWeight:900,
+      cursor:"pointer",
+    },
+    dangerButton: {
+      border:"1px solid rgba(248,113,113,.30)",
+      background:"rgba(127,29,29,.45)",
+      color:"#fecaca",
+      borderRadius:10,
+      padding:"10px 11px",
+      fontWeight:900,
+      cursor:"pointer",
+    },
+    panel: {
+      borderRadius:18,
+      border:"1px solid rgba(148,163,184,.17)",
+      background:"linear-gradient(145deg, rgba(8,13,31,.96), rgba(3,7,18,.99))",
+      boxShadow:"0 22px 70px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.055)",
+      padding:"clamp(14px, 2vw, 18px)",
+      minWidth:0,
+      overflow:"hidden",
+    },
+    layout: {
+      display:"grid",
+      gridTemplateColumns:"minmax(0, 1.12fr) minmax(280px, .88fr)",
+      gap:16,
+      alignItems:"start",
+    },
+    clockCard: {
+      position:"relative",
+      overflow:"hidden",
+      borderRadius:20,
+      padding:"clamp(18px, 3vw, 26px)",
+      background:"linear-gradient(145deg, rgba(15,23,42,.94), rgba(3,7,18,.99))",
+      border:"1px solid rgba(96,165,250,.22)",
+      display:"grid",
+      gridTemplateColumns:"auto minmax(0,1fr)",
+      gap:18,
+      alignItems:"center",
+      minHeight:210,
+    },
+    clockText: {
+      fontSize:"clamp(44px, 8vw, 88px)",
+      lineHeight:.82,
+      fontWeight:1000,
+      letterSpacing:"-.06em",
+      color:"#fff",
+    },
+    boardTools: {
+      display:"grid",
+      gridTemplateColumns:"repeat(auto-fit, minmax(180px, 1fr))",
+      gap:10,
+      marginTop:12,
+    },
+    teamGrid: {
+      display:"grid",
+      gridTemplateColumns:"repeat(auto-fill, minmax(180px, 1fr))",
+      gap:10,
+    },
+    teamTile: {
+      position:"relative",
+      overflow:"hidden",
+      minHeight:132,
+      borderRadius:16,
+      border:"1.5px solid #ffffff",
+      color:"#fff",
+      padding:13,
+      display:"grid",
+      gap:9,
+      alignContent:"space-between",
+      textAlign:"left",
+      cursor:"pointer",
+      boxShadow:"0 16px 44px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.08)",
+    },
+    rightRail: {
+      display:"grid",
+      gap:14,
+    },
+    pickRow: {
+      display:"grid",
+      gridTemplateColumns:"42px minmax(0,1fr) auto",
+      gap:10,
+      alignItems:"center",
+      padding:10,
+      borderRadius:12,
+      background:"rgba(255,255,255,.04)",
+      border:"1px solid rgba(255,255,255,.08)",
+    },
+    confGrid: {
+      display:"grid",
+      gridTemplateColumns:"repeat(auto-fit, minmax(150px, 1fr))",
+      gap:10,
+    },
+    confCard: {
+      borderRadius:14,
+      padding:12,
+      background:"rgba(255,255,255,.04)",
+      border:"1px solid rgba(255,255,255,.08)",
+      display:"grid",
+      gap:5,
+    },
+    tag: {
+      display:"inline-flex",
+      alignItems:"center",
+      justifyContent:"center",
+      width:"fit-content",
+      border:"1px solid rgba(255,255,255,.14)",
+      background:"rgba(255,255,255,.06)",
+      borderRadius:999,
+      padding:"5px 9px",
+      fontSize:11,
+      fontWeight:950,
+      color:"rgba(255,255,255,.80)",
+    },
   };
 
   return (
-    <section style={S.page}>
-      <div style={S.hero}>
+    <section style={D.shell}>
+      <div style={D.hero}>
         <div>
-          <div style={S.eyebrow}>CFBElite 27 Draft Room</div>
-          <h2 style={S.title}>The Board Is Live</h2>
-          <p style={S.muted}>Public CFB 27 team draft room. Available teams are limited to American, CUSA, MAC, Mountain West, PAC 12, and Sun Belt.</p>
+          <div style={D.kicker}>CFBELITE 27 • LIVE DRAFT ROOM</div>
+          <h1 style={D.heroTitle}>Draft Room Broadcast</h1>
+          <div style={{ color:"rgba(226,232,240,.78)", fontWeight:900 }}>Round 1 • Pick {displayPick?.pick_number || 1} • {localPaused ? "Paused" : "Live Board"}</div>
         </div>
-        <div style={S.panel}>
-          <div style={S.eyebrow}>{displayPick?.status === "pick_is_in" ? "The Pick Is In" : "On The Clock"}</div>
-          <h3 style={{ margin: "8px 0", color: "#fff", fontSize: 30 }}>Pick #{String(displayPick?.pick_number || 1).padStart(2, "0")}</h3>
-          <div style={{ color: "#fff", fontSize: 26, fontWeight: 1000 }}>{displayPick?.discord_username || displayPick?.discord_users?.discord_username || "User TBD"}</div>
-          <div style={S.clock}>{timeLabel()}</div>
+        <div style={D.heroControls}>
+          <label style={{...D.kicker, color:"rgba(226,232,240,.72)"}}>Pick
+            <select style={D.input} value={manualPickNumber} onChange={(e)=>setManualPickNumber(Number(e.target.value))}>
+              {sortedPicks.map((pick)=><option key={pick.pick_number} value={pick.pick_number}>#{pick.pick_number} {userName(pick)}</option>)}
+            </select>
+          </label>
+          <label style={{...D.kicker, color:"rgba(226,232,240,.72)"}}>Timer
+            <input style={D.input} value={timerMinutes} onChange={(e)=>setTimerMinutes(e.target.value)} />
+          </label>
+          <button style={D.button} onClick={handleStartClock}>Start Clock</button>
+          <button style={D.ghostButton} onClick={localPaused ? handleResumeClock : handlePauseClock}>{localPaused ? "Resume" : "Pause"}</button>
         </div>
       </div>
 
-      <div style={S.panel}>
-        <div style={S.eyebrow}>Draft Controls</div>
-        <p style={S.muted}>Controls are open. Set the clock, select a team, stage the pick, download/copy the announcement, then reveal it to the public board.</p>
-        <div style={S.grid}>
-          <select title="Manual current pick override" style={S.input} value={manualPickNumber} onChange={(e) => setManualPickNumber(Number(e.target.value))}>
-            {sortedPicks.map((pick) => (
-              <option style={{color:"#111827", background:"#fff"}} key={pick.pick_number} value={pick.pick_number}>
-                Pick #{String(pick.pick_number).padStart(2, "0")} - {pick.discord_username || pick.discord_users?.discord_username || "User TBD"}
-              </option>
-            ))}
-          </select>
-          <input style={S.input} type="number" min="1" max="60" value={timerMinutes} onChange={(e) => setTimerMinutes(e.target.value)} placeholder="Clock minutes" />
-          <select style={S.input} value={selectedTeamId} onChange={(e) => setSelectedTeamId(e.target.value)}>
-            <option style={{color:"#111827", background:"#fff"}} value="">Select Team For Pick #{displayPick?.pick_number || ""}</option>
-            {availableTeams.map((team) => (
-              <option style={{color:"#111827", background:"#fff"}} key={team.id} value={team.id}>{team.name} - {cleanConference(team.conference)}</option>
-            ))}
-          </select>
-          <button style={S.button} type="button" onClick={handleStartClock}>Start / Reset Clock</button>
-          <button style={S.ghost} type="button" onClick={() => setManualPickNumber(Number(manualPickNumber) || 1)}>Set Current Pick</button>
-          <button style={S.ghost} type="button" onClick={handlePauseClock}>Pause Clock</button>
-          <button style={S.ghost} type="button" onClick={handleResumeClock}>Resume Clock</button>
-          <button style={S.button} type="button" disabled={!selectedTeamId} onClick={handlePickIsIn}>Pick Is In</button>
-        </div>
-
-        {(selectedTeam || stagedTeam) && (
-          <div style={S.activePickRow}>
-            <div>
-              <div style={S.eyebrow}>{stagedTeam ? "Pick Is In" : "Selected Team"}</div>
-              <div style={S.activePickTeam}>{(stagedTeam || selectedTeam)?.name}</div>
+      <div style={D.layout}>
+        <div style={{ display:"grid", gap:14, minWidth:0 }}>
+          <div style={D.clockCard}>
+            <div style={{ display:"grid", gap:10, justifyItems:"center" }}>
+              <div style={{ ...D.tag, color:"#bfdbfe" }}>ON THE CLOCK</div>
+              <div style={D.clockText}>{timeLabel()}</div>
             </div>
-            <div style={S.activePickMeta}>
-              Pick #{String((stagedPick || currentPick)?.pick_number || 1).padStart(2, "0")} · {cleanConference((stagedTeam || selectedTeam)?.conference)}
+            <div style={{ minWidth:0 }}>
+              <div style={D.kicker}>Pick #{displayPick?.pick_number || 1}</div>
+              <h2 style={{ margin:"4px 0", fontSize:"clamp(30px, 5vw, 56px)", lineHeight:.9, letterSpacing:"-.05em" }}>{userName(displayPick)}</h2>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginTop:10 }}>
+                <span style={D.tag}>{availableTeams.length} Available</span>
+                <span style={D.tag}>{pickedPicks.length} Picked</span>
+                <span style={D.tag}>{selectedTeam ? selectedTeam.name : "No Team Selected"}</span>
+              </div>
+              <div style={D.boardTools}>
+                <button style={D.button} onClick={handlePickIsIn} disabled={!selectedTeamId}>Pick Is In</button>
+                {stagedPick && <button style={D.button} onClick={()=>handleRevealPick(stagedPick.pick_number)}>Reveal Pick #{stagedPick.pick_number}</button>}
+                {currentPick?.team_id && <button style={D.dangerButton} onClick={()=>handleUndoPick(currentPick.pick_number)}>Undo Current Pick</button>}
+              </div>
             </div>
           </div>
-        )}
-      </div>
 
-      <div style={S.panel}>
-        <div style={S.eyebrow}>Conference Draft Caps</div>
-        <div style={S.grid}>
-          {allowedConferences.map((conf) => {
-            const count = conferenceCounts[conf] || 0;
-            const locked = lockedConferences.has(conf);
-            return (
-              <div key={conf} style={{ ...S.pickTile, background: locked ? "rgba(127,29,29,.75)" : "rgba(255,255,255,.07)", borderColor: locked ? "rgba(248,113,113,.70)" : "rgba(255,255,255,.18)" }}>
-                <div style={{display:"flex", justifyContent:"space-between", gap:8, alignItems:"center"}}>
-                  <b style={{ color: "#fff" }}>{conf}</b>
-                  <span style={{ color: locked ? "#fecaca" : "#bbf7d0", fontWeight: 1000, fontSize: 12 }}>{locked ? "LOCKED" : "OPEN"}</span>
+          {stagedPick && stagedTeam && (
+            <div style={{...D.panel, borderColor:"rgba(250,204,21,.35)", background:"linear-gradient(145deg, rgba(59,45,8,.60), rgba(3,7,18,.98))"}}>
+              <div style={{display:"grid", gridTemplateColumns:"auto minmax(0,1fr) auto", gap:14, alignItems:"center"}}>
+                <DraftBadge team={stagedTeam} size={62}/>
+                <div>
+                  <div style={D.kicker}>The Pick Is In</div>
+                  <h3 style={{margin:"3px 0", fontSize:26}}>{userName(stagedPick)} selected {stagedTeam.name}</h3>
+                  <span style={D.tag}>{cleanConference(stagedTeam.conference)}</span>
                 </div>
-                <span style={S.muted}>{count} selected</span>
-                <div style={S.confPickRows}>
-                  {(conferenceSelections[conf] || []).map((item) => (
-                    <div key={`${conf}-${item.pickNumber}`} style={S.confPickRow}>
-                      <span>#{String(item.pickNumber).padStart(2,"0")} {item.user}</span>
-                      <b>{item.team}</b>
+                <div style={{display:"grid", gap:8}}>
+                  <button style={D.button} onClick={()=>handleRevealPick(stagedPick.pick_number)}>Reveal</button>
+                  <button style={D.ghostButton} onClick={()=>copyCaption(stagedPick, stagedTeam)}>Copy Caption</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div style={D.panel}>
+            <div style={{display:"grid", gridTemplateColumns:"minmax(0,1fr) auto", gap:12, alignItems:"center", marginBottom:12}}>
+              <div>
+                <div style={D.kicker}>Available Teams Board</div>
+                <h2 style={{margin:"4px 0 0", fontSize:26}}>Select a Program</h2>
+              </div>
+              <div style={{display:"flex", flexWrap:"wrap", gap:8, justifyContent:"flex-end"}}>
+                <input style={{...D.input, width:210}} value={teamSearch} onChange={(e)=>setTeamSearch(e.target.value)} placeholder="Search teams..." />
+                <select style={{...D.input, width:170}} value={conferenceFilter} onChange={(e)=>setConferenceFilter(e.target.value)}>
+                  <option>All</option>
+                  {allowedConferences.map((conf)=><option key={conf}>{conf}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div style={{display:"grid", gap:16}}>
+              {availableTeamsByConference.filter((group)=>conferenceFilter === "All" || group.conference === conferenceFilter).map((group)=>(
+                <div key={group.conference} style={{display:"grid", gap:9}}>
+                  <div style={{display:"flex", justifyContent:"space-between", gap:10, alignItems:"center"}}>
+                    <div>
+                      <b style={{fontSize:18}}>{group.conference}</b>
+                      <div style={{color:"rgba(255,255,255,.62)", fontSize:12, fontWeight:850}}>{group.selectedCount} picked • {group.availableCount} available</div>
                     </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {latestPick && latestTeam && (
-        <div style={S.panel}>
-          <div style={S.eyebrow}>Latest Pick</div>
-          <h3 style={{ margin: "8px 0", color: "#fff", fontSize: 30 }}>Pick #{String(latestPick.pick_number).padStart(2, "0")} · {latestPick.discord_username || latestPick.discord_users?.discord_username}</h3>
-          <div style={{ color: "#facc15", fontSize: 38, fontWeight: 1000 }}>{latestTeam.name}</div>
-        </div>
-      )}
-
-      <div style={S.twoCol}>
-        <div style={S.panel}>
-          <div style={S.eyebrow}>Draft Board</div>
-          <div style={{ ...S.grid, marginTop: 12 }}>
-            {sortedPicks.map((pick) => {
-              const team = teams.find((t) => String(t.id) === String(pick.team_id)) || pick.teams;
-              const visible = pick.status === "picked";
-              return (
-                <div key={pick.pick_number} style={{...S.pickTile, background: visible && team ? `linear-gradient(135deg, ${team.primary_color || "#1f2937"}cc, rgba(15,23,42,.88))` : S.pickTile.background, borderColor: visible && team ? (team.accent_color || team.secondary_color || "rgba(255,255,255,.18)") : S.pickTile.border}}>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                    <b style={{ color: "#fff" }}>#{String(pick.pick_number).padStart(2, "0")}</b>
-                    <span style={{ color: "#facc15", fontWeight: 900 }}>{pick.status === "pick_is_in" ? "PICK IS IN" : (pick.status || "pending")}</span>
+                    {group.locked && <span style={{...D.tag, color:"#fecaca", borderColor:"rgba(248,113,113,.32)"}}>Locked</span>}
                   </div>
-                  <div style={{ color: "#fff", fontWeight: 1000 }}>{pick.discord_username || pick.discord_users?.discord_username}</div>
-                  {visible && team && (team.logo_url || team.helmet_url) && <img src={team.logo_url || team.helmet_url} alt="" style={S.tileWatermark}/>}
-                  <div style={visible && team ? { color: "#facc15", fontWeight: 1000, position:"relative", zIndex:1 } : S.muted}>{visible && team ? team.name : (pick.status === "pick_is_in" ? "Team hidden until reveal" : "On deck")}</div>
-                  {pick.status === "pick_is_in" && <button style={S.button} type="button" onClick={() => handleRevealPick(pick.pick_number)}>Reveal Pick</button>}
-                  {pick.team_id && <button style={S.ghost} type="button" onClick={() => handleUndoPick(pick.pick_number)}>Undo</button>}
+
+                  {!group.locked && (
+                    <div style={D.teamGrid}>
+                      {group.teams.map((team)=>{
+                        const active = String(selectedTeamId) === String(team.id);
+                        return (
+                          <button
+                            key={team.id}
+                            type="button"
+                            onClick={()=>setSelectedTeamId(team.id)}
+                            style={{
+                              ...D.teamTile,
+                              background:`radial-gradient(circle at 100% 0%, ${teamSecondary(team)}44, transparent 36%), linear-gradient(135deg, ${teamPrimary(team)}dd, rgba(15,23,42,.92))`,
+                              borderColor: active ? "#facc15" : "#ffffff",
+                              boxShadow: active ? "0 0 0 2px rgba(250,204,21,.55), 0 22px 60px rgba(250,204,21,.20)" : D.teamTile.boxShadow,
+                            }}
+                          >
+                            <div style={{display:"flex", justifyContent:"space-between", gap:10, alignItems:"start", position:"relative", zIndex:2}}>
+                              <DraftBadge team={team} size={48}/>
+                              <span style={D.tag}>{cleanConference(team.conference)}</span>
+                            </div>
+                            <div style={{position:"relative", zIndex:2}}>
+                              <b style={{display:"block", fontSize:16, lineHeight:1.05}}>{team.name}</b>
+                              <small style={{color:"rgba(255,255,255,.72)", fontWeight:850}}>{active ? "Selected for current pick" : "Available"}</small>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
         </div>
 
-        <div style={S.panel}>
-          <div style={S.eyebrow}>Available Teams · {availableTeams.length}</div>
-          <input style={{ ...S.input, marginTop: 12 }} value={teamSearch} onChange={(e) => setTeamSearch(e.target.value)} placeholder="Search available teams or conference..." />
-
-          <div style={S.availableConferenceStack}>
-            {availableTeamsByConference.map((group) => (
-              <div key={group.conference} style={S.availableConferenceGroup}>
-                <div style={{
-                  ...S.availableConferenceHeader,
-                  background: group.locked ? "rgba(127,29,29,.76)" : "rgba(255,255,255,.08)",
-                  borderColor: group.locked ? "rgba(248,113,113,.70)" : "rgba(255,255,255,.18)",
-                }}>
-                  <span>{group.locked ? "🔒 " : ""}{group.conference}</span>
-                  <b>{group.locked ? "LOCKED" : `${group.teams.length} Remaining`}</b>
-                </div>
-
-                {!group.locked && (
-                  <div style={S.availableTeamGrid}>
-                    {group.teams.map((team) => (
-                      <div key={team.id} style={{
-                        ...S.pickTile,
-                        position: "relative",
-                        overflow: "hidden",
-                        background: `linear-gradient(135deg, ${team.primary_color || "#1f2937"}cc, rgba(15,23,42,.88))`,
-                        borderColor: "#ffffff",
-                        borderWidth: 1.5
-                      }}>
-                        {(team.logo_url || team.helmet_url) && <img src={team.logo_url || team.helmet_url} alt="" style={S.tileWatermark}/>}
-                        <b style={{ color: "#ffffff", fontWeight: 1000, position:"relative", zIndex:1 }}>{team.name}</b>
-                        <span style={{ color: "rgba(255,255,255,.82)", fontWeight: 850, position:"relative", zIndex:1 }}>{cleanConference(team.conference)}</span>
-                      </div>
-                    ))}
+        <aside style={D.rightRail}>
+          <div style={D.panel}>
+            <div style={D.kicker}>Pick History</div>
+            <h2 style={{margin:"4px 0 12px", fontSize:24}}>Round 1 Board</h2>
+            <div style={{display:"grid", gap:8, maxHeight:520, overflow:"auto", paddingRight:4}}>
+              {sortedPicks.map((pick)=>{
+                const team = pick.team_id ? teams.find((t)=>String(t.id)===String(pick.team_id)) || pick.teams : null;
+                const isCurrent = Number(pick.pick_number) === Number(currentPick?.pick_number);
+                const isStaged = pick.status === "pick_is_in";
+                return (
+                  <div key={pick.pick_number} style={{...D.pickRow, borderColor:isCurrent ? "rgba(96,165,250,.42)" : "rgba(255,255,255,.08)", background:isCurrent ? "rgba(37,99,235,.11)" : D.pickRow.background}}>
+                    <b style={{fontSize:18}}>#{pick.pick_number}</b>
+                    <div style={{minWidth:0}}>
+                      <b style={{display:"block", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{userName(pick)}</b>
+                      <small style={{color:"rgba(255,255,255,.62)", fontWeight:850}}>{team?.name || (isCurrent ? "On the clock" : "Awaiting pick")}</small>
+                    </div>
+                    {team ? <DraftBadge team={team} size={34}/> : <span style={D.tag}>{isCurrent ? "OTC" : "—"}</span>}
+                    {isStaged && <button style={{...D.button, gridColumn:"1 / -1"}} onClick={()=>handleRevealPick(pick.pick_number)}>Reveal Pick</button>}
                   </div>
-                )}
-              </div>
-            ))}
+                );
+              })}
+            </div>
           </div>
-        </div>
+
+          <div style={D.panel}>
+            <div style={D.kicker}>Conference Tracker</div>
+            <h2 style={{margin:"4px 0 12px", fontSize:24}}>Draft Distribution</h2>
+            <div style={D.confGrid}>
+              {allowedConferences.map((conf)=>(
+                <div key={conf} style={{...D.confCard, borderColor:lockedConferences.has(conf) ? "rgba(248,113,113,.30)" : "rgba(255,255,255,.08)"}}>
+                  <b>{conf}</b>
+                  <span style={{fontSize:24, fontWeight:1000}}>{conferenceCounts[conf] || 0}</span>
+                  <small style={{color:"rgba(255,255,255,.60)", fontWeight:850}}>{lockedConferences.has(conf) ? "Locked" : "Picked"}</small>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={D.panel}>
+            <div style={D.kicker}>Draft Analytics</div>
+            <div style={{display:"grid", gridTemplateColumns:"repeat(2, minmax(0,1fr))", gap:10, marginTop:10}}>
+              <div style={D.confCard}><small>Available</small><b style={{fontSize:24}}>{availableTeams.length}</b></div>
+              <div style={D.confCard}><small>Picked</small><b style={{fontSize:24}}>{pickedPicks.length}</b></div>
+              <div style={D.confCard}><small>Latest</small><b>{latestTeam?.name || "—"}</b></div>
+              <div style={D.confCard}><small>Selected</small><b>{selectedTeam?.name || "—"}</b></div>
+            </div>
+          </div>
+        </aside>
       </div>
     </section>
   );
