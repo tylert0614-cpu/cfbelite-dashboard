@@ -1615,7 +1615,7 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
   const champions = nationalChampions.filter((row)=>String(row.season_year)===String(currentYear)).length;
   const rankings = computerRankingRows(teams, results, assignments, users).slice(0,5);
   const headlines = [
-    ...recruiting.filter((r)=>String(r.season_year)===String(currentYear) && Number(r.rank)===1).slice(0,1).map((r)=>`${teamNameById(r.team_id, teams)} lands the #1 class`),
+    ...recruiting.filter((r)=>String(r.season_year)===String(currentYear) && Number(r.rank)===1).slice(0,1).map((r)=>`${teamNameById(r.team_id, teams)} lands the #1 recruiting class`),
     ...prestigeRows.slice(0,2).map((r,index)=>`${r.team.name} holds the #${index+1} prestige spot`),
     rankings[0] ? `${rankings[0].teamName} owns the #1 computer rank` : null,
     `${results.length} games recorded in ${currentYear}`,
@@ -1629,78 +1629,102 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
   });
 
   return (
-    <div style={dynastyShell}>
-      <section style={dynastyHero}>
-        <div>
-          <div style={heroKicker}>CFBELITE 27</div>
-          <h1 style={dynastyHeroTitle}>Dynasty Headquarters</h1>
-          <p style={dynastyHeroSub}>Year {currentYear} • {currentWeek}</p>
+    <div style={dashboardCanvasV24}>
+      <section style={heroV24}>
+        <div style={heroLogoLockupV24}>
+          <div style={heroLogoBoxV24}>CFB<span>27</span></div>
+          <div>
+            <div style={heroKickerV24}>CFBELITE 27</div>
+            <h1 style={heroTitleV24}>Dynasty Headquarters</h1>
+            <p style={heroSubV24}>Year {currentYear} • {currentWeek}</p>
+          </div>
         </div>
-        <div style={heroControls}>
+        <div style={heroControlsV24}>
           <select value={currentYear} onChange={(e)=>setCurrentYear(e.target.value)} style={input}>{YEARS.map((year)=><option key={year}>{year}</option>)}</select>
           <select value={currentWeek} onChange={(e)=>setCurrentWeek(e.target.value)} style={input}>{WEEKS.map((week)=><option key={week}>{week}</option>)}</select>
           <button style={button} onClick={saveSettings}>Save Year / Week</button>
         </div>
       </section>
 
-      <section style={kpiGridV23}>
-        <div style={kpiCardV23}><span>Coaches</span><b>32</b><small>Total league slots</small></div>
-        <div style={kpiCardV23}><span>Active Coaches</span><b>{activeCoachCount}</b><small>Currently assigned</small></div>
-        <div style={kpiCardV23}><span>Games Played</span><b>{results.length}</b><small>This season</small></div>
-        <div style={kpiCardV23}><span>National Champions</span><b>{champions}</b><small>{currentYear} season</small></div>
+      <section style={kpiRailV24}>
+        <div style={kpiV24}><span>Total Coaches</span><b>32</b><small>League slots</small></div>
+        <div style={kpiV24}><span>Active Coaches</span><b>{activeCoachCount}</b><small>Assigned users</small></div>
+        <div style={kpiV24}><span>Games Played</span><b>{results.length}</b><small>This season</small></div>
+        <div style={kpiV24}><span>National Champions</span><b>{champions}</b><small>{currentYear}</small></div>
       </section>
 
-      <section style={dashboardPanelGrid}>
-        <div style={mockPanel}>
-          <div style={panelHeaderV23}><div><div style={eyebrow}>CFBElite Automated Rankings</div><h2 style={panelTitleV23}>Top Computer Teams</h2></div><button style={smallGhostButton}>Full Rankings</button></div>
-          <div style={rankListV23}>
+      <section style={mainGridV24}>
+        <div style={panelV24}>
+          <div style={panelHeaderV24}>
+            <div><span>CFBELITE Automated Rankings</span><h2>Top Computer Teams</h2></div>
+            <button style={pillButtonV24}>Full Rankings</button>
+          </div>
+          <div style={rankingRowsV24}>
             {rankings.map((row,index)=>{
               const team = teams.find((team)=>team.id===row.team?.id) || row.team;
               return (
-                <button key={team?.id || row.teamName || index} style={rankRowV23} onClick={()=>team?.id && goToTeam(team.id)}>
-                  <span style={rankBadgeV23}>{index+1}</span>
-                  <TeamLogoMark team={team} size={30}/>
-                  <span>{row.teamName || team?.name}</span>
+                <button key={team?.id || row.teamName || index} style={rankingRowV24} onClick={()=>team?.id && goToTeam(team.id)}>
+                  <em>{index+1}</em>
+                  <TeamLogoMark team={team} size={34}/>
+                  <strong>{row.teamName || team?.name}</strong>
                   <b>{Number(row.score || row.rating || 0).toFixed(1)}</b>
                 </button>
               );
             })}
           </div>
-          <ComputerRankings teams={teams} results={results} currentWeek={currentWeek} sortState={sortState} setSortState={setSortState} assignments={assignments} users={users}/>
+          <div style={embeddedRankingsV24}>
+            <ComputerRankings teams={teams} results={results} currentWeek={currentWeek} sortState={sortState} setSortState={setSortState} assignments={assignments} users={users}/>
+          </div>
         </div>
 
-        <div style={mockPanel}>
-          <div style={panelHeaderV23}><div><div style={eyebrow}>Prestige Spotlight</div><h2 style={panelTitleV23}>Top 5 Programs</h2></div><button style={smallGhostButton}>Prestige</button></div>
-          <div style={rankListV23}>
+        <div style={panelV24}>
+          <div style={panelHeaderV24}>
+            <div><span>Prestige Spotlight</span><h2>Top 5 Programs</h2></div>
+            <button style={pillButtonV24}>Prestige</button>
+          </div>
+          <div style={rankingRowsV24}>
             {prestigeRows.map((row,index)=>(
-              <button key={row.team.id} style={rankRowV23} onClick={()=>goToTeam(row.team.id)}>
-                <span style={rankBadgeV23}>{index+1}</span>
-                <TeamLogoMark team={row.team} size={30}/>
-                <span>{row.team.name}</span>
+              <button key={row.team.id} style={rankingRowV24} onClick={()=>goToTeam(row.team.id)}>
+                <em>{index+1}</em>
+                <TeamLogoMark team={row.team} size={34}/>
+                <strong>{row.team.name}</strong>
                 <b>{row.score}</b>
               </button>
             ))}
           </div>
         </div>
 
-        <div style={mockPanel}>
-          <div style={panelHeaderV23}><div><div style={eyebrow}>Dynasty Headlines</div><h2 style={panelTitleV23}>The Wire</h2></div></div>
-          <div style={newsListV23}>
-            {headlines.map((headline,index)=><div key={index} style={newsItemV23}>🏈 {headline}<small>{index+1}h ago</small></div>)}
+        <div style={panelV24}>
+          <div style={panelHeaderV24}>
+            <div><span>Dynasty Headlines</span><h2>The Wire</h2></div>
+          </div>
+          <div style={newsStackV24}>
+            {headlines.map((headline,index)=>(
+              <div key={index} style={newsCardV24}>
+                <div style={newsIconV24}>🏈</div>
+                <div><b>{headline}</b><small>{index+1}h ago</small></div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      <section style={mockPanel}>
-        <div style={panelHeaderV23}><div><div style={eyebrow}>Conference Overview</div><h2 style={panelTitleV23}>League Map</h2></div></div>
-        <div style={conferenceCardsV23}>
+      <section style={panelV24}>
+        <div style={panelHeaderV24}>
+          <div><span>Conference Overview</span><h2>League Map</h2></div>
+        </div>
+        <div style={conferenceGridV24}>
           {[...confMap.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([conf, confTeams])=>{
             const activeTeams = confTeams.filter((team)=>activeAssignments.some((assignment)=>assignment.team_id===team.id));
             const sampleLogoTeam = activeTeams[0] || confTeams[0];
             return (
-              <div key={conf} style={conferenceCardV23}>
-                <div style={conferenceLogoCircle}><TeamLogoMark team={sampleLogoTeam} size={44}/></div>
-                <div><b>{conf}</b><span>{activeTeams.length} Coaches</span><span>{confTeams.length} Teams</span></div>
+              <div key={conf} style={conferenceV24}>
+                <div style={conferenceMarkV24}><TeamLogoMark team={sampleLogoTeam} size={42}/></div>
+                <div>
+                  <b>{conf}</b>
+                  <span>{activeTeams.length} Coaches</span>
+                  <small>{confTeams.length} teams</small>
+                </div>
               </div>
             );
           })}
@@ -4387,7 +4411,9 @@ function GlobalStyle() {
           display: none !important;
         }
       }
-    `}</style>
+    `}
+ 
+</style>
   );
 }
 
@@ -5243,8 +5269,8 @@ function MiniList({ title, rows }) { return <div style={miniCard}><h3>{title}</h
 function Table({ headers, children }) { return <div style={{overflowX:"auto",marginTop:20}}><table style={table}><thead><tr>{headers.map((h, index)=><th key={typeof h === "string" ? h : index} style={th}>{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div>; }
 function DeleteButton({ onClick }) { return <button onClick={onClick} style={deleteButton}>Delete</button>; }
 
-const page={minHeight:"100vh",width:"100%",background:"radial-gradient(circle at 18% -8%, rgba(86,45,168,.48), transparent 30%), radial-gradient(circle at 90% 4%, rgba(15,70,160,.34), transparent 28%), linear-gradient(135deg,#030614 0%,#071026 45%,#190735 100%)",color:"white",overflowX:"hidden",fontFamily:"Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"};
-const container={width:"100%",maxWidth:"none",margin:0,padding:"clamp(14px, 2vw, 28px)",boxSizing:"border-box"};
+const page={minHeight:"100vh",width:"100%",background:"radial-gradient(circle at 10% -8%, rgba(59,130,246,.20), transparent 28%), radial-gradient(circle at 85% 0%, rgba(124,58,237,.18), transparent 30%), linear-gradient(135deg,#020617 0%,#07111f 46%,#13051f 100%)",color:"white",overflowX:"hidden",fontFamily:"Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"};
+const container={width:"100%",maxWidth:"1640px",margin:"0 auto",padding:"clamp(14px, 2vw, 28px)",boxSizing:"border-box"};
 const header={display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,flexWrap:"wrap",gap:20,background:"linear-gradient(135deg, rgba(88,28,135,.55), rgba(15,23,42,.8))",border:"1px solid rgba(250,204,21,.35)",borderRadius:28,padding:"clamp(14px, 2vw, 24px)",boxShadow:"0 24px 80px rgba(0,0,0,.35)"};
 const brandWrap={display:"flex",flexDirection:"column",alignItems:"flex-start",gap:8,minWidth:0};
 const headerLogo={width:"clamp(170px, 28vw, 340px)",height:"auto",display:"block",objectFit:"contain",filter:"drop-shadow(0 16px 32px rgba(0,0,0,.45))"};
@@ -5256,19 +5282,19 @@ const tabRow={display:"flex",gap:8,width:"max-content"};
 const tabStyle={background:"rgba(30,27,75,.65)",color:"#e5e7eb",border:"1px solid rgba(255,255,255,.1)",borderRadius:14,padding:"10px 14px",fontWeight:800,cursor:"pointer",whiteSpace:"nowrap"};
 const activeTabStyle={...tabStyle,background:"linear-gradient(135deg,#6d28d9,#facc15)",border:"1px solid #fde68a",color:"#111827"};
 const statsGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))",gap:20,marginBottom:32};
-const statCard={background:"linear-gradient(145deg, rgba(27,26,73,.95), rgba(7,10,28,.98))",border:"1px solid rgba(250,204,21,.22)",borderRadius:22,padding:"clamp(18px, 2vw, 28px)",boxShadow:"0 22px 70px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.08)",minHeight:136};
+const statCard={background:"linear-gradient(145deg, rgba(15,23,42,.94), rgba(3,7,18,.985))",border:"1px solid rgba(96,165,250,.16)",borderRadius:18,padding:"clamp(18px, 2vw, 26px)",boxShadow:"0 18px 55px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.06)",minHeight:128};
 const statTitle={color:"#c4b5fd",fontSize:12,marginBottom:10,textTransform:"uppercase",letterSpacing:".08em",fontWeight:900};
 const statValue={fontSize:38,fontWeight:950,color:"#fff7ed"};
 const statInput={...statValue,background:"transparent",color:"white",border:"none",outline:"none",width:"100%"};
 const statSelect={background:"#111827",color:"#fff7ed",border:"1px solid rgba(250,204,21,.25)",borderRadius:12,padding:14,fontSize:24,fontWeight:900,width:"100%"};
-const card={background:"linear-gradient(145deg, rgba(12,18,43,.92), rgba(5,8,25,.985))",border:"1px solid rgba(148,163,184,.24)",borderRadius:22,padding:"clamp(18px, 2vw, 30px)",marginBottom:26,boxShadow:"0 26px 90px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.07)"};
+const card={background:"linear-gradient(145deg, rgba(8,13,31,.94), rgba(3,7,18,.985))",border:"1px solid rgba(148,163,184,.18)",borderRadius:20,padding:"clamp(18px, 2vw, 28px)",marginBottom:24,boxShadow:"0 24px 80px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.055)"};
 const sectionTop={display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"};
-const sectionTitle={fontSize:"clamp(25px, 3vw, 36px)",fontWeight:950,margin:0,color:"#fff7ed",letterSpacing:"-.03em"};
+const sectionTitle={fontSize:"clamp(22px, 2.2vw, 32px)",fontWeight:950,margin:0,color:"#f8fafc",letterSpacing:"-.035em"};
 const formGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))",gap:16,marginTop:20};
-const input={background:"rgba(5,10,28,.94)",border:"1px solid rgba(148,163,184,.30)",color:"#fff",padding:14,borderRadius:14,fontSize:15,width:"100%",boxSizing:"border-box",outline:"none",boxShadow:"inset 0 1px 0 rgba(255,255,255,.05)"};
+const input={background:"rgba(2,6,23,.86)",border:"1px solid rgba(148,163,184,.24)",color:"#fff",padding:13,borderRadius:12,fontSize:14,width:"100%",boxSizing:"border-box",outline:"none",boxShadow:"inset 0 1px 0 rgba(255,255,255,.045)"};
 const smallInput={...input,width:"120px",marginRight:8};
 const searchInput={...input,maxWidth:320};
-const button={background:"linear-gradient(135deg,#8b5cf6,#2563eb)",color:"#fff",border:"1px solid rgba(255,255,255,.18)",borderRadius:14,padding:14,fontWeight:950,cursor:"pointer",boxShadow:"0 14px 34px rgba(124,58,237,.30)"};
+const button={background:"linear-gradient(135deg,#2563eb,#7c3aed)",color:"#fff",border:"1px solid rgba(255,255,255,.14)",borderRadius:12,padding:13,fontWeight:950,cursor:"pointer",boxShadow:"0 14px 34px rgba(37,99,235,.24)"};
 const sortButton={background:"transparent",border:"none",color:"#c4b5fd",fontSize:13,textTransform:"uppercase",fontWeight:900,cursor:"pointer",padding:0};
 const deleteButton={background:"#7f1d1d",color:"white",border:"1px solid #ef4444",borderRadius:10,padding:"8px 10px",cursor:"pointer"};
 const table={width:"100%",borderCollapse:"separate",borderSpacing:0,minWidth:820};
@@ -7100,28 +7126,30 @@ const dynastyHero = {
 };
 
 const heroKicker = {
-  color: "#93c5fd",
-  fontSize: "clamp(22px, 3vw, 42px)",
+  color: "#60a5fa",
+  fontSize: "clamp(18px, 2.1vw, 30px)",
   fontWeight: 1000,
-  letterSpacing: ".09em",
+  letterSpacing: ".12em",
   textTransform: "uppercase",
 };
 
 const dynastyHeroTitle = {
-  fontSize: "clamp(48px, 8vw, 104px)",
-  fontWeight: 1000,
-  lineHeight: .82,
-  letterSpacing: "-.075em",
-  margin: "8px 0",
+  fontSize: "clamp(40px, 5.6vw, 78px)",
+  fontWeight: 950,
+  lineHeight: 1.02,
+  letterSpacing: "-.045em",
+  margin: "8px 0 4px",
   color: "#fff",
-  textShadow: "0 0 38px rgba(96,165,250,.22)",
+  textShadow: "0 0 34px rgba(96,165,250,.20)",
+  maxWidth: "100%",
 };
 
 const dynastyHeroSub = {
-  color: "rgba(255,255,255,.72)",
-  fontSize: "clamp(18px, 2vw, 28px)",
-  fontWeight: 850,
+  color: "rgba(226,232,240,.82)",
+  fontSize: "clamp(17px, 1.7vw, 24px)",
+  fontWeight: 900,
   margin: 0,
+  letterSpacing: "-.015em",
 };
 
 const heroControls = {
@@ -7332,3 +7360,207 @@ const hofProgressFill = {
   borderRadius: 999,
   background: "linear-gradient(90deg,#facc15,#22c55e)",
 };
+
+
+const dashboardCanvasV24 = {
+  display: "grid",
+  gap: 18,
+};
+
+const heroV24 = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0,1fr) minmax(260px, 390px)",
+  gap: 20,
+  alignItems: "center",
+  padding: "clamp(22px, 3vw, 38px)",
+  borderRadius: 24,
+  border: "1px solid rgba(96,165,250,.20)",
+  background: "radial-gradient(circle at 18% 0%, rgba(96,165,250,.24), transparent 28%), radial-gradient(circle at 88% 20%, rgba(124,58,237,.22), transparent 34%), linear-gradient(135deg, rgba(3,7,18,.96), rgba(10,18,38,.98))",
+  boxShadow: "0 28px 90px rgba(0,0,0,.50), inset 0 1px 0 rgba(255,255,255,.07)",
+  overflow: "hidden",
+};
+
+const heroLogoLockupV24 = {
+  display: "flex",
+  alignItems: "center",
+  gap: 20,
+  minWidth: 0,
+};
+
+const heroLogoBoxV24 = {
+  width: "clamp(72px, 9vw, 118px)",
+  height: "clamp(72px, 9vw, 118px)",
+  borderRadius: 22,
+  display: "grid",
+  placeItems: "center",
+  background: "linear-gradient(145deg, rgba(15,23,42,.86), rgba(2,6,23,.95))",
+  border: "1px solid rgba(255,255,255,.14)",
+  fontSize: "clamp(21px, 2.7vw, 36px)",
+  fontWeight: 1000,
+  letterSpacing: "-.06em",
+  color: "#fff",
+  boxShadow: "0 20px 50px rgba(0,0,0,.32)",
+};
+
+const heroKickerV24 = {
+  color: "#60a5fa",
+  fontSize: "clamp(15px, 1.35vw, 21px)",
+  fontWeight: 1000,
+  letterSpacing: ".14em",
+  textTransform: "uppercase",
+};
+
+const heroTitleV24 = {
+  fontSize: "clamp(36px, 5vw, 72px)",
+  fontWeight: 1000,
+  lineHeight: .94,
+  letterSpacing: "-.055em",
+  margin: "5px 0 4px",
+  color: "#f8fafc",
+};
+
+const heroSubV24 = {
+  margin: 0,
+  color: "rgba(226,232,240,.78)",
+  fontSize: "clamp(17px, 1.8vw, 24px)",
+  fontWeight: 900,
+};
+
+const heroControlsV24 = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: 10,
+  padding: 14,
+  borderRadius: 18,
+  background: "rgba(2,6,23,.44)",
+  border: "1px solid rgba(255,255,255,.09)",
+};
+
+const kpiRailV24 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+  gap: 12,
+};
+
+const kpiV24 = {
+  minHeight: 116,
+  borderRadius: 18,
+  padding: 18,
+  background: "linear-gradient(145deg, rgba(15,23,42,.92), rgba(3,7,18,.985))",
+  border: "1px solid rgba(96,165,250,.14)",
+  boxShadow: "0 18px 55px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.055)",
+  display: "grid",
+  gap: 6,
+};
+
+const mainGridV24 = {
+  display: "grid",
+  gridTemplateColumns: "minmax(320px,1.15fr) minmax(300px,.92fr) minmax(300px,.92fr)",
+  gap: 16,
+};
+
+const panelV24 = {
+  borderRadius: 20,
+  padding: 16,
+  background: "linear-gradient(145deg, rgba(8,13,31,.96), rgba(3,7,18,.99))",
+  border: "1px solid rgba(148,163,184,.18)",
+  boxShadow: "0 24px 80px rgba(0,0,0,.40), inset 0 1px 0 rgba(255,255,255,.055)",
+  overflow: "hidden",
+};
+
+const panelHeaderV24 = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+  marginBottom: 14,
+};
+
+const pillButtonV24 = {
+  border: "1px solid rgba(96,165,250,.20)",
+  background: "rgba(15,23,42,.62)",
+  color: "#dbeafe",
+  borderRadius: 999,
+  padding: "8px 12px",
+  fontWeight: 900,
+};
+
+const rankingRowsV24 = {
+  display: "grid",
+  gap: 8,
+};
+
+const rankingRowV24 = {
+  width: "100%",
+  border: "1px solid rgba(255,255,255,.09)",
+  background: "rgba(255,255,255,.04)",
+  color: "#fff",
+  borderRadius: 13,
+  padding: "10px 11px",
+  display: "grid",
+  gridTemplateColumns: "28px 38px minmax(0,1fr) auto",
+  gap: 10,
+  alignItems: "center",
+  textAlign: "left",
+  cursor: "pointer",
+};
+
+const embeddedRankingsV24 = {
+  marginTop: 12,
+  maxHeight: 420,
+  overflow: "auto",
+  borderTop: "1px solid rgba(255,255,255,.08)",
+  paddingTop: 10,
+};
+
+const newsStackV24 = {
+  display: "grid",
+  gap: 10,
+};
+
+const newsCardV24 = {
+  display: "grid",
+  gridTemplateColumns: "38px minmax(0,1fr)",
+  gap: 10,
+  alignItems: "center",
+  borderRadius: 14,
+  padding: 12,
+  background: "rgba(255,255,255,.04)",
+  border: "1px solid rgba(255,255,255,.09)",
+};
+
+const newsIconV24 = {
+  width: 34,
+  height: 34,
+  display: "grid",
+  placeItems: "center",
+  borderRadius: 10,
+  background: "rgba(96,165,250,.12)",
+};
+
+const conferenceGridV24 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+  gap: 12,
+};
+
+const conferenceV24 = {
+  display: "flex",
+  gap: 12,
+  alignItems: "center",
+  borderRadius: 15,
+  padding: 13,
+  background: "rgba(255,255,255,.04)",
+  border: "1px solid rgba(255,255,255,.09)",
+};
+
+const conferenceMarkV24 = {
+  width: 54,
+  height: 54,
+  display: "grid",
+  placeItems: "center",
+  borderRadius: 15,
+  background: "rgba(255,255,255,.055)",
+  border: "1px solid rgba(255,255,255,.09)",
+};
+
