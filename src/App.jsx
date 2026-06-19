@@ -1341,7 +1341,7 @@ function Rivalries({ users, teams, assignments, results }) {
 }
 
 function DynastyRecords({ users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting, seasonPlayerStats = [], teamSeasonStats = [] }) {
-  const records = recordBookRows(users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting, seasonPlayerStats, teamSeasonStats);
+  const records = recordBookRows(users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting, seasonPlayerStats || [], teamSeasonStats || []);
 
   return (
     <section style={card}>
@@ -4496,7 +4496,7 @@ function PrestigeLeaderboard({ users, teams, activeTeams, assignments, results, 
   );
 }
 
-function RecordBook({ users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting }) {
+function RecordBook({ users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting, seasonPlayerStats = [], teamSeasonStats = [] }) {
   const rows = recordBookRows(users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting, seasonPlayerStats, teamSeasonStats);
 
   return (
