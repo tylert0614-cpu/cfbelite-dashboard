@@ -141,6 +141,12 @@ function ChampionshipRings({ count = 0 }) {
   return <span style={ringRow}>{Array.from({length:safe}, (_,i)=><span key={i} title="National Championship">💍</span>)}</span>;
 }
 
+function TeamLogoMark({ team, size = 34, faded = false }) {
+  const url = team?.logo_url || team?.helmet_url;
+  if (!url) return null;
+  return <img src={url} alt="" style={{ width:size, height:size, objectFit:"contain", opacity:faded ? .22 : 1, filter:faded ? "grayscale(.12)" : "none" }}/>;
+}
+
 function TeamLabel({ team, name }) {
   const displayName = name || team?.name || team?.team_name || "—";
   const helmetUrl = getHelmetUrl(team);
@@ -443,11 +449,31 @@ function recordBookRows(users, teams, assignments, results, allAmericans, awards
 
     tiedBest(teamSeasonStats.map((row)=>({label: `${teamNameById(row.team_id, teams)} (${row.season_year})`, total_offense: row.total_offense || 0})), "total_offense", "Team Stats: Most Total Offense", (value)=>Number(value).toLocaleString(), 1),
     tiedBest(teamSeasonStats.map((row)=>({label: `${teamNameById(row.team_id, teams)} (${row.season_year})`, points_per_game: row.points_per_game || 0})), "points_per_game", "Team Stats: Highest PPG", (value)=>Number(value).toFixed(1), 0.1),
-    tiedBest(teamSeasonStats.map((row)=>({label: `${teamNameById(row.team_id, teams)} (${row.season_year})`, defensive_ppg_allowed: row.defensive_ppg_allowed ? 1000-Number(row.defensive_ppg_allowed) : 0, actual: row.defensive_ppg_allowed})), "defensive_ppg_allowed", "Team Stats: Best Defense PPG", (value,row)=>Number(row.actual).toFixed(1), 1),
+    tiedBest(teamSeasonStats.map((row)=>({label: `${teamNameById(row.team_id, teams)} (${row.season_year})`, total_ppg_allowed: row.total_ppg_allowed ? 1000-Number(row.total_ppg_allowed) : 0, actual: row.total_ppg_allowed})), "total_ppg_allowed", "Team Stats: Best Total PPG Allowed", (value,row)=>Number(row.actual).toFixed(1), 1),
     tiedBest(teamSeasonStats.map((row)=>({label: `${teamNameById(row.team_id, teams)} (${row.season_year})`, turnover_margin: row.turnover_margin || 0})), "turnover_margin", "Team Stats: Best Turnover Margin", (value)=>`+${value}`, 1),
     tiedBest(seasonPlayerStats.map((row)=>({label: `${row.player_name} (${row.season_year})`, pass_yards: row.pass_yards || 0})), "pass_yards", "Player Stats: Most Pass Yards", (value)=>Number(value).toLocaleString(), 1),
     tiedBest(seasonPlayerStats.map((row)=>({label: `${row.player_name} (${row.season_year})`, rush_yards: row.rush_yards || 0})), "rush_yards", "Player Stats: Most Rush Yards", (value)=>Number(value).toLocaleString(), 1),
     tiedBest(seasonPlayerStats.map((row)=>({label: `${row.player_name} (${row.season_year})`, rec_yards: row.rec_yards || 0})), "rec_yards", "Player Stats: Most Receiving Yards", (value)=>Number(value).toLocaleString(), 1),
+
+    // Records 2.0: Team Offense / Defense / Turnovers
+    tiedBest(teamSeasonStats.map((row)=>({label: `${teamNameById(row.team_id, teams)} (${row.season_year})`, value: row.points_per_game || 0})), "value", "Team Record: Highest PPG", (value)=>Number(value).toFixed(1), 0.1),
+    tiedBest(teamSeasonStats.map((row)=>({label: `${teamNameById(row.team_id, teams)} (${row.season_year})`, value: row.total_offense || 0})), "value", "Team Record: Most Total Offense", (value)=>Number(value).toLocaleString(), 1),
+    tiedBest(teamSeasonStats.map((row)=>({label: `${teamNameById(row.team_id, teams)} (${row.season_year})`, value: row.takeaways || 0})), "value", "Team Record: Most Takeaways", (value)=>Number(value).toLocaleString(), 1),
+    tiedBest(teamSeasonStats.map((row)=>({label: `${teamNameById(row.team_id, teams)} (${row.season_year})`, value: row.turnover_margin || 0})), "value", "Team Record: Best Turnover Margin", (value)=>Number(value) >= 0 ? `+${value}` : value, 1),
+    tiedBest(teamSeasonStats.map((row)=>({label: `${teamNameById(row.team_id, teams)} (${row.season_year})`, value: row.sacks || 0})), "value", "Team Record: Most Sacks", (value)=>Number(value).toLocaleString(), 1),
+    tiedBest(teamSeasonStats.map((row)=>({label: `${teamNameById(row.team_id, teams)} (${row.season_year})`, value: row.tfls || 0})), "value", "Team Record: Most TFLs", (value)=>Number(value).toLocaleString(), 1),
+    tiedBest(teamSeasonStats.map((row)=>({label: `${teamNameById(row.team_id, teams)} (${row.season_year})`, value: row.total_ppg_allowed ? 1000 - Number(row.total_ppg_allowed) : 0, actual: row.total_ppg_allowed})), "value", "Team Record: Lowest PPG Allowed", (value,row)=>row.actual ? Number(row.actual).toFixed(1) : "—", 1),
+
+    // Records 2.0: Player Offense / Defense
+    tiedBest(seasonPlayerStats.map((row)=>({label: `${row.player_name} (${row.season_year})`, value: row.pass_yards || 0})), "value", "Player Record: Passing Yards", (value)=>Number(value).toLocaleString(), 1),
+    tiedBest(seasonPlayerStats.map((row)=>({label: `${row.player_name} (${row.season_year})`, value: row.pass_tds || 0})), "value", "Player Record: Passing TDs", (value)=>Number(value).toLocaleString(), 1),
+    tiedBest(seasonPlayerStats.map((row)=>({label: `${row.player_name} (${row.season_year})`, value: row.rush_yards || 0})), "value", "Player Record: Rushing Yards", (value)=>Number(value).toLocaleString(), 1),
+    tiedBest(seasonPlayerStats.map((row)=>({label: `${row.player_name} (${row.season_year})`, value: row.rush_tds || 0})), "value", "Player Record: Rushing TDs", (value)=>Number(value).toLocaleString(), 1),
+    tiedBest(seasonPlayerStats.map((row)=>({label: `${row.player_name} (${row.season_year})`, value: row.rec_yards || 0})), "value", "Player Record: Receiving Yards", (value)=>Number(value).toLocaleString(), 1),
+    tiedBest(seasonPlayerStats.map((row)=>({label: `${row.player_name} (${row.season_year})`, value: row.rec_tds || 0})), "value", "Player Record: Receiving TDs", (value)=>Number(value).toLocaleString(), 1),
+    tiedBest(seasonPlayerStats.map((row)=>({label: `${row.player_name} (${row.season_year})`, value: row.tackles || 0})), "value", "Player Record: Tackles", (value)=>Number(value).toLocaleString(), 1),
+    tiedBest(seasonPlayerStats.map((row)=>({label: `${row.player_name} (${row.season_year})`, value: row.sacks || 0})), "value", "Player Record: Sacks", (value)=>Number(value).toLocaleString(), 1),
+    tiedBest(seasonPlayerStats.map((row)=>({label: `${row.player_name} (${row.season_year})`, value: row.interceptions_def || 0})), "value", "Player Record: Interceptions", (value)=>Number(value).toLocaleString(), 1),
   ];
 }
 
@@ -2724,7 +2750,7 @@ function MassDataEntry({ teams, users, currentYear, currentWeek, setError, loadD
   const [activeForm, setActiveForm] = useState("player");
   const [scoreForm, setScoreForm] = useState({ season_year: currentYear, week: currentWeek, team_1_id: "", team_2_id: "", team_1_score: "", team_2_score: "", team_1_rank: "", team_2_rank: "" });
   const [seasonForm, setSeasonForm] = useState({ season_year: currentYear, player_name: "", discord_user_id: "", team_id: "", position: "QB", games: "", pass_yards: "", pass_tds: "", interceptions: "", rush_yards: "", rush_tds: "", receptions: "", rec_yards: "", rec_tds: "", tackles: "", sacks: "", interceptions_def: "", forced_fumbles: "", fumble_recoveries: "" });
-  const [teamForm, setTeamForm] = useState({ season_year: currentYear, team_id: "", discord_user_id: "", games: "", wins: "", losses: "", points_per_game: "", total_offense: "", pass_yards: "", rush_yards: "", defensive_ppg_allowed: "", yards_allowed: "", pass_yards_allowed: "", rush_yards_allowed: "", sacks: "", turnovers: "", takeaways: "", turnover_margin: "" });
+  const [teamForm, setTeamForm] = useState({ season_year: currentYear, team_id: "", discord_user_id: "", games: "", wins: "", losses: "", points_per_game: "", total_offense: "", pass_yards: "", rush_yards: "", avg_total_yards_allowed: "", total_ppg_allowed: "", avg_rush_yards_allowed: "", avg_pass_yards_allowed: "", sacks: "", tfls: "", turnovers: "", takeaways: "", turnover_margin: "" });
   const [recruitRows, setRecruitRows] = useState([]);
 
   useEffect(() => {
@@ -2826,11 +2852,12 @@ function MassDataEntry({ teams, users, currentYear, currentWeek, setError, loadD
       total_offense: n(teamForm.total_offense),
       pass_yards: n(teamForm.pass_yards),
       rush_yards: n(teamForm.rush_yards),
-      defensive_ppg_allowed: n(teamForm.defensive_ppg_allowed),
-      yards_allowed: n(teamForm.yards_allowed),
-      pass_yards_allowed: n(teamForm.pass_yards_allowed),
-      rush_yards_allowed: n(teamForm.rush_yards_allowed),
+      avg_total_yards_allowed: n(teamForm.avg_total_yards_allowed),
+      total_ppg_allowed: n(teamForm.total_ppg_allowed),
+      avg_rush_yards_allowed: n(teamForm.avg_rush_yards_allowed),
+      avg_pass_yards_allowed: n(teamForm.avg_pass_yards_allowed),
       sacks: n(teamForm.sacks),
+      tfls: n(teamForm.tfls),
       turnovers: n(teamForm.turnovers),
       takeaways: n(teamForm.takeaways),
       turnover_margin: n(teamForm.turnover_margin),
@@ -2842,7 +2869,7 @@ function MassDataEntry({ teams, users, currentYear, currentWeek, setError, loadD
       return;
     }
 
-    setTeamForm({ season_year: currentYear, team_id: "", discord_user_id: "", games: "", wins: "", losses: "", points_per_game: "", total_offense: "", pass_yards: "", rush_yards: "", defensive_ppg_allowed: "", yards_allowed: "", pass_yards_allowed: "", rush_yards_allowed: "", sacks: "", turnovers: "", takeaways: "", turnover_margin: "" });
+    setTeamForm({ season_year: currentYear, team_id: "", discord_user_id: "", games: "", wins: "", losses: "", points_per_game: "", total_offense: "", pass_yards: "", rush_yards: "", avg_total_yards_allowed: "", total_ppg_allowed: "", avg_rush_yards_allowed: "", avg_pass_yards_allowed: "", sacks: "", tfls: "", turnovers: "", takeaways: "", turnover_margin: "" });
     setError("Team season stats saved.");
     await loadData();
   }
@@ -2917,7 +2944,7 @@ function MassDataEntry({ teams, users, currentYear, currentWeek, setError, loadD
             <select style={input} value={teamForm.team_id} onChange={(e) => setTeamForm({ ...teamForm, team_id: e.target.value })}><option value="">Team</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
             <select style={input} value={teamForm.discord_user_id} onChange={(e) => setTeamForm({ ...teamForm, discord_user_id: e.target.value })}><option value="">Discord User</option>{users.map((user) => <option key={user.id} value={user.id}>{user.discord_username}</option>)}</select>
             <select style={input} value={teamForm.season_year} onChange={(e) => setTeamForm({ ...teamForm, season_year: e.target.value })}>{YEARS.map((year) => <option key={year}>{year}</option>)}</select>
-            {["games","wins","losses","points_per_game","total_offense","pass_yards","rush_yards","defensive_ppg_allowed","yards_allowed","pass_yards_allowed","rush_yards_allowed","sacks","turnovers","takeaways","turnover_margin"].map((field) => (
+            {["games","wins","losses","points_per_game","total_offense","pass_yards","rush_yards","avg_total_yards_allowed","total_ppg_allowed","avg_rush_yards_allowed","avg_pass_yards_allowed","sacks","tfls","turnovers","takeaways","turnover_margin"].map((field) => (
               <input key={field} style={input} value={teamForm[field]} onChange={(e) => setTeamForm({ ...teamForm, [field]: e.target.value })} placeholder={field.replaceAll("_", " ")} />
             ))}
           </div>
@@ -3013,16 +3040,16 @@ function TeamStatsPage({ rows, teams, users, deleteRow }) {
   });
 
   return (
-    <section style={broadcastCard}>
+    <section style={broadcastPageCard}>
       <div style={sectionTop}>
         <div>
           <h2 style={sectionTitle}>Team Season Stats</h2>
-          <p style={mutedText}>Offense, defense, and turnover/takeaway team stats by season.</p>
+          <p style={mutedText}>Offense, defense, TFLs, turnovers, and takeaways by season.</p>
         </div>
         <SearchBox value={searchText} onChange={setSearchText}/>
       </div>
 
-      <Table headers={["Year","Team","Discord User","G","W","L","PPG","Total OFF","Pass Yds","Rush Yds","DEF PPG","Yds Allowed","Pass Allowed","Rush Allowed","Sacks","TO","Takeaways","TO Margin",""]}>
+      <Table headers={["Year","Team","Discord User","G","W","L","PPG","Total OFF","Pass Yds","Rush Yds","Avg Yds Allowed","Total PPG Allowed","Avg Rush Allowed","Avg Pass Allowed","Sacks","TFL","TO","Takeaways","TO Margin",""]}>
         {filtered.map((row) => (
           <tr key={row.id} style={trStyle}>
             <td style={td}>{row.season_year}</td>
@@ -3035,11 +3062,12 @@ function TeamStatsPage({ rows, teams, users, deleteRow }) {
             <td style={td}>{row.total_offense ?? "—"}</td>
             <td style={td}>{row.pass_yards ?? "—"}</td>
             <td style={td}>{row.rush_yards ?? "—"}</td>
-            <td style={td}>{row.defensive_ppg_allowed ?? "—"}</td>
-            <td style={td}>{row.yards_allowed ?? "—"}</td>
-            <td style={td}>{row.pass_yards_allowed ?? "—"}</td>
-            <td style={td}>{row.rush_yards_allowed ?? "—"}</td>
+            <td style={td}>{row.avg_total_yards_allowed ?? "—"}</td>
+            <td style={td}>{row.total_ppg_allowed ?? "—"}</td>
+            <td style={td}>{row.avg_rush_yards_allowed ?? "—"}</td>
+            <td style={td}>{row.avg_pass_yards_allowed ?? "—"}</td>
             <td style={td}>{row.sacks ?? "—"}</td>
+            <td style={td}>{row.tfls ?? "—"}</td>
             <td style={td}>{row.turnovers ?? "—"}</td>
             <td style={td}>{row.takeaways ?? "—"}</td>
             <td style={td}>{row.turnover_margin ?? "—"}</td>
@@ -3612,6 +3640,8 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
   const coachHeismans = rowsForCoachUser(heismans, user, assignments);
   const coachEloRow = userEloRows(usersFallback(user), assignments, results).find((row)=>row.user.id === user.id);
   const coachTier = userTierFromElo(coachEloRow?.elo || 1500, 1);
+  const coachPrestigeScore = Math.min(100, Math.round((stats?.prestige || stats?.rawPrestige || stats?.totalScore || 0) / 2.5));
+  const coachPrestigeTier = typeof dynastyPrestigeTier === "function" ? dynastyPrestigeTier(coachPrestigeScore) : { stars: "⭐", label: "1-Star Coach" };
   const superlatives = coachSuperlatives(user, users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
   const currentSeasonRecord = currentTeam ? recordFromResults(currentTeam.id, results.filter((row)=>String(row.season_year) === String(new Date().getFullYear()))) : { wins:0, losses:0 };
 
@@ -3639,6 +3669,19 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
         <span style={teamBadgeBubble}>{coachTier.label}</span>
       </div>
     </div>
+    <div style={coachHero2}>
+      <div style={coachHeroLogoBox}>{currentTeam ? <TeamLogoMark team={currentTeam} size={96}/> : "CFB"}</div>
+      <div>
+        <div style={eyebrow}>Coach Profile 2.0</div>
+        <div style={coachHeroName}>{user.discord_username}</div>
+        <div style={mutedText}>Current Team: <b>{currentTeam?.name || "Unassigned"}</b></div>
+      </div>
+      <div style={coachHeroBadges}>
+        <span style={teamBadgeBubble}>{coachPrestigeTier.stars} {coachPrestigeTier.label}</span>
+        <span style={teamBadgeBubble}>Prestige {coachPrestigeScore}</span>
+        <span style={teamBadgeBubble}>{stats?.wins||0}-{stats?.losses||0}</span>
+      </div>
+    </div>
     <CoachRings stats={stats} superlatives={superlatives}/>
     <div style={twoCol}>
       <div style={miniCard}>
@@ -3646,7 +3689,7 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
         <div style={miniRow}>Player stat seasons recorded: <b>{coachPlayerStats.length}</b></div>
         <div style={miniRow}>Team stat seasons recorded: <b>{coachTeamStats.length}</b></div>
         <div style={miniRow}>Best team offense: <b>{coachTeamStats.length ? Math.max(...coachTeamStats.map((row)=>Number(row.total_offense || 0))) : "—"}</b></div>
-        <div style={miniRow}>Best defense PPG allowed: <b>{coachTeamStats.length ? Math.min(...coachTeamStats.map((row)=>Number(row.defensive_ppg_allowed || 999)).filter(Boolean)) : "—"}</b></div>
+        <div style={miniRow}>Best total PPG allowed: <b>{coachTeamStats.length ? Math.min(...coachTeamStats.map((row)=>Number(row.total_ppg_allowed || 999)).filter(Boolean)) : "—"}</b></div>
       </div>
       <MiniList title="Recent Player Stat Seasons" rows={coachPlayerStats.slice(0,8).map((row)=>`${row.season_year} ${row.player_name} · ${row.position} · ${row.teams?.name || teamNameById(row.team_id, teams)}`)}/>
     </div>
@@ -4108,6 +4151,37 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
     </>
   );
 }
+function PrestigeSpotlight({ teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats }) {
+  const rows = typeof dynastyPrestigeRows === "function" ? dynastyPrestigeRows(teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats).slice(0,5) : [];
+  if (!rows.length) return null;
+
+  return (
+    <section style={prestigeSpotlight}>
+      <div style={sectionTop}>
+        <div>
+          <div style={eyebrow}>Prestige Spotlight</div>
+          <h2 style={sectionTitle}>Dynasty Power Programs</h2>
+        </div>
+      </div>
+      <div style={prestigeSpotlightGrid}>
+        {rows.map((row,index)=>(
+          <div key={row.team.id} style={prestigeSpotlightCard}>
+            <div style={leaderRow}><b>#{index+1}</b><span>{row.tier.stars}</span></div>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              <TeamLogoMark team={row.team} size={54}/>
+              <div>
+                <div style={prestigeTeamName}>{row.team.name}</div>
+                <div style={mutedText}>{row.tier.label}</div>
+              </div>
+            </div>
+            <div style={prestigeScore}>{row.score}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function Stats({ currentYear, setCurrentYear, currentWeek, setCurrentWeek, teams, assignments, saveSettings }) {
   const validTeamIds = new Set(teams.map((team)=>team.id));
   const activeCoaches = new Set(
@@ -4734,13 +4808,24 @@ function TeamPage({ team, standings, results, allResults, teams, assignments, al
   const teamCoachBanner = { ...coachBanner, color: secondaryColor, border: `1px solid ${secondaryColor}` };
   const teamCoachNameStyle = { ...coachNameStyle, color: secondaryColor };
 
-  return <section style={teamPageStyle}><h2 style={teamSectionTitle}><TeamLabel team={team} /></h2><div style={teamCoachBanner}><div><div style={statTitle}>Current Discord User / Coach</div><div style={teamCoachNameStyle}>{coachName}</div></div><div><div style={statTitle}>Program Page</div><div style={mutedText}>Team history and coach profile combined.</div></div></div><div style={statsGrid}><Stat title="Overall" value={`${stat.wins??0}-${stat.losses??0}`}/><Stat title="Avg PF" value={rec.avgPf}/><Stat title="Avg PA" value={rec.avgPa}/><Stat title="Top 25" value={top25Wins(team.id, results)}/><Stat title="Top 25 Class" value={recruiting.filter((r)=>Number(r.rank) >= 1 && Number(r.rank) <= 25).length}/><Stat title="Awards" value={awards.length}/><Stat title="All-Americans" value={allAmericans.length}/><Stat title="Heismans" value={heismans.length}/><Stat title="Conf Titles" value={titleCount(team.id, results, "Conference Championship Week")}/><Stat title="Nattys" value={titleCount(team.id, results, "National Championship Week")}/><Stat title="Bowl" value={`${bowl.wins}-${bowl.losses}`}/><Stat title="SOR" value={strengthOfResult(team.id, teams, allResults)}/></div><div style={twoCol}><div style={miniCard}><h3>Recruiting Rankings</h3><div style={formGrid}><input placeholder="Year" value={newRecruiting.season_year} onChange={(e)=>setNewRecruiting({...newRecruiting,season_year:e.target.value})} style={input}/><input placeholder="Rank" value={newRecruiting.rank} onChange={(e)=>setNewRecruiting({...newRecruiting,rank:e.target.value})} style={input}/><button onClick={()=>addRecruiting(team.id)} style={button}>Add</button></div>{recruiting.map((r)=><div key={r.id} style={miniRow}>{r.season_year}: #{r.rank} <DeleteButton onClick={()=>deleteRow("recruiting_classes",r.id)}/></div>)}</div><div style={miniCard}><h3>History</h3><div style={formGrid}><input placeholder="Year" value={newHistory.season_year} onChange={(e)=>setNewHistory({...newHistory,season_year:e.target.value})} style={input}/><input placeholder="Record" value={newHistory.record} onChange={(e)=>setNewHistory({...newHistory,record:e.target.value})} style={input}/><button onClick={()=>addHistory(team.id)} style={button}>Add</button></div>{historyRows.map((r)=><div key={r.id} style={miniRow}><input value={r.season_year} onChange={(e)=>updateRow("team_history_records",r.id,"season_year",Number(e.target.value))} style={smallInput}/><input value={r.record || ""} onChange={(e)=>updateRow("team_history_records",r.id,"record",e.target.value)} style={smallInput}/><DeleteButton onClick={()=>deleteRow("team_history_records",r.id)}/></div>)}</div></div><Results rows={results} deleteResult={()=>{}} search="" setSearch={()=>{}}/><div style={twoCol}><MiniList title="All-Americans" rows={allAmericans.map((r)=>`${r.player_name} — ${r.type}, ${r.position}, ${r.season_year}`)}/><MiniList title="Awards" rows={awards.map((r)=>`${r.player_name} — ${r.award_name}, ${r.position}, ${r.season_year}`)}/><MiniList title="Heisman Winners" rows={heismans.map((r)=>`${r.player_name} — ${r.position}, ${r.season_year}`)}/></div></section>;
+  return <section style={teamPageStyle}><h2 style={teamSectionTitle}><TeamLabel team={team} /></h2><div style={teamCoachBanner}><div><div style={statTitle}>Current Discord User / Coach</div><div style={teamCoachNameStyle}>{coachName}</div></div><div><div style={statTitle}>Program Page</div><div style={mutedText}>Team history and coach profile combined.</div></div></div><div style={teamEncyclopediaPanel}>
+    <div><div style={eyebrow}>Team Encyclopedia</div><h3 style={miniTitle}>Program Snapshot</h3></div>
+    <div style={programRingRow}>
+      <span>Coach: <b>{coachName}</b></span>
+      <span>Recruiting Classes: <b>{recruiting.length}</b></span>
+      <span>Awards: <b>{awards.length}</b></span>
+      <span>All-Americans: <b>{allAmericans.length}</b></span>
+      <span>Heismans: <b>{heismans.length}</b></span>
+      <span>History Rows: <b>{historyRows.length}</b></span>
+    </div>
+  </div>
+  <div style={statsGrid}><Stat title="Overall" value={`${stat.wins??0}-${stat.losses??0}`}/><Stat title="Avg PF" value={rec.avgPf}/><Stat title="Avg PA" value={rec.avgPa}/><Stat title="Top 25" value={top25Wins(team.id, results)}/><Stat title="Top 25 Class" value={recruiting.filter((r)=>Number(r.rank) >= 1 && Number(r.rank) <= 25).length}/><Stat title="Awards" value={awards.length}/><Stat title="All-Americans" value={allAmericans.length}/><Stat title="Heismans" value={heismans.length}/><Stat title="Conf Titles" value={titleCount(team.id, results, "Conference Championship Week")}/><Stat title="Nattys" value={titleCount(team.id, results, "National Championship Week")}/><Stat title="Bowl" value={`${bowl.wins}-${bowl.losses}`}/><Stat title="SOR" value={strengthOfResult(team.id, teams, allResults)}/></div><div style={twoCol}><div style={miniCard}><h3>Recruiting Rankings</h3><div style={formGrid}><input placeholder="Year" value={newRecruiting.season_year} onChange={(e)=>setNewRecruiting({...newRecruiting,season_year:e.target.value})} style={input}/><input placeholder="Rank" value={newRecruiting.rank} onChange={(e)=>setNewRecruiting({...newRecruiting,rank:e.target.value})} style={input}/><button onClick={()=>addRecruiting(team.id)} style={button}>Add</button></div>{recruiting.map((r)=><div key={r.id} style={miniRow}>{r.season_year}: #{r.rank} <DeleteButton onClick={()=>deleteRow("recruiting_classes",r.id)}/></div>)}</div><div style={miniCard}><h3>History</h3><div style={formGrid}><input placeholder="Year" value={newHistory.season_year} onChange={(e)=>setNewHistory({...newHistory,season_year:e.target.value})} style={input}/><input placeholder="Record" value={newHistory.record} onChange={(e)=>setNewHistory({...newHistory,record:e.target.value})} style={input}/><button onClick={()=>addHistory(team.id)} style={button}>Add</button></div>{historyRows.map((r)=><div key={r.id} style={miniRow}><input value={r.season_year} onChange={(e)=>updateRow("team_history_records",r.id,"season_year",Number(e.target.value))} style={smallInput}/><input value={r.record || ""} onChange={(e)=>updateRow("team_history_records",r.id,"record",e.target.value)} style={smallInput}/><DeleteButton onClick={()=>deleteRow("team_history_records",r.id)}/></div>)}</div></div><Results rows={results} deleteResult={()=>{}} search="" setSearch={()=>{}}/><div style={twoCol}><MiniList title="All-Americans" rows={allAmericans.map((r)=>`${r.player_name} — ${r.type}, ${r.position}, ${r.season_year}`)}/><MiniList title="Awards" rows={awards.map((r)=>`${r.player_name} — ${r.award_name}, ${r.position}, ${r.season_year}`)}/><MiniList title="Heisman Winners" rows={heismans.map((r)=>`${r.player_name} — ${r.position}, ${r.season_year}`)}/></div></section>;
 }
 function MiniList({ title, rows }) { return <div style={miniCard}><h3>{title}</h3>{rows.map((r,i)=><div key={i} style={miniRow}>{r}</div>)}</div>; }
 function Table({ headers, children }) { return <div style={{overflowX:"auto",marginTop:20}}><table style={table}><thead><tr>{headers.map((h, index)=><th key={typeof h === "string" ? h : index} style={th}>{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div>; }
 function DeleteButton({ onClick }) { return <button onClick={onClick} style={deleteButton}>Delete</button>; }
 
-const page={minHeight:"100vh",width:"100%",background:"radial-gradient(circle at 18% -12%, rgba(124,58,237,.45), transparent 34%), radial-gradient(circle at 90% 0%, rgba(37,99,235,.25), transparent 30%), linear-gradient(135deg,#050816 0%,#080b1f 46%,#17072f 100%)",color:"white",overflowX:"hidden",fontFamily:"Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"};
+const page={minHeight:"100vh",width:"100%",background:"radial-gradient(circle at 18% -8%, rgba(86,45,168,.48), transparent 30%), radial-gradient(circle at 90% 4%, rgba(15,70,160,.34), transparent 28%), linear-gradient(135deg,#030614 0%,#071026 45%,#190735 100%)",color:"white",overflowX:"hidden",fontFamily:"Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"};
 const container={width:"100%",maxWidth:"none",margin:0,padding:"clamp(14px, 2vw, 28px)",boxSizing:"border-box"};
 const header={display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,flexWrap:"wrap",gap:20,background:"linear-gradient(135deg, rgba(88,28,135,.55), rgba(15,23,42,.8))",border:"1px solid rgba(250,204,21,.35)",borderRadius:28,padding:"clamp(14px, 2vw, 24px)",boxShadow:"0 24px 80px rgba(0,0,0,.35)"};
 const brandWrap={display:"flex",flexDirection:"column",alignItems:"flex-start",gap:8,minWidth:0};
@@ -4753,19 +4838,19 @@ const tabRow={display:"flex",gap:8,width:"max-content"};
 const tabStyle={background:"rgba(30,27,75,.65)",color:"#e5e7eb",border:"1px solid rgba(255,255,255,.1)",borderRadius:14,padding:"10px 14px",fontWeight:800,cursor:"pointer",whiteSpace:"nowrap"};
 const activeTabStyle={...tabStyle,background:"linear-gradient(135deg,#6d28d9,#facc15)",border:"1px solid #fde68a",color:"#111827"};
 const statsGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))",gap:20,marginBottom:32};
-const statCard={background:"linear-gradient(180deg, rgba(30,27,75,.78), rgba(12,12,18,.92))",border:"1px solid rgba(250,204,21,.16)",borderRadius:22,padding:24,boxShadow:"0 14px 45px rgba(0,0,0,.28)"};
+const statCard={background:"linear-gradient(145deg, rgba(27,26,73,.95), rgba(7,10,28,.98))",border:"1px solid rgba(250,204,21,.22)",borderRadius:22,padding:"clamp(18px, 2vw, 28px)",boxShadow:"0 22px 70px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.08)",minHeight:136};
 const statTitle={color:"#c4b5fd",fontSize:12,marginBottom:10,textTransform:"uppercase",letterSpacing:".08em",fontWeight:900};
 const statValue={fontSize:38,fontWeight:950,color:"#fff7ed"};
 const statInput={...statValue,background:"transparent",color:"white",border:"none",outline:"none",width:"100%"};
 const statSelect={background:"#111827",color:"#fff7ed",border:"1px solid rgba(250,204,21,.25)",borderRadius:12,padding:14,fontSize:24,fontWeight:900,width:"100%"};
-const card={background:"linear-gradient(145deg, rgba(15,23,42,.94), rgba(7,10,28,.98))",border:"1px solid rgba(167,139,250,.24)",borderRadius:18,padding:"clamp(18px, 2vw, 28px)",marginBottom:28,boxShadow:"0 24px 80px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.07)"};
+const card={background:"linear-gradient(145deg, rgba(12,18,43,.92), rgba(5,8,25,.985))",border:"1px solid rgba(148,163,184,.24)",borderRadius:22,padding:"clamp(18px, 2vw, 30px)",marginBottom:26,boxShadow:"0 26px 90px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.07)"};
 const sectionTop={display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"};
 const sectionTitle={fontSize:"clamp(25px, 3vw, 36px)",fontWeight:950,margin:0,color:"#fff7ed",letterSpacing:"-.03em"};
 const formGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))",gap:16,marginTop:20};
-const input={background:"rgba(9,13,32,.94)",border:"1px solid rgba(167,139,250,.24)",color:"#fff",padding:14,borderRadius:10,fontSize:15,width:"100%",boxSizing:"border-box",outline:"none"};
+const input={background:"rgba(5,10,28,.94)",border:"1px solid rgba(148,163,184,.30)",color:"#fff",padding:14,borderRadius:14,fontSize:15,width:"100%",boxSizing:"border-box",outline:"none",boxShadow:"inset 0 1px 0 rgba(255,255,255,.05)"};
 const smallInput={...input,width:"120px",marginRight:8};
 const searchInput={...input,maxWidth:320};
-const button={background:"linear-gradient(135deg,#7c3aed,#4f46e5)",color:"#fff",border:"1px solid rgba(255,255,255,.18)",borderRadius:10,padding:14,fontWeight:950,cursor:"pointer",boxShadow:"0 14px 34px rgba(124,58,237,.28)"};
+const button={background:"linear-gradient(135deg,#8b5cf6,#2563eb)",color:"#fff",border:"1px solid rgba(255,255,255,.18)",borderRadius:14,padding:14,fontWeight:950,cursor:"pointer",boxShadow:"0 14px 34px rgba(124,58,237,.30)"};
 const sortButton={background:"transparent",border:"none",color:"#c4b5fd",fontSize:13,textTransform:"uppercase",fontWeight:900,cursor:"pointer",padding:0};
 const deleteButton={background:"#7f1d1d",color:"white",border:"1px solid #ef4444",borderRadius:10,padding:"8px 10px",cursor:"pointer"};
 const table={width:"100%",borderCollapse:"separate",borderSpacing:0,minWidth:820};
@@ -4894,43 +4979,11 @@ const hofGrid = {
 };
 
 
-const navShell = {
-  position: "sticky",
-  top: 0,
-  zIndex: 20,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 12,
-  marginBottom: 18,
-  padding: "10px 0",
-  backdropFilter: "blur(12px)",
-};
 
-const hamburgerButton = {
-  border: "1px solid rgba(250,204,21,.34)",
-  background: "linear-gradient(135deg, rgba(88,28,135,.95), rgba(15,23,42,.96))",
-  color: "#fff",
-  borderRadius: 14,
-  padding: "12px 16px",
-  fontWeight: 900,
-  cursor: "pointer",
-  boxShadow: "0 12px 30px rgba(0,0,0,.28)",
-};
 
-const activePagePill = {
-  border: "1px solid rgba(255,255,255,.12)",
-  background: "rgba(15,23,42,.76)",
-  color: "rgba(255,255,255,.86)",
-  borderRadius: 999,
-  padding: "10px 14px",
-  fontSize: 13,
-  fontWeight: 800,
-  whiteSpace: "nowrap",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  maxWidth: "60vw",
-};
+
+
+
 
 const drawerOverlay = {
   position: "fixed",
@@ -4940,16 +4993,7 @@ const drawerOverlay = {
   backdropFilter: "blur(4px)",
 };
 
-const drawerPanel = {
-  width: "min(390px, 92vw)",
-  height: "100%",
-  background: "linear-gradient(180deg, #140821, #111827 45%, #050816)",
-  borderRight: "1px solid rgba(250,204,21,.25)",
-  boxShadow: "24px 0 70px rgba(0,0,0,.45)",
-  color: "#fff",
-  display: "flex",
-  flexDirection: "column",
-};
+
 
 const drawerHeader = {
   display: "flex",
@@ -5625,46 +5669,9 @@ const headlineItem = {
   boxShadow: "inset 0 1px 0 rgba(255,255,255,.12)",
 };
 
-const colorDrawerItem = {
-  width: "100%",
-  position: "relative",
-  display: "grid",
-  gridTemplateColumns: "7px minmax(0, 1fr) auto",
-  alignItems: "center",
-  gap: 12,
-  textAlign: "left",
-  borderRadius: 18,
-  padding: "14px 14px 14px 0",
-  marginBottom: 10,
-  cursor: "pointer",
-  fontWeight: 950,
-  overflow: "hidden",
-  transition: "transform .16s ease, box-shadow .16s ease, border-color .16s ease",
-  textShadow: "0 2px 10px rgba(0,0,0,.30)",
-  letterSpacing: ".01em",
-  backdropFilter: "blur(18px) saturate(155%)",
-  WebkitBackdropFilter: "blur(18px) saturate(155%)",
-};
 
-const coachDrawerItem = {
-  width: "100%",
-  position: "relative",
-  display: "grid",
-  gridTemplateColumns: "7px minmax(0, 1fr) auto",
-  alignItems: "center",
-  gap: 12,
-  textAlign: "left",
-  borderRadius: 20,
-  padding: "14px 14px 14px 0",
-  marginBottom: 10,
-  cursor: "pointer",
-  fontWeight: 950,
-  overflow: "hidden",
-  transition: "transform .16s ease, box-shadow .16s ease, border-color .16s ease, filter .16s ease",
-  transform: "translateZ(0)",
-  backdropFilter: "blur(18px) saturate(155%)",
-  WebkitBackdropFilter: "blur(18px) saturate(155%)",
-};
+
+
 
 const successBox = {
   ...liquidGlassPanel,
@@ -6342,3 +6349,157 @@ const broadcastMetricCard = {
   boxShadow: "0 18px 55px rgba(0,0,0,.32)",
 };
 
+
+
+const broadcastPageCard = {
+  ...card,
+  background: "linear-gradient(145deg, rgba(10,16,39,.965), rgba(4,7,21,.99))",
+  border: "1px solid rgba(148,163,184,.26)",
+  borderRadius: 20,
+  boxShadow: "0 24px 80px rgba(0,0,0,.46), inset 0 1px 0 rgba(255,255,255,.07)",
+};
+
+const navShell = {
+  position: "sticky",
+  top: 0,
+  zIndex: 20,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+  marginBottom: 20,
+  padding: "12px 14px",
+  border: "1px solid rgba(148,163,184,.18)",
+  borderRadius: 18,
+  background: "linear-gradient(90deg, rgba(5,8,25,.92), rgba(13,18,45,.82))",
+  backdropFilter: "blur(16px)",
+  boxShadow: "0 18px 60px rgba(0,0,0,.30)",
+};
+
+const hamburgerButton = {
+  border: "1px solid rgba(167,139,250,.45)",
+  background: "linear-gradient(135deg, rgba(88,28,135,.95), rgba(15,23,42,.96))",
+  color: "#fff",
+  borderRadius: 14,
+  padding: "12px 16px",
+  fontWeight: 1000,
+  cursor: "pointer",
+  boxShadow: "0 14px 34px rgba(124,58,237,.25)",
+};
+
+const activePagePill = {
+  border: "1px solid rgba(148,163,184,.24)",
+  background: "rgba(15,23,42,.72)",
+  color: "#e5e7eb",
+  borderRadius: 999,
+  padding: "10px 14px",
+  fontWeight: 900,
+  fontSize: 13,
+};
+
+const drawerPanel = {
+  width: "min(420px, 92vw)",
+  height: "100%",
+  background: "linear-gradient(180deg, rgba(5,8,25,.98), rgba(16,12,42,.98))",
+  borderRight: "1px solid rgba(148,163,184,.20)",
+  padding: 18,
+  overflowY: "auto",
+  boxShadow: "30px 0 90px rgba(0,0,0,.55)",
+};
+
+const colorDrawerItem = {
+  position: "relative",
+  width: "100%",
+  minHeight: 58,
+  borderRadius: 16,
+  padding: "13px 16px 13px 18px",
+  display: "flex",
+  alignItems: "center",
+  gap: 12,
+  textAlign: "left",
+  overflow: "hidden",
+  cursor: "pointer",
+  fontWeight: 950,
+};
+
+const coachDrawerItem = {
+  position: "relative",
+  width: "100%",
+  minHeight: 72,
+  borderRadius: 18,
+  padding: "14px 18px",
+  display: "flex",
+  alignItems: "center",
+  gap: 12,
+  textAlign: "left",
+  overflow: "hidden",
+  cursor: "pointer",
+  fontWeight: 950,
+};
+
+
+const coachHero2 = {
+  ...broadcastPageCard,
+  display: "grid",
+  gridTemplateColumns: "auto minmax(0,1fr) auto",
+  gap: 18,
+  alignItems: "center",
+  marginBottom: 18,
+};
+
+const coachHeroLogoBox = {
+  width: 116,
+  height: 116,
+  borderRadius: 24,
+  display: "grid",
+  placeItems: "center",
+  background: "rgba(255,255,255,.06)",
+  border: "1px solid rgba(255,255,255,.14)",
+  fontWeight: 1000,
+};
+
+const coachHeroName = {
+  fontSize: "clamp(38px, 8vw, 72px)",
+  fontWeight: 1000,
+  letterSpacing: "-.06em",
+  lineHeight: .88,
+};
+
+const coachHeroBadges = {
+  display: "grid",
+  gap: 8,
+  justifyItems: "end",
+};
+
+const prestigeSpotlight = {
+  ...broadcastPageCard,
+  marginBottom: 26,
+};
+
+const prestigeSpotlightGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: 14,
+  marginTop: 18,
+};
+
+const prestigeSpotlightCard = {
+  ...liquidGlassTile,
+  display: "grid",
+  gap: 12,
+  minHeight: 190,
+  background: "linear-gradient(145deg, rgba(30,41,87,.75), rgba(8,12,30,.96))",
+};
+
+const teamEncyclopediaPanel = {
+  ...broadcastPageCard,
+  marginBottom: 16,
+};
+
+const programRingRow = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+  gap: 10,
+  color: "#fff",
+  fontWeight: 900,
+};
