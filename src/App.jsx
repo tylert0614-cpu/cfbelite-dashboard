@@ -1769,6 +1769,15 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
           })}
         </div>
       </section>
+      <section style={dashboardWirePanelV38}>
+        <div style={dashboardPanelHeaderPro}><span>DYNASTY WIRE</span><h2>The Wire</h2></div>
+        <div style={dashboardNewsListPro}>
+          {headlineRows.length ? headlineRows.map((item,index)=>(
+            <div key={index} style={dashboardNewsRowPro}><span>🏈</span><div><b>{item.title}</b><small>{item.meta}</small></div></div>
+          )) : <div style={mutedText}>No storylines yet. Add results in League Data Center.</div>}
+        </div>
+      </section>
+
     </div>
   );
 }
@@ -2699,7 +2708,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
   const recentPicked = [...sortedPicks].filter((pick)=>pick.team_id && pick.status === "picked").slice(-8).reverse();
 
   return (
-    <section style={draftBroadcastPageV37}>
+    <section style={draftBroadcastPageV37} className="cfb-mobile-page">
       <div style={draftOnClockHeroV37}>
         <div style={draftOnClockMainV37}>
           <div style={S.eyebrow}>ON THE CLOCK</div>
@@ -2712,7 +2721,13 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
         </div>
       </div>
 
-      <div style={draftTickerV37}>
+      <div style={draftLowerThirdV38}>
+        <span>CFBELITE 27 DRAFTCAST</span>
+        <b>{displayPick?.status === "pick_is_in" ? "The pick is in" : `${displayPick?.discord_username || displayPick?.discord_users?.discord_username || "User TBD"} is on the clock`}</b>
+        <small>Pick #{String(displayPick?.pick_number || 1).padStart(2, "0")} • {availableTeams.length} teams available</small>
+      </div>
+
+      <div style={draftEspnTickerV38}>
         {(recentPicked.length ? recentPicked : sortedPicks.slice(0,8)).map((pick)=> {
           const team = teams.find((t)=>String(t.id)===String(pick.team_id)) || pick.teams;
           return <span key={pick.pick_number}>#{pick.pick_number} {pick.discord_username || pick.discord_users?.discord_username || "User TBD"} {team ? `→ ${team.name}` : "on deck"}</span>;
@@ -2748,8 +2763,8 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
         </div>
       )}
 
-      <section style={draftMainBoardV37}>
-        <div style={draftBoardPanelV37}>
+      <section style={draftMainBoardV37} className="cfb-responsive-grid">
+        <div style={draftBoardPanelV37} className="cfb-card">
           <div style={S.eyebrow}>Draft Board</div>
           <div style={draftBoardRowsV37}>
             {sortedPicks.map((pick) => {
@@ -2771,7 +2786,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
           </div>
         </div>
 
-        <aside style={draftAvailablePanelV37}>
+        <aside style={draftAvailablePanelV37} className="cfb-card">
           <div style={S.eyebrow}>Available Teams · {availableTeams.length}</div>
           <input style={{ ...S.input, marginTop: 12 }} value={teamSearch} onChange={(e) => setTeamSearch(e.target.value)} placeholder="Search available teams or conference..." />
           <div style={S.availableConferenceStack}>
@@ -3575,27 +3590,78 @@ function opponentUserTierScore(teamId, results, assignments, users = []) {
 }
 
 function computerRankingRows(teams, results, assignments = [], users = []) {
+  const safeResults = results || [];
   const base = teams.map((team) => {
-    const rec = recordFromResults(team.id, results);
+    const rec = recordFromResults(team.id, safeResults);
     const games = rec.games || 0;
     const winPct = games ? rec.wins / games : 0;
     const avgPf = Number(rec.avgPf);
     const avgPa = Number(rec.avgPa);
-    const sor = Number(strengthOfResult(team.id, teams, results)) || 0;
-    const qw = qualityWins(team.id, results);
+    const sor = Number(strengthOfResult(team.id, teams, safeResults)) || 0;
+    const top10 = top10Wins(team.id, safeResults);
+    const top25 = top25Wins(team.id, safeResults);
+    const qw = qualityWins(team.id, safeResults);
     const margin = avgPf - avgPa;
-    const userTierScore = opponentUserTierScore(team.id, results, assignments, users);
-    const score =
-      (winPct * 38) +
-      (sor * 2.8) +
-      (qw * 6.5) +
-      (Math.max(-20, Math.min(30, margin)) * 0.38) +
-      (rec.wins * 1.2) +
-      (userTierScore * 0.24);
-    const rating = Number(score.toFixed(1));
-    return { team, teamName: team.name, wins: rec.wins, losses: rec.losses, games, avgPf, avgPa, top25: top25Wins(team.id, results), top10: top10Wins(team.id, results), qw, sor, userTierScore: Number(userTierScore.toFixed(1)), rating, score: rating };
+    const offenseScore = Math.max(0, Math.min(18, avgPf * 0.22));
+    const defenseScore = Math.max(0, Math.min(18, (38 - avgPa) * 0.28));
+    const marginScore = Math.max(-8, Math.min(14, margin * 0.32));
+    const userTierScore = opponentUserTierScore(team.id, safeResults, assignments, users);
+    const lossPenalty = rec.losses * 4.2;
+    const winsScore = rec.wins * 2.1;
+    const winPctScore = winPct * 34;
+    const sorScore = sor * 3.15;
+    const top10Score = top10 * 8.5;
+    const top25Score = Math.max(0, top25 - top10) * 4.25;
+    const qualityWinScore = qw * 3.75;
+    const userDifficultyScore = userTierScore * 0.28;
+    const gameVolumeBonus = Math.min(6, games * 0.55);
+
+    const raw =
+      winPctScore +
+      winsScore +
+      sorScore +
+      top10Score +
+      top25Score +
+      qualityWinScore +
+      offenseScore +
+      defenseScore +
+      marginScore +
+      userDifficultyScore +
+      gameVolumeBonus -
+      lossPenalty;
+
+    const rating = Number(Math.max(0, raw).toFixed(1));
+
+    return {
+      team,
+      teamName: team.name,
+      wins: rec.wins,
+      losses: rec.losses,
+      games,
+      avgPf,
+      avgPa,
+      top10,
+      top25,
+      qw,
+      sor,
+      winPct: Number((winPct * 100).toFixed(1)),
+      userTierScore: Number(userTierScore.toFixed(1)),
+      rating,
+      score: rating,
+      formulaParts: {
+        winPctScore: Number(winPctScore.toFixed(1)),
+        sorScore: Number(sorScore.toFixed(1)),
+        top10Score: Number(top10Score.toFixed(1)),
+        top25Score: Number(top25Score.toFixed(1)),
+        offenseScore: Number(offenseScore.toFixed(1)),
+        defenseScore: Number(defenseScore.toFixed(1)),
+        lossPenalty: Number(lossPenalty.toFixed(1)),
+      },
+    };
   });
-  return base.sort((a,b)=>b.score-a.score || b.wins-a.wins || a.losses-b.losses || a.teamName.localeCompare(b.teamName)).map((row,index)=>({...row, rank:index+1}));
+  return base
+    .sort((a,b)=>b.rating-a.rating || b.wins-a.wins || a.losses-b.losses || b.sor-a.sor || a.teamName.localeCompare(b.teamName))
+    .map((row,index)=>({...row, rank:index+1}));
 }
 
 function LeaguePulse({ teams, results, allAmericans = [], awards = [], currentYear, assignments = [], users = [] }) {
@@ -3863,6 +3929,26 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
   const coachPrestigeTier = typeof dynastyPrestigeTier === "function" ? dynastyPrestigeTier(coachPrestigeScore) : { stars: "⭐", label: "1-Star Coach" };
   const hofPct = Math.min(100, Math.max(0, coachPrestigeScore));
   const latestTeamStat = coachTeamStats.slice().sort((a,b)=>Number(b.season_year)-Number(a.season_year))[0];
+  const coachYears = [...new Set([
+    ...coachRecruiting.map((row)=>Number(row.season_year)).filter(Boolean),
+    ...coachResults.map((row)=>Number(row.season_year)).filter(Boolean),
+    ...timeline.flatMap((row)=>[Number(row.start_year), Number(row.end_year)]).filter(Boolean),
+  ])].sort((a,b)=>a-b).slice(-6);
+  const trendRows = coachYears.length ? coachYears.map((year, index)=>{
+    const yearResults = coachResults.filter((row)=>Number(row.season_year)===Number(year));
+    const winRow = currentTeam ? recordFromResults(currentTeam.id, yearResults) : { wins:0, losses:0 };
+    const recruitRow = coachRecruiting.find((row)=>Number(row.season_year)===Number(year));
+    const point = Math.min(100, Math.max(5, coachPrestigeScore - ((coachYears.length - index - 1) * 4) + ((recruitRow && recruitRow.rank <= 25) ? 4 : 0) + ((winRow.wins || 0) * .4)));
+    return { year, point: Number(point.toFixed(1)), recruitRank: recruitRow?.rank || "—" };
+  }) : [{year:"Now", point:coachPrestigeScore, recruitRank:"—"}];
+  const trophyRows = [
+    { label:"National Titles", value:stats?.nattys||0, icon:"🏆" },
+    { label:"Conference Titles", value:stats?.confTitles||0, icon:"🏅" },
+    { label:"Awards", value:stats?.awards||0, icon:"⭐" },
+    { label:"All-Americans", value:stats?.allAmericans||0, icon:"🇺🇸" },
+    { label:"Heismans", value:stats?.heismans||0, icon:"🏈" },
+  ];
+
 
   return (
     <section style={coachPageV37}>
@@ -3888,6 +3974,34 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
         <Stat title="Awards" value={stats?.awards||0}/>
         <Stat title="All-Americans" value={stats?.allAmericans||0}/>
       </div>
+
+      <section style={coachFeatureGridV38}>
+        <div style={coachPanelV37}>
+          <h3 style={miniTitle}>Prestige Trend</h3>
+          <div style={coachPrestigeTrendV38}>
+            {trendRows.map((row,index)=>(
+              <div key={`${row.year}-${index}`} style={coachTrendColumnV38}>
+                <div style={{...coachTrendBarV38, height:`${Math.max(12, row.point)}%`, background:`linear-gradient(180deg, ${secondary}, ${primary})`}} />
+                <small>{row.year}</small>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={coachPanelV37}>
+          <h3 style={miniTitle}>Recruiting Graph</h3>
+          <div style={coachRecruitGraphV38}>
+            {trendRows.map((row,index)=>(
+              <div key={`${row.year}-r-${index}`} style={miniRow}><span>{row.year}</span><b>{row.recruitRank === "—" ? "—" : `#${row.recruitRank}`}</b></div>
+            ))}
+          </div>
+        </div>
+        <div style={coachPanelV37}>
+          <h3 style={miniTitle}>Trophy Case</h3>
+          <div style={coachTrophyGridV38}>
+            {trophyRows.map((row)=><div key={row.label} style={coachTrophyV38}><span>{row.icon}</span><b>{row.value}</b><small>{row.label}</small></div>)}
+          </div>
+        </div>
+      </section>
 
       <section style={coachGridV37}>
         <div style={coachPanelV37}>
@@ -4191,13 +4305,43 @@ function GlobalStyle() {
         }
       }
 
+      @media (max-width: 900px) {
+        .cfb-mobile-page {
+          gap: 12px !important;
+        }
+
+        .cfb-card {
+          padding: 14px !important;
+        }
+
+        h1,
+        h2 {
+          overflow-wrap: anywhere;
+        }
+
+        button,
+        input,
+        select {
+          min-height: 44px;
+        }
+      }
+
       @media (max-width: 720px) {
         .hide-on-mobile-table {
           display: none !important;
         }
       }
-    `}
-</style>
+
+      @media (max-width: 640px) {
+        body {
+          font-size: 14px;
+        }
+
+        table {
+          font-size: 12px;
+        }
+      }
+    `}</style>
   );
 }
 
@@ -8351,4 +8495,95 @@ const coachGridV37 = {
 const coachPanelV37 = {
   ...broadcastCard,
   marginBottom: 0,
+};
+
+
+const dashboardWirePanelV38 = {
+  borderRadius: 20,
+  padding: 16,
+  border: "1px solid rgba(148,163,184,.16)",
+  background: "linear-gradient(145deg, rgba(8,13,31,.96), rgba(3,7,18,.99))",
+  boxShadow: "0 18px 55px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.055)",
+};
+
+const draftLowerThirdV38 = {
+  display: "grid",
+  gridTemplateColumns: "auto minmax(0,1fr) auto",
+  gap: 14,
+  alignItems: "center",
+  borderRadius: 14,
+  padding: "12px 16px",
+  background: "linear-gradient(90deg, rgba(250,204,21,.92), rgba(217,119,6,.88))",
+  color: "#020617",
+  border: "1px solid rgba(250,204,21,.35)",
+  boxShadow: "0 18px 48px rgba(0,0,0,.30)",
+  fontWeight: 1000,
+};
+
+const draftEspnTickerV38 = {
+  borderRadius: 0,
+  padding: "10px 14px",
+  display: "flex",
+  gap: 24,
+  overflowX: "auto",
+  background: "linear-gradient(90deg, #020617, #111827)",
+  borderTop: "2px solid #facc15",
+  borderBottom: "2px solid #facc15",
+  color: "#f8fafc",
+  fontWeight: 1000,
+  whiteSpace: "nowrap",
+  textTransform: "uppercase",
+};
+
+const coachFeatureGridV38 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+  gap: 16,
+};
+
+const coachPrestigeTrendV38 = {
+  height: 170,
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(36px,1fr))",
+  alignItems: "end",
+  gap: 10,
+  padding: "18px 6px 4px",
+};
+
+const coachTrendColumnV38 = {
+  height: 150,
+  display: "grid",
+  gridTemplateRows: "1fr auto",
+  alignItems: "end",
+  gap: 8,
+  textAlign: "center",
+};
+
+const coachTrendBarV38 = {
+  width: "100%",
+  minHeight: 12,
+  borderRadius: "10px 10px 4px 4px",
+  boxShadow: "0 12px 30px rgba(0,0,0,.28)",
+};
+
+const coachRecruitGraphV38 = {
+  display: "grid",
+  gap: 8,
+};
+
+const coachTrophyGridV38 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(92px, 1fr))",
+  gap: 10,
+};
+
+const coachTrophyV38 = {
+  minHeight: 96,
+  borderRadius: 14,
+  display: "grid",
+  placeItems: "center",
+  textAlign: "center",
+  padding: 10,
+  background: "rgba(255,255,255,.045)",
+  border: "1px solid rgba(255,255,255,.10)",
 };
