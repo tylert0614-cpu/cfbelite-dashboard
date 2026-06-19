@@ -3473,16 +3473,6 @@ function allTimeUserRankingRows(users, teams, assignments, results) {
       }
     });
     const games = wins + losses;
-    const coachPlayerStats = seasonPlayerStats.filter((row)=>{
-    if (row.discord_user_id === user.id) return true;
-    const assignment = coachForTeamYear(row.team_id, row.season_year, assignments);
-    return assignment?.discord_user_id === user.id;
-  });
-  const coachTeamStats = teamSeasonStats.filter((row)=>{
-    if (row.discord_user_id === user.id) return true;
-    const assignment = coachForTeamYear(row.team_id, row.season_year, assignments);
-    return assignment?.discord_user_id === user.id;
-  });
   const activeAssignment = assignments.find((assignment) => assignment.discord_user_id === user.id && assignment.status === "Active");
     const currentTeam = teams.find((team) => team.id === activeAssignment?.team_id);
     const avgPf = games ? pf / games : 0;
