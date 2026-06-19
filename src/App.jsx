@@ -4497,7 +4497,7 @@ function PrestigeLeaderboard({ users, teams, activeTeams, assignments, results, 
 }
 
 function RecordBook({ users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting }) {
-  const rows = recordBookRows(users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
+  const rows = recordBookRows(users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting, seasonPlayerStats, teamSeasonStats);
 
   return (
     <section style={card}>
