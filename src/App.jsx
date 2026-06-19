@@ -185,9 +185,26 @@ function resultUserLabels(result, assignments, users) {
   };
 }
 
+
+function activeAssignmentsForLeague(assignments, teams) {
+  const validTeamIds = new Set(teams.map((team)=>team.id));
+  const seenUsers = new Set();
+  return assignments.filter((assignment)=>{
+    if (assignment.status !== "Active") return false;
+    if (!assignment.discord_user_id || !assignment.team_id) return false;
+    if (!validTeamIds.has(assignment.team_id)) return false;
+    if (seenUsers.has(assignment.discord_user_id)) return false;
+    seenUsers.add(assignment.discord_user_id);
+    return true;
+  });
+}
+
 function TeamLogoMark({ team, size = 34, faded = false }) {
   const url = team?.logo_url || team?.helmet_url;
-  if (!url) return null;
+  if (!url) {
+    const initials = String(team?.name || "CFB").split(" ").map((part)=>part[0]).join("").slice(0,3).toUpperCase();
+    return <span style={{ width:size, height:size, borderRadius:Math.max(8,size*.22), display:"inline-grid", placeItems:"center", background:"rgba(255,255,255,.08)", border:"1px solid rgba(255,255,255,.14)", color:"#fff", fontWeight:1000, fontSize:Math.max(10,size*.28), opacity:faded ? .22 : 1 }}>{initials}</span>;
+  }
   return <img src={url} alt="" style={{ width:size, height:size, objectFit:"contain", opacity:faded ? .22 : 1, filter:faded ? "grayscale(.12)" : "none" }}/>;
 }
 
@@ -1592,14 +1609,18 @@ function BestWorstPanel({ user, results, assignments }) {
 
 
 function DashboardRedesign({ teams, users, assignments, results, allResults, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats, currentYear, currentWeek, setCurrentYear, setCurrentWeek, saveSettings, goToTeam, sortState, setSortState }) {
-  const activeCoachCount = new Set(assignments.filter((a)=>a.status==="Active" && a.discord_user_id).map((a)=>a.discord_user_id)).size;
+  const activeAssignments = activeAssignmentsForLeague(assignments, teams);
+  const activeCoachCount = activeAssignments.length;
   const prestigeRows = typeof dynastyPrestigeRows === "function" ? dynastyPrestigeRows(teams, assignments, allResults, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats).slice(0,5) : [];
   const champions = nationalChampions.filter((row)=>String(row.season_year)===String(currentYear)).length;
+  const rankings = computerRankingRows(teams, results, assignments, users).slice(0,5);
   const headlines = [
-    ...recruiting.filter((r)=>String(r.season_year)===String(currentYear) && Number(r.rank)===1).slice(0,1).map((r)=>`${teamNameById(r.team_id, teams)} lands the #1 recruiting class`),
-    ...prestigeRows.slice(0,3).map((r,index)=>`${r.team.name} sits #${index+1} in Dynasty Prestige`),
-    `${results.length} games recorded for ${currentYear}`,
-  ].slice(0,6);
+    ...recruiting.filter((r)=>String(r.season_year)===String(currentYear) && Number(r.rank)===1).slice(0,1).map((r)=>`${teamNameById(r.team_id, teams)} lands the #1 class`),
+    ...prestigeRows.slice(0,2).map((r,index)=>`${r.team.name} holds the #${index+1} prestige spot`),
+    rankings[0] ? `${rankings[0].teamName} owns the #1 computer rank` : null,
+    `${results.length} games recorded in ${currentYear}`,
+  ].filter(Boolean).slice(0,5);
+
   const confMap = new Map();
   teams.forEach((team)=>{
     const conf = cleanConference(team.conference || "Independent");
@@ -1608,76 +1629,84 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
   });
 
   return (
-    <>
-      <section style={dashboardHero}>
+    <div style={dynastyShell}>
+      <section style={dynastyHero}>
         <div>
-          <div style={eyebrow}>CFBELITE 27</div>
-          <h1 style={dashboardHeroTitle}>Year {currentYear} • {currentWeek}</h1>
-          <p style={mutedText}>Dynasty headquarters for coaches, prestige, headlines, conferences, stats, recruiting, and league history.</p>
-          <div style={dashboardControls}>
-            <select value={currentYear} onChange={(e)=>setCurrentYear(e.target.value)} style={input}>{YEARS.map((year)=><option key={year}>{year}</option>)}</select>
-            <select value={currentWeek} onChange={(e)=>setCurrentWeek(e.target.value)} style={input}>{WEEKS.map((week)=><option key={week}>{week}</option>)}</select>
-            <button style={button} onClick={saveSettings}>Save League Week</button>
+          <div style={heroKicker}>CFBELITE 27</div>
+          <h1 style={dynastyHeroTitle}>Dynasty Headquarters</h1>
+          <p style={dynastyHeroSub}>Year {currentYear} • {currentWeek}</p>
+        </div>
+        <div style={heroControls}>
+          <select value={currentYear} onChange={(e)=>setCurrentYear(e.target.value)} style={input}>{YEARS.map((year)=><option key={year}>{year}</option>)}</select>
+          <select value={currentWeek} onChange={(e)=>setCurrentWeek(e.target.value)} style={input}>{WEEKS.map((week)=><option key={week}>{week}</option>)}</select>
+          <button style={button} onClick={saveSettings}>Save Year / Week</button>
+        </div>
+      </section>
+
+      <section style={kpiGridV23}>
+        <div style={kpiCardV23}><span>Coaches</span><b>32</b><small>Total league slots</small></div>
+        <div style={kpiCardV23}><span>Active Coaches</span><b>{activeCoachCount}</b><small>Currently assigned</small></div>
+        <div style={kpiCardV23}><span>Games Played</span><b>{results.length}</b><small>This season</small></div>
+        <div style={kpiCardV23}><span>National Champions</span><b>{champions}</b><small>{currentYear} season</small></div>
+      </section>
+
+      <section style={dashboardPanelGrid}>
+        <div style={mockPanel}>
+          <div style={panelHeaderV23}><div><div style={eyebrow}>CFBElite Automated Rankings</div><h2 style={panelTitleV23}>Top Computer Teams</h2></div><button style={smallGhostButton}>Full Rankings</button></div>
+          <div style={rankListV23}>
+            {rankings.map((row,index)=>{
+              const team = teams.find((team)=>team.id===row.team?.id) || row.team;
+              return (
+                <button key={team?.id || row.teamName || index} style={rankRowV23} onClick={()=>team?.id && goToTeam(team.id)}>
+                  <span style={rankBadgeV23}>{index+1}</span>
+                  <TeamLogoMark team={team} size={30}/>
+                  <span>{row.teamName || team?.name}</span>
+                  <b>{Number(row.score || row.rating || 0).toFixed(1)}</b>
+                </button>
+              );
+            })}
+          </div>
+          <ComputerRankings teams={teams} results={results} currentWeek={currentWeek} sortState={sortState} setSortState={setSortState} assignments={assignments} users={users}/>
+        </div>
+
+        <div style={mockPanel}>
+          <div style={panelHeaderV23}><div><div style={eyebrow}>Prestige Spotlight</div><h2 style={panelTitleV23}>Top 5 Programs</h2></div><button style={smallGhostButton}>Prestige</button></div>
+          <div style={rankListV23}>
+            {prestigeRows.map((row,index)=>(
+              <button key={row.team.id} style={rankRowV23} onClick={()=>goToTeam(row.team.id)}>
+                <span style={rankBadgeV23}>{index+1}</span>
+                <TeamLogoMark team={row.team} size={30}/>
+                <span>{row.team.name}</span>
+                <b>{row.score}</b>
+              </button>
+            ))}
           </div>
         </div>
-        <div style={dashboardHeroMetrics}>
-          <div style={dashboardMetric}><span>Coaches</span><b>{activeCoachCount}/32</b></div>
-          <div style={dashboardMetric}><span>Games Played</span><b>{results.length}</b></div>
-          <div style={dashboardMetric}><span>National Champions</span><b>{champions}</b></div>
+
+        <div style={mockPanel}>
+          <div style={panelHeaderV23}><div><div style={eyebrow}>Dynasty Headlines</div><h2 style={panelTitleV23}>The Wire</h2></div></div>
+          <div style={newsListV23}>
+            {headlines.map((headline,index)=><div key={index} style={newsItemV23}>🏈 {headline}<small>{index+1}h ago</small></div>)}
+          </div>
         </div>
       </section>
 
-      <section style={broadcastPageCard}>
-        <div style={sectionTop}><div><div style={eyebrow}>Prestige Spotlight</div><h2 style={sectionTitle}>Top 5 Programs</h2></div></div>
-        <div style={prestigeSpotlightGrid}>
-          {prestigeRows.map((row,index)=>(
-            <button key={row.team.id} style={prestigeSpotlightCard} onClick={()=>goToTeam(row.team.id)}>
-              <div style={leaderRow}><b>#{index+1}</b><span>{row.tier.stars}</span></div>
-              <div style={{display:"flex",alignItems:"center",gap:12}}>
-                <TeamLogoMark team={row.team} size={56}/>
-                <div style={{textAlign:"left"}}>
-                  <div style={prestigeTeamName}>{row.team.name}</div>
-                  <div style={mutedText}>{row.tier.label}</div>
-                </div>
-              </div>
-              <div style={prestigeScore}>{row.score}</div>
-              <div style={positiveTrend}>+{Math.max(0.1, (row.score/22)).toFixed(1)} from last season</div>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section style={broadcastPageCard}>
-        <div style={sectionTop}><div><div style={eyebrow}>Dynasty Headlines</div><h2 style={sectionTitle}>The Wire</h2></div></div>
-        <div style={headlineGrid}>{headlines.map((item,index)=><div key={index} style={headlineCard}>{item}</div>)}</div>
-      </section>
-
-      <section style={broadcastPageCard}>
-        <div style={sectionTop}><div><div style={eyebrow}>Conference Overview</div><h2 style={sectionTitle}>Active League Map</h2></div></div>
-        <div style={conferenceOverviewGrid}>
+      <section style={mockPanel}>
+        <div style={panelHeaderV23}><div><div style={eyebrow}>Conference Overview</div><h2 style={panelTitleV23}>League Map</h2></div></div>
+        <div style={conferenceCardsV23}>
           {[...confMap.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([conf, confTeams])=>{
-            const activeTeams = confTeams.filter((team)=>assignments.some((a)=>a.team_id===team.id && a.status==="Active"));
+            const activeTeams = confTeams.filter((team)=>activeAssignments.some((assignment)=>assignment.team_id===team.id));
+            const sampleLogoTeam = activeTeams[0] || confTeams[0];
             return (
-              <div key={conf} style={conferenceOverviewCard}>
-                <div style={leaderRow}><b>{conf}</b><span>{activeTeams.length} users</span></div>
-                <div style={logoCluster}>{activeTeams.slice(0,8).map((team)=><TeamLogoMark key={team.id} team={team} size={32}/>)}</div>
-                <div style={mutedText}>{activeTeams.map((team)=>team.name).slice(0,5).join(" • ") || "No active users"}</div>
+              <div key={conf} style={conferenceCardV23}>
+                <div style={conferenceLogoCircle}><TeamLogoMark team={sampleLogoTeam} size={44}/></div>
+                <div><b>{conf}</b><span>{activeTeams.length} Coaches</span><span>{confTeams.length} Teams</span></div>
               </div>
             );
           })}
         </div>
       </section>
-
-      <section style={broadcastPageCard}>
-        <div style={sectionTop}>
-          <div>
-            <div style={eyebrow}>CFBElite Automated Rankings</div>
-            <h2 style={sectionTitle}>Automated Team Rankings</h2>
-          </div>
-        </div>
-        <ComputerRankings teams={teams} results={results} currentWeek={currentWeek} sortState={sortState} setSortState={setSortState} assignments={assignments} users={users}/>
-      </section>
-    </>
+    </div>
   );
 }
 
@@ -2915,8 +2944,8 @@ function LogoManager({ teams, updateRow }) {
 
   return (
     <section style={broadcastCard}>
-      <h2 style={sectionTitle}>Team Logo Manager</h2>
-      <p style={mutedText}>Use Supabase Storage public URLs. `logo_url` should be the official school/team logo. `helmet_url` should be the helmet. These power draft tiles, coach menu cards, team pages, search results, and rankings.</p>
+      <h2 style={sectionTitle}>Team Assets Manager</h2>
+      <p style={mutedText}>Paste Supabase Storage public URLs for each school. These assets power dashboard cards, coach profiles, draft room, search, recruiting, records, and prestige pages.</p>
       <SearchBox value={searchText} onChange={setSearchText}/>
       <div style={logoManagerGrid}>
         {filtered.map((team)=>(
@@ -4020,6 +4049,19 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
   } : profileCard;
 
   return <section style={teamThemedProfile}>
+    <div style={{...coachProfileBannerV23, background: `linear-gradient(135deg, ${(currentTeam?.primary_color || "#111827")}dd, rgba(2,6,23,.96))`}}>
+      <div style={coachBannerLogoV23}><TeamLogoMark team={currentTeam} size={108}/></div>
+      <div style={coachBannerMainV23}>
+        <div style={eyebrow}>{currentTeam?.name || "Unassigned"}</div>
+        <h1 style={coachBannerNameV23}>{user.discord_username}</h1>
+        <p style={mutedText}>Head Coach • CFBElite Dynasty</p>
+      </div>
+      <div style={coachPrestigeBoxV23}>
+        <span>Prestige Score</span>
+        <b>{coachPrestigeScore}</b>
+        <small>{coachPrestigeTier.stars} {coachPrestigeTier.label}</small>
+      </div>
+    </div>
     <div style={teamProfileHeroClean}>
       <div>
         <div style={{...eyebrow, color: accent, letterSpacing:".18em"}}>Coach Profile</div>
@@ -7001,21 +7043,9 @@ const sportsReferenceGrid = {
   marginBottom: 18,
 };
 
-const hofProgressTrack = {
-  width: "100%",
-  height: 14,
-  borderRadius: 999,
-  overflow: "hidden",
-  background: "rgba(255,255,255,.10)",
-  border: "1px solid rgba(255,255,255,.12)",
-  margin: "10px 0",
-};
 
-const hofProgressFill = {
-  height: "100%",
-  borderRadius: 999,
-  background: "linear-gradient(90deg,#facc15,#22c55e)",
-};
+
+
 
 const prestigeHistoryGrid = {
   display: "grid",
@@ -7047,4 +7077,258 @@ const trendBar = {
   minWidth: 8,
   borderRadius: "6px 6px 0 0",
   background: "linear-gradient(180deg,#facc15,#7c3aed)",
+};
+
+
+const dynastyShell = {
+  display: "grid",
+  gap: 22,
+};
+
+const dynastyHero = {
+  position: "relative",
+  overflow: "hidden",
+  borderRadius: 24,
+  padding: "clamp(24px, 4vw, 44px)",
+  border: "1px solid rgba(148,163,184,.24)",
+  background: "radial-gradient(circle at 15% 0%, rgba(96,165,250,.26), transparent 28%), radial-gradient(circle at 85% 10%, rgba(124,58,237,.30), transparent 35%), linear-gradient(135deg, rgba(2,6,23,.96), rgba(12,18,45,.98))",
+  boxShadow: "0 28px 90px rgba(0,0,0,.52), inset 0 1px 0 rgba(255,255,255,.08)",
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1fr) minmax(260px, 420px)",
+  gap: 22,
+  alignItems: "center",
+};
+
+const heroKicker = {
+  color: "#93c5fd",
+  fontSize: "clamp(22px, 3vw, 42px)",
+  fontWeight: 1000,
+  letterSpacing: ".09em",
+  textTransform: "uppercase",
+};
+
+const dynastyHeroTitle = {
+  fontSize: "clamp(48px, 8vw, 104px)",
+  fontWeight: 1000,
+  lineHeight: .82,
+  letterSpacing: "-.075em",
+  margin: "8px 0",
+  color: "#fff",
+  textShadow: "0 0 38px rgba(96,165,250,.22)",
+};
+
+const dynastyHeroSub = {
+  color: "rgba(255,255,255,.72)",
+  fontSize: "clamp(18px, 2vw, 28px)",
+  fontWeight: 850,
+  margin: 0,
+};
+
+const heroControls = {
+  display: "grid",
+  gap: 12,
+  padding: 16,
+  borderRadius: 18,
+  background: "rgba(2,6,23,.48)",
+  border: "1px solid rgba(255,255,255,.10)",
+};
+
+const kpiGridV23 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: 14,
+};
+
+const kpiCardV23 = {
+  borderRadius: 18,
+  padding: 20,
+  background: "linear-gradient(145deg, rgba(15,23,42,.92), rgba(5,8,22,.98))",
+  border: "1px solid rgba(148,163,184,.22)",
+  boxShadow: "0 18px 60px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.06)",
+  display: "grid",
+  gap: 8,
+};
+
+const dashboardPanelGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(310px, 1fr))",
+  gap: 16,
+};
+
+const mockPanel = {
+  borderRadius: 20,
+  padding: 18,
+  background: "linear-gradient(145deg, rgba(10,16,39,.96), rgba(4,7,21,.99))",
+  border: "1px solid rgba(148,163,184,.22)",
+  boxShadow: "0 24px 80px rgba(0,0,0,.44), inset 0 1px 0 rgba(255,255,255,.06)",
+  overflow: "hidden",
+};
+
+const panelHeaderV23 = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 12,
+  alignItems: "center",
+  marginBottom: 14,
+};
+
+const panelTitleV23 = {
+  margin: 0,
+  color: "#fff",
+  fontSize: 21,
+  fontWeight: 1000,
+  letterSpacing: "-.03em",
+};
+
+const smallGhostButton = {
+  border: "1px solid rgba(96,165,250,.26)",
+  background: "rgba(15,23,42,.62)",
+  color: "#dbeafe",
+  borderRadius: 10,
+  padding: "9px 11px",
+  fontWeight: 900,
+};
+
+const rankListV23 = {
+  display: "grid",
+  gap: 8,
+  marginBottom: 12,
+};
+
+const rankRowV23 = {
+  width: "100%",
+  border: "1px solid rgba(255,255,255,.10)",
+  background: "rgba(255,255,255,.045)",
+  color: "#fff",
+  borderRadius: 13,
+  padding: "10px 12px",
+  display: "grid",
+  gridTemplateColumns: "32px 36px minmax(0,1fr) auto",
+  gap: 10,
+  alignItems: "center",
+  textAlign: "left",
+  cursor: "pointer",
+};
+
+const rankBadgeV23 = {
+  width: 28,
+  height: 28,
+  borderRadius: 999,
+  display: "grid",
+  placeItems: "center",
+  background: "rgba(96,165,250,.16)",
+  color: "#bfdbfe",
+  fontWeight: 1000,
+};
+
+const newsListV23 = {
+  display: "grid",
+  gap: 10,
+};
+
+const newsItemV23 = {
+  borderRadius: 14,
+  padding: 12,
+  background: "rgba(255,255,255,.045)",
+  border: "1px solid rgba(255,255,255,.09)",
+  color: "#fff",
+  fontWeight: 900,
+  display: "grid",
+  gap: 6,
+};
+
+const conferenceCardsV23 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: 12,
+};
+
+const conferenceCardV23 = {
+  borderRadius: 16,
+  padding: 14,
+  background: "rgba(255,255,255,.045)",
+  border: "1px solid rgba(255,255,255,.10)",
+  display: "flex",
+  gap: 12,
+  alignItems: "center",
+};
+
+const conferenceLogoCircle = {
+  width: 54,
+  height: 54,
+  borderRadius: 16,
+  display: "grid",
+  placeItems: "center",
+  background: "rgba(255,255,255,.06)",
+  border: "1px solid rgba(255,255,255,.10)",
+};
+
+const coachProfileBannerV23 = {
+  position: "relative",
+  overflow: "hidden",
+  borderRadius: 26,
+  padding: "clamp(20px, 3vw, 34px)",
+  border: "1px solid rgba(148,163,184,.25)",
+  boxShadow: "0 28px 90px rgba(0,0,0,.46), inset 0 1px 0 rgba(255,255,255,.08)",
+  display: "grid",
+  gridTemplateColumns: "auto minmax(0,1fr) minmax(200px, 260px)",
+  gap: 22,
+  alignItems: "center",
+  marginBottom: 18,
+};
+
+const coachBannerLogoV23 = {
+  width: 132,
+  height: 132,
+  borderRadius: 28,
+  display: "grid",
+  placeItems: "center",
+  background: "rgba(255,255,255,.08)",
+  border: "1px solid rgba(255,255,255,.14)",
+};
+
+const coachBannerMainV23 = {
+  minWidth: 0,
+};
+
+const coachBannerNameV23 = {
+  fontSize: "clamp(42px, 7vw, 88px)",
+  fontWeight: 1000,
+  lineHeight: .82,
+  letterSpacing: "-.075em",
+  color: "#fff",
+  margin: "6px 0",
+};
+
+const coachPrestigeBoxV23 = {
+  borderRadius: 18,
+  padding: 18,
+  background: "rgba(2,6,23,.42)",
+  border: "1px solid rgba(255,255,255,.12)",
+  display: "grid",
+  gap: 8,
+  textAlign: "center",
+};
+
+const coachReferenceGridV23 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+  gap: 14,
+  marginBottom: 18,
+};
+
+const hofProgressTrack = {
+  width: "100%",
+  height: 14,
+  borderRadius: 999,
+  overflow: "hidden",
+  background: "rgba(255,255,255,.10)",
+  border: "1px solid rgba(255,255,255,.12)",
+  margin: "10px 0",
+};
+
+const hofProgressFill = {
+  height: "100%",
+  borderRadius: 999,
+  background: "linear-gradient(90deg,#facc15,#22c55e)",
 };
