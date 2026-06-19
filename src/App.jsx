@@ -1620,7 +1620,6 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
   const currentSeasonResults = results.filter((r)=>String(r.season_year)===String(currentYear));
   const rankings = computerRankingRows(teams, currentSeasonResults, assignments, users);
   const prestigeRows = typeof dynastyPrestigeRows === "function" ? dynastyPrestigeRows(teams, assignments, allResults, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats).slice(0,5) : [];
-  const topRecruit = recruiting.filter((row)=>String(row.season_year)===String(currentYear) && Number(row.rank)>0).sort((a,b)=>Number(a.rank)-Number(b.rank))[0];
 
   const rankingDetails = rankings.map((row, index) => {
     const team = teams.find((team)=>team.id===row.team?.id) || row.team || teams.find((team)=>team.name===row.teamName);
@@ -1677,14 +1676,14 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
     return { ...row, rank:index+1, user:userName || "CPU" };
   });
 
+  const topAutomaticRows = rankingDetails.slice(0,3);
+
   const prestigeLeader = topPrestigeRows[0];
-  const topRecruitTeam = topRecruit ? teams.find((team)=>team.id===topRecruit.team_id) || topRecruit.teams : null;
-  const topRecruitUser = topRecruitTeam ? users.find((user)=>user.id===activeCoachForTeam(topRecruitTeam.id, assignments)?.discord_user_id)?.discord_username : null;
 
   const tileData = [
-    { label:"Prestige Leader", value: prestigeLeader?.score ?? "—", sub: prestigeLeader ? `${prestigeLeader.team.name} — ${prestigeLeader.user}` : "No prestige yet", team:prestigeLeader?.team },
+    { label:"Top 3 Automatic Rankings", value:"", sub: topAutomaticRows.length ? topAutomaticRows.map((row)=>`#${row.rank} ${row.teamName} — ${row.user} • ${Number(row.rating || 0).toFixed(1)}`) : ["No rankings yet"], team:topAutomaticRows[0]?.team },
     { label:"Highest SOR", value: highestSor?.sor || "—", sub: highestSor ? `${highestSor.teamName} — ${highestSor.user}` : "No games yet", team:highestSor?.team },
-    { label:"Top Recruiter", value: topRecruit ? `#${topRecruit.rank}` : "—", sub: topRecruitTeam ? `${topRecruitTeam.name} — ${topRecruitUser || "CPU"}` : "No class entered", team:topRecruitTeam },
+    { label:"Top 3 Prestige Leaders", value:"", sub: topPrestigeRows.length ? topPrestigeRows.map((row)=>`#${row.rank} ${row.team.name} — ${row.user} • ${row.score}`) : ["No prestige yet"], team:topPrestigeRows[0]?.team },
     { label:"Active Coaches", value: activeCoachCount, sub: "of 32", team:null },
   ];
 
@@ -1768,37 +1767,6 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
               </button>
             );
           })}
-        </div>
-      </section>
-
-      <section style={dashboardBelowGridV37}>
-        <div style={dashboardSmallPanelPro}>
-          <div style={dashboardPanelHeaderPro}><span>TOP 3 SOR</span><h2>Resume Strength</h2></div>
-          <div style={dashboardMiniListPro}>
-            {topSorRows.length ? topSorRows.map((row)=>(
-              <div key={row.rank} style={{...dashboardMiniRowPro, background:`linear-gradient(100deg, ${getTeamPrimary(row.team)}55, rgba(15,23,42,.92), ${getTeamSecondary(row.team)}22)`}}>
-                <span>#{row.rank}</span><TeamLogoMark team={row.team} size={28}/><strong>{row.teamName}<small style={{display:"block", color:"rgba(255,255,255,.65)", fontWeight:800}}>{row.user}</small></strong><b>{row.sor}</b>
-              </div>
-            )) : <p style={mutedText}>No games yet.</p>}
-          </div>
-        </div>
-        <div style={dashboardSmallPanelPro}>
-          <div style={dashboardPanelHeaderPro}><span>TOP 3 PRESTIGE</span><h2>Program Power</h2></div>
-          <div style={dashboardMiniListPro}>
-            {topPrestigeRows.length ? topPrestigeRows.map((row)=>(
-              <div key={row.team.id} style={{...dashboardMiniRowPro, background:`linear-gradient(100deg, ${getTeamPrimary(row.team)}55, rgba(15,23,42,.92), ${getTeamSecondary(row.team)}22)`}}>
-                <span>#{row.rank}</span><TeamLogoMark team={row.team} size={28}/><strong>{row.team.name}<small style={{display:"block", color:"rgba(255,255,255,.65)", fontWeight:800}}>{row.user}</small></strong><b>{row.score}</b>
-              </div>
-            )) : <p style={mutedText}>No prestige yet.</p>}
-          </div>
-        </div>
-        <div style={dashboardSmallPanelPro}>
-          <div style={dashboardPanelHeaderPro}><span>DYNASTY HEADLINES</span><h2>The Wire</h2></div>
-          <div style={dashboardNewsListPro}>
-            {headlineRows.length ? headlineRows.map((item,index)=>(
-              <div key={index} style={dashboardNewsRowPro}><span>🏈</span><div><b>{item.title}</b><small>{item.meta}</small></div></div>
-            )) : <div style={mutedText}>No storylines yet. Add results in League Data Center.</div>}
-          </div>
         </div>
       </section>
     </div>
@@ -8189,12 +8157,6 @@ const dashboardRankPanelFullV37 = {
   background: "linear-gradient(145deg, rgba(8,13,31,.98), rgba(3,7,18,.99))",
   boxShadow: "0 28px 90px rgba(0,0,0,.46), inset 0 1px 0 rgba(255,255,255,.06)",
   overflowX: "auto",
-};
-
-const dashboardBelowGridV37 = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))",
-  gap: 16,
 };
 
 const draftBroadcastPageV37 = {
