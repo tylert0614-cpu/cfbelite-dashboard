@@ -719,20 +719,10 @@ export default function App() {
   );
   const activeTeamOptions = useMemo(() => teamOptions.filter((team) => activeTeamIds.has(team.id)), [teamOptions, activeTeamIds]);
   const selectedTeam = activeTab.startsWith("team-") ? teams.find((team) => `team-${team.id}` === activeTab) : null;
-  const activeCoachUsers = useMemo(() => {
-    const activeUserIds = new Set(
-      assignments
-        .filter((assignment) =>
-          assignment.status === "Active" &&
-          assignment.discord_user_id &&
-          assignment.team_id &&
-          activeTeamIds.has(assignment.team_id)
-        )
-        .map((assignment) => assignment.discord_user_id)
-    );
-    return userOptions.filter((user) => activeUserIds.has(user.id));
-  }, [assignments, userOptions, activeTeamIds]);
-  const selectedCoach = activeTab.startsWith("coach-") ? users.find((user) => `coach-${user.id}` === activeTab) : null;
+  const coachProfileUsers = useMemo(() => {
+    return userOptions.filter((user) => user?.id && user?.discord_username);
+  }, [userOptions]);
+  const selectedCoach = activeTab.startsWith("coach-") ? (coachProfileUsers.find((user) => `coach-${user.id}` === activeTab) || users.find((user) => `coach-${user.id}` === activeTab) || null) : null;
   const currentYearResults = results.filter((r) => String(r.season_year) === String(currentYear));
   const orderedStandings = standingsOrder.length
     ? standingsOrder.map((id) => standings.find((row) => row.team_id === id)).filter(Boolean)
@@ -782,7 +772,7 @@ export default function App() {
     await saveCommissionerRankings(next);
   }
 
-  const baseTabs = [["dashboard","Dashboard"],["draftRoom","CFBElite 27 Draft Room"],["commissionerCenter","Commissioner Center"],["logoManager","Team Assets"],["leagueDataCenter","League Data Center"],["seasonStats","Season Player Stats"],["teamStats","Team Stats"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["powerIndex","Power Index"],["eloRankings","User ELO"],["conferencePower","Conference Power"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["assignments","Users/Team Assignments"],["resultsManager","Results Manager"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...activeCoachUsers.map((user) => [`coach-${user.id}`, user.discord_username])];
+  const baseTabs = [["dashboard","Dashboard"],["draftRoom","CFBElite 27 Draft Room"],["commissionerCenter","Commissioner Center"],["logoManager","Team Assets"],["leagueDataCenter","League Data Center"],["seasonStats","Season Player Stats"],["teamStats","Team Stats"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["powerIndex","Power Index"],["eloRankings","User ELO"],["conferencePower","Conference Power"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["assignments","Users/Team Assignments"],["resultsManager","Results Manager"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...coachProfileUsers.map((user) => [`coach-${user.id}`, user.discord_username])];
   const tabs = useMemo(() => {
     const tabMap = new Map(baseTabs);
     const ordered = tabOrder
@@ -790,7 +780,7 @@ export default function App() {
       .filter(Boolean);
     const remaining = baseTabs.filter(([key]) => !tabOrder.includes(key));
     return [...ordered, ...remaining];
-  }, [tabOrder, activeCoachUsers]);
+  }, [tabOrder, coachProfileUsers]);
 
   async function saveTabOrder(nextTabs) {
     const order = nextTabs.map(([key]) => key);
@@ -1626,17 +1616,31 @@ function BestWorstPanel({ user, results, assignments }) {
 function DashboardRedesign({ teams, users, assignments, results, allResults, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats, currentYear, currentWeek, setCurrentYear, setCurrentWeek, saveSettings, goToTeam, sortState, setSortState }) {
   const activeAssignments = activeAssignmentsForLeague(assignments, teams);
   const activeCoachCount = activeAssignments.length;
-  const rankings = computerRankingRows(teams, results, assignments, users).slice(0,8);
+  const rankings = computerRankingRows(teams, results, assignments, users).slice(0,12);
   const prestigeRows = typeof dynastyPrestigeRows === "function" ? dynastyPrestigeRows(teams, assignments, allResults, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats).slice(0,5) : [];
-  const champions = nationalChampions.filter((row)=>String(row.season_year)===String(currentYear)).length;
-  const gamesThisYear = results.filter((row)=>String(row.season_year)===String(currentYear)).length;
-  const recentResult = results.find((row)=>String(row.season_year)===String(currentYear));
-  const recentWinner = recentResult ? (Number(recentResult.team_1_score || 0) >= Number(recentResult.team_2_score || 0) ? teamNameById(recentResult.team_1_id, teams) : teamNameById(recentResult.team_2_id, teams)) : null;
+  const championCount = nationalChampions.filter((row)=>String(row.season_year)===String(currentYear)).length;
+
+  const rankingDetails = rankings.map((row, index) => {
+    const team = teams.find((team)=>team.id===row.team?.id) || row.team || teams.find((team)=>team.name===row.teamName);
+    const rec = team ? recordFromResults(team.id, results.filter((r)=>String(r.season_year)===String(currentYear))) : { wins:0, losses:0, avgPf:"0.0", avgPa:"0.0" };
+    const sor = team ? strengthOfResult(team.id, teams, results.filter((r)=>String(r.season_year)===String(currentYear))) : "—";
+    const top10 = team ? top10Wins(team.id, results.filter((r)=>String(r.season_year)===String(currentYear))) : 0;
+    const assignment = team ? activeCoachForTeam(team.id, assignments) : null;
+    const user = assignment ? users.find((u)=>u.id===assignment.discord_user_id)?.discord_username : "CPU";
+    return { ...row, rank:index+1, team, record:rec, sor, top10, user };
+  });
+
+  const highestSor = rankingDetails
+    .filter((row)=>row.sor !== "—" && !Number.isNaN(Number(row.sor)))
+    .sort((a,b)=>Number(b.sor)-Number(a.sor))[0];
+
+  const topThree = rankingDetails.slice(0,3);
+
   const headlineRows = [
-    rankings[0] ? { title: `${rankings[0].teamName} leads the CFBElite Automatic Rankings`, meta: "Rankings Desk" } : null,
+    rankingDetails[0] ? { title: `${rankingDetails[0].teamName} leads the CFBElite Automatic Rankings`, meta: "Rankings Desk" } : null,
+    highestSor ? { title: `${highestSor.teamName} owns the strongest SOR at ${highestSor.sor}`, meta: "Strength of Result" } : null,
     prestigeRows[0] ? { title: `${prestigeRows[0].team.name} is the current prestige leader`, meta: "Prestige Tracker" } : null,
-    recentWinner ? { title: `${recentWinner} owns the latest recorded win`, meta: "Final Score Wire" } : null,
-    recruiting.find((r)=>String(r.season_year)===String(currentYear) && Number(r.rank)===1) ? { title: `${teamNameById(recruiting.find((r)=>String(r.season_year)===String(currentYear) && Number(r.rank)===1).team_id, teams)} owns the #1 recruiting class`, meta: "Recruiting Wire" } : null,
+    championCount ? { title: `${championCount} national champion${championCount === 1 ? "" : "s"} recorded for ${currentYear}`, meta: "Legacy Tracker" } : null,
   ].filter(Boolean);
 
   return (
@@ -1656,8 +1660,8 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
 
       <section style={dashboardKpiPro}>
         <div style={dashboardKpiCardPro}><span>Active Coaches</span><b>{activeCoachCount}</b><small>of 32</small></div>
-        <div style={dashboardKpiCardPro}><span>Games Played</span><b>{gamesThisYear}</b><small>{currentYear}</small></div>
-        <div style={dashboardKpiCardPro}><span>National Champions</span><b>{champions}</b><small>Recorded this season</small></div>
+        <div style={dashboardKpiCardPro}><span>Highest SOR</span><b>{highestSor?.sor || "—"}</b><small>{highestSor?.teamName || "No games yet"}</small></div>
+        <div style={dashboardKpiCardPro}><span>Top 3 Ranked</span><div style={dashboardTopThreeMini}>{topThree.map((row)=><small key={row.rank}>#{row.rank} {row.teamName} — {row.user}</small>)}</div></div>
         <div style={dashboardKpiCardPro}><span>Prestige Leader</span><b>{prestigeRows[0]?.score ?? "—"}</b><small>{prestigeRows[0]?.team?.name || "No leader yet"}</small></div>
       </section>
 
@@ -1667,14 +1671,24 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
             <span>CFBELITE AUTOMATIC RANKINGS</span>
             <h2>Commissioner Power Table</h2>
           </div>
+          <div style={dashboardTableHeadPro}>
+            <span>Rank</span><span>Team</span><span>User</span><span>W-L</span><span>Avg PF</span><span>Avg PA</span><span>Top 10</span><span>SOR</span><span>Score</span>
+          </div>
           <div style={dashboardRankingListPro}>
-            {rankings.map((row,index)=>{
-              const team = teams.find((team)=>team.id===row.team?.id) || row.team;
+            {rankingDetails.map((row)=>{
+              const team = row.team;
+              const primary = getTeamPrimary(team);
+              const secondary = getTeamSecondary(team);
               return (
-                <button key={team?.id || row.teamName || index} style={dashboardRankRowPro} onClick={()=>team?.id && goToTeam(team.id)}>
-                  <em>{index+1}</em>
-                  <TeamLogoMark team={team} size={36}/>
-                  <strong>{row.teamName || team?.name}</strong>
+                <button key={team?.id || row.teamName || row.rank} style={{...dashboardRankRowPro, background:`linear-gradient(100deg, ${primary}66, rgba(15,23,42,.92) 42%, ${secondary}22)`, borderColor:`${secondary}66`}} onClick={()=>team?.id && goToTeam(team.id)}>
+                  <em>#{row.rank}</em>
+                  <span style={dashboardTeamCellPro}><TeamLogoMark team={team} size={34}/><strong>{row.teamName || team?.name}</strong></span>
+                  <span>{row.user}</span>
+                  <span>{row.record.wins}-{row.record.losses}</span>
+                  <span>{row.record.avgPf}</span>
+                  <span>{row.record.avgPa}</span>
+                  <span>{row.top10}</span>
+                  <span>{row.sor}</span>
                   <b>{Number(row.score || row.rating || 0).toFixed(1)}</b>
                 </button>
               );
@@ -1687,7 +1701,7 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
             <div style={dashboardPanelHeaderPro}><span>PRESTIGE SPOTLIGHT</span><h2>Top Programs</h2></div>
             <div style={dashboardMiniListPro}>
               {prestigeRows.map((row,index)=>(
-                <button key={row.team.id} style={dashboardMiniRowPro} onClick={()=>goToTeam(row.team.id)}>
+                <button key={row.team.id} style={{...dashboardMiniRowPro, background:`linear-gradient(100deg, ${getTeamPrimary(row.team)}55, rgba(15,23,42,.92), ${getTeamSecondary(row.team)}22)`}} onClick={()=>goToTeam(row.team.id)}>
                   <span>#{index+1}</span><TeamLogoMark team={row.team} size={28}/><strong>{row.team.name}</strong><b>{row.score}</b>
                 </button>
               ))}
@@ -3785,28 +3799,28 @@ function CoachRings({ stats, superlatives }) {
 }
 
 function CoachProfile({ user, users = [], teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting, seasonPlayerStats = [], teamSeasonStats = [] }) {
-  const coachStats = getCoachStats(usersFallback(user), teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
-  const stats = coachStats.find((row)=>row.userId === user.id) || { wins:0, losses:0, nattys:0, confTitles:0, top25Wins:0, awards:0, allAmericans:0, heismans:0, prestige:0 };
-  const activeAssignment = assignments.find((a)=>a.discord_user_id===user.id && a.status==="Active");
+  const coachStats = getCoachStats(usersFallback(user || {}), teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
+  const stats = coachStats.find((row)=>row.userId === user?.id) || { wins:0, losses:0, nattys:0, confTitles:0, top25Wins:0, awards:0, allAmericans:0, heismans:0, prestige:0 };
+  const activeAssignment = assignments.find((a)=>a.discord_user_id===user?.id && a.status==="Active");
   const currentTeam =
     teams.find((t)=>t.id===activeAssignment?.team_id) ||
     activeAssignment?.teams ||
     activeAssignment?.team ||
     null;
-  const timeline = assignments.filter((a)=>a.discord_user_id===user.id).sort((a,b)=>Number(a.start_year||0)-Number(b.start_year||0));
+  const timeline = assignments.filter((a)=>a.discord_user_id===user?.id).sort((a,b)=>Number(a.start_year||0)-Number(b.start_year||0));
   const coachResults = results.filter((result) => {
     const team1UserId = result.team_1_user_id || coachForTeamYear(result.team_1_id, result.season_year, assignments)?.discord_user_id;
     const team2UserId = result.team_2_user_id || coachForTeamYear(result.team_2_id, result.season_year, assignments)?.discord_user_id;
-    return team1UserId === user.id || team2UserId === user.id;
+    return team1UserId === user?.id || team2UserId === user?.id;
   });
-  const coachAA = rowsForCoachUser(allAmericans, user, assignments);
-  const coachAwards = rowsForCoachUser(awards, user, assignments);
-  const coachHeismans = rowsForCoachUser(heismans, user, assignments);
-  const coachEloRow = userEloRows(usersFallback(user), assignments, results).find((row)=>row.user.id === user.id);
+  const coachAA = rowsForCoachUser(allAmericans, user || {}, assignments);
+  const coachAwards = rowsForCoachUser(awards, user || {}, assignments);
+  const coachHeismans = rowsForCoachUser(heismans, user || {}, assignments);
+  const coachEloRow = userEloRows(usersFallback(user || {}), assignments, results).find((row)=>row.user?.id === user?.id);
   const coachTier = userTierFromElo(coachEloRow?.elo || 1500, 1);
   const coachPrestigeScore = Math.min(100, Math.round((stats?.prestige || stats?.rawPrestige || stats?.totalScore || 0) / 2.5));
   const coachPrestigeTier = typeof dynastyPrestigeTier === "function" ? dynastyPrestigeTier(coachPrestigeScore) : { stars: "⭐", label: "1-Star Coach" };
-  const superlatives = coachSuperlatives(user, users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
+  const superlatives = coachSuperlatives(user || {}, users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
   const currentSeasonRecord = currentTeam ? recordFromResults(currentTeam.id, results.filter((row)=>String(row.season_year) === String(new Date().getFullYear()))) : { wins:0, losses:0 };
 
   const primary = getTeamPrimary(currentTeam);
@@ -3824,7 +3838,7 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
       <div style={coachBannerLogoV23}><TeamLogoMark team={currentTeam} size={108}/></div>
       <div style={coachBannerMainV23}>
         <div style={eyebrow}>{currentTeam?.name || "Unassigned"}</div>
-        <h1 style={coachBannerNameV23}>{user.discord_username}</h1>
+        <h1 style={coachBannerNameV23}>{(user?.discord_username || 'Coach')}</h1>
         <p style={mutedText}>Head Coach • CFBElite Dynasty</p>
       </div>
       <div style={coachPrestigeBoxV23}>
@@ -3836,7 +3850,7 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
     <div style={teamProfileHeroClean}>
       <div>
         <div style={{...eyebrow, color: accent, letterSpacing:".18em"}}>Coach Profile</div>
-        <h2 style={teamProfileName}>{user.discord_username}</h2>
+        <h2 style={teamProfileName}>{(user?.discord_username || 'Coach')}</h2>
         <p style={teamProfileSubline}><span>Current Team</span><b>{currentTeam?.name || "Unassigned"}</b></p>
       </div>
       <div style={badgeRow}>
@@ -3850,7 +3864,7 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
       <div style={coachHeroLogoBox}>{currentTeam ? <TeamLogoMark team={currentTeam} size={96}/> : "CFB"}</div>
       <div>
         <div style={eyebrow}>Coach Profile 2.0</div>
-        <div style={coachHeroName}>{user.discord_username}</div>
+        <div style={coachHeroName}>{(user?.discord_username || 'Coach')}</div>
         <div style={mutedText}>Current Team: <b>{currentTeam?.name || "Unassigned"}</b></div>
       </div>
       <div style={coachHeroBadges}>
@@ -3870,7 +3884,7 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
       </div>
       <MiniList title="Recent Player Stat Seasons" rows={coachPlayerStats.slice(0,8).map((row)=>`${row.season_year} ${row.player_name} · ${row.position} · ${row.teams?.name || teamNameById(row.team_id, teams)}`)}/>
     </div>
-    <div style={statsGrid}><Stat title="Career Record" value={`${stats?.wins||0}-${stats?.losses||0}`}/><Stat title="National Titles" value={stats?.nattys||0}/><Stat title="Conference Titles" value={stats?.confTitles||0}/><Stat title="Top 10 Wins" value={stats?.top10Wins||0}/><Stat title="Awards" value={stats?.awards||0}/><Stat title="All-Americans" value={stats?.allAmericans||0}/><Stat title="Heismans" value={stats?.heismans||0}/><Stat title="Top 25 Recruiting Classes" value={top25RecruitingClassesForCoach(user, recruiting, assignments)}/></div>
+    <div style={statsGrid}><Stat title="Career Record" value={`${stats?.wins||0}-${stats?.losses||0}`}/><Stat title="National Titles" value={stats?.nattys||0}/><Stat title="Conference Titles" value={stats?.confTitles||0}/><Stat title="Top 10 Wins" value={stats?.top10Wins||0}/><Stat title="Awards" value={stats?.awards||0}/><Stat title="All-Americans" value={stats?.allAmericans||0}/><Stat title="Heismans" value={stats?.heismans||0}/><Stat title="Top 25 Recruiting Classes" value={top25RecruitingClassesForCoach(user || {}, recruiting, assignments)}/></div>
     <div style={sportsReferenceGrid}>
       <div style={miniCard}>
         <h3 style={miniTitle}>Hall of Fame Progress</h3>
@@ -3879,13 +3893,13 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
         <div style={miniRow}>Career Record: <b>{stats?.wins||0}-{stats?.losses||0}</b></div>
         <div style={miniRow}>Titles: <b>{stats?.nattys||0} National • {stats?.confTitles||0} Conference</b></div>
       </div>
-      <MiniList title="Recruiting History" rows={recruiting.filter((row)=>coachForTeamYear(row.team_id,row.season_year,assignments)?.discord_user_id===user.id).slice(0,8).map((row)=>`${row.season_year}: ${teamNameById(row.team_id,teams)} #${row.rank}`)}/>
+      <MiniList title="Recruiting History" rows={recruiting.filter((row)=>coachForTeamYear(row.team_id,row.season_year,assignments)?.discord_user_id===user?.id).slice(0,8).map((row)=>`${row.season_year}: ${teamNameById(row.team_id,teams)} #${row.rank}`)}/>
       <MiniList title="Team Stat Seasons" rows={coachTeamStats.slice(0,8).map((row)=>`${row.season_year}: ${teamNameById(row.team_id,teams)} • ${row.points_per_game || "—"} PPG • ${row.total_ppg_allowed || "—"} allowed`)}/>
       <MiniList title="Player Stat Leaders" rows={coachPlayerStats.slice(0,8).map((row)=>`${row.season_year}: ${row.player_name} • ${row.position}`)}/>
     </div>
     <CoachTimelineTable timeline={timeline} teams={teams} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions}/>
     <Results rows={coachResults} deleteResult={()=>{}} search="" setSearch={()=>{}}/>
-    <RivalryBadges user={user} users={usersFallback(user)} allUsers={users} results={results} assignments={assignments}/><BestWorstPanel user={user} results={results} assignments={assignments}/><CoachTimelineEvents user={user} teams={teams} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} assignments={assignments}/><RecognitionTable title="All-Americans" headers={["Player","Position","Team","Year","Type"]} rows={coachAA.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year,r.type]}))}/>
+    <RivalryBadges user={user} users={usersFallback(user || {})} allUsers={users} results={results} assignments={assignments}/><BestWorstPanel user={user} results={results} assignments={assignments}/><CoachTimelineEvents user={user} teams={teams} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} assignments={assignments}/><RecognitionTable title="All-Americans" headers={["Player","Position","Team","Year","Type"]} rows={coachAA.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year,r.type]}))}/>
     <RecognitionTable title="Award Winners" headers={["Player","Position","Team","Year","Award"]} rows={coachAwards.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year,r.award_name]}))}/>
     <RecognitionTable title="Heisman Winners" headers={["Player","Position","Team","Year"]} rows={coachHeismans.map((r)=>({id:r.id,cells:[r.player_name,r.position,teamNameById(r.team_id,teams),r.season_year]}))}/>
   </section>;
@@ -7961,6 +7975,7 @@ const dashboardRankPanelPro = {
   border: "1px solid rgba(96,165,250,.18)",
   background: "linear-gradient(145deg, rgba(8,13,31,.96), rgba(3,7,18,.99))",
   boxShadow: "0 24px 80px rgba(0,0,0,.40), inset 0 1px 0 rgba(255,255,255,.055)",
+  overflowX: "auto",
 };
 
 const dashboardSideStackPro = {
@@ -7990,16 +8005,16 @@ const dashboardRankingListPro = {
 const dashboardRankRowPro = {
   width: "100%",
   display: "grid",
-  gridTemplateColumns: "36px 44px minmax(0,1fr) auto",
-  gap: 12,
+  gridTemplateColumns: "52px minmax(190px,1.25fr) minmax(120px,.7fr) 70px 80px 80px 78px 70px 76px",
+  gap: 10,
   alignItems: "center",
   border: "1px solid rgba(255,255,255,.09)",
   borderRadius: 14,
   padding: "12px 14px",
-  background: "rgba(255,255,255,.04)",
   color: "#fff",
   textAlign: "left",
   cursor: "pointer",
+  minWidth: 880,
 };
 
 const dashboardMiniListPro = {
@@ -8036,4 +8051,31 @@ const dashboardNewsRowPro = {
   padding: 11,
   background: "rgba(255,255,255,.035)",
   border: "1px solid rgba(255,255,255,.08)",
+};
+
+
+const dashboardTableHeadPro = {
+  display: "grid",
+  gridTemplateColumns: "52px minmax(190px,1.25fr) minmax(120px,.7fr) 70px 80px 80px 78px 70px 76px",
+  gap: 10,
+  alignItems: "center",
+  color: "rgba(219,234,254,.72)",
+  textTransform: "uppercase",
+  letterSpacing: ".08em",
+  fontSize: 11,
+  fontWeight: 950,
+  padding: "0 14px 8px",
+};
+
+const dashboardTeamCellPro = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  minWidth: 0,
+};
+
+const dashboardTopThreeMini = {
+  display: "grid",
+  gap: 4,
+  marginTop: 4,
 };
