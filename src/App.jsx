@@ -1612,13 +1612,13 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
   const activeAssignments = activeAssignmentsForLeague(assignments, teams);
   const activeCoachCount = activeAssignments.length;
   const prestigeRows = typeof dynastyPrestigeRows === "function" ? dynastyPrestigeRows(teams, assignments, allResults, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats).slice(0,5) : [];
+  const rankings = computerRankingRows(teams, results, assignments, users).slice(0,8);
   const champions = nationalChampions.filter((row)=>String(row.season_year)===String(currentYear)).length;
-  const rankings = computerRankingRows(teams, results, assignments, users).slice(0,5);
-  const headlines = [
-    ...recruiting.filter((r)=>String(r.season_year)===String(currentYear) && Number(r.rank)===1).slice(0,1).map((r)=>`${teamNameById(r.team_id, teams)} lands the #1 recruiting class`),
-    ...prestigeRows.slice(0,2).map((r,index)=>`${r.team.name} holds the #${index+1} prestige spot`),
-    rankings[0] ? `${rankings[0].teamName} owns the #1 computer rank` : null,
-    `${results.length} games recorded in ${currentYear}`,
+  const headlineRows = [
+    ...recruiting.filter((r)=>String(r.season_year)===String(currentYear) && Number(r.rank)===1).slice(0,1).map((r)=>({title:`${teamNameById(r.team_id, teams)} lands the #1 recruiting class`, meta:"Recruiting Wire"})),
+    ...prestigeRows.slice(0,2).map((r,index)=>({title:`${r.team.name} holds the #${index+1} prestige spot`, meta:"Prestige Tracker"})),
+    rankings[0] ? {title:`${rankings[0].teamName} leads the CFBElite computer rankings`, meta:"Rankings Desk"} : null,
+    {title:`${results.length} games recorded in ${currentYear}`, meta:"League Database"},
   ].filter(Boolean).slice(0,5);
 
   const confMap = new Map();
@@ -1629,41 +1629,41 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
   });
 
   return (
-    <div style={dashboardCanvasV24}>
-      <section style={heroV24}>
-        <div style={heroLogoLockupV24}>
-          <div style={heroLogoBoxV24}>CFB<span>27</span></div>
+    <div style={proPageV26}>
+      <section style={proHeroV26}>
+        <div style={proHeroCopyV26}>
+          <div style={proEyebrowV26}>CFBELITE 27 • LIVE DYNASTY DATABASE</div>
+          <h1 style={proHeroTitleV26}>Dynasty Headquarters</h1>
+          <p style={proHeroMetaV26}>Season {currentYear} • {currentWeek}</p>
+        </div>
+        <div style={proHeroControlsV26}>
           <div>
-            <div style={heroKickerV24}>CFBELITE 27</div>
-            <h1 style={heroTitleV24}>Dynasty Headquarters</h1>
-            <p style={heroSubV24}>Year {currentYear} • {currentWeek}</p>
+            <label style={proLabelV26}>Season</label>
+            <select value={currentYear} onChange={(e)=>setCurrentYear(e.target.value)} style={input}>{YEARS.map((year)=><option key={year}>{year}</option>)}</select>
           </div>
-        </div>
-        <div style={heroControlsV24}>
-          <select value={currentYear} onChange={(e)=>setCurrentYear(e.target.value)} style={input}>{YEARS.map((year)=><option key={year}>{year}</option>)}</select>
-          <select value={currentWeek} onChange={(e)=>setCurrentWeek(e.target.value)} style={input}>{WEEKS.map((week)=><option key={week}>{week}</option>)}</select>
-          <button style={button} onClick={saveSettings}>Save Year / Week</button>
+          <div>
+            <label style={proLabelV26}>Week</label>
+            <select value={currentWeek} onChange={(e)=>setCurrentWeek(e.target.value)} style={input}>{WEEKS.map((week)=><option key={week}>{week}</option>)}</select>
+          </div>
+          <button style={button} onClick={saveSettings}>Save League Settings</button>
         </div>
       </section>
 
-      <section style={kpiRailV24}>
-        <div style={kpiV24}><span>Total Coaches</span><b>32</b><small>League slots</small></div>
-        <div style={kpiV24}><span>Active Coaches</span><b>{activeCoachCount}</b><small>Assigned users</small></div>
-        <div style={kpiV24}><span>Games Played</span><b>{results.length}</b><small>This season</small></div>
-        <div style={kpiV24}><span>National Champions</span><b>{champions}</b><small>{currentYear}</small></div>
+      <section style={proKpiGridV26}>
+        <div style={proKpiV26}><span>Total Coaches</span><b>32</b><small>League slots</small></div>
+        <div style={proKpiV26}><span>Active Coaches</span><b>{activeCoachCount}</b><small>Assigned users</small></div>
+        <div style={proKpiV26}><span>Games Played</span><b>{results.length}</b><small>This season</small></div>
+        <div style={proKpiV26}><span>National Champions</span><b>{champions}</b><small>{currentYear}</small></div>
       </section>
 
-      <section style={mainGridV24}>
-        <div style={panelV24}>
-          <div style={panelHeaderV24}>
-            <div><span>CFBELITE Automated Rankings</span><h2>Top Computer Teams</h2></div>
-            <button style={pillButtonV24}>Full Rankings</button>
-          </div>
-          <div style={rankingRowsV24}>
+      <section style={proThreeColV26}>
+        <div style={proPanelV26}>
+          <div style={proPanelHeadV26}><div><span>CFBELITE AUTOMATED RANKINGS</span><h2>Computer Top 8</h2></div></div>
+          <div style={proListV26}>
             {rankings.map((row,index)=>{
               const team = teams.find((team)=>team.id===row.team?.id) || row.team;
               return (
-                <button key={team?.id || row.teamName || index} style={rankingRowV24} onClick={()=>team?.id && goToTeam(team.id)}>
+                <button key={team?.id || row.teamName || index} style={proRankRowV26} onClick={()=>team?.id && goToTeam(team.id)}>
                   <em>{index+1}</em>
                   <TeamLogoMark team={team} size={34}/>
                   <strong>{row.teamName || team?.name}</strong>
@@ -1672,19 +1672,16 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
               );
             })}
           </div>
-          <div style={embeddedRankingsV24}>
+          <div style={proInsetV26}>
             <ComputerRankings teams={teams} results={results} currentWeek={currentWeek} sortState={sortState} setSortState={setSortState} assignments={assignments} users={users}/>
           </div>
         </div>
 
-        <div style={panelV24}>
-          <div style={panelHeaderV24}>
-            <div><span>Prestige Spotlight</span><h2>Top 5 Programs</h2></div>
-            <button style={pillButtonV24}>Prestige</button>
-          </div>
-          <div style={rankingRowsV24}>
+        <div style={proPanelV26}>
+          <div style={proPanelHeadV26}><div><span>PRESTIGE SPOTLIGHT</span><h2>Top Programs</h2></div></div>
+          <div style={proListV26}>
             {prestigeRows.map((row,index)=>(
-              <button key={row.team.id} style={rankingRowV24} onClick={()=>goToTeam(row.team.id)}>
+              <button key={row.team.id} style={proRankRowV26} onClick={()=>goToTeam(row.team.id)}>
                 <em>{index+1}</em>
                 <TeamLogoMark team={row.team} size={34}/>
                 <strong>{row.team.name}</strong>
@@ -1694,37 +1691,29 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
           </div>
         </div>
 
-        <div style={panelV24}>
-          <div style={panelHeaderV24}>
-            <div><span>Dynasty Headlines</span><h2>The Wire</h2></div>
-          </div>
-          <div style={newsStackV24}>
-            {headlines.map((headline,index)=>(
-              <div key={index} style={newsCardV24}>
-                <div style={newsIconV24}>🏈</div>
-                <div><b>{headline}</b><small>{index+1}h ago</small></div>
+        <div style={proPanelV26}>
+          <div style={proPanelHeadV26}><div><span>DYNASTY HEADLINES</span><h2>The Wire</h2></div></div>
+          <div style={proNewsV26}>
+            {headlineRows.map((item,index)=>(
+              <div key={index} style={proNewsItemV26}>
+                <span>🏈</span>
+                <div><b>{item.title}</b><small>{item.meta}</small></div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section style={panelV24}>
-        <div style={panelHeaderV24}>
-          <div><span>Conference Overview</span><h2>League Map</h2></div>
-        </div>
-        <div style={conferenceGridV24}>
+      <section style={proPanelV26}>
+        <div style={proPanelHeadV26}><div><span>CONFERENCE OVERVIEW</span><h2>League Map</h2></div></div>
+        <div style={proConferenceGridV26}>
           {[...confMap.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([conf, confTeams])=>{
             const activeTeams = confTeams.filter((team)=>activeAssignments.some((assignment)=>assignment.team_id===team.id));
             const sampleLogoTeam = activeTeams[0] || confTeams[0];
             return (
-              <div key={conf} style={conferenceV24}>
-                <div style={conferenceMarkV24}><TeamLogoMark team={sampleLogoTeam} size={42}/></div>
-                <div>
-                  <b>{conf}</b>
-                  <span>{activeTeams.length} Coaches</span>
-                  <small>{confTeams.length} teams</small>
-                </div>
+              <div key={conf} style={proConferenceCardV26}>
+                <div style={proConferenceLogoV26}><TeamLogoMark team={sampleLogoTeam} size={42}/></div>
+                <div><b>{conf}</b><span>{activeTeams.length} active coaches</span><small>{confTeams.length} teams</small></div>
               </div>
             );
           })}
@@ -4412,7 +4401,6 @@ function GlobalStyle() {
         }
       }
     `}
- 
 </style>
   );
 }
@@ -5269,8 +5257,8 @@ function MiniList({ title, rows }) { return <div style={miniCard}><h3>{title}</h
 function Table({ headers, children }) { return <div style={{overflowX:"auto",marginTop:20}}><table style={table}><thead><tr>{headers.map((h, index)=><th key={typeof h === "string" ? h : index} style={th}>{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div>; }
 function DeleteButton({ onClick }) { return <button onClick={onClick} style={deleteButton}>Delete</button>; }
 
-const page={minHeight:"100vh",width:"100%",background:"radial-gradient(circle at 10% -8%, rgba(59,130,246,.20), transparent 28%), radial-gradient(circle at 85% 0%, rgba(124,58,237,.18), transparent 30%), linear-gradient(135deg,#020617 0%,#07111f 46%,#13051f 100%)",color:"white",overflowX:"hidden",fontFamily:"Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"};
-const container={width:"100%",maxWidth:"1640px",margin:"0 auto",padding:"clamp(14px, 2vw, 28px)",boxSizing:"border-box"};
+const page={minHeight:"100vh",width:"100%",background:"radial-gradient(circle at 15% -10%, rgba(37,99,235,.18), transparent 28%), radial-gradient(circle at 90% 0%, rgba(124,58,237,.16), transparent 30%), linear-gradient(135deg,#020617 0%,#07111f 48%,#11071f 100%)",color:"white",overflowX:"hidden",fontFamily:"Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"};
+const container={width:"100%",maxWidth:"1680px",margin:"0 auto",padding:"clamp(14px, 2vw, 28px)",boxSizing:"border-box"};
 const header={display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,flexWrap:"wrap",gap:20,background:"linear-gradient(135deg, rgba(88,28,135,.55), rgba(15,23,42,.8))",border:"1px solid rgba(250,204,21,.35)",borderRadius:28,padding:"clamp(14px, 2vw, 24px)",boxShadow:"0 24px 80px rgba(0,0,0,.35)"};
 const brandWrap={display:"flex",flexDirection:"column",alignItems:"flex-start",gap:8,minWidth:0};
 const headerLogo={width:"clamp(170px, 28vw, 340px)",height:"auto",display:"block",objectFit:"contain",filter:"drop-shadow(0 16px 32px rgba(0,0,0,.45))"};
@@ -6049,15 +6037,7 @@ const liquidGlassPanel = {
   marginBottom: 20,
 };
 
-const liquidGlassTile = {
-  background: "linear-gradient(145deg, rgba(255,255,255,.13), rgba(255,255,255,.04))",
-  backdropFilter: "blur(20px) saturate(155%)",
-  WebkitBackdropFilter: "blur(20px) saturate(155%)",
-  border: "1px solid rgba(255,255,255,.14)",
-  borderRadius: 24,
-  padding: 18,
-  boxShadow: "0 20px 60px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.15)",
-};
+
 
 const liquidGlassNav = {
   width: "100%",
@@ -6665,13 +6645,7 @@ const recruitingMassRow = {
 };
 
 
-const broadcastCard = {
-  ...card,
-  borderRadius: 20,
-  border: "1px solid rgba(148,163,184,.24)",
-  background: "linear-gradient(145deg, rgba(12,18,40,.965), rgba(5,8,23,.99))",
-  boxShadow: "0 24px 80px rgba(0,0,0,.44), inset 0 1px 0 rgba(255,255,255,.06)",
-};
+
 
 const commishGrid = {
   display: "grid",
@@ -6795,13 +6769,7 @@ const broadcastMetricCard = {
 
 
 
-const broadcastPageCard = {
-  ...card,
-  background: "linear-gradient(145deg, rgba(10,16,39,.965), rgba(4,7,21,.99))",
-  border: "1px solid rgba(148,163,184,.26)",
-  borderRadius: 20,
-  boxShadow: "0 24px 80px rgba(0,0,0,.46), inset 0 1px 0 rgba(255,255,255,.07)",
-};
+
 
 const navShell = {
   position: "sticky",
@@ -7564,3 +7532,203 @@ const conferenceMarkV24 = {
   border: "1px solid rgba(255,255,255,.09)",
 };
 
+
+
+const proPageV26 = {
+  display: "grid",
+  gap: 18,
+};
+
+const proHeroV26 = {
+  position: "relative",
+  overflow: "hidden",
+  display: "grid",
+  gridTemplateColumns: "minmax(0,1fr) minmax(280px,410px)",
+  gap: 22,
+  alignItems: "center",
+  padding: "clamp(24px, 4vw, 46px)",
+  borderRadius: 28,
+  border: "1px solid rgba(96,165,250,.22)",
+  background: "radial-gradient(circle at 18% 0%, rgba(96,165,250,.22), transparent 28%), radial-gradient(circle at 88% 18%, rgba(124,58,237,.18), transparent 32%), linear-gradient(135deg, rgba(2,6,23,.96), rgba(9,17,34,.98))",
+  boxShadow: "0 30px 100px rgba(0,0,0,.52), inset 0 1px 0 rgba(255,255,255,.075)",
+};
+
+const proHeroCopyV26 = {
+  minWidth: 0,
+};
+
+const proEyebrowV26 = {
+  color: "#60a5fa",
+  fontSize: "clamp(14px, 1.2vw, 19px)",
+  fontWeight: 1000,
+  letterSpacing: ".16em",
+  textTransform: "uppercase",
+};
+
+const proHeroTitleV26 = {
+  fontSize: "clamp(38px, 5.2vw, 74px)",
+  fontWeight: 1000,
+  lineHeight: .98,
+  letterSpacing: "-.055em",
+  margin: "7px 0 6px",
+  color: "#f8fafc",
+};
+
+const proHeroMetaV26 = {
+  color: "rgba(226,232,240,.80)",
+  fontSize: "clamp(17px, 1.7vw, 25px)",
+  fontWeight: 900,
+};
+
+const proHeroControlsV26 = {
+  display: "grid",
+  gap: 10,
+  padding: 16,
+  borderRadius: 18,
+  background: "rgba(2,6,23,.50)",
+  border: "1px solid rgba(255,255,255,.10)",
+};
+
+const proLabelV26 = {
+  display: "block",
+  color: "rgba(255,255,255,.60)",
+  fontSize: 11,
+  fontWeight: 950,
+  textTransform: "uppercase",
+  letterSpacing: ".08em",
+  marginBottom: 6,
+};
+
+const proKpiGridV26 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+  gap: 12,
+};
+
+const proKpiV26 = {
+  borderRadius: 18,
+  padding: 18,
+  minHeight: 112,
+  background: "linear-gradient(145deg, rgba(15,23,42,.92), rgba(3,7,18,.985))",
+  border: "1px solid rgba(96,165,250,.14)",
+  boxShadow: "0 18px 55px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.055)",
+  display: "grid",
+  gap: 6,
+};
+
+const proThreeColV26 = {
+  display: "grid",
+  gridTemplateColumns: "minmax(320px,1.12fr) minmax(290px,.94fr) minmax(290px,.94fr)",
+  gap: 16,
+};
+
+const proPanelV26 = {
+  borderRadius: 20,
+  padding: 16,
+  background: "linear-gradient(145deg, rgba(8,13,31,.96), rgba(3,7,18,.99))",
+  border: "1px solid rgba(148,163,184,.18)",
+  boxShadow: "0 24px 80px rgba(0,0,0,.40), inset 0 1px 0 rgba(255,255,255,.055)",
+  overflow: "hidden",
+};
+
+const proPanelHeadV26 = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+  marginBottom: 14,
+};
+
+const proListV26 = {
+  display: "grid",
+  gap: 8,
+};
+
+const proRankRowV26 = {
+  width: "100%",
+  border: "1px solid rgba(255,255,255,.09)",
+  background: "rgba(255,255,255,.04)",
+  color: "#fff",
+  borderRadius: 13,
+  padding: "10px 11px",
+  display: "grid",
+  gridTemplateColumns: "28px 38px minmax(0,1fr) auto",
+  gap: 10,
+  alignItems: "center",
+  textAlign: "left",
+  cursor: "pointer",
+};
+
+const proInsetV26 = {
+  marginTop: 12,
+  maxHeight: 360,
+  overflow: "auto",
+  borderTop: "1px solid rgba(255,255,255,.08)",
+  paddingTop: 10,
+};
+
+const proNewsV26 = {
+  display: "grid",
+  gap: 10,
+};
+
+const proNewsItemV26 = {
+  display: "grid",
+  gridTemplateColumns: "34px minmax(0,1fr)",
+  gap: 10,
+  alignItems: "center",
+  borderRadius: 14,
+  padding: 12,
+  background: "rgba(255,255,255,.04)",
+  border: "1px solid rgba(255,255,255,.09)",
+};
+
+const proConferenceGridV26 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+  gap: 12,
+};
+
+const proConferenceCardV26 = {
+  display: "flex",
+  gap: 12,
+  alignItems: "center",
+  borderRadius: 15,
+  padding: 13,
+  background: "rgba(255,255,255,.04)",
+  border: "1px solid rgba(255,255,255,.09)",
+};
+
+const proConferenceLogoV26 = {
+  width: 54,
+  height: 54,
+  borderRadius: 15,
+  display: "grid",
+  placeItems: "center",
+  background: "rgba(255,255,255,.055)",
+  border: "1px solid rgba(255,255,255,.09)",
+};
+
+const liquidGlassTile = {
+  background: "linear-gradient(145deg, rgba(15,23,42,.86), rgba(3,7,18,.96))",
+  border: "1px solid rgba(148,163,184,.16)",
+  borderRadius: 16,
+  padding: 14,
+  boxShadow: "0 16px 44px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.05)",
+};
+
+const broadcastCard = {
+  ...card,
+  borderRadius: 20,
+  background: "linear-gradient(145deg, rgba(8,13,31,.96), rgba(3,7,18,.99))",
+  border: "1px solid rgba(148,163,184,.18)",
+  boxShadow: "0 24px 80px rgba(0,0,0,.40), inset 0 1px 0 rgba(255,255,255,.055)",
+};
+
+const broadcastPageCard = {
+  ...card,
+  borderRadius: 20,
+  background: "linear-gradient(145deg, rgba(8,13,31,.96), rgba(3,7,18,.99))",
+  border: "1px solid rgba(148,163,184,.18)",
+  boxShadow: "0 24px 80px rgba(0,0,0,.40), inset 0 1px 0 rgba(255,255,255,.055)",
+};
