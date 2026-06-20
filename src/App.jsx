@@ -1759,7 +1759,7 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
 
   const tileData = [
     { label:"Top 3 Automatic Rankings", value:"", sub: topAutomaticRows.length ? topAutomaticRows.map((row)=>`#${row.rank} ${row.teamName} — ${row.user} • ${Number(row.rating || 0).toFixed(1)}`) : ["No rankings yet"], team:topAutomaticRows[0]?.team },
-    { label:"Highest SOR", value: highestSor?.sor || "—", sub: highestSor ? `${highestSor.teamName} — ${highestSor.user}` : "No games yet", team:highestSor?.team },
+    { label:"Top 3 SOR", value:"", sub: topSorRows.length ? topSorRows.map((row)=>`#${row.rank} ${row.teamName} — ${row.user} • ${row.sor}`) : ["No games yet"], team:topSorRows[0]?.team },
     { label:"Top 3 Prestige Leaders", value:"", sub: topPrestigeRows.length ? topPrestigeRows.map((row)=>`#${row.rank} ${row.team.name} — ${row.user} • ${row.score}`) : ["No prestige yet"], team:topPrestigeRows[0]?.team },
     { label:"Active Coaches", value: activeCoachCount, sub: "of 32", team:null },
   ];
@@ -1801,29 +1801,16 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
           return (
             <div key={tile.label} style={{...dashboardKpiCardPro, background: tile.team ? `linear-gradient(135deg, ${primary}aa, rgba(2,6,23,.96) 64%, ${secondary}33)` : dashboardKpiCardPro.background, borderColor: tile.team ? `${secondary}77` : "rgba(148,163,184,.16)"}}>
               <span>{tile.label}</span>
-              <b>{tile.value}</b>
-              <small style={dashboardTileSubV45}>{tile.sub}</small>
+              {tile.value !== "" && <b>{tile.value}</b>}
+              <div style={dashboardTileLinesV47}>
+                {(Array.isArray(tile.sub) ? tile.sub : [tile.sub]).map((line, i)=><small key={i} style={dashboardTileSubV45}>{line}</small>)}
+              </div>
             </div>
           );
         })}
       </section>
 
       <section style={dashboardRankPanelFullV37}>
-        <div style={dashboardPanelHeaderPro}>
-          <span>CFBELITE CFP REVEAL</span>
-          <h2>Committee Top 12</h2>
-        </div>
-        <div style={cfpRevealGridV46}>
-          {sortedRankingDetails.slice(0,12).map((row)=>(
-            <button key={`cfp-${row.team?.id || row.teamName}`} style={{...cfpRevealCardV46, borderColor:getTeamSecondary(row.team), background:`linear-gradient(135deg, ${getTeamPrimary(row.team)}88, rgba(2,6,23,.96))`}} onClick={()=>row.team?.id && goToTeam(row.team.id)}>
-              <div style={cfpRankV46}>#{row.rank}</div>
-              <TeamLogoMark team={row.team} size={46}/>
-              <div style={cfpTeamTextV46}><b>{row.teamName}</b><small>{row.record.wins}-{row.record.losses} • SOR {row.sor}</small></div>
-              <strong>{Number(row.rating || 0).toFixed(1)}</strong>
-            </button>
-          ))}
-        </div>
-
         <div style={dashboardPanelHeaderPro}>
           <span>CFBELITE AUTOMATIC RANKINGS</span>
           <h2>Sortable Power Table</h2>
@@ -1842,7 +1829,7 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
             const secondary = getTeamSecondary(team);
             return (
               <button key={team?.id || row.teamName || row.rank} style={{...dashboardRankRowPro, background:`linear-gradient(100deg, ${primary}70, rgba(15,23,42,.92) 42%, ${secondary}28)`, borderColor:`${secondary}77`}} onClick={()=>team?.id && goToTeam(team.id)}>
-                <em>#{row.rank}</em>
+                <em style={dashboardRankNumberV47}>#{row.rank}</em>
                 <span style={dashboardTeamCellPro}><TeamLogoMark team={team} size={34}/><strong>{row.teamName || team?.name}</strong></span>
                 <span>{row.user}</span>
                 <span>{row.record.wins}</span>
@@ -2962,6 +2949,21 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
         </div>
       </section>
 
+
+
+      <section style={warRoomModePanelV46}>
+        <div style={draftBestHeaderV40}>
+          <span>WAR ROOM MODE</span>
+          <b>NFL Network Style Draft Analytics</b>
+        </div>
+        <div style={warRoomModeGridV46}>
+          <WarRoomList title="Best Offense Available" rows={bestOffenseAvailable} metric={(team)=>team.draft_offense ?? team.offense_rating ?? team.off ?? "—"} setSelectedTeamId={setSelectedTeamId}/>
+          <WarRoomList title="Best Defense Available" rows={bestDefenseAvailable} metric={(team)=>team.draft_defense ?? team.defense_rating ?? team.def ?? "—"} setSelectedTeamId={setSelectedTeamId}/>
+          <WarRoomList title="Highest Prestige Available" rows={highestPrestigeAvailable} metric={(team)=>draftPrestigeStars(team)} setSelectedTeamId={setSelectedTeamId}/>
+          <WarRoomList title="Best Value Available" rows={bestValueAvailable} metric={(team)=>draftTeamRating(team)} setSelectedTeamId={setSelectedTeamId}/>
+        </div>
+      </section>
+
       <section style={draftConferencePowerPanelV42}>
         <div style={draftBestHeaderV40}>
           <span>CONFERENCE POWER INDEX</span>
@@ -2986,20 +2988,6 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
           ))}
         </div>
       </section>
-
-      <section style={warRoomModePanelV46}>
-        <div style={draftBestHeaderV40}>
-          <span>WAR ROOM MODE</span>
-          <b>Draft Analytics</b>
-        </div>
-        <div style={warRoomModeGridV46}>
-          <WarRoomList title="Best Offense Available" rows={bestOffenseAvailable} metric={(team)=>team.draft_offense ?? team.offense_rating ?? team.off ?? "—"} setSelectedTeamId={setSelectedTeamId}/>
-          <WarRoomList title="Best Defense Available" rows={bestDefenseAvailable} metric={(team)=>team.draft_defense ?? team.defense_rating ?? team.def ?? "—"} setSelectedTeamId={setSelectedTeamId}/>
-          <WarRoomList title="Highest Prestige Available" rows={highestPrestigeAvailable} metric={(team)=>draftPrestigeStars(team)} setSelectedTeamId={setSelectedTeamId}/>
-          <WarRoomList title="Best Value Available" rows={bestValueAvailable} metric={(team)=>draftTeamRating(team)} setSelectedTeamId={setSelectedTeamId}/>
-        </div>
-      </section>
-
       <section style={draftMainBoardV37} className="cfb-responsive-grid">
         <div style={draftBoardPanelV37} className="cfb-card">
           <div style={S.eyebrow}>Draft Board</div>
@@ -4916,6 +4904,28 @@ function GlobalStyle() {
         --cfb-border: rgba(255,255,255,.08);
         --cfb-text: #f8fafc;
       }
+
+      /* v47-hard-theme */
+      html,
+      body,
+      #root {
+        background: #020617 !important;
+        color: #f8fafc !important;
+      }
+
+      body {
+        background:
+          radial-gradient(circle at 50% -20%, rgba(212,175,55,.08), transparent 28%),
+          #020617 !important;
+      }
+
+      :root {
+        --cfb-gold: #d4af37;
+        --cfb-panel: #0f172a;
+        --cfb-bg: #020617;
+        --cfb-border: rgba(255,255,255,.08);
+        --cfb-text: #f8fafc;
+      }
 `}</style>
   );
 }
@@ -5746,7 +5756,14 @@ function MiniList({ title, rows }) { return <div style={miniCard}><h3>{title}</h
 function Table({ headers, children }) { return <div style={{overflowX:"auto",marginTop:20}}><table style={table}><thead><tr>{headers.map((h, index)=><th key={typeof h === "string" ? h : index} style={th}>{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div>; }
 function DeleteButton({ onClick }) { return <button onClick={onClick} style={deleteButton}>Delete</button>; }
 
-const page={minHeight:"100vh",width:"100%",background:"linear-gradient(180deg,#020617 0%,#07111f 48%,#020617 100%)",color:"white",overflowX:"hidden",fontFamily:"Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"};
+const page = {
+  minHeight:"100vh",
+  width:"100%",
+  background:"#020617",
+  color:"#f8fafc",
+  overflowX:"hidden",
+  fontFamily:"Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+};
 const container={width:"100%",maxWidth:"1680px",margin:"0 auto",padding:"clamp(14px, 2vw, 28px)",boxSizing:"border-box"};
 const header={display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,flexWrap:"wrap",gap:20,background:"linear-gradient(135deg, rgba(88,28,135,.55), rgba(15,23,42,.8))",border:"1px solid rgba(250,204,21,.35)",borderRadius:28,padding:"clamp(14px, 2vw, 24px)",boxShadow:"0 24px 80px rgba(0,0,0,.35)"};
 const brandWrap={display:"flex",flexDirection:"column",alignItems:"flex-start",gap:8,minWidth:0};
@@ -5765,12 +5782,12 @@ const statValue={fontSize:38,fontWeight:950,color:"#fff7ed"};
 const statInput={...statValue,background:"transparent",color:"white",border:"none",outline:"none",width:"100%"};
 const statSelect={background:"#111827",color:"#fff7ed",border:"1px solid rgba(250,204,21,.25)",borderRadius:12,padding:14,fontSize:24,fontWeight:900,width:"100%"};
 const card = {
-  background: "linear-gradient(145deg, rgba(15,23,42,.96), rgba(2,6,23,.99))",
-  border: "1px solid rgba(71,85,105,.62)",
-  borderRadius: 16,
-  padding: "clamp(16px, 2vw, 24px)",
-  marginBottom: 22,
-  boxShadow: "0 22px 70px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.04)",
+  background:"#0f172a",
+  border:"1px solid rgba(255,255,255,.08)",
+  borderRadius:16,
+  padding:"clamp(16px, 2vw, 24px)",
+  marginBottom:22,
+  boxShadow:"0 22px 70px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.035)"
 };
 const sectionTop={display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"};
 const sectionTitle={fontSize:"clamp(22px, 2vw, 30px)",fontWeight:950,margin:0,color:"#f8fafc",letterSpacing:"-.035em"};
@@ -8649,11 +8666,11 @@ const liquidGlassTile = {
 };
 
 const broadcastCard = {
-  background: "linear-gradient(145deg, rgba(15,23,42,.96), rgba(2,6,23,.99))",
-  border: "1px solid rgba(71,85,105,.62)",
-  borderRadius: 18,
-  padding: "clamp(16px, 2vw, 24px)",
-  boxShadow: "0 22px 70px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.04)",
+  background:"#0f172a",
+  border:"1px solid rgba(255,255,255,.08)",
+  borderRadius:18,
+  padding:"clamp(16px, 2vw, 24px)",
+  boxShadow:"0 22px 70px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.035)"
 };
 
 const broadcastPageCard = {
@@ -8723,14 +8740,15 @@ const dashboardKpiPro = {
 };
 
 const dashboardKpiCardPro = {
-  borderRadius: 18,
-  border: "1px solid rgba(148,163,184,.16)",
-  background: "linear-gradient(145deg, rgba(15,23,42,.94), rgba(3,7,18,.985))",
-  padding: 18,
   minHeight: 118,
+  borderRadius: 16,
+  padding: 16,
+  border: "1px solid rgba(255,255,255,.08)",
+  background: "#0f172a",
+  boxShadow: "0 18px 48px rgba(0,0,0,.26), inset 0 1px 0 rgba(255,255,255,.035)",
   display: "grid",
-  gap: 6,
-  boxShadow: "0 18px 55px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.055)",
+  gap: 8,
+  alignContent: "center",
 };
 
 const dashboardFeatureGridPro = {
@@ -8857,13 +8875,13 @@ const dashboardHeaderButtonPro = {
 const dashboardRankRowPro = {
   width: "100%",
   display: "grid",
-  gridTemplateColumns: "52px minmax(190px,1.25fr) minmax(120px,.7fr) 54px 54px 80px 80px 78px 70px 82px",
+  gridTemplateColumns: "58px minmax(190px,1.25fr) minmax(120px,.7fr) 54px 54px 80px 80px 78px 70px 82px",
   gap: 10,
   alignItems: "center",
-  border: "1px solid rgba(255,255,255,.09)",
+  border: "1px solid rgba(255,255,255,.08)",
   borderRadius: 14,
   padding: "12px 14px",
-  color: "#fff",
+  color: "#f8fafc",
   textAlign: "left",
   cursor: "pointer",
   minWidth: 940,
@@ -8875,16 +8893,16 @@ const dashboardProV37 = {
   gap: 18,
 };
 
-const dashboardHeroV37={
+const dashboardHeroV37 = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
   gap: 18,
   alignItems: "center",
   borderRadius: 18,
   padding: "clamp(20px, 4vw, 48px)",
-  border: "1px solid rgba(51,65,85,.95)",
-  background: "linear-gradient(135deg, rgba(15,23,42,.98), rgba(2,6,23,.98))",
-  boxShadow: "0 24px 80px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.05)",
+  border: "1px solid rgba(255,255,255,.08)",
+  background: "#0f172a",
+  boxShadow: "0 24px 80px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.035)",
   overflow: "hidden",
 };
 
@@ -8899,12 +8917,12 @@ const dashboardTitleV37={
   wordBreak: "normal",
 };
 
-const dashboardRankPanelFullV37={
+const dashboardRankPanelFullV37 = {
   borderRadius: 16,
   padding: 20,
-  border: "1px solid rgba(51,65,85,.95)",
-  background: "linear-gradient(145deg, rgba(15,23,42,.98), rgba(2,6,23,.99))",
-  boxShadow: "0 24px 70px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.04)",
+  border: "1px solid rgba(255,255,255,.08)",
+  background: "#0f172a",
+  boxShadow: "0 24px 70px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.035)",
   overflowX: "auto",
 };
 
@@ -9110,11 +9128,11 @@ const coachPanelV37 = {
 
 
 const dashboardWirePanelV38 = {
-  borderRadius: 20,
-  padding: 16,
-  border: "1px solid rgba(148,163,184,.16)",
-  background: "linear-gradient(145deg, rgba(8,13,31,.96), rgba(3,7,18,.99))",
-  boxShadow: "0 18px 55px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.055)",
+  borderRadius: 16,
+  padding: 18,
+  border: "1px solid rgba(255,255,255,.08)",
+  background: "#0f172a",
+  boxShadow: "0 18px 55px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.035)",
 };
 
 const draftLowerThirdV38 = {
@@ -9383,12 +9401,12 @@ const draftBestTileV43 = {
   minHeight: 172,
   borderRadius: 18,
   padding: 14,
-  color: "#fff",
-  border: "1px solid rgba(255,255,255,.16)",
+  color: "#f8fafc",
+  border: "1px solid rgba(255,255,255,.08)",
   textAlign: "center",
   cursor: "pointer",
   overflow: "hidden",
-  boxShadow: "0 16px 40px rgba(0,0,0,.26), inset 0 1px 0 rgba(255,255,255,.08)",
+  boxShadow: "0 16px 40px rgba(0,0,0,.26), inset 0 1px 0 rgba(255,255,255,.035)",
 };
 
 const draftBestRankV43 = {
@@ -9600,9 +9618,9 @@ const coachMilestoneTileV46 = {
 const warRoomModePanelV46 = {
   borderRadius: 16,
   padding: 16,
-  border: "1px solid rgba(255,255,255,.08)",
-  background: "linear-gradient(145deg, rgba(15,23,42,.97), rgba(2,6,23,.99))",
-  boxShadow: "0 18px 55px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.04)",
+  border: "1px solid rgba(212,175,55,.22)",
+  background: "#0f172a",
+  boxShadow: "0 18px 55px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.035)",
 };
 
 const warRoomModeGridV46 = {
@@ -9653,5 +9671,28 @@ const hofRankingCardV46 = {
 const hofRankNumberV46 = {
   fontSize: 24,
   fontWeight: 1000,
+  color: "#d4af37",
+};
+
+
+const dashboardRankNumberV47 = {
+  display: "inline-grid",
+  placeItems: "center",
+  width: 42,
+  height: 34,
+  borderRadius: 10,
+  background: "linear-gradient(135deg, rgba(212,175,55,.98), rgba(146,111,23,.94))",
+  color: "#020617",
+  fontStyle: "normal",
+  fontWeight: 1000,
+  boxShadow: "0 10px 24px rgba(212,175,55,.18), inset 0 1px 0 rgba(255,255,255,.30)",
+};
+
+const dashboardTileLinesV47 = {
+  display: "grid",
+  gap: 3,
+};
+
+const cfpGoldTextV47 = {
   color: "#d4af37",
 };
