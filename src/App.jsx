@@ -772,7 +772,7 @@ export default function App() {
     await saveCommissionerRankings(next);
   }
 
-  const baseTabs = [["dashboard","Dashboard"],["draftRoom","CFBElite 27 Draft Room"],["commissionerCenter","Commissioner Center"],["logoManager","Team Assets"],["leagueDataCenter","League Data Center"],["seasonStats","Season Player Stats"],["teamStats","Team Stats"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["powerIndex","Power Index"],["eloRankings","User ELO"],["conferencePower","Conference Power"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["assignments","Users/Team Assignments"],["resultsManager","Results Manager"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...coachProfileUsers.map((user) => [`coach-${user.id}`, user.discord_username])];
+  const baseTabs = [["dashboard","Dashboard"],["draftRoom","CFBElite 27 Draft Room"],["commissionerCenter","Commissioner Center"],["logoManager","Team Assets"],["leagueDataCenter","League Data Center"],["seasonStats","Season Player Stats"],["teamStats","Team Stats"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["dynastyHOF","Dynasty Hall of Fame"],["rivalries","Rivalries"],["powerIndex","Power Index"],["eloRankings","User ELO"],["conferencePower","Conference Power"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["assignments","Users/Team Assignments"],["resultsManager","Results Manager"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...coachProfileUsers.map((user) => [`coach-${user.id}`, user.discord_username])];
   const tabs = useMemo(() => {
     const tabMap = new Map(baseTabs);
     const ordered = tabOrder
@@ -1189,6 +1189,7 @@ export default function App() {
     {activeTab === "dashboard" && <DashboardRedesign teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} teamSeasonStats={teamSeasonStats} currentYear={currentYear} currentWeek={currentWeek} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} saveSettings={saveLeagueSettings} goToTeam={goToTeam} sortState={userSort} setSortState={setUserSort}/>}
     {activeTab === "eloRankings" && <EloRankings users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
     {activeTab === "dynastyRecords" && <DynastyRecords users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} seasonPlayerStats={seasonPlayerStats} teamSeasonStats={teamSeasonStats}/>}    
+    {activeTab === "dynastyHOF" && <DynastyHallOfFame users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
     {activeTab === "rivalries" && <Rivalries users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
     {activeTab === "powerIndex" && <DynastyPowerIndex users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}
     {activeTab === "commissionerCenter" && (adminUnlocked ? <CommissionerCenterSafe setActiveTab={setActiveTab} loadData={loadData}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>) }    
@@ -1437,11 +1438,14 @@ function DynastyRecords({ users, teams, assignments, results, allAmericans, awar
 
 
 function dynastyPrestigeTier(score) {
-  if (score >= 94) return { stars: "⭐⭐⭐⭐⭐", label: "Blue Blood" };
-  if (score >= 82) return { stars: "⭐⭐⭐⭐", label: "4-Star Program" };
-  if (score >= 66) return { stars: "⭐⭐⭐", label: "3-Star Program" };
-  if (score >= 48) return { stars: "⭐⭐", label: "2-Star Program" };
-  return { stars: "⭐", label: "1-Star Program" };
+  const n = Number(score) || 0;
+  if (n >= 95) return { stars: "⭐⭐⭐⭐⭐", label: "Blue Blood", tier: "Blue Blood" };
+  if (n >= 85) return { stars: "⭐⭐⭐⭐⭐", label: "National Power", tier: "National Power" };
+  if (n >= 75) return { stars: "⭐⭐⭐⭐", label: "Contender", tier: "Contender" };
+  if (n >= 65) return { stars: "⭐⭐⭐", label: "Rising Program", tier: "Rising Program" };
+  if (n >= 50) return { stars: "⭐⭐⭐", label: "Established", tier: "Established" };
+  if (n >= 35) return { stars: "⭐⭐", label: "Rebuilding", tier: "Rebuilding" };
+  return { stars: "⭐", label: "Basement", tier: "Basement" };
 }
 
 function dynastyPrestigeRows(teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats = []) {
@@ -1613,6 +1617,79 @@ function BestWorstPanel({ user, results, assignments }) {
 }
 
 
+
+function dynastyWireItems({ rankingDetails = [], results = [], teams = [], recruiting = [], prestigeRows = [], currentYear }) {
+  const items = [];
+  const currentResults = (results || []).filter((row)=>String(row.season_year) === String(currentYear));
+  currentResults.slice(-12).reverse().forEach((result)=>{
+    const t1 = teams.find((team)=>team.id===result.team_1_id) || result.team_1 || result.teams_1;
+    const t2 = teams.find((team)=>team.id===result.team_2_id) || result.team_2 || result.teams_2;
+    const s1 = Number(result.team_1_score);
+    const s2 = Number(result.team_2_score);
+    if (!t1 || !t2 || Number.isNaN(s1) || Number.isNaN(s2)) return;
+    const r1 = Number(result.team_1_rank || rankingDetails.find((row)=>row.team?.id===t1.id)?.rank || 0);
+    const r2 = Number(result.team_2_rank || rankingDetails.find((row)=>row.team?.id===t2.id)?.rank || 0);
+    const winner = s1 > s2 ? t1 : t2;
+    const loser = s1 > s2 ? t2 : t1;
+    const winnerRank = s1 > s2 ? r1 : r2;
+    const loserRank = s1 > s2 ? r2 : r1;
+    if (loserRank && (!winnerRank || winnerRank > loserRank + 5)) {
+      items.push({ title: `Upset Alert: ${winner.name} defeats #${loserRank} ${loser.name}`, meta: "Largest upset watch", icon: "🚨" });
+    } else if (loserRank && loserRank <= 10) {
+      items.push({ title: `Resume Builder: ${winner.name} adds a Top 10 win`, meta: "CFP résumé boost", icon: "📈" });
+    } else {
+      items.push({ title: `${winner.name} takes down ${loser.name} ${Math.max(s1,s2)}-${Math.min(s1,s2)}`, meta: "Final score", icon: "🏈" });
+    }
+  });
+
+  const topClass = (recruiting || [])
+    .filter((row)=>String(row.season_year) === String(currentYear) && Number(row.rank) > 0)
+    .sort((a,b)=>Number(a.rank)-Number(b.rank))[0];
+  if (topClass) {
+    items.push({ title: `Recruiting Win: ${teamNameById(topClass.team_id, teams)} lands the #${topClass.rank} class`, meta: "Signing day watch", icon: "📝" });
+  }
+
+  if (rankingDetails[0]) {
+    items.push({ title: `${rankingDetails[0].teamName} holds #1 in the CFBElite Automatic Rankings`, meta: "CFP committee desk", icon: "🏆" });
+  }
+
+  if (prestigeRows[0]) {
+    const tier = dynastyPrestigeTier(prestigeRows[0].score);
+    items.push({ title: `${prestigeRows[0].team.name} is a ${tier.label} program`, meta: `Prestige ${prestigeRows[0].score}`, icon: "⭐" });
+  }
+
+  return items.slice(0,8);
+}
+
+function coachMilestonesForStats(stats = {}) {
+  const rows = [];
+  const wins = Number(stats.wins || 0);
+  const top10 = Number(stats.top10Wins || 0);
+  const nattys = Number(stats.nattys || 0);
+  const confTitles = Number(stats.confTitles || 0);
+  const awards = Number(stats.awards || 0);
+  if (wins >= 50) rows.push({ label: "50 Career Wins", icon: "🏁" });
+  if (wins >= 100) rows.push({ label: "100 Career Wins", icon: "💯" });
+  if (wins >= 200) rows.push({ label: "200 Career Wins", icon: "👑" });
+  if (top10 >= 10) rows.push({ label: "10 Top 10 Wins", icon: "⚡" });
+  if (nattys >= 1) rows.push({ label: "First National Championship", icon: "🏆" });
+  if (confTitles >= 1) rows.push({ label: "First Conference Title", icon: "🏅" });
+  if (awards >= 5) rows.push({ label: "Award Factory", icon: "⭐" });
+  return rows;
+}
+
+function dynastyHallOfFameScore(row = {}) {
+  return Number((
+    (Number(row.wins || 0) * 1.2) +
+    (Number(row.nattys || 0) * 45) +
+    (Number(row.confTitles || 0) * 18) +
+    (Number(row.awards || 0) * 6) +
+    (Number(row.heismans || 0) * 18) +
+    (Number(row.top10Wins || 0) * 8) +
+    (Number(row.prestige || row.rawPrestige || 0) * 0.28)
+  ).toFixed(1));
+}
+
 function DashboardRedesign({ teams, users, assignments, results, allResults, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats, currentYear, currentWeek, setCurrentYear, setCurrentWeek, saveSettings, goToTeam, sortState, setSortState }) {
   const [rankingSort, setRankingSort] = useState({ key: "rating", direction: "desc" });
   const activeAssignments = activeAssignmentsForLeague(assignments, teams);
@@ -1700,11 +1777,7 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
     ["rating","Rating"],
   ];
 
-  const headlineRows = [
-    rankingDetails[0] ? { title: `${rankingDetails[0].teamName} leads the CFBElite Automatic Rankings`, meta: "Rankings Desk" } : null,
-    highestSor ? { title: `${highestSor.teamName} owns the strongest SOR at ${highestSor.sor}`, meta: "Strength of Result" } : null,
-    prestigeLeader ? { title: `${prestigeLeader.team.name} leads prestige at ${prestigeLeader.score}`, meta: "Prestige Tracker" } : null,
-  ].filter(Boolean);
+  const headlineRows = dynastyWireItems({ rankingDetails, results: allResults, teams, recruiting, prestigeRows, currentYear });
 
   return (
     <div style={dashboardProV37}>
@@ -1737,8 +1810,23 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
 
       <section style={dashboardRankPanelFullV37}>
         <div style={dashboardPanelHeaderPro}>
+          <span>CFBELITE CFP REVEAL</span>
+          <h2>Committee Top 12</h2>
+        </div>
+        <div style={cfpRevealGridV46}>
+          {sortedRankingDetails.slice(0,12).map((row)=>(
+            <button key={`cfp-${row.team?.id || row.teamName}`} style={{...cfpRevealCardV46, borderColor:getTeamSecondary(row.team), background:`linear-gradient(135deg, ${getTeamPrimary(row.team)}88, rgba(2,6,23,.96))`}} onClick={()=>row.team?.id && goToTeam(row.team.id)}>
+              <div style={cfpRankV46}>#{row.rank}</div>
+              <TeamLogoMark team={row.team} size={46}/>
+              <div style={cfpTeamTextV46}><b>{row.teamName}</b><small>{row.record.wins}-{row.record.losses} • SOR {row.sor}</small></div>
+              <strong>{Number(row.rating || 0).toFixed(1)}</strong>
+            </button>
+          ))}
+        </div>
+
+        <div style={dashboardPanelHeaderPro}>
           <span>CFBELITE AUTOMATIC RANKINGS</span>
-          <h2>Commissioner Power Table</h2>
+          <h2>Sortable Power Table</h2>
         </div>
         <div style={dashboardTableHeadPro}>
           {headerCells.map(([key,label])=>(
@@ -1773,7 +1861,7 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
         <div style={dashboardPanelHeaderPro}><span>DYNASTY WIRE</span><h2>The Wire</h2></div>
         <div style={dashboardNewsListPro}>
           {headlineRows.length ? headlineRows.map((item,index)=>(
-            <div key={index} style={dashboardNewsRowPro}><span>🏈</span><div style={wireTextStackV45}><b>{item.title}</b><small>{item.meta}</small></div></div>
+            <div key={index} style={dashboardNewsRowPro}><span>{item.icon || "🏈"}</span><div style={wireTextStackV45}><b>{item.title}</b><small>{item.meta}</small></div></div>
           )) : <div style={mutedText}>No storylines yet. Add results in League Data Center.</div>}
         </div>
       </section>
@@ -2400,6 +2488,24 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
     .sort((a,b)=>draftTeamRating(b)-draftTeamRating(a) || a.name.localeCompare(b.name))
     .slice(0,14);
 
+  const bestOffenseAvailable = [...availableTeams]
+    .filter((team)=>team.draft_offense || team.offense_rating || team.off)
+    .sort((a,b)=>draftNumberValue(b.draft_offense ?? b.offense_rating ?? b.off, 0)-draftNumberValue(a.draft_offense ?? a.offense_rating ?? a.off, 0))
+    .slice(0,5);
+  const bestDefenseAvailable = [...availableTeams]
+    .filter((team)=>team.draft_defense || team.defense_rating || team.def)
+    .sort((a,b)=>draftNumberValue(b.draft_defense ?? b.defense_rating ?? b.def, 0)-draftNumberValue(a.draft_defense ?? a.defense_rating ?? a.def, 0))
+    .slice(0,5);
+  const highestPrestigeAvailable = [...availableTeams]
+    .filter((team)=>team.draft_prestige || team.school_prestige || team.prestige_grade)
+    .sort((a,b)=>draftNumberValue(b.draft_prestige ?? b.school_prestige ?? b.prestige_grade, 0)-draftNumberValue(a.draft_prestige ?? a.school_prestige ?? a.prestige_grade, 0))
+    .slice(0,5);
+  const bestValueAvailable = [...availableTeams]
+    .filter((team)=>draftTeamRating(team) !== "—")
+    .sort((a,b)=>draftTeamRating(b)-draftTeamRating(a))
+    .slice(0,5);
+
+
   const draftConferencePowerRows = allowedConferences
     .map((conf) => {
       const confTeams = teams.filter((team)=>eligibleTeamNames.has(team.name) && cleanConference(team.conference) === conf);
@@ -2881,6 +2987,19 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
         </div>
       </section>
 
+      <section style={warRoomModePanelV46}>
+        <div style={draftBestHeaderV40}>
+          <span>WAR ROOM MODE</span>
+          <b>Draft Analytics</b>
+        </div>
+        <div style={warRoomModeGridV46}>
+          <WarRoomList title="Best Offense Available" rows={bestOffenseAvailable} metric={(team)=>team.draft_offense ?? team.offense_rating ?? team.off ?? "—"} setSelectedTeamId={setSelectedTeamId}/>
+          <WarRoomList title="Best Defense Available" rows={bestDefenseAvailable} metric={(team)=>team.draft_defense ?? team.defense_rating ?? team.def ?? "—"} setSelectedTeamId={setSelectedTeamId}/>
+          <WarRoomList title="Highest Prestige Available" rows={highestPrestigeAvailable} metric={(team)=>draftPrestigeStars(team)} setSelectedTeamId={setSelectedTeamId}/>
+          <WarRoomList title="Best Value Available" rows={bestValueAvailable} metric={(team)=>draftTeamRating(team)} setSelectedTeamId={setSelectedTeamId}/>
+        </div>
+      </section>
+
       <section style={draftMainBoardV37} className="cfb-responsive-grid">
         <div style={draftBoardPanelV37} className="cfb-card">
           <div style={S.eyebrow}>Draft Board</div>
@@ -2957,6 +3076,23 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
         })}
       </section>
     </section>
+  );
+}
+
+
+function WarRoomList({ title, rows = [], metric, setSelectedTeamId }) {
+  return (
+    <div style={warRoomListV46}>
+      <h3>{title}</h3>
+      {rows.length ? rows.map((team,index)=>(
+        <button key={team.id || team.name} style={warRoomRowV46} onClick={()=>setSelectedTeamId(String(team.id))}>
+          <span>#{index+1}</span>
+          <TeamLogoMark team={team} size={26}/>
+          <b>{team.name}</b>
+          <strong>{metric(team)}</strong>
+        </button>
+      )) : <p style={mutedText}>Add ratings in Team Assets.</p>}
+    </div>
   );
 }
 
@@ -4174,6 +4310,15 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
     { key:"recTds", label:"Rec TD" }, { key:"tackles", label:"Tackles" }, { key:"sacks", label:"Sacks" }, { key:"defInts", label:"Def INT" },
     { key:"ff", label:"FF" }, { key:"fr", label:"FR" },
   ];
+  const trophyRows = [
+    { label:"National Championships", value:stats?.nattys||0, icon:"🏆" },
+    { label:"Conference Titles", value:stats?.confTitles||0, icon:"🏅" },
+    { label:"Heismans", value:stats?.heismans||0, icon:"🏈" },
+    { label:"Award Winners", value:stats?.awards||0, icon:"⭐" },
+    { label:"1st Team All-Americans", value:stats?.allAmericans||0, icon:"🇺🇸" },
+  ];
+  const milestoneRows = coachMilestonesForStats(stats);
+
 
   return (
     <section style={coachPageV43}>
@@ -4201,6 +4346,28 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
         <Stat title="All-Americans" value={stats?.allAmericans||0}/>
         <Stat title="Heismans" value={stats?.heismans||0}/>
         <Stat title="HOF Progress" value={`${hofPct}%`}/>
+      </section>
+
+      <section style={coachTrophyCaseV46}>
+        <div style={sectionTop}><h3 style={miniTitle}>Trophy Case</h3><span style={mutedText}>Career résumé display</span></div>
+        <div style={coachTrophyGridV46}>
+          {trophyRows.map((item)=>(
+            <div key={item.label} style={coachTrophyTileV46}>
+              <span>{item.icon}</span>
+              <b>{item.value}</b>
+              <small>{item.label}</small>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section style={coachTrophyCaseV46}>
+        <div style={sectionTop}><h3 style={miniTitle}>Career Milestones</h3><span style={mutedText}>Auto-generated achievements</span></div>
+        <div style={coachMilestoneGridV46}>
+          {milestoneRows.length ? milestoneRows.map((item)=>(
+            <div key={item.label} style={coachMilestoneTileV46}><span>{item.icon}</span><b>{item.label}</b></div>
+          )) : <div style={tableEmptyStateV43}>No career milestones yet.<br/><small>Milestones unlock automatically as results and titles are recorded.</small></div>}
+        </div>
       </section>
 
       <section style={coachProfileGridV43}>
@@ -4261,6 +4428,36 @@ function coachHofCriteria(row) {
   if (accolades >= 55) reasons.push("55+ Major Accolades");
 
   return { qualifies, reasons };
+}
+
+
+function DynastyHallOfFame({ users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting }) {
+  const rows = getCoachStats(users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting)
+    .map((row)=>({ ...row, hofScore: dynastyHallOfFameScore(row), milestones: coachMilestonesForStats(row) }))
+    .sort((a,b)=>b.hofScore-a.hofScore || b.nattys-a.nattys || b.wins-a.wins);
+
+  return (
+    <section style={card}>
+      <div style={sectionTop}>
+        <div>
+          <h2 style={sectionTitle}>CFBElite Hall of Fame</h2>
+          <p style={mutedText}>All-time coach ranking powered by wins, national titles, conference titles, awards, Heismans, Top 10 wins, and prestige.</p>
+        </div>
+      </div>
+      <div style={hofRankingGridV46}>
+        {rows.map((row,index)=>(
+          <div key={row.userId || row.discord || index} style={hofRankingCardV46}>
+            <div style={hofRankNumberV46}>#{index+1}</div>
+            <div>
+              <h3>{row.discord}</h3>
+              <p>{row.wins}-{row.losses} • {row.nattys} Nattys • {row.confTitles} Conf Titles</p>
+            </div>
+            <strong>{row.hofScore}</strong>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function CoachHallOfFame({ users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting }) {
@@ -4705,6 +4902,19 @@ function GlobalStyle() {
         [style*="grid-template-columns: repeat(2, minmax(0, 1fr))"] {
           grid-template-columns: 1fr !important;
         }
+      }
+
+      /* v46-cfp-theme */
+      body {
+        background: #020617 !important;
+      }
+
+      :root {
+        --cfb-gold: #d4af37;
+        --cfb-panel: #0f172a;
+        --cfb-bg: #020617;
+        --cfb-border: rgba(255,255,255,.08);
+        --cfb-text: #f8fafc;
       }
 `}</style>
   );
@@ -9312,3 +9522,136 @@ const coachHeroMetricV45 = {
   textAlign: "center",
 };
 
+
+
+const cfpRevealGridV46 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+  gap: 12,
+  margin: "14px 0 24px",
+};
+
+const cfpRevealCardV46 = {
+  display: "grid",
+  gridTemplateColumns: "46px 54px minmax(0,1fr) auto",
+  gap: 12,
+  alignItems: "center",
+  borderRadius: 14,
+  padding: 14,
+  color: "#f8fafc",
+  border: "1px solid rgba(255,255,255,.10)",
+  textAlign: "left",
+  cursor: "pointer",
+  boxShadow: "0 18px 48px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.06)",
+};
+
+const cfpRankV46 = {
+  fontSize: 22,
+  fontWeight: 1000,
+  color: "#d4af37",
+};
+
+const cfpTeamTextV46 = {
+  display: "grid",
+  gap: 3,
+  minWidth: 0,
+};
+
+const coachTrophyCaseV46 = {
+  ...broadcastCard,
+};
+
+const coachTrophyGridV46 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+  gap: 12,
+  marginTop: 14,
+};
+
+const coachTrophyTileV46 = {
+  minHeight: 118,
+  borderRadius: 16,
+  display: "grid",
+  placeItems: "center",
+  textAlign: "center",
+  gap: 4,
+  padding: 12,
+  background: "linear-gradient(145deg, rgba(15,23,42,.95), rgba(2,6,23,.98))",
+  border: "1px solid rgba(212,175,55,.20)",
+};
+
+const coachMilestoneGridV46 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: 10,
+  marginTop: 14,
+};
+
+const coachMilestoneTileV46 = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  borderRadius: 14,
+  padding: 12,
+  background: "rgba(255,255,255,.04)",
+  border: "1px solid rgba(255,255,255,.08)",
+};
+
+const warRoomModePanelV46 = {
+  borderRadius: 16,
+  padding: 16,
+  border: "1px solid rgba(255,255,255,.08)",
+  background: "linear-gradient(145deg, rgba(15,23,42,.97), rgba(2,6,23,.99))",
+  boxShadow: "0 18px 55px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.04)",
+};
+
+const warRoomModeGridV46 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+  gap: 12,
+};
+
+const warRoomListV46 = {
+  borderRadius: 14,
+  padding: 12,
+  background: "rgba(255,255,255,.035)",
+  border: "1px solid rgba(255,255,255,.08)",
+};
+
+const warRoomRowV46 = {
+  width: "100%",
+  display: "grid",
+  gridTemplateColumns: "34px 32px minmax(0,1fr) auto",
+  gap: 8,
+  alignItems: "center",
+  border: 0,
+  borderRadius: 10,
+  padding: "9px 8px",
+  color: "#f8fafc",
+  background: "transparent",
+  textAlign: "left",
+  cursor: "pointer",
+};
+
+const hofRankingGridV46 = {
+  display: "grid",
+  gap: 10,
+  marginTop: 16,
+};
+
+const hofRankingCardV46 = {
+  display: "grid",
+  gridTemplateColumns: "70px minmax(0,1fr) auto",
+  gap: 14,
+  alignItems: "center",
+  borderRadius: 16,
+  padding: 16,
+  background: "linear-gradient(145deg, rgba(15,23,42,.96), rgba(2,6,23,.99))",
+  border: "1px solid rgba(212,175,55,.18)",
+};
+
+const hofRankNumberV46 = {
+  fontSize: 24,
+  fontWeight: 1000,
+  color: "#d4af37",
+};
