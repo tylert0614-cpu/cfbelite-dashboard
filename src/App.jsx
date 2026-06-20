@@ -223,7 +223,12 @@ function TeamLogoMark({ team, size = 34, faded = false }) {
     const initials = String(team?.name || "CFB").split(" ").map((part)=>part[0]).join("").slice(0,3).toUpperCase();
     return <span style={{ width:size, height:size, borderRadius:Math.max(8,size*.22), display:"inline-grid", placeItems:"center", background:"rgba(255,255,255,.08)", border:"1px solid rgba(255,255,255,.14)", color:"#fff", fontWeight:1000, fontSize:Math.max(10,size*.28), opacity:faded ? .22 : 1 }}>{initials}</span>;
   }
-  return <img src={url} alt="" style={{ width:size, height:size, objectFit:"contain", opacity:faded ? .22 : 1, filter:faded ? "grayscale(.12)" : "none" }}/>;
+  const logoSize = Math.round(size * 1.28);
+  return (
+    <span style={{ width:size, height:size, display:"inline-grid", placeItems:"center", overflow:"visible", opacity:faded ? .22 : 1 }}>
+      <img src={url} alt="" style={{ width:logoSize, height:logoSize, objectFit:"contain", filter:faded ? "grayscale(.12)" : "none", display:"block" }}/>
+    </span>
+  );
 }
 
 function TeamLabel({ team, name }) {
@@ -1830,7 +1835,7 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
             return (
               <button key={team?.id || row.teamName || row.rank} style={{...dashboardRankRowPro, background:`linear-gradient(100deg, ${primary}70, rgba(15,23,42,.92) 42%, ${secondary}28)`, borderColor:`${secondary}77`}} onClick={()=>team?.id && goToTeam(team.id)}>
                 <em style={dashboardRankNumberV47}>#{row.rank}</em>
-                <span style={dashboardTeamCellPro}><TeamLogoMark team={team} size={34}/><strong>{row.teamName || team?.name}</strong></span>
+                <span style={dashboardTeamCellPro}><TeamLogoMark team={team} size={40}/><strong>{row.teamName || team?.name}</strong></span>
                 <span>{row.user}</span>
                 <span>{row.record.wins}</span>
                 <span>{row.record.losses}</span>
@@ -4385,7 +4390,7 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
     <section style={coachPageV43}>
       <div style={{...coachHeroV43, borderColor:`${secondary}77`, background:`linear-gradient(135deg, ${primary}e8, rgba(2,6,23,.98) 58%)`}}>
         <div style={coachHeroIdentityV43}>
-          <TeamLogoMark team={currentTeam} size={72}/>
+          <TeamLogoMark team={currentTeam} size={84}/>
           <div>
             <div style={dashboardKickerPro}>{currentTeam?.name || "Unassigned Coach"}</div>
             <h1 style={coachNameV43}>{safeUser.discord_username || "Coach"}</h1>
