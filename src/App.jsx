@@ -2242,19 +2242,39 @@ function draftPrestigeStars(team) {
 }
 
 function draftTeamRating(team) {
-  const prestige = draftNumberValue(team?.draft_prestige ?? team?.school_prestige ?? team?.prestige_grade, 0);
-  const ovr = draftNumberValue(team?.draft_overall ?? team?.overall_rating ?? team?.ovr, 0);
-  const off = draftNumberValue(team?.draft_offense ?? team?.offense_rating ?? team?.off, 0);
-  const def = draftNumberValue(team?.draft_defense ?? team?.defense_rating ?? team?.def, 0);
-  const rating = (ovr * 0.45) + (off * 0.20) + (def * 0.20) + (prestige * 6);
+  const prestigeRaw = team?.draft_prestige ?? team?.school_prestige ?? team?.prestige_grade;
+  const ovrRaw = team?.draft_overall ?? team?.overall_rating ?? team?.ovr;
+  const offRaw = team?.draft_offense ?? team?.offense_rating ?? team?.off;
+  const defRaw = team?.draft_defense ?? team?.defense_rating ?? team?.def;
+  const hasAny = [prestigeRaw, ovrRaw, offRaw, defRaw].some((value)=>value !== "" && value !== null && value !== undefined);
+  if (!hasAny) return "—";
+  const prestige = Math.max(0, Math.min(5, draftNumberValue(prestigeRaw, 0)));
+  const prestigeRating = prestige * 20;
+  const ovr = draftNumberValue(ovrRaw, 0);
+  const off = draftNumberValue(offRaw, 0);
+  const def = draftNumberValue(defRaw, 0);
+  const rating = (ovr * 0.40) + (off * 0.20) + (def * 0.20) + (prestigeRating * 0.20);
   return Number(rating.toFixed(1));
+}
+
+function draftConferencePowerScore(row) {
+  if (!row || !row.ratedTeams) return "—";
+  const prestigeRating = row.avgPrestige * 20;
+  const score = (row.avgOvr * 0.40) + (row.avgOff * 0.20) + (row.avgDef * 0.20) + (prestigeRating * 0.20);
+  return Number(score.toFixed(1));
+}
+
+function draftRatingAverage(values) {
+  const nums = values.map((value)=>Number(value)).filter((value)=>Number.isFinite(value));
+  if (!nums.length) return null;
+  return Number((nums.reduce((sum,value)=>sum+value,0)/nums.length).toFixed(1));
 }
 
 function draftRatingLine(team) {
   const off = team?.draft_offense ?? team?.offense_rating ?? team?.off ?? "—";
   const def = team?.draft_defense ?? team?.defense_rating ?? team?.def ?? "—";
   const ovr = team?.draft_overall ?? team?.overall_rating ?? team?.ovr ?? "—";
-  return `Prestige ${draftPrestigeStars(team)} · OFF ${off} · DEF ${def} · OVR ${ovr}`;
+  return `Prestige ${draftPrestigeStars(team)} | OFF ${off} | DEF ${def} | OVR ${ovr}`;
 }
 
 function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClock, pauseClock, resumeClock, announcePick, revealPick, undoPick }) {
@@ -2379,6 +2399,19 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
   const bestAvailableTeams = [...availableTeams]
     .sort((a,b)=>draftTeamRating(b)-draftTeamRating(a) || a.name.localeCompare(b.name))
     .slice(0,8);
+
+  const draftConferencePowerRows = allowedConferences
+    .map((conf) => {
+      const confTeams = teams.filter((team)=>eligibleTeamNames.has(team.name) && cleanConference(team.conference) === conf);
+      const ratedTeams = confTeams.filter((team)=>draftTeamRating(team) !== "—");
+      const avgOvr = draftRatingAverage(ratedTeams.map((team)=>team.draft_overall ?? team.overall_rating ?? team.ovr)) ?? 0;
+      const avgOff = draftRatingAverage(ratedTeams.map((team)=>team.draft_offense ?? team.offense_rating ?? team.off)) ?? 0;
+      const avgDef = draftRatingAverage(ratedTeams.map((team)=>team.draft_defense ?? team.defense_rating ?? team.def)) ?? 0;
+      const avgPrestige = draftRatingAverage(ratedTeams.map((team)=>team.draft_prestige ?? team.school_prestige ?? team.prestige_grade)) ?? 0;
+      const row = { conference: conf, totalTeams: confTeams.length, ratedTeams: ratedTeams.length, avgOvr, avgOff, avgDef, avgPrestige };
+      return { ...row, powerScore: draftConferencePowerScore(row) };
+    })
+    .sort((a,b)=>(Number(b.powerScore) || 0) - (Number(a.powerScore) || 0) || a.conference.localeCompare(b.conference));
 
   const selectedTeam = teams.find((team) => String(team.id) === String(selectedTeamId));
   const stagedPick = sortedPicks.find((pick) => pick.status === "pick_is_in");
@@ -2808,12 +2841,39 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
         <div style={draftBestGridV40}>
           {bestAvailableTeams.map((team, index)=>(
             <button key={team.id} style={{...draftBestTileV40, background:`linear-gradient(135deg, ${getTeamPrimary(team)}99, rgba(2,6,23,.94))`, borderColor:getTeamSecondary(team)}} onClick={()=>setSelectedTeamId(team.id)}>
-              <em>#{index+1}</em>
-              <TeamLogoMark team={team} size={34}/>
-              <strong>{team.name}</strong>
-              <small>{draftRatingLine(team)}</small>
-              <b>{draftTeamRating(team)}</b>
+              <div style={draftBestRankV41}>#{index+1}</div>
+              <div style={draftBestLogoV41}><TeamLogoMark team={team} size={32}/></div>
+              <div style={draftBestTeamInfoV41}>
+                <strong>{team.name}</strong>
+                <small>{draftRatingLine(team)}</small>
+              </div>
+              <div style={draftBestScoreV41}>{draftTeamRating(team)}</div>
             </button>
+          ))}
+        </div>
+      </section>
+
+      <section style={draftConferencePowerPanelV42}>
+        <div style={draftBestHeaderV40}>
+          <span>CONFERENCE POWER INDEX</span>
+          <b>Ranked by Average Draft Strength</b>
+        </div>
+        <div style={draftConferencePowerGridV42}>
+          {draftConferencePowerRows.map((row, index)=>(
+            <div key={row.conference} style={draftConferencePowerTileV42}>
+              <div style={draftConferencePowerTopV42}>
+                <span>#{index+1}</span>
+                <strong>{row.conference}</strong>
+                <b>{row.powerScore}</b>
+              </div>
+              <div style={draftConferencePowerStatsV42}>
+                <span>OVR <b>{row.ratedTeams ? row.avgOvr : "—"}</b></span>
+                <span>OFF <b>{row.ratedTeams ? row.avgOff : "—"}</b></span>
+                <span>DEF <b>{row.ratedTeams ? row.avgDef : "—"}</b></span>
+                <span>PRESTIGE <b>{row.ratedTeams ? row.avgPrestige : "—"}</b></span>
+              </div>
+              <small>{row.ratedTeams}/{row.totalTeams} teams rated</small>
+            </div>
           ))}
         </div>
       </section>
@@ -2867,7 +2927,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
                         <b>{team.name}</b>
                         <span>{cleanConference(team.conference)}</span>
                         <small style={draftTileRatingsV40}>{draftRatingLine(team)}</small>
-                        <strong style={draftTileScoreV40}>Board Score {draftTeamRating(team)}</strong>
+                        <strong style={draftTileScoreV40}>Board Score: {draftTeamRating(team)}</strong>
                       </button>
                     ))}
                   </div>
@@ -3052,7 +3112,7 @@ function LogoManager({ teams, updateRow }) {
   return (
     <section style={broadcastCard}>
       <h2 style={sectionTitle}>Team Assets Manager</h2>
-      <p style={mutedText}>Logos are optional. Add colors and draft-room ratings here. Draft Room Best Available uses Prestige, OVR, OFF, and DEF.</p>
+      <p style={mutedText}>Input draft-room team data here. Add Prestige 0-5, Overall, Offense, and Defense; Best Available uses those fields to calculate Board Score: OVR 40%, OFF 20%, DEF 20%, Prestige 20%.</p>
       <SearchBox value={searchText} onChange={setSearchText}/>
       <div style={logoManagerGrid}>
         {filtered.map((team)=>(
@@ -3966,6 +4026,60 @@ function CoachRings({ stats, superlatives }) {
   );
 }
 
+
+function SortableStatsTable({ title, rows = [], columns = [], emptyText = "No records yet." }) {
+  const [sortConfig, setSortConfig] = useState({ key: columns[0]?.key || "", direction: "desc" });
+
+  const sortedRows = [...rows].sort((a,b)=>{
+    const av = a?.[sortConfig.key];
+    const bv = b?.[sortConfig.key];
+    const an = Number(av);
+    const bn = Number(bv);
+    if (!Number.isNaN(an) && !Number.isNaN(bn)) {
+      return sortConfig.direction === "asc" ? an - bn : bn - an;
+    }
+    const cmp = String(av ?? "").localeCompare(String(bv ?? ""));
+    return sortConfig.direction === "asc" ? cmp : -cmp;
+  });
+
+  function toggleSort(key) {
+    setSortConfig((prev)=>({ key, direction: prev.key === key && prev.direction === "desc" ? "asc" : "desc" }));
+  }
+
+  return (
+    <section style={coachFullWidthTableV41}>
+      <div style={sectionTop}>
+        <h3 style={miniTitle}>{title}</h3>
+        <span style={mutedText}>{rows.length} records</span>
+      </div>
+      <div style={coachStatsTableWrapV41}>
+        <table style={fullTable}>
+          <thead>
+            <tr>
+              {columns.map((column)=>(
+                <th key={column.key}>
+                  <button type="button" style={tableSortButtonV41} onClick={()=>toggleSort(column.key)}>
+                    {column.label}{sortConfig.key === column.key ? (sortConfig.direction === "asc" ? " ↑" : " ↓") : ""}
+                  </button>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {sortedRows.length ? sortedRows.map((row, index)=>(
+              <tr key={row.id || `${title}-${index}`}>
+                {columns.map((column)=><td key={column.key}>{row[column.key] ?? "—"}</td>)}
+              </tr>
+            )) : (
+              <tr><td colSpan={columns.length}>{emptyText}</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 function CoachProfile({ user, users = [], teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting, seasonPlayerStats = [], teamSeasonStats = [] }) {
   const safeUser = user || {};
   const coachStats = getCoachStats(usersFallback(safeUser), teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
@@ -3997,6 +4111,83 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
   const coachPrestigeTier = typeof dynastyPrestigeTier === "function" ? dynastyPrestigeTier(coachPrestigeScore) : { stars: "⭐", label: "1-Star Coach" };
   const hofPct = Math.min(100, Math.max(0, coachPrestigeScore));
   const latestTeamStat = coachTeamStats.slice().sort((a,b)=>Number(b.season_year)-Number(a.season_year))[0];
+  const coachTeamStatRows = coachTeamStats.map((row)=>({
+    id: row.id,
+    year: row.season_year,
+    team: teamNameById(row.team_id, teams),
+    ppg: row.points_per_game,
+    ypg: row.avg_yards_per_game,
+    passYpg: row.avg_pass_yards_per_game,
+    rushYpg: row.avg_rush_yards_per_game,
+    yardsAllowed: row.avg_total_yards_allowed,
+    ppgAllowed: row.total_ppg_allowed,
+    rushAllowed: row.avg_rush_yards_allowed,
+    passAllowed: row.avg_pass_yards_allowed,
+    sacks: row.sacks,
+    tfls: row.tfls,
+    turnovers: row.turnovers,
+    takeaways: row.takeaways,
+    margin: row.turnover_margin,
+  }));
+  const coachPlayerStatRows = coachPlayerStats.map((row)=>({
+    id: row.id,
+    year: row.season_year,
+    player: row.player_name,
+    pos: row.position,
+    team: teamNameById(row.team_id, teams),
+    games: row.games,
+    passYards: row.pass_yards,
+    passTds: row.pass_tds,
+    ints: row.interceptions,
+    rushYards: row.rush_yards,
+    rushTds: row.rush_tds,
+    rec: row.receptions,
+    recYards: row.rec_yards,
+    recTds: row.rec_tds,
+    tackles: row.tackles,
+    sacks: row.sacks,
+    defInts: row.interceptions_def,
+    ff: row.forced_fumbles,
+    fr: row.fumble_recoveries,
+  }));
+  const teamStatColumns = [
+    { key:"year", label:"Year" },
+    { key:"team", label:"Team" },
+    { key:"ppg", label:"PPG" },
+    { key:"ypg", label:"YPG" },
+    { key:"passYpg", label:"Pass YPG" },
+    { key:"rushYpg", label:"Rush YPG" },
+    { key:"yardsAllowed", label:"Yds Allowed" },
+    { key:"ppgAllowed", label:"PPG Allowed" },
+    { key:"rushAllowed", label:"Rush Allowed" },
+    { key:"passAllowed", label:"Pass Allowed" },
+    { key:"sacks", label:"Sacks" },
+    { key:"tfls", label:"TFLs" },
+    { key:"turnovers", label:"TO" },
+    { key:"takeaways", label:"Takeaways" },
+    { key:"margin", label:"TO Margin" },
+  ];
+  const playerStatColumns = [
+    { key:"year", label:"Year" },
+    { key:"player", label:"Player" },
+    { key:"pos", label:"Pos" },
+    { key:"team", label:"Team" },
+    { key:"games", label:"GP" },
+    { key:"passYards", label:"Pass Yds" },
+    { key:"passTds", label:"Pass TD" },
+    { key:"ints", label:"INT" },
+    { key:"rushYards", label:"Rush Yds" },
+    { key:"rushTds", label:"Rush TD" },
+    { key:"rec", label:"REC" },
+    { key:"recYards", label:"Rec Yds" },
+    { key:"recTds", label:"Rec TD" },
+    { key:"tackles", label:"Tackles" },
+    { key:"sacks", label:"Sacks" },
+    { key:"defInts", label:"Def INT" },
+    { key:"ff", label:"FF" },
+    { key:"fr", label:"FR" },
+  ];
+
   const coachYears = [...new Set([
     ...coachRecruiting.map((row)=>Number(row.season_year)).filter(Boolean),
     ...coachResults.map((row)=>Number(row.season_year)).filter(Boolean),
@@ -4035,22 +4226,7 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
         <Stat title="Awards" value={stats?.awards||0}/>
         <Stat title="All-Americans" value={stats?.allAmericans||0}/>
       </div>
-
-      <section style={coachFeatureGridV38}>
-        <div style={coachPanelV37}>
-          <h3 style={miniTitle}>Prestige Trend</h3>
-          <div style={coachPrestigeTrendV38}>
-            {trendRows.map((row,index)=>(
-              <div key={`${row.year}-${index}`} style={coachTrendColumnV38}>
-                <div style={{...coachTrendBarV38, height:`${Math.max(12, row.point)}%`, background:`linear-gradient(180deg, ${secondary}, ${primary})`}} />
-                <small>{row.year}</small>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section style={coachGridV37}>
+<section style={coachGridV37}>
         <div style={coachPanelV37}>
           <h3 style={miniTitle}>Hall of Fame Progress</h3>
           <div style={hofProgressTrack}><div style={{...hofProgressFill, width:`${hofPct}%`}} /></div>
@@ -4067,18 +4243,6 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
             </div>
           )) : <p style={mutedText}>No recruiting classes recorded yet.</p>}
         </div>
-
-        <div style={coachPanelV37}>
-          <h3 style={miniTitle}>Latest Team Stat Season</h3>
-          {latestTeamStat ? <>
-            <div style={miniRow}>Team: <b>{teamNameById(latestTeamStat.team_id, teams)}</b></div>
-            <div style={miniRow}>PPG: <b>{latestTeamStat.points_per_game || "—"}</b></div>
-            <div style={miniRow}>YPG: <b>{latestTeamStat.avg_yards_per_game || "—"}</b></div>
-            <div style={miniRow}>PPG Allowed: <b>{latestTeamStat.total_ppg_allowed || "—"}</b></div>
-          </> : <p style={mutedText}>No team stats recorded yet.</p>}
-        </div>
-
-        <MiniList title="Player Stat Leaders" rows={coachPlayerStats.slice(0,8).map((row)=>`${row.season_year}: ${row.player_name} • ${row.position} • ${teamNameById(row.team_id, teams)}`)}/>
       </section>
 
       <CoachTimelineTable timeline={timeline} teams={teams} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions}/>
@@ -4473,6 +4637,17 @@ function GlobalStyle() {
           overflow-x: auto;
           white-space: nowrap;
           font-size: 12px;
+        }
+      }
+
+      /* draft-best-mobile-fix-v41 */
+      @media (max-width: 700px) {
+        .cfb-card {
+          overflow-x: auto !important;
+        }
+
+        table {
+          min-width: 920px;
         }
       }
 `}</style>
@@ -8556,17 +8731,18 @@ const draftAvailableGridV37 = {
 };
 
 const draftAvailableTileV37 = {
-  minHeight: 94,
+  minHeight: 136,
   borderRadius: 16,
   padding: 12,
   display: "grid",
-  gap: 5,
-  alignContent: "center",
+  gap: 6,
+  alignContent: "start",
   textAlign: "left",
   color: "#fff",
   border: "1px solid rgba(255,255,255,.18)",
   cursor: "pointer",
   boxShadow: "inset 0 1px 0 rgba(255,255,255,.14), 0 14px 32px rgba(0,0,0,.26)",
+  overflow: "hidden",
 };
 
 const coachPageV37 = {
@@ -8784,16 +8960,17 @@ const draftBestGridV40 = {
 
 const draftBestTileV40 = {
   display: "grid",
-  gridTemplateColumns: "32px 42px minmax(0,1fr) auto",
-  gap: 9,
+  gridTemplateColumns: "40px 40px minmax(0, 1fr) 58px",
+  gap: 10,
   alignItems: "center",
-  minHeight: 86,
+  minHeight: 104,
   borderRadius: 14,
   padding: 12,
   color: "#fff",
   border: "1px solid rgba(255,255,255,.16)",
   textAlign: "left",
   cursor: "pointer",
+  overflow: "hidden",
 };
 
 const draftTileRatingsV40 = {
@@ -8808,4 +8985,93 @@ const draftTileScoreV40 = {
   fontWeight: 1000,
   position: "relative",
   zIndex: 1,
+};
+
+
+const draftBestRankV41 = {
+  color: "#dbeafe",
+  fontWeight: 1000,
+};
+
+const draftBestLogoV41 = {
+  display: "grid",
+  placeItems: "center",
+};
+
+const draftBestTeamInfoV41 = {
+  display: "grid",
+  gap: 4,
+  minWidth: 0,
+};
+
+const draftBestScoreV41 = {
+  justifySelf: "end",
+  fontSize: 22,
+  fontWeight: 1000,
+  color: "#f8fafc",
+};
+
+const coachFullWidthTableV41 = {
+  ...broadcastCard,
+  width: "100%",
+  overflow: "hidden",
+};
+
+const coachStatsTableWrapV41 = {
+  width: "100%",
+  overflowX: "auto",
+  marginTop: 12,
+};
+
+const tableSortButtonV41 = {
+  background: "transparent",
+  border: 0,
+  color: "#c4b5fd",
+  fontWeight: 1000,
+  textTransform: "uppercase",
+  letterSpacing: ".08em",
+  cursor: "pointer",
+  padding: 0,
+  whiteSpace: "nowrap",
+};
+
+
+const draftConferencePowerPanelV42 = {
+  borderRadius: 16,
+  padding: 16,
+  border: "1px solid rgba(51,65,85,.95)",
+  background: "linear-gradient(145deg, rgba(15,23,42,.96), rgba(2,6,23,.99))",
+  boxShadow: "0 18px 55px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.04)",
+};
+
+const draftConferencePowerGridV42 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 245px), 1fr))",
+  gap: 10,
+};
+
+const draftConferencePowerTileV42 = {
+  display: "grid",
+  gap: 10,
+  borderRadius: 14,
+  padding: 12,
+  background: "rgba(2,6,23,.52)",
+  border: "1px solid rgba(148,163,184,.18)",
+  color: "#f8fafc",
+};
+
+const draftConferencePowerTopV42 = {
+  display: "grid",
+  gridTemplateColumns: "36px minmax(0,1fr) auto",
+  gap: 10,
+  alignItems: "center",
+};
+
+const draftConferencePowerStatsV42 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: 8,
+  color: "rgba(226,232,240,.82)",
+  fontSize: 12,
+  fontWeight: 850,
 };
