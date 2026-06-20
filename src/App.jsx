@@ -1729,7 +1729,7 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
             <div key={tile.label} style={{...dashboardKpiCardPro, background: tile.team ? `linear-gradient(135deg, ${primary}aa, rgba(2,6,23,.96) 64%, ${secondary}33)` : dashboardKpiCardPro.background, borderColor: tile.team ? `${secondary}77` : "rgba(148,163,184,.16)"}}>
               <span>{tile.label}</span>
               <b>{tile.value}</b>
-              <small>{tile.sub}</small>
+              <small style={dashboardTileSubV45}>{tile.sub}</small>
             </div>
           );
         })}
@@ -1773,7 +1773,7 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
         <div style={dashboardPanelHeaderPro}><span>DYNASTY WIRE</span><h2>The Wire</h2></div>
         <div style={dashboardNewsListPro}>
           {headlineRows.length ? headlineRows.map((item,index)=>(
-            <div key={index} style={dashboardNewsRowPro}><span>🏈</span><div><b>{item.title}</b><small>{item.meta}</small></div></div>
+            <div key={index} style={dashboardNewsRowPro}><span>🏈</span><div style={wireTextStackV45}><b>{item.title}</b><small>{item.meta}</small></div></div>
           )) : <div style={mutedText}>No storylines yet. Add results in League Data Center.</div>}
         </div>
       </section>
@@ -4083,7 +4083,7 @@ function SortableStatsTable({ title, rows = [], columns = [], emptyText = "No re
                 {columns.map((column)=><td key={column.key}>{row[column.key] ?? "—"}</td>)}
               </tr>
             )) : (
-              <tr><td colSpan={columns.length}><div style={tableEmptyStateV43}>{emptyText}<br/><small>Use League Data Center to record this data.</small></div></td></tr>
+              <tr><td colSpan={columns.length}><div style={tableEmptyStateV43}>{emptyText}<br/><small>Use League Data Center → Team Stats / Player Stats to record this data.</small></div></td></tr>
             )}
           </tbody>
         </table>
@@ -4186,11 +4186,11 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
             <p style={coachSubV37}>CFBElite Coach Profile</p>
           </div>
         </div>
-        <div style={coachHeroMetricsV43}>
-          <div><span>Record</span><b>{stats?.wins||0}-{stats?.losses||0}</b></div>
-          <div><span>Prestige</span><b>{coachPrestigeScore}</b><small>{coachPrestigeTier.stars} {coachPrestigeTier.label}</small></div>
-          <div><span>Nattys</span><b>{stats?.nattys||0}</b></div>
-          <div><span>Conf Titles</span><b>{stats?.confTitles||0}</b></div>
+        <div style={coachHeroMetricsV45}>
+          <div style={coachHeroMetricV45}><span>Record</span><b>{stats?.wins||0}-{stats?.losses||0}</b></div>
+          <div style={coachHeroMetricV45}><span>Prestige</span><b>{coachPrestigeScore}</b><small>{coachPrestigeTier.stars} {coachPrestigeTier.label}</small></div>
+          <div style={coachHeroMetricV45}><span>Nattys</span><b>{stats?.nattys||0}</b></div>
+          <div style={coachHeroMetricV45}><span>Conf Titles</span><b>{stats?.confTitles||0}</b></div>
         </div>
       </div>
 
@@ -4677,6 +4677,33 @@ function GlobalStyle() {
         th,
         td {
           padding: 10px 8px;
+        }
+      }
+
+      /* v45-ui-polish */
+      small {
+        display: block;
+      }
+
+      @media (max-width: 1000px) {
+        [style*="grid-template-columns: minmax(0,1.1fr) minmax(420px,.9fr)"] {
+          grid-template-columns: 1fr !important;
+        }
+
+        [style*="grid-template-columns: repeat(4, minmax(0, 1fr))"] {
+          grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        }
+      }
+
+      @media (max-width: 620px) {
+        [style*="grid-template-columns: 86px minmax(0,1fr)"] {
+          grid-template-columns: 1fr !important;
+          text-align: center !important;
+          justify-items: center !important;
+        }
+
+        [style*="grid-template-columns: repeat(2, minmax(0, 1fr))"] {
+          grid-template-columns: 1fr !important;
         }
       }
 `}</style>
@@ -8565,10 +8592,10 @@ const dashboardNewsListPro = {
 const dashboardNewsRowPro = {
   display: "grid",
   gridTemplateColumns: "34px minmax(0,1fr)",
-  gap: 10,
+  gap: 12,
   alignItems: "center",
   borderRadius: 12,
-  padding: 11,
+  padding: "12px 14px",
   background: "rgba(255,255,255,.035)",
   border: "1px solid rgba(255,255,255,.08)",
 };
@@ -8768,15 +8795,15 @@ const draftBoardRowsV37 = {
 
 const draftBoardRowV37 = {
   display: "grid",
-  gridTemplateColumns: "52px minmax(120px,.9fr) minmax(140px,1fr) 92px auto auto",
+  gridTemplateColumns: "64px minmax(160px,.9fr) minmax(170px,1fr) 110px auto auto",
   gap: 10,
   alignItems: "center",
-  borderRadius: 14,
-  padding: "11px 12px",
-  background: "rgba(255,255,255,.04)",
-  border: "1px solid rgba(255,255,255,.09)",
+  borderRadius: 12,
+  padding: "10px 12px",
+  background: "rgba(255,255,255,.035)",
+  border: "1px solid rgba(148,163,184,.30)",
   color: "#fff",
-  minWidth: 640,
+  minWidth: 720,
 };
 
 const draftAvailableGridV37 = {
@@ -9072,6 +9099,9 @@ const coachFullWidthTableV41 = {
   ...broadcastCard,
   width: "100%",
   overflow: "hidden",
+  borderRadius: 18,
+  border: "1px solid rgba(71,85,105,.70)",
+  background: "linear-gradient(145deg, rgba(15,23,42,.97), rgba(2,6,23,.99))",
 };
 
 const coachStatsTableWrapV41 = {
@@ -9201,18 +9231,19 @@ const coachPageV43 = {
 
 const coachHeroV43 = {
   display: "grid",
-  gridTemplateColumns: "minmax(0,1.2fr) minmax(360px,.8fr)",
-  gap: 18,
+  gridTemplateColumns: "minmax(0,1.1fr) minmax(420px,.9fr)",
+  gap: 20,
   alignItems: "center",
   borderRadius: 20,
-  padding: "clamp(20px, 3vw, 34px)",
+  padding: "clamp(22px, 3vw, 36px)",
   border: "1px solid rgba(255,255,255,.16)",
   boxShadow: "0 24px 80px rgba(0,0,0,.46), inset 0 1px 0 rgba(255,255,255,.06)",
   overflow: "hidden",
 };
 
 const coachHeroIdentityV43 = {
-  display: "flex",
+  display: "grid",
+  gridTemplateColumns: "86px minmax(0,1fr)",
   gap: 18,
   alignItems: "center",
   minWidth: 0,
@@ -9221,10 +9252,11 @@ const coachHeroIdentityV43 = {
 const coachNameV43 = {
   margin: "4px 0",
   color: "#fff",
-  fontSize: "clamp(40px, 6vw, 82px)",
+  fontSize: "clamp(42px, 5.8vw, 76px)",
   lineHeight: .9,
   letterSpacing: "-.055em",
   fontWeight: 1000,
+  overflowWrap: "anywhere",
 };
 
 const coachHeroMetricsV43 = {
@@ -9250,3 +9282,33 @@ const tableEmptyStateV43 = {
   color: "rgba(226,232,240,.84)",
   fontWeight: 800,
 };
+
+
+const wireTextStackV45 = {
+  display: "grid",
+  gap: 2,
+  minWidth: 0,
+};
+
+const dashboardTileSubV45 = {
+  color: "rgba(226,232,240,.78)",
+  fontWeight: 850,
+  lineHeight: 1.35,
+};
+
+const coachHeroMetricsV45 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+  gap: 10,
+};
+
+const coachHeroMetricV45 = {
+  display: "grid",
+  gap: 4,
+  padding: "14px 12px",
+  borderRadius: 14,
+  background: "rgba(2,6,23,.48)",
+  border: "1px solid rgba(255,255,255,.09)",
+  textAlign: "center",
+};
+
