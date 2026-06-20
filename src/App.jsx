@@ -2524,10 +2524,34 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
       const avgOff = draftRatingAverage(ratedTeams.map((team)=>team.draft_offense ?? team.offense_rating ?? team.off)) ?? 0;
       const avgDef = draftRatingAverage(ratedTeams.map((team)=>team.draft_defense ?? team.defense_rating ?? team.def)) ?? 0;
       const avgPrestige = draftRatingAverage(ratedTeams.map((team)=>team.draft_prestige ?? team.school_prestige ?? team.prestige_grade)) ?? 0;
-      const row = { conference: conf, totalTeams: confTeams.length, ratedTeams: ratedTeams.length, avgOvr, avgOff, avgDef, avgPrestige };
+      const draftedTeams = localPicks
+        .map((pick)=>{
+          const team = teams.find((t)=>String(t.id)===String(pick.team_id)) || pick.teams;
+          if (!team || cleanConference(team.conference) !== conf) return null;
+          return {
+            team,
+            userName: pick.discord_username || pick.discord_users?.discord_username || "User TBD",
+            pickNumber: pick.pick_number,
+          };
+        })
+        .filter(Boolean)
+        .sort((a,b)=>Number(a.pickNumber)-Number(b.pickNumber));
+      const row = { conference: conf, totalTeams: confTeams.length, ratedTeams: ratedTeams.length, avgOvr, avgOff, avgDef, avgPrestige, draftedTeams };
       return { ...row, powerScore: draftConferencePowerScore(row) };
     })
     .sort((a,b)=>(Number(b.powerScore) || 0) - (Number(a.powerScore) || 0) || a.conference.localeCompare(b.conference));
+
+  const draftTickerEntries = sortedPicks.map((pick) => {
+    const team = teams.find((t)=>String(t.id)===String(pick.team_id)) || pick.teams;
+    const userName = pick.discord_username || pick.discord_users?.discord_username || "User TBD";
+    const isClock = Number(pick.pick_number) === Number(displayPick?.pick_number);
+    const statusText = team
+      ? `#${pick.pick_number} ${userName} selects ${team.name}`
+      : isClock
+        ? `ON THE CLOCK: #${pick.pick_number} ${userName}`
+        : `#${pick.pick_number} ${userName} on deck`;
+    return { ...pick, team, userName, isClock, statusText };
+  });
 
   const selectedTeam = teams.find((team) => String(team.id) === String(selectedTeamId));
   const stagedPick = sortedPicks.find((pick) => pick.status === "pick_is_in");
@@ -2913,10 +2937,9 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
 
       <div style={draftEspnTickerV38}>
         <div className="cfb-draft-ticker-track" style={draftTickerTrackV39}>
-          {([...((recentPicked.length ? recentPicked : sortedPicks.slice(0,8))), ...((recentPicked.length ? recentPicked : sortedPicks.slice(0,8)))].map((pick, index)=> {
-            const team = teams.find((t)=>String(t.id)===String(pick.team_id)) || pick.teams;
-            return <span key={`${pick.pick_number}-${index}`}>#{pick.pick_number} {pick.discord_username || pick.discord_users?.discord_username || "User TBD"} {team ? `→ ${team.name}` : "on deck"}</span>;
-          }))}
+          {([...draftTickerEntries, ...draftTickerEntries].map((entry, index)=>(
+            <span key={`${entry.pick_number}-${index}`} style={entry.isClock ? draftTickerClockV49 : null}>{entry.statusText}</span>
+          )))}
         </div>
       </div>
 
@@ -2977,7 +3000,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
       <section style={warRoomModePanelV46}>
         <div style={draftBestHeaderV40}>
           <span>WAR ROOM MODE</span>
-          <b>NFL Network Style Draft Analytics</b>
+          <b>Draft Analytics</b>
         </div>
         <div style={warRoomModeGridV46}>
           <WarRoomList title="Best Offense Available" rows={bestOffenseAvailable} metric={(team)=>team.draft_offense ?? team.offense_rating ?? team.off ?? "—"} setSelectedTeamId={setSelectedTeamId}/>
@@ -3007,6 +3030,16 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
                 <span>PRESTIGE <b>{row.ratedTeams ? row.avgPrestige : "—"}</b></span>
               </div>
               <small>{row.ratedTeams}/{row.totalTeams} teams rated</small>
+              <div style={draftConferencePicksV49}>
+                {row.draftedTeams.length ? row.draftedTeams.map((item)=>(
+                  <div key={`${row.conference}-${item.pickNumber}`} style={draftConferencePickRowV49}>
+                    <span>#{item.pickNumber}</span>
+                    <TeamLogoMark team={item.team} size={22}/>
+                    <b>{item.team.name}</b>
+                    <small>{item.userName}</small>
+                  </div>
+                )) : <small>No teams drafted from this conference yet.</small>}
+              </div>
             </div>
           ))}
         </div>
@@ -3103,17 +3136,23 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
 
 
 function WarRoomList({ title, rows = [], metric, setSelectedTeamId }) {
+  const topTeam = rows[0];
+  const primary = getTeamPrimary(topTeam);
+  const secondary = getTeamSecondary(topTeam);
+
   return (
-    <div style={warRoomListV46}>
+    <div style={{...warRoomListV49, background: topTeam ? `linear-gradient(145deg, ${primary}99, rgba(15,23,42,.96))` : warRoomListV49.background, borderColor: topTeam ? `${secondary}88` : warRoomListV49.border}}>
       <h3>{title}</h3>
-      {rows.length ? rows.map((team,index)=>(
-        <button key={team.id || team.name} style={warRoomRowV46} onClick={()=>setSelectedTeamId(String(team.id))}>
-          <span>#{index+1}</span>
-          <TeamLogoMark team={team} size={26}/>
-          <b>{team.name}</b>
-          <strong>{metric(team)}</strong>
-        </button>
-      )) : <p style={mutedText}>Add ratings in Team Assets.</p>}
+      <div style={warRoomTopFiveV49}>
+        {rows.length ? rows.slice(0,5).map((team,index)=>(
+          <button key={team.id || team.name} style={warRoomRowV49} onClick={()=>setSelectedTeamId(String(team.id))}>
+            <span>#{index+1}</span>
+            <TeamLogoMark team={team} size={28}/>
+            <b>{team.name}</b>
+            <strong>{metric(team)}</strong>
+          </button>
+        )) : <p style={mutedText}>Add ratings in Team Assets.</p>}
+      </div>
     </div>
   );
 }
@@ -4337,7 +4376,7 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
     { label:"Conference Titles", value:stats?.confTitles||0, icon:"🏅" },
     { label:"Heismans", value:stats?.heismans||0, icon:"🏈" },
     { label:"Award Winners", value:stats?.awards||0, icon:"⭐" },
-    { label:"1st Team All-Americans", value:stats?.allAmericans||0, icon:"🇺🇸" },
+    { label:"All-Americans", value:stats?.allAmericans||0, icon:"🇺🇸" },
   ];
   const milestoneRows = coachMilestonesForStats(stats);
 
@@ -4356,21 +4395,10 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
         <div style={coachHeroMetricsV45}>
           <div style={coachHeroMetricV45}><span>Record</span><b>{stats?.wins||0}-{stats?.losses||0}</b></div>
           <div style={coachHeroMetricV45}><span>Prestige</span><b>{coachPrestigeScore}</b><small>{coachPrestigeTier.stars} {coachPrestigeTier.label}</small></div>
-          <div style={coachHeroMetricV45}><span>Nattys</span><b>{stats?.nattys||0}</b></div>
-          <div style={coachHeroMetricV45}><span>Conf Titles</span><b>{stats?.confTitles||0}</b></div>
+
         </div>
       </div>
-
-      <section style={coachResumeStripV43}>
-        <Stat title="Top 10 Wins" value={stats?.top10Wins||0}/>
-        <Stat title="Top 25 Wins" value={stats?.top25Wins||0}/>
-        <Stat title="Awards" value={stats?.awards||0}/>
-        <Stat title="All-Americans" value={stats?.allAmericans||0}/>
-        <Stat title="Heismans" value={stats?.heismans||0}/>
-        <Stat title="HOF Progress" value={`${hofPct}%`}/>
-      </section>
-
-      <section style={coachTrophyCaseV46}>
+<section style={coachTrophyCaseV46}>
         <div style={sectionTop}><h3 style={miniTitle}>Trophy Case</h3><span style={mutedText}>Career résumé display</span></div>
         <div style={coachTrophyGridV46}>
           {trophyRows.map((item)=>(
@@ -9560,7 +9588,7 @@ const dashboardTileSubV45 = {
 
 const coachHeroMetricsV45 = {
   display: "grid",
-  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
   gap: 10,
 };
 
@@ -9611,6 +9639,8 @@ const cfpTeamTextV46 = {
 
 const coachTrophyCaseV46 = {
   ...broadcastCard,
+  border: "1px solid rgba(255,255,255,.06)",
+  background: "linear-gradient(145deg, rgba(15,23,42,.92), rgba(2,6,23,.98))",
 };
 
 const coachTrophyGridV46 = {
@@ -9628,8 +9658,8 @@ const coachTrophyTileV46 = {
   textAlign: "center",
   gap: 4,
   padding: 12,
-  background: "linear-gradient(145deg, rgba(15,23,42,.95), rgba(2,6,23,.98))",
-  border: "1px solid rgba(212,175,55,.20)",
+  background: "rgba(255,255,255,.035)",
+  border: "1px solid rgba(255,255,255,.06)",
 };
 
 const coachMilestoneGridV46 = {
@@ -9755,4 +9785,53 @@ const draftConferenceSortSelectV48 = {
   padding: "10px 12px",
   fontWeight: 900,
   minWidth: 220,
+};
+
+
+const draftTickerClockV49 = {
+  color: "#d4af37",
+  fontWeight: 1000,
+};
+
+const draftConferencePicksV49 = {
+  display: "grid",
+  gap: 6,
+  marginTop: 10,
+  paddingTop: 10,
+  borderTop: "1px solid rgba(255,255,255,.08)",
+};
+
+const draftConferencePickRowV49 = {
+  display: "grid",
+  gridTemplateColumns: "34px 28px minmax(0,1fr) minmax(78px, auto)",
+  gap: 6,
+  alignItems: "center",
+  fontSize: 12,
+};
+
+const warRoomListV49 = {
+  borderRadius: 14,
+  padding: 12,
+  background: "rgba(255,255,255,.035)",
+  border: "1px solid rgba(255,255,255,.08)",
+};
+
+const warRoomTopFiveV49 = {
+  display: "grid",
+  gap: 6,
+};
+
+const warRoomRowV49 = {
+  width: "100%",
+  display: "grid",
+  gridTemplateColumns: "34px 34px minmax(0,1fr) auto",
+  gap: 8,
+  alignItems: "center",
+  border: "1px solid rgba(255,255,255,.07)",
+  borderRadius: 10,
+  padding: "9px 8px",
+  color: "#f8fafc",
+  background: "rgba(2,6,23,.35)",
+  textAlign: "left",
+  cursor: "pointer",
 };
