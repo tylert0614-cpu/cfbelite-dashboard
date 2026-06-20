@@ -2226,6 +2226,37 @@ function draftConferenceLimitFor(conference, lockedConferences, counts) {
   return null;
 }
 
+
+function draftNumberValue(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function draftPrestigeStars(team) {
+  const raw = team?.draft_prestige ?? team?.school_prestige ?? team?.prestige_grade ?? team?.prestige ?? "";
+  if (raw === "" || raw === null || raw === undefined) return "—";
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return String(raw);
+  const clamped = Math.max(0, Math.min(5, n));
+  return "★".repeat(Math.round(clamped)) + (clamped < 5 ? "☆".repeat(5 - Math.round(clamped)) : "");
+}
+
+function draftTeamRating(team) {
+  const prestige = draftNumberValue(team?.draft_prestige ?? team?.school_prestige ?? team?.prestige_grade, 0);
+  const ovr = draftNumberValue(team?.draft_overall ?? team?.overall_rating ?? team?.ovr, 0);
+  const off = draftNumberValue(team?.draft_offense ?? team?.offense_rating ?? team?.off, 0);
+  const def = draftNumberValue(team?.draft_defense ?? team?.defense_rating ?? team?.def, 0);
+  const rating = (ovr * 0.45) + (off * 0.20) + (def * 0.20) + (prestige * 6);
+  return Number(rating.toFixed(1));
+}
+
+function draftRatingLine(team) {
+  const off = team?.draft_offense ?? team?.offense_rating ?? team?.off ?? "—";
+  const def = team?.draft_defense ?? team?.defense_rating ?? team?.def ?? "—";
+  const ovr = team?.draft_overall ?? team?.overall_rating ?? team?.ovr ?? "—";
+  return `Prestige ${draftPrestigeStars(team)} · OFF ${off} · DEF ${def} · OVR ${ovr}`;
+}
+
 function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClock, pauseClock, resumeClock, announcePick, revealPick, undoPick }) {
   const [selectedTeamId, setSelectedTeamId] = useState("");
   const [teamSearch, setTeamSearch] = useState("");
@@ -2344,6 +2375,10 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
       selectedCount: conferenceCounts[conf] || 0,
     }))
     .filter((group) => group.teams.length || group.locked || group.selectedCount > 0);
+
+  const bestAvailableTeams = [...availableTeams]
+    .sort((a,b)=>draftTeamRating(b)-draftTeamRating(a) || a.name.localeCompare(b.name))
+    .slice(0,8);
 
   const selectedTeam = teams.find((team) => String(team.id) === String(selectedTeamId));
   const stagedPick = sortedPicks.find((pick) => pick.status === "pick_is_in");
@@ -2711,7 +2746,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
     <section style={draftBroadcastPageV37} className="cfb-mobile-page">
       <div style={draftOnClockHeroV37}>
         <div style={draftOnClockMainV37}>
-          <div style={S.eyebrow}>ON THE CLOCK</div>
+          <div style={draftBroadcastEyebrowV40}>ON THE CLOCK</div>
           <h1 style={draftOnClockNameV37}>{displayPick?.discord_username || displayPick?.discord_users?.discord_username || "User TBD"}</h1>
           <div style={draftOnClockMetaV37}>Pick #{String(displayPick?.pick_number || 1).padStart(2, "0")}</div>
         </div>
@@ -2728,10 +2763,12 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
       </div>
 
       <div style={draftEspnTickerV38}>
-        {(recentPicked.length ? recentPicked : sortedPicks.slice(0,8)).map((pick)=> {
-          const team = teams.find((t)=>String(t.id)===String(pick.team_id)) || pick.teams;
-          return <span key={pick.pick_number}>#{pick.pick_number} {pick.discord_username || pick.discord_users?.discord_username || "User TBD"} {team ? `→ ${team.name}` : "on deck"}</span>;
-        })}
+        <div className="cfb-draft-ticker-track" style={draftTickerTrackV39}>
+          {([...((recentPicked.length ? recentPicked : sortedPicks.slice(0,8))), ...((recentPicked.length ? recentPicked : sortedPicks.slice(0,8)))].map((pick, index)=> {
+            const team = teams.find((t)=>String(t.id)===String(pick.team_id)) || pick.teams;
+            return <span key={`${pick.pick_number}-${index}`}>#{pick.pick_number} {pick.discord_username || pick.discord_users?.discord_username || "User TBD"} {team ? `→ ${team.name}` : "on deck"}</span>;
+          }))}
+        </div>
       </div>
 
       <div style={draftControlBarV37}>
@@ -2759,9 +2796,27 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
         <div style={pickPreviewCard}>
           <div style={S.eyebrow}>{stagedTeam ? "Pick Is In" : "Selected Team"}</div>
           <div style={pickTeamLine}>{(stagedTeam || selectedTeam)?.name}</div>
-          <div style={S.muted}>Pick #{String((stagedPick || currentPick)?.pick_number || 1).padStart(2, "0")} · {cleanConference((stagedTeam || selectedTeam)?.conference)}</div>
+          <div style={S.muted}>Pick #{String((stagedPick || currentPick)?.pick_number || 1).padStart(2, "0")} · {cleanConference((stagedTeam || selectedTeam)?.conference)} · {draftRatingLine(stagedTeam || selectedTeam)}</div>
         </div>
       )}
+
+      <section style={draftBestAvailableStripV40}>
+        <div style={draftBestHeaderV40}>
+          <span>BEST AVAILABLE</span>
+          <b>War Room Board</b>
+        </div>
+        <div style={draftBestGridV40}>
+          {bestAvailableTeams.map((team, index)=>(
+            <button key={team.id} style={{...draftBestTileV40, background:`linear-gradient(135deg, ${getTeamPrimary(team)}99, rgba(2,6,23,.94))`, borderColor:getTeamSecondary(team)}} onClick={()=>setSelectedTeamId(team.id)}>
+              <em>#{index+1}</em>
+              <TeamLogoMark team={team} size={34}/>
+              <strong>{team.name}</strong>
+              <small>{draftRatingLine(team)}</small>
+              <b>{draftTeamRating(team)}</b>
+            </button>
+          ))}
+        </div>
+      </section>
 
       <section style={draftMainBoardV37} className="cfb-responsive-grid">
         <div style={draftBoardPanelV37} className="cfb-card">
@@ -2776,7 +2831,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
                 <div key={pick.pick_number} style={{...draftBoardRowV37, background: visible && team ? `linear-gradient(100deg, ${primary}88, rgba(15,23,42,.94), ${secondary}22)` : draftBoardRowV37.background, borderColor: visible && team ? `${secondary}77` : draftBoardRowV37.borderColor}}>
                   <b>#{String(pick.pick_number).padStart(2, "0")}</b>
                   <strong>{pick.discord_username || pick.discord_users?.discord_username || "User TBD"}</strong>
-                  <span>{visible && team ? team.name : (pick.status === "pick_is_in" ? "Team hidden until reveal" : "On deck")}</span>
+                  <span>{visible && team ? team.name : (pick.status === "pick_is_in" ? "Team hidden until reveal" : "On deck")} {visible && team ? `• ${draftTeamRating(team)}` : ""}</span>
                   <em>{pick.status === "pick_is_in" ? "PICK IS IN" : (pick.status || "pending")}</em>
                   {pick.status === "pick_is_in" && <button style={S.button} type="button" onClick={() => handleRevealPick(pick.pick_number)}>Reveal</button>}
                   {pick.team_id && <button style={S.ghost} type="button" onClick={() => handleUndoPick(pick.pick_number)}>Undo</button>}
@@ -2811,6 +2866,8 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
                         <TeamLogoMark team={team} size={34}/>
                         <b>{team.name}</b>
                         <span>{cleanConference(team.conference)}</span>
+                        <small style={draftTileRatingsV40}>{draftRatingLine(team)}</small>
+                        <strong style={draftTileScoreV40}>Board Score {draftTeamRating(team)}</strong>
                       </button>
                     ))}
                   </div>
@@ -2995,7 +3052,7 @@ function LogoManager({ teams, updateRow }) {
   return (
     <section style={broadcastCard}>
       <h2 style={sectionTitle}>Team Assets Manager</h2>
-      <p style={mutedText}>Logos are optional. Add colors first; anywhere a logo is missing, the app uses a clean team initials badge.</p>
+      <p style={mutedText}>Logos are optional. Add colors and draft-room ratings here. Draft Room Best Available uses Prestige, OVR, OFF, and DEF.</p>
       <SearchBox value={searchText} onChange={setSearchText}/>
       <div style={logoManagerGrid}>
         {filtered.map((team)=>(
@@ -3008,6 +3065,11 @@ function LogoManager({ teams, updateRow }) {
             
             <input style={input} value={team.primary_color || ""} onChange={(e)=>updateRow("teams", team.id, "primary_color", e.target.value)} placeholder="Primary Color #000000"/>
             <input style={input} value={team.secondary_color || ""} onChange={(e)=>updateRow("teams", team.id, "secondary_color", e.target.value)} placeholder="Secondary Color #ffffff"/>
+            <input style={input} value={team.draft_prestige || ""} onChange={(e)=>updateRow("teams", team.id, "draft_prestige", e.target.value)} placeholder="Draft Prestige 0-5"/>
+            <input style={input} value={team.draft_overall || ""} onChange={(e)=>updateRow("teams", team.id, "draft_overall", e.target.value)} placeholder="Overall Rating"/>
+            <input style={input} value={team.draft_offense || ""} onChange={(e)=>updateRow("teams", team.id, "draft_offense", e.target.value)} placeholder="Offense Rating"/>
+            <input style={input} value={team.draft_defense || ""} onChange={(e)=>updateRow("teams", team.id, "draft_defense", e.target.value)} placeholder="Defense Rating"/>
+            <div style={draftAssetPreviewV40}>{draftRatingLine(team)} · Board Score {draftTeamRating(team)}</div>
           </div>
         ))}
       </div>
@@ -3031,9 +3093,15 @@ function LeagueDataCenter({ teams, users, assignments, results = [], currentYear
   };
 
   const currentSeasonResultsForRanks = (results || []).filter((row)=>String(row.season_year) === String(result.season_year || currentYear));
-  const automaticRankRows = computerRankingRows(teams, currentSeasonResultsForRanks, assignments, users);
+  const userControlledTeamIdsForRanks = new Set(
+    assignments
+      .filter((assignment)=>assignment.status === "Active" && assignment.discord_user_id && assignment.team_id)
+      .map((assignment)=>String(assignment.team_id))
+  );
+  const automaticRankRows = computerRankingRows(teams, currentSeasonResultsForRanks, assignments, users)
+    .filter((row)=>userControlledTeamIdsForRanks.has(String(row.team?.id)));
   const automaticRankMap = new Map(automaticRankRows.map((row)=>[String(row.team?.id), row.rank]));
-  const autoRankForTeam = (teamId) => automaticRankMap.get(String(teamId)) || "";
+  const autoRankForTeam = (teamId) => userControlledTeamIdsForRanks.has(String(teamId)) ? (automaticRankMap.get(String(teamId)) || "") : "";
   const setResultTeam = (field, teamId) => {
     const rankField = field === "team_1_id" ? "team_1_rank" : "team_2_rank";
     setResult((prev)=>({ ...prev, [field]: teamId, [rankField]: autoRankForTeam(teamId) }));
@@ -3115,7 +3183,7 @@ function LeagueDataCenter({ teams, users, assignments, results = [], currentYear
       <div style={dataCenterTabs}>{tabs.map(([key,label])=><button key={key} style={{...dataCenterTab, borderColor: activeForm===key ? "#facc15" : "rgba(255,255,255,.16)"}} onClick={()=>setActiveForm(key)}>{label}</button>)}</div>
 
       {activeForm === "results" && <div style={entryPanel}><h3 style={miniTitle}>Results</h3><div style={entryGrid}>
-        <select style={input} value={result.season_year} onChange={(e)=>{ const nextYear=e.target.value; const yearResults=(results || []).filter((row)=>String(row.season_year)===String(nextYear)); const rankRows=computerRankingRows(teams, yearResults, assignments, users); const rankMap=new Map(rankRows.map((row)=>[String(row.team?.id), row.rank])); setResult({...result, season_year:nextYear, team_1_rank: rankMap.get(String(result.team_1_id)) || "", team_2_rank: rankMap.get(String(result.team_2_id)) || ""}); }}>{YEARS.map((year)=><option key={year}>{year}</option>)}</select>
+        <select style={input} value={result.season_year} onChange={(e)=>{ const nextYear=e.target.value; const yearResults=(results || []).filter((row)=>String(row.season_year)===String(nextYear)); const userTeamIds=new Set(assignments.filter((a)=>a.status==="Active" && a.discord_user_id && a.team_id).map((a)=>String(a.team_id))); const rankRows=computerRankingRows(teams, yearResults, assignments, users).filter((row)=>userTeamIds.has(String(row.team?.id))); const rankMap=new Map(rankRows.map((row)=>[String(row.team?.id), row.rank])); setResult({...result, season_year:nextYear, team_1_rank: userTeamIds.has(String(result.team_1_id)) ? (rankMap.get(String(result.team_1_id)) || "") : "", team_2_rank: userTeamIds.has(String(result.team_2_id)) ? (rankMap.get(String(result.team_2_id)) || "") : ""}); }}>{YEARS.map((year)=><option key={year}>{year}</option>)}</select>
         <select style={input} value={result.week} onChange={(e)=>setResult({...result, week:e.target.value})}>{WEEKS.map((week)=><option key={week}>{week}</option>)}</select>
         <select style={input} value={result.team_1_id} onChange={(e)=>setResultTeam("team_1_id", e.target.value)}><option value="">Team 1</option>{teams.map((team)=><option key={team.id} value={team.id}>{team.name}</option>)}</select>
         <div style={autoUserBox}>Discord User: <b>{resultTeam1User?.discord_username || "CPU / Unassigned"}</b></div>
@@ -3941,13 +4009,6 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
     const point = Math.min(100, Math.max(5, coachPrestigeScore - ((coachYears.length - index - 1) * 4) + ((recruitRow && recruitRow.rank <= 25) ? 4 : 0) + ((winRow.wins || 0) * .4)));
     return { year, point: Number(point.toFixed(1)), recruitRank: recruitRow?.rank || "—" };
   }) : [{year:"Now", point:coachPrestigeScore, recruitRank:"—"}];
-  const trophyRows = [
-    { label:"National Titles", value:stats?.nattys||0, icon:"🏆" },
-    { label:"Conference Titles", value:stats?.confTitles||0, icon:"🏅" },
-    { label:"Awards", value:stats?.awards||0, icon:"⭐" },
-    { label:"All-Americans", value:stats?.allAmericans||0, icon:"🇺🇸" },
-    { label:"Heismans", value:stats?.heismans||0, icon:"🏈" },
-  ];
 
 
   return (
@@ -3985,20 +4046,6 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
                 <small>{row.year}</small>
               </div>
             ))}
-          </div>
-        </div>
-        <div style={coachPanelV37}>
-          <h3 style={miniTitle}>Recruiting Graph</h3>
-          <div style={coachRecruitGraphV38}>
-            {trendRows.map((row,index)=>(
-              <div key={`${row.year}-r-${index}`} style={miniRow}><span>{row.year}</span><b>{row.recruitRank === "—" ? "—" : `#${row.recruitRank}`}</b></div>
-            ))}
-          </div>
-        </div>
-        <div style={coachPanelV37}>
-          <h3 style={miniTitle}>Trophy Case</h3>
-          <div style={coachTrophyGridV38}>
-            {trophyRows.map((row)=><div key={row.label} style={coachTrophyV38}><span>{row.icon}</span><b>{row.value}</b><small>{row.label}</small></div>)}
           </div>
         </div>
       </section>
@@ -4341,7 +4388,94 @@ function GlobalStyle() {
           font-size: 12px;
         }
       }
-    `}</style>
+    
+      @keyframes cfbDraftTickerScroll {
+        0% { transform: translateX(0); }
+        100% { transform: translateX(-50%); }
+      }
+
+      @media (max-width: 900px) {
+        .cfb-mobile-page {
+          gap: 12px !important;
+        }
+
+        .cfb-card {
+          padding: 14px !important;
+          overflow-x: auto !important;
+        }
+
+        h1,
+        h2 {
+          overflow-wrap: anywhere;
+        }
+
+        button,
+        input,
+        select {
+          min-height: 44px;
+        }
+
+        table {
+          display: block;
+          overflow-x: auto;
+          white-space: nowrap;
+        }
+      }
+
+      @media (max-width: 640px) {
+        body {
+          font-size: 14px;
+        }
+
+        .cfb-draft-ticker-track {
+          animation-duration: 22s !important;
+        }
+
+        table {
+          font-size: 12px;
+        }
+      }
+
+      .cfb-draft-ticker-track:hover {
+        animation-play-state: paused;
+      }
+
+      @media (max-width: 760px) {
+        .cfb-responsive-grid {
+          grid-template-columns: 1fr !important;
+        }
+
+        .cfb-mobile-page {
+          gap: 12px !important;
+        }
+
+        .cfb-card {
+          padding: 14px !important;
+          overflow-x: auto !important;
+        }
+
+        h1,
+        h2 {
+          overflow-wrap: normal !important;
+          word-break: normal !important;
+        }
+
+        button,
+        input,
+        select {
+          min-height: 44px;
+        }
+      }
+
+      @media (max-width: 520px) {
+        table {
+          display: block;
+          overflow-x: auto;
+          white-space: nowrap;
+          font-size: 12px;
+        }
+      }
+`}</style>
   );
 }
 
@@ -5171,7 +5305,7 @@ function MiniList({ title, rows }) { return <div style={miniCard}><h3>{title}</h
 function Table({ headers, children }) { return <div style={{overflowX:"auto",marginTop:20}}><table style={table}><thead><tr>{headers.map((h, index)=><th key={typeof h === "string" ? h : index} style={th}>{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div>; }
 function DeleteButton({ onClick }) { return <button onClick={onClick} style={deleteButton}>Delete</button>; }
 
-const page={minHeight:"100vh",width:"100%",background:"radial-gradient(circle at 12% -10%, rgba(37,99,235,.20), transparent 30%), radial-gradient(circle at 88% 0%, rgba(124,58,237,.16), transparent 30%), linear-gradient(135deg,#020617 0%,#07111f 48%,#11071f 100%)",color:"white",overflowX:"hidden",fontFamily:"Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"};
+const page={minHeight:"100vh",width:"100%",background:"linear-gradient(180deg,#020617 0%,#07111f 48%,#020617 100%)",color:"white",overflowX:"hidden",fontFamily:"Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"};
 const container={width:"100%",maxWidth:"1680px",margin:"0 auto",padding:"clamp(14px, 2vw, 28px)",boxSizing:"border-box"};
 const header={display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,flexWrap:"wrap",gap:20,background:"linear-gradient(135deg, rgba(88,28,135,.55), rgba(15,23,42,.8))",border:"1px solid rgba(250,204,21,.35)",borderRadius:28,padding:"clamp(14px, 2vw, 24px)",boxShadow:"0 24px 80px rgba(0,0,0,.35)"};
 const brandWrap={display:"flex",flexDirection:"column",alignItems:"flex-start",gap:8,minWidth:0};
@@ -5189,14 +5323,14 @@ const statTitle={color:"#c4b5fd",fontSize:12,marginBottom:10,textTransform:"uppe
 const statValue={fontSize:38,fontWeight:950,color:"#fff7ed"};
 const statInput={...statValue,background:"transparent",color:"white",border:"none",outline:"none",width:"100%"};
 const statSelect={background:"#111827",color:"#fff7ed",border:"1px solid rgba(250,204,21,.25)",borderRadius:12,padding:14,fontSize:24,fontWeight:900,width:"100%"};
-const card={background:"linear-gradient(145deg, rgba(8,13,31,.96), rgba(3,7,18,.99))",border:"1px solid rgba(148,163,184,.18)",borderRadius:18,padding:"clamp(16px, 2vw, 24px)",marginBottom:22,boxShadow:"0 24px 80px rgba(0,0,0,.40), inset 0 1px 0 rgba(255,255,255,.055)"};
+const card={background:"linear-gradient(145deg, rgba(15,23,42,.96), rgba(2,6,23,.99))",border:"1px solid rgba(51,65,85,.85)",borderRadius:14,padding:"clamp(16px, 2vw, 24px)",marginBottom:22,boxShadow:"0 18px 60px rgba(0,0,0,.36), inset 0 1px 0 rgba(255,255,255,.035)"};
 const sectionTop={display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"};
 const sectionTitle={fontSize:"clamp(22px, 2vw, 30px)",fontWeight:950,margin:0,color:"#f8fafc",letterSpacing:"-.035em"};
 const formGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))",gap:16,marginTop:20};
 const input={background:"rgba(2,6,23,.86)",border:"1px solid rgba(148,163,184,.24)",color:"#fff",padding:12,borderRadius:10,fontSize:14,width:"100%",boxSizing:"border-box",outline:"none",boxShadow:"inset 0 1px 0 rgba(255,255,255,.045)"};
 const smallInput={...input,width:"120px",marginRight:8};
 const searchInput={...input,maxWidth:320};
-const button={background:"linear-gradient(135deg,#2563eb,#7c3aed)",color:"#fff",border:"1px solid rgba(255,255,255,.14)",borderRadius:10,padding:12,fontWeight:950,cursor:"pointer",boxShadow:"0 14px 34px rgba(37,99,235,.24)"};
+const button={background:"linear-gradient(135deg,#1d4ed8,#1e40af)",color:"#fff",border:"1px solid rgba(96,165,250,.22)",borderRadius:10,padding:12,fontWeight:900,cursor:"pointer",boxShadow:"0 12px 28px rgba(29,78,216,.20)"};
 const sortButton={background:"transparent",border:"none",color:"#c4b5fd",fontSize:13,textTransform:"uppercase",fontWeight:900,cursor:"pointer",padding:0};
 const deleteButton={background:"#7f1d1d",color:"white",border:"1px solid #ef4444",borderRadius:10,padding:"8px 10px",cursor:"pointer"};
 const table={width:"100%",borderCollapse:"separate",borderSpacing:0,minWidth:820};
@@ -8273,33 +8407,36 @@ const dashboardProV37 = {
   gap: 18,
 };
 
-const dashboardHeroV37 = {
+const dashboardHeroV37={
   display: "grid",
-  gridTemplateColumns: "minmax(0,1fr) minmax(260px, 360px)",
+  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
   gap: 18,
   alignItems: "center",
-  borderRadius: 26,
-  padding: "clamp(26px, 4.4vw, 54px)",
-  border: "1px solid rgba(96,165,250,.24)",
-  background: "radial-gradient(circle at 18% 0%, rgba(96,165,250,.28), transparent 30%), radial-gradient(circle at 88% 0%, rgba(124,58,237,.24), transparent 34%), linear-gradient(135deg, rgba(2,6,23,.98), rgba(8,13,31,.97))",
-  boxShadow: "0 30px 100px rgba(0,0,0,.52), inset 0 1px 0 rgba(255,255,255,.075)",
+  borderRadius: 18,
+  padding: "clamp(20px, 4vw, 48px)",
+  border: "1px solid rgba(51,65,85,.95)",
+  background: "linear-gradient(135deg, rgba(15,23,42,.98), rgba(2,6,23,.98))",
+  boxShadow: "0 24px 80px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.05)",
+  overflow: "hidden",
 };
 
-const dashboardTitleV37 = {
+const dashboardTitleV37={
   margin: "8px 0 8px",
   color: "#f8fafc",
-  fontSize: "clamp(48px, 7.4vw, 108px)",
-  lineHeight: .84,
-  letterSpacing: "-.075em",
+  fontSize: "clamp(34px, 9vw, 92px)",
+  lineHeight: .9,
+  letterSpacing: "-.055em",
   fontWeight: 1000,
+  overflowWrap: "normal",
+  wordBreak: "normal",
 };
 
-const dashboardRankPanelFullV37 = {
-  borderRadius: 22,
+const dashboardRankPanelFullV37={
+  borderRadius: 16,
   padding: 20,
-  border: "1px solid rgba(96,165,250,.22)",
-  background: "linear-gradient(145deg, rgba(8,13,31,.98), rgba(3,7,18,.99))",
-  boxShadow: "0 28px 90px rgba(0,0,0,.46), inset 0 1px 0 rgba(255,255,255,.06)",
+  border: "1px solid rgba(51,65,85,.95)",
+  background: "linear-gradient(145deg, rgba(15,23,42,.98), rgba(2,6,23,.99))",
+  boxShadow: "0 24px 70px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.04)",
   overflowX: "auto",
 };
 
@@ -8310,14 +8447,15 @@ const draftBroadcastPageV37 = {
 
 const draftOnClockHeroV37 = {
   display: "grid",
-  gridTemplateColumns: "minmax(0,1fr) minmax(280px, 520px)",
+  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
   gap: 18,
   alignItems: "stretch",
   borderRadius: 26,
-  padding: "clamp(22px, 4vw, 42px)",
+  padding: "clamp(18px, 4vw, 42px)",
   border: "1px solid rgba(250,204,21,.34)",
   background: "radial-gradient(circle at 12% 0%, rgba(250,204,21,.22), transparent 30%), radial-gradient(circle at 90% 0%, rgba(37,99,235,.22), transparent 34%), linear-gradient(135deg, rgba(2,6,23,.98), rgba(30,27,75,.92))",
   boxShadow: "0 30px 100px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.08)",
+  overflow: "hidden",
 };
 
 const draftOnClockMainV37 = {
@@ -8329,10 +8467,11 @@ const draftOnClockMainV37 = {
 const draftOnClockNameV37 = {
   margin: 0,
   color: "#fff",
-  fontSize: "clamp(48px, 8vw, 110px)",
-  lineHeight: .82,
-  letterSpacing: "-.075em",
+  fontSize: "clamp(40px, 12vw, 110px)",
+  lineHeight: .88,
+  letterSpacing: "-.055em",
   fontWeight: 1000,
+  overflowWrap: "anywhere",
 };
 
 const draftOnClockMetaV37 = {
@@ -8376,7 +8515,7 @@ const draftControlBarV37 = {
 
 const draftMainBoardV37 = {
   display: "grid",
-  gridTemplateColumns: "minmax(0, 1.15fr) minmax(320px, .85fr)",
+  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 360px), 1fr))",
   gap: 16,
 };
 
@@ -8398,7 +8537,7 @@ const draftBoardRowsV37 = {
 
 const draftBoardRowV37 = {
   display: "grid",
-  gridTemplateColumns: "58px minmax(130px,.8fr) minmax(160px,1fr) 100px auto auto",
+  gridTemplateColumns: "52px minmax(120px,.9fr) minmax(140px,1fr) 92px auto auto",
   gap: 10,
   alignItems: "center",
   borderRadius: 14,
@@ -8406,6 +8545,7 @@ const draftBoardRowV37 = {
   background: "rgba(255,255,255,.04)",
   border: "1px solid rgba(255,255,255,.09)",
   color: "#fff",
+  minWidth: 640,
 };
 
 const draftAvailableGridV37 = {
@@ -8436,13 +8576,14 @@ const coachPageV37 = {
 
 const coachHeroV37 = {
   display: "grid",
-  gridTemplateColumns: "auto minmax(0,1fr) minmax(210px,280px)",
-  gap: 22,
+  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
+  gap: 18,
   alignItems: "center",
   borderRadius: 28,
-  padding: "clamp(22px, 4vw, 42px)",
+  padding: "clamp(18px, 4vw, 42px)",
   border: "1px solid rgba(255,255,255,.18)",
   boxShadow: "0 30px 100px rgba(0,0,0,.52), inset 0 1px 0 rgba(255,255,255,.08)",
+  overflow: "hidden",
 };
 
 const coachLogoV37 = {
@@ -8458,10 +8599,11 @@ const coachLogoV37 = {
 const coachNameV37 = {
   margin: "6px 0",
   color: "#fff",
-  fontSize: "clamp(44px, 7.5vw, 96px)",
-  lineHeight: .84,
-  letterSpacing: "-.075em",
+  fontSize: "clamp(38px, 11vw, 96px)",
+  lineHeight: .88,
+  letterSpacing: "-.055em",
   fontWeight: 1000,
+  overflowWrap: "anywhere",
 };
 
 const coachSubV37 = {
@@ -8482,7 +8624,7 @@ const coachPrestigeV37 = {
 
 const coachQuickStatsV37 = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))",
   gap: 12,
 };
 
@@ -8508,8 +8650,8 @@ const dashboardWirePanelV38 = {
 
 const draftLowerThirdV38 = {
   display: "grid",
-  gridTemplateColumns: "auto minmax(0,1fr) auto",
-  gap: 14,
+  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+  gap: 10,
   alignItems: "center",
   borderRadius: 14,
   padding: "12px 16px",
@@ -8518,14 +8660,13 @@ const draftLowerThirdV38 = {
   border: "1px solid rgba(250,204,21,.35)",
   boxShadow: "0 18px 48px rgba(0,0,0,.30)",
   fontWeight: 1000,
+  overflow: "hidden",
 };
 
 const draftEspnTickerV38 = {
   borderRadius: 0,
-  padding: "10px 14px",
-  display: "flex",
-  gap: 24,
-  overflowX: "auto",
+  padding: "10px 0",
+  overflow: "hidden",
   background: "linear-gradient(90deg, #020617, #111827)",
   borderTop: "2px solid #facc15",
   borderBottom: "2px solid #facc15",
@@ -8586,4 +8727,85 @@ const coachTrophyV38 = {
   padding: 10,
   background: "rgba(255,255,255,.045)",
   border: "1px solid rgba(255,255,255,.10)",
+};
+
+const draftTickerTrackV39 = {
+  display: "inline-flex",
+  gap: 28,
+  minWidth: "max-content",
+  animation: "cfbDraftTickerScroll 32s linear infinite",
+  paddingLeft: "100%",
+};
+
+
+const draftAssetPreviewV40 = {
+  border: "1px solid rgba(51,65,85,.85)",
+  background: "rgba(2,6,23,.55)",
+  color: "rgba(226,232,240,.82)",
+  borderRadius: 10,
+  padding: 10,
+  fontSize: 12,
+  fontWeight: 800,
+};
+
+const draftBroadcastEyebrowV40 = {
+  color: "#93c5fd",
+  fontSize: 13,
+  fontWeight: 1000,
+  letterSpacing: ".18em",
+  textTransform: "uppercase",
+};
+
+const draftBestAvailableStripV40 = {
+  borderRadius: 16,
+  padding: 16,
+  border: "1px solid rgba(51,65,85,.95)",
+  background: "linear-gradient(145deg, rgba(15,23,42,.96), rgba(2,6,23,.99))",
+  boxShadow: "0 18px 55px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.04)",
+};
+
+const draftBestHeaderV40 = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 12,
+  alignItems: "center",
+  marginBottom: 12,
+  color: "#dbeafe",
+  textTransform: "uppercase",
+  letterSpacing: ".08em",
+  fontWeight: 1000,
+};
+
+const draftBestGridV40 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))",
+  gap: 10,
+};
+
+const draftBestTileV40 = {
+  display: "grid",
+  gridTemplateColumns: "32px 42px minmax(0,1fr) auto",
+  gap: 9,
+  alignItems: "center",
+  minHeight: 86,
+  borderRadius: 14,
+  padding: 12,
+  color: "#fff",
+  border: "1px solid rgba(255,255,255,.16)",
+  textAlign: "left",
+  cursor: "pointer",
+};
+
+const draftTileRatingsV40 = {
+  color: "rgba(255,255,255,.78)",
+  fontWeight: 800,
+  position: "relative",
+  zIndex: 1,
+};
+
+const draftTileScoreV40 = {
+  color: "#dbeafe",
+  fontWeight: 1000,
+  position: "relative",
+  zIndex: 1,
 };
