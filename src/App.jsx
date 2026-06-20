@@ -217,16 +217,47 @@ function activeAssignmentsForLeague(assignments, teams) {
   });
 }
 
-function TeamLogoMark({ team, size = 34, faded = false }) {
+function TeamLogoMark({ team, size = 34, faded = false, plate = false }) {
   const url = team?.logo_url || team?.logo || team?.image_url;
+  const plateStyle = plate ? {
+    width: size,
+    height: size,
+    borderRadius: Math.max(10, size * .24),
+    display: "inline-grid",
+    placeItems: "center",
+    background: "linear-gradient(180deg, rgba(255,255,255,.105), rgba(255,255,255,.035))",
+    border: "1px solid rgba(255,255,255,.16)",
+    boxShadow: "0 12px 30px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.12)",
+    overflow: "visible",
+    opacity: faded ? .32 : 1,
+  } : {
+    width: size,
+    height: size,
+    display: "inline-grid",
+    placeItems: "center",
+    overflow: "visible",
+    opacity: faded ? .32 : 1,
+  };
+
   if (!url) {
     const initials = String(team?.name || "CFB").split(" ").map((part)=>part[0]).join("").slice(0,3).toUpperCase();
-    return <span style={{ width:size, height:size, borderRadius:Math.max(8,size*.22), display:"inline-grid", placeItems:"center", background:"rgba(255,255,255,.08)", border:"1px solid rgba(255,255,255,.14)", color:"#fff", fontWeight:1000, fontSize:Math.max(10,size*.28), opacity:faded ? .22 : 1 }}>{initials}</span>;
+    return <span style={{ ...plateStyle, background: plate ? plateStyle.background : "rgba(255,255,255,.08)", border: plate ? plateStyle.border : "1px solid rgba(255,255,255,.14)", color:"#fff", fontWeight:1000, fontSize:Math.max(10,size*.30) }}>{initials}</span>;
   }
-  const logoSize = Math.round(size * 1.28);
+
+  const logoSize = Math.round(size * 1.72);
   return (
-    <span style={{ width:size, height:size, display:"inline-grid", placeItems:"center", overflow:"visible", opacity:faded ? .22 : 1 }}>
-      <img src={url} alt="" style={{ width:logoSize, height:logoSize, objectFit:"contain", filter:faded ? "grayscale(.12)" : "none", display:"block" }}/>
+    <span style={plateStyle}>
+      <img
+        src={url}
+        alt=""
+        style={{
+          width: logoSize,
+          height: logoSize,
+          objectFit: "contain",
+          filter: faded ? "grayscale(.12)" : "drop-shadow(0 4px 10px rgba(0,0,0,.42))",
+          display: "block",
+        }}
+      />
     </span>
   );
 }
@@ -1835,7 +1866,7 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
             return (
               <button key={team?.id || row.teamName || row.rank} style={{...dashboardRankRowPro, background:`linear-gradient(100deg, ${primary}70, rgba(15,23,42,.92) 42%, ${secondary}28)`, borderColor:`${secondary}77`}} onClick={()=>team?.id && goToTeam(team.id)}>
                 <em style={dashboardRankNumberV47}>#{row.rank}</em>
-                <span style={dashboardTeamCellPro}><TeamLogoMark team={team} size={40}/><strong>{row.teamName || team?.name}</strong></span>
+                <span style={dashboardTeamCellPro}><TeamLogoMark team={team} size={50}/><strong>{row.teamName || team?.name}</strong></span>
                 <span>{row.user}</span>
                 <span>{row.record.wins}</span>
                 <span>{row.record.losses}</span>
@@ -2986,7 +3017,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
           {bestAvailableTeams.map((team, index)=>(
             <button key={team.id} style={{...draftBestTileV43, background:`linear-gradient(145deg, ${getTeamPrimary(team)}cc, rgba(2,6,23,.96))`, borderColor:getTeamSecondary(team)}} onClick={()=>setSelectedTeamId(team.id)}>
               <div style={draftBestRankV43}>#{index+1}</div>
-              <div style={draftBestLogoV43}><TeamLogoMark team={team} size={40}/></div>
+              <div style={draftBestLogoV43}><TeamLogoMark team={team} size={52}/></div>
               <strong style={draftBestTeamNameV43}>{team.name}</strong>
               <div style={draftBestStarsV43}>{draftPrestigeStars(team)}</div>
               <div style={draftBestRatingsV43}>
@@ -4390,7 +4421,7 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
     <section style={coachPageV43}>
       <div style={{...coachHeroV43, borderColor:`${secondary}77`, background:`linear-gradient(135deg, ${primary}e8, rgba(2,6,23,.98) 58%)`}}>
         <div style={coachHeroIdentityV43}>
-          <TeamLogoMark team={currentTeam} size={84}/>
+          <TeamLogoMark team={currentTeam} size={104} plate/>
           <div>
             <div style={dashboardKickerPro}>{currentTeam?.name || "Unassigned Coach"}</div>
             <h1 style={coachNameV43}>{safeUser.discord_username || "Coach"}</h1>
@@ -5102,6 +5133,9 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
       >
         {(team?.logo_url) && <img src={team.logo_url} alt="" style={coachMenuLogoWatermark}/>}
         <span style={{ ...coachAccentStripe, background: accent }} />
+        <span style={coachMenuLogoPlateV51}>
+          <TeamLogoMark team={team} size={72}/>
+        </span>
         <span style={coachNavTextWrap}>
           <strong style={coachNavName}>{label}</strong>
           <small style={coachNavTeam}>{team?.name || "No active team"}</small>
@@ -5192,7 +5226,7 @@ function PrestigeSpotlight({ teams, assignments, results, allAmericans, awards, 
           <div key={row.team.id} style={prestigeSpotlightCard}>
             <div style={leaderRow}><b>#{index+1}</b><span>{row.tier.stars}</span></div>
             <div style={{display:"flex",alignItems:"center",gap:12}}>
-              <TeamLogoMark team={row.team} size={54}/>
+              <TeamLogoMark team={row.team} size={66} plate/>
               <div>
                 <div style={prestigeTeamName}>{row.team.name}</div>
                 <div style={mutedText}>{row.tier.label}</div>
@@ -6474,24 +6508,27 @@ const coachAccentStripe = {
 const coachNavTextWrap = {
   minWidth: 0,
   display: "grid",
-  gap: 4,
+  gap: 5,
+  position: "relative",
+  zIndex: 2,
 };
 
 const coachNavName = {
-  fontSize: "clamp(16px, 4.8vw, 24px)",
-  lineHeight: 1.05,
+  fontSize: "clamp(18px, 5vw, 26px)",
+  lineHeight: 1.02,
   color: "#fff",
   overflowWrap: "anywhere",
-  textShadow: "0 2px 12px rgba(0,0,0,.35)",
+  textShadow: "0 2px 14px rgba(0,0,0,.45)",
 };
 
 const coachNavTeam = {
-  color: "rgba(255,255,255,.78)",
-  fontSize: 12,
-  fontWeight: 800,
+  color: "rgba(255,255,255,.86)",
+  fontSize: 13,
+  fontWeight: 900,
   overflow: "hidden",
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",
+  textShadow: "0 2px 10px rgba(0,0,0,.35)",
 };
 
 const activeSpark = {
@@ -7172,15 +7209,16 @@ const dangerButton = {
 
 const coachMenuLogoWatermark = {
   position: "absolute",
-  right: 12,
+  right: 14,
   top: "50%",
   transform: "translateY(-50%)",
-  width: 74,
-  height: 74,
+  width: 112,
+  height: 112,
   objectFit: "contain",
-  opacity: .20,
+  opacity: .30,
   pointerEvents: "none",
   zIndex: 0,
+  filter: "drop-shadow(0 0 18px rgba(255,255,255,.16))",
 };
 
 const massFormGrid = {
@@ -7448,12 +7486,12 @@ const colorDrawerItem = {
 const coachDrawerItem = {
   position: "relative",
   width: "100%",
-  minHeight: 72,
-  borderRadius: 18,
-  padding: "14px 18px",
+  minHeight: 96,
+  borderRadius: 20,
+  padding: "12px 18px 12px 14px",
   display: "flex",
   alignItems: "center",
-  gap: 12,
+  gap: 14,
   textAlign: "left",
   overflow: "hidden",
   cursor: "pointer",
@@ -8901,7 +8939,7 @@ const dashboardNewsRowPro = {
 const dashboardTeamCellPro = {
   display: "flex",
   alignItems: "center",
-  gap: 10,
+  gap: 14,
   minWidth: 0,
 };
 
@@ -9538,7 +9576,7 @@ const coachHeroV43 = {
 
 const coachHeroIdentityV43 = {
   display: "grid",
-  gridTemplateColumns: "86px minmax(0,1fr)",
+  gridTemplateColumns: "116px minmax(0,1fr)",
   gap: 18,
   alignItems: "center",
   minWidth: 0,
@@ -9839,4 +9877,20 @@ const warRoomRowV49 = {
   background: "rgba(2,6,23,.35)",
   textAlign: "left",
   cursor: "pointer",
+};
+
+
+const coachMenuLogoPlateV51 = {
+  width: 82,
+  height: 82,
+  minWidth: 82,
+  borderRadius: 19,
+  display: "grid",
+  placeItems: "center",
+  background: "linear-gradient(180deg, rgba(255,255,255,.13), rgba(255,255,255,.045))",
+  border: "1px solid rgba(255,255,255,.18)",
+  boxShadow: "0 16px 34px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.13)",
+  position: "relative",
+  zIndex: 2,
+  overflow: "visible",
 };
