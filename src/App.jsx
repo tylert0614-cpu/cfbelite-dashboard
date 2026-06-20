@@ -2398,7 +2398,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
 
   const bestAvailableTeams = [...availableTeams]
     .sort((a,b)=>draftTeamRating(b)-draftTeamRating(a) || a.name.localeCompare(b.name))
-    .slice(0,8);
+    .slice(0,14);
 
   const draftConferencePowerRows = allowedConferences
     .map((conf) => {
@@ -4030,6 +4030,15 @@ function CoachRings({ stats, superlatives }) {
 }
 
 
+
+const fullTable = {
+  width: "100%",
+  borderCollapse: "separate",
+  borderSpacing: 0,
+  color: "#f8fafc",
+  minWidth: 920,
+};
+
 function SortableStatsTable({ title, rows = [], columns = [], emptyText = "No records yet." }) {
   const [sortConfig, setSortConfig] = useState({ key: columns[0]?.key || "", direction: "desc" });
 
@@ -4631,6 +4640,43 @@ function GlobalStyle() {
       @media (max-width: 640px) {
         [style*="grid-template-columns: repeat(4, minmax(0, 1fr))"] {
           grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        }
+      }
+
+      /* v44-polish */
+      th {
+        text-align: left;
+        color: #c4b5fd;
+        font-size: 12px;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        border-bottom: 1px solid rgba(250,204,21,.18);
+        padding: 12px 10px;
+        white-space: nowrap;
+      }
+
+      td {
+        border-bottom: 1px solid rgba(148,163,184,.10);
+        padding: 12px 10px;
+        white-space: nowrap;
+      }
+
+      tr:hover td {
+        background: rgba(255,255,255,.035);
+      }
+
+      ::selection {
+        background: rgba(96,165,250,.35);
+      }
+
+      @media (max-width: 760px) {
+        body {
+          background: #020617 !important;
+        }
+
+        th,
+        td {
+          padding: 10px 8px;
         }
       }
 `}</style>
@@ -5481,14 +5527,41 @@ const statTitle={color:"#c4b5fd",fontSize:12,marginBottom:10,textTransform:"uppe
 const statValue={fontSize:38,fontWeight:950,color:"#fff7ed"};
 const statInput={...statValue,background:"transparent",color:"white",border:"none",outline:"none",width:"100%"};
 const statSelect={background:"#111827",color:"#fff7ed",border:"1px solid rgba(250,204,21,.25)",borderRadius:12,padding:14,fontSize:24,fontWeight:900,width:"100%"};
-const card={background:"linear-gradient(145deg, rgba(15,23,42,.96), rgba(2,6,23,.99))",border:"1px solid rgba(51,65,85,.85)",borderRadius:14,padding:"clamp(16px, 2vw, 24px)",marginBottom:22,boxShadow:"0 18px 60px rgba(0,0,0,.36), inset 0 1px 0 rgba(255,255,255,.035)"};
+const card = {
+  background: "linear-gradient(145deg, rgba(15,23,42,.96), rgba(2,6,23,.99))",
+  border: "1px solid rgba(71,85,105,.62)",
+  borderRadius: 16,
+  padding: "clamp(16px, 2vw, 24px)",
+  marginBottom: 22,
+  boxShadow: "0 22px 70px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.04)",
+};
 const sectionTop={display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"};
 const sectionTitle={fontSize:"clamp(22px, 2vw, 30px)",fontWeight:950,margin:0,color:"#f8fafc",letterSpacing:"-.035em"};
 const formGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))",gap:16,marginTop:20};
-const input={background:"rgba(2,6,23,.86)",border:"1px solid rgba(148,163,184,.24)",color:"#fff",padding:12,borderRadius:10,fontSize:14,width:"100%",boxSizing:"border-box",outline:"none",boxShadow:"inset 0 1px 0 rgba(255,255,255,.045)"};
+const input = {
+  background: "rgba(2,6,23,.82)",
+  border: "1px solid rgba(100,116,139,.45)",
+  color: "#fff",
+  padding: 12,
+  borderRadius: 12,
+  fontSize: 14,
+  width: "100%",
+  boxSizing: "border-box",
+  outline: "none",
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,.045)",
+};
 const smallInput={...input,width:"120px",marginRight:8};
 const searchInput={...input,maxWidth:320};
-const button={background:"linear-gradient(135deg,#1d4ed8,#1e40af)",color:"#fff",border:"1px solid rgba(96,165,250,.22)",borderRadius:10,padding:12,fontWeight:900,cursor:"pointer",boxShadow:"0 12px 28px rgba(29,78,216,.20)"};
+const button = {
+  background: "linear-gradient(135deg,#2563eb,#1d4ed8)",
+  color: "#fff",
+  border: "1px solid rgba(147,197,253,.25)",
+  borderRadius: 12,
+  padding: 12,
+  fontWeight: 950,
+  cursor: "pointer",
+  boxShadow: "0 14px 34px rgba(37,99,235,.22)",
+};
 const sortButton={background:"transparent",border:"none",color:"#c4b5fd",fontSize:13,textTransform:"uppercase",fontWeight:900,cursor:"pointer",padding:0};
 const deleteButton={background:"#7f1d1d",color:"white",border:"1px solid #ef4444",borderRadius:10,padding:"8px 10px",cursor:"pointer"};
 const table={width:"100%",borderCollapse:"separate",borderSpacing:0,minWidth:820};
@@ -8339,11 +8412,11 @@ const liquidGlassTile = {
 };
 
 const broadcastCard = {
-  ...card,
+  background: "linear-gradient(145deg, rgba(15,23,42,.96), rgba(2,6,23,.99))",
+  border: "1px solid rgba(71,85,105,.62)",
   borderRadius: 18,
-  background: "linear-gradient(145deg, rgba(8,13,31,.96), rgba(3,7,18,.99))",
-  border: "1px solid rgba(148,163,184,.18)",
-  boxShadow: "0 24px 80px rgba(0,0,0,.40), inset 0 1px 0 rgba(255,255,255,.055)",
+  padding: "clamp(16px, 2vw, 24px)",
+  boxShadow: "0 22px 70px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.04)",
 };
 
 const broadcastPageCard = {
@@ -8937,7 +9010,7 @@ const draftBestHeaderV40 = {
 
 const draftBestGridV40 = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
   gap: 12,
 };
 
@@ -9067,14 +9140,15 @@ const draftBestTileV43 = {
   gap: 8,
   justifyItems: "center",
   alignContent: "center",
-  minHeight: 188,
+  minHeight: 172,
   borderRadius: 18,
-  padding: 16,
+  padding: 14,
   color: "#fff",
   border: "1px solid rgba(255,255,255,.16)",
   textAlign: "center",
   cursor: "pointer",
   overflow: "hidden",
+  boxShadow: "0 16px 40px rgba(0,0,0,.26), inset 0 1px 0 rgba(255,255,255,.08)",
 };
 
 const draftBestRankV43 = {
