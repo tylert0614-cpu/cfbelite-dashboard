@@ -2361,6 +2361,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
   const [localPaused, setLocalPaused] = useState(Boolean(settings?.paused));
   const [localPicks, setLocalPicks] = useState(picks || []);
   const [manualPickNumber, setManualPickNumber] = useState(1);
+  const [conferenceTeamSort, setConferenceTeamSort] = useState("name");
 
   useEffect(() => {
     const id = setInterval(() => setTick(Date.now()), 1000);
@@ -2461,6 +2462,28 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
       if (confCompare !== 0) return confCompare;
       return a.name.localeCompare(b.name);
     });
+
+
+  function draftSortValue(team, key) {
+    if (key === "boardScore") {
+      const score = draftTeamRating(team);
+      return score === "—" ? -1 : Number(score);
+    }
+    if (key === "overall") return draftNumberValue(team.draft_overall ?? team.overall_rating ?? team.ovr, -1);
+    if (key === "offense") return draftNumberValue(team.draft_offense ?? team.offense_rating ?? team.off, -1);
+    if (key === "defense") return draftNumberValue(team.draft_defense ?? team.defense_rating ?? team.def, -1);
+    if (key === "prestige") return draftNumberValue(team.draft_prestige ?? team.school_prestige ?? team.prestige_grade, -1);
+    return String(team.name || "");
+  }
+
+  function sortConferenceTeams(list) {
+    return [...list].sort((a,b)=>{
+      if (conferenceTeamSort === "name") return String(a.name || "").localeCompare(String(b.name || ""));
+      const av = draftSortValue(a, conferenceTeamSort);
+      const bv = draftSortValue(b, conferenceTeamSort);
+      return Number(bv) - Number(av) || String(a.name || "").localeCompare(String(b.name || ""));
+    });
+  }
 
   const availableTeamsByConference = allowedConferences
     .map((conf) => ({
@@ -3014,6 +3037,17 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
         <aside style={draftAvailablePanelV37} className="cfb-card">
           <div style={S.eyebrow}>Available Teams · {availableTeams.length}</div>
           <input style={{ ...S.input, marginTop: 12 }} value={teamSearch} onChange={(e) => setTeamSearch(e.target.value)} placeholder="Search available teams or conference..." />
+          <div style={draftConferenceSortBarV48}>
+            <span>Sort conference teams by</span>
+            <select style={draftConferenceSortSelectV48} value={conferenceTeamSort} onChange={(e)=>setConferenceTeamSort(e.target.value)}>
+              <option value="name">Team Name A-Z</option>
+              <option value="boardScore">Board Score</option>
+              <option value="overall">Overall Rating</option>
+              <option value="offense">Offensive Rating</option>
+              <option value="defense">Defensive Rating</option>
+              <option value="prestige">Prestige</option>
+            </select>
+          </div>
           <div style={S.availableConferenceStack}>
             {availableTeamsByConference.map((group) => (
               <div key={group.conference} style={S.availableConferenceGroup}>
@@ -9695,4 +9729,30 @@ const dashboardTileLinesV47 = {
 
 const cfpGoldTextV47 = {
   color: "#d4af37",
+};
+
+
+const draftConferenceSortBarV48 = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 12,
+  margin: "12px 0",
+  padding: "10px 12px",
+  borderRadius: 12,
+  background: "rgba(255,255,255,.035)",
+  border: "1px solid rgba(255,255,255,.08)",
+  color: "rgba(248,250,252,.82)",
+  fontWeight: 900,
+  flexWrap: "wrap",
+};
+
+const draftConferenceSortSelectV48 = {
+  background: "#020617",
+  border: "1px solid rgba(255,255,255,.12)",
+  color: "#f8fafc",
+  borderRadius: 10,
+  padding: "10px 12px",
+  fontWeight: 900,
+  minWidth: 220,
 };
