@@ -217,6 +217,19 @@ function activeAssignmentsForLeague(assignments, teams) {
   });
 }
 
+
+const DRAFT_PRESTIGE_OPTIONS = ["", "0.5", "1", "1.5", "2", "2.5", "3", "3.5", "4", "4.5", "5"];
+const CONFERENCE_ASSET_NAMES = ["American", "CUSA", "MAC", "Mountain West", "PAC 12", "Sun Belt", "SEC", "ACC", "Big Ten", "Big 12"];
+
+function ConferenceLogoMark({ conference, conferenceAssets = [], size = 42 }) {
+  const asset = (conferenceAssets || []).find((row)=>cleanConference(row.conference_name) === cleanConference(conference));
+  const url = asset?.logo_url;
+  if (!url) {
+    return <span style={{ width:size, height:size, borderRadius:12, display:"inline-grid", placeItems:"center", background:"rgba(255,255,255,.06)", border:"1px solid rgba(255,255,255,.10)", color:"#f8fafc", fontWeight:1000, fontSize:Math.max(10, size*.26) }}>{String(conference || "CFB").slice(0,3).toUpperCase()}</span>;
+  }
+  return <span style={{ width:size, height:size, display:"inline-grid", placeItems:"center" }}><img src={url} alt="" style={{ width:size, height:size, objectFit:"contain", display:"block" }}/></span>;
+}
+
 function TeamLogoMark({ team, size = 34, faded = false, plate = false }) {
   const url = team?.logo_url || team?.logo || team?.image_url;
   const baseSize = Number(size) || 34;
@@ -722,6 +735,7 @@ export default function App() {
   const [historyRows, setHistoryRows] = useState([]);
   const [seasonPlayerStats, setSeasonPlayerStats] = useState([]);
   const [teamSeasonStats, setTeamSeasonStats] = useState([]);
+  const [conferenceAssets, setConferenceAssets] = useState([]);
   const [loading, setLoading] = useState(false);
   const [standingsOrder, setStandingsOrder] = useState([]);
   const [commissionerRankings, setCommissionerRankings] = useState([]);
@@ -855,7 +869,7 @@ export default function App() {
 
   async function loadData() {
     setLoading(true); setError("");
-    const [teamsRes, settingsRes, tabOrderRes, usersRes, assignmentsRes, standingsRes, rankingsRes, resultsRes, weeklyMatchupsRes, draftPicks27Res, draftSettings27Res, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, seasonStatsRes, teamStatsRes, historyRes] = await Promise.all([
+    const [teamsRes, settingsRes, tabOrderRes, usersRes, assignmentsRes, standingsRes, rankingsRes, resultsRes, weeklyMatchupsRes, draftPicks27Res, draftSettings27Res, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, seasonStatsRes, teamStatsRes, historyRes, conferenceAssetsRes] = await Promise.all([
       supabase.from("teams").select("*").order("name"),
       supabase.from("league_settings").select("*").eq("id", 1).single(),
       supabase.from("dashboard_tab_order").select("*").eq("id", 1).single(),
@@ -877,6 +891,7 @@ export default function App() {
       supabase.from("season_player_stats").select("*, teams(name), discord_users(discord_username)").order("season_year", { ascending: false }).order("created_at", { ascending: false }),
       supabase.from("team_season_stats").select("*, teams(name), discord_users(discord_username)").order("season_year", { ascending: false }).order("created_at", { ascending: false }),
       supabase.from("team_history_records").select("*, teams(name)").order("season_year", { ascending: false }),
+      supabase.from("conference_assets").select("*").order("conference_name"),
     ]);
     const firstError = [teamsRes, settingsRes, tabOrderRes, usersRes, assignmentsRes, standingsRes, rankingsRes, resultsRes, weeklyMatchupsRes, draftPicks27Res, draftSettings27Res, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, seasonStatsRes, teamStatsRes, historyRes].find((r) => r.error)?.error;
     if (firstError) setError(firstError.message);
@@ -896,7 +911,7 @@ export default function App() {
           week: settingsRes.data.current_week,
         }));
       }
-      setTeams(teamsRes.data || []); setUsers(usersRes.data || []);
+      setTeams(teamsRes.data || []); setUsers(usersRes.data || []); setConferenceAssets(conferenceAssetsRes?.data || []);
       setAssignments((assignmentsRes.data || []).sort((a,b) => (a.teams?.name || "").localeCompare(b.teams?.name || "")));
       const loadedStandings = standingsRes.data || [];
       const loadedRankings = rankingsRes.data || [];
@@ -939,6 +954,20 @@ export default function App() {
   }
   async function deleteRow(table, id) { const { error: deleteError } = await supabase.from(table).delete().eq("id", id); if (deleteError) setError(deleteError.message); await loadData(); }
   async function updateRow(table, id, field, value) { const { error: updateError } = await supabase.from(table).update({ [field]: value === "" ? null : value }).eq("id", id); if (updateError) setError(updateError.message); else setError(""); await loadData(); }
+
+  async function saveConferenceAsset(conferenceName, field, value) {
+    const payload = {
+      conference_name: conferenceName,
+      [field]: value === "" ? null : value,
+      updated_at: new Date().toISOString(),
+    };
+    const { error: upsertError } = await supabase
+      .from("conference_assets")
+      .upsert(payload, { onConflict: "conference_name" });
+    if (upsertError) setError(`Conference asset save failed: ${upsertError.message}`);
+    else setError("");
+    await loadData();
+  }
   async function updateLeagueSetting(field, value) {
     const payload = {
       [field]: field === "current_year" ? Number(value) : value,
@@ -1232,7 +1261,7 @@ export default function App() {
   }
 
   return <><GlobalStyle/><div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={isErrorMessage(error) ? errorBox : successBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} draggedTab={draggedTab} setDraggedTab={setDraggedTab} reorderTabs={reorderTabs} adminUnlocked={adminUnlocked} adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin} teams={teamOptions} assignments={assignments} currentYear={currentYear}/>
-    {activeTab === "draftRoom" && <DraftRoom teams={teamOptions} users={userOptions} picks={draftPicks27} settings={draftSettings27} startClock={startDraftClock} pauseClock={pauseDraftClock} resumeClock={resumeDraftClock} announcePick={announceDraftPick} revealPick={revealDraftPick} undoPick={undoDraftPick}/>}     
+    {activeTab === "draftRoom" && <DraftRoom teams={teamOptions} users={userOptions} picks={draftPicks27} settings={draftSettings27} conferenceAssets={conferenceAssets} startClock={startDraftClock} pauseClock={pauseDraftClock} resumeClock={resumeDraftClock} announcePick={announceDraftPick} revealPick={revealDraftPick} undoPick={undoDraftPick}/>}     
     {activeTab === "dashboard" && <DashboardRedesign teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} teamSeasonStats={teamSeasonStats} currentYear={currentYear} currentWeek={currentWeek} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} saveSettings={saveLeagueSettings} goToTeam={goToTeam} sortState={userSort} setSortState={setUserSort}/>}
     {activeTab === "eloRankings" && <EloRankings users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
     {activeTab === "dynastyRecords" && <DynastyRecords users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} seasonPlayerStats={seasonPlayerStats} teamSeasonStats={teamSeasonStats}/>}    
@@ -1240,7 +1269,7 @@ export default function App() {
     {activeTab === "rivalries" && <Rivalries users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
     {activeTab === "powerIndex" && <DynastyPowerIndex users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}
     {activeTab === "commissionerCenter" && (adminUnlocked ? <CommissionerCenterSafe setActiveTab={setActiveTab} loadData={loadData}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>) }    
-    {activeTab === "logoManager" && <LogoManager teams={teamOptions} updateRow={updateRow}/>}    
+    {activeTab === "logoManager" && <LogoManager teams={teamOptions} updateRow={updateRow} conferenceAssets={conferenceAssets} saveConferenceAsset={saveConferenceAsset}/>}    
     {activeTab === "leagueDataCenter" && <LeagueDataCenter teams={teamOptions} users={userOptions} assignments={assignments} results={results} currentYear={currentYear} currentWeek={currentWeek} setError={setError} loadData={loadData}/>}
     {activeTab === "conferencePower" && <ConferencePowerRankings teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
     {activeTab === "weeklyMedia" && <WeeklyMedia teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} weeklyMatchups={weeklyMatchups} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} currentWeek={currentWeek}/>}    
@@ -2399,7 +2428,7 @@ function draftRatingLine(team) {
   return `Prestige ${draftPrestigeStars(team)} | OFF ${off} | DEF ${def} | OVR ${ovr}`;
 }
 
-function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClock, pauseClock, resumeClock, announcePick, revealPick, undoPick }) {
+function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferenceAssets = [], startClock, pauseClock, resumeClock, announcePick, revealPick, undoPick }) {
   const [selectedTeamId, setSelectedTeamId] = useState("");
   const [teamSearch, setTeamSearch] = useState("");
   const [timerMinutes, setTimerMinutes] = useState(settings?.timer_minutes || 10);
@@ -3067,7 +3096,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, startClo
             <div key={row.conference} style={draftConferencePowerTileV42}>
               <div style={draftConferencePowerTopV42}>
                 <span>#{index+1}</span>
-                <strong>{row.conference}</strong>
+                <span style={conferencePowerNameV54}><ConferenceLogoMark conference={row.conference} conferenceAssets={conferenceAssets} size={30}/><strong>{row.conference}</strong></span>
                 <b>{row.powerScore}</b>
               </div>
               <div style={draftConferencePowerStatsV42}>
@@ -3352,27 +3381,36 @@ function CommissionerCenterSafe({ setActiveTab, loadData }) {
   );
 }
 
-function LogoManager({ teams, updateRow }) {
+function LogoManager({ teams, updateRow, conferenceAssets = [], saveConferenceAsset }) {
   const [searchText, setSearchText] = useState("");
   const filtered = teams.filter((team)=>team.name.toLowerCase().includes(searchText.toLowerCase()));
+  const conferenceRows = CONFERENCE_ASSET_NAMES.map((name)=>conferenceAssets.find((row)=>cleanConference(row.conference_name) === cleanConference(name)) || { conference_name:name, logo_url:"" });
 
   return (
     <section style={broadcastCard}>
       <h2 style={sectionTitle}>Team Assets Manager</h2>
-      <p style={mutedText}>Input draft-room team data here. Add Prestige 0-5, Overall, Offense, and Defense; Best Available uses those fields to calculate Board Score: OVR 40%, OFF 20%, DEF 20%, Prestige 20%.</p>
+      <p style={mutedText}>Add official team logos, team colors, and draft-room ratings. Prestige uses half-star values from 0.5 to 5.</p>
       <SearchBox value={searchText} onChange={setSearchText}/>
       <div style={logoManagerGrid}>
         {filtered.map((team)=>(
           <div key={team.id} style={logoManagerCard}>
-            <div style={logoPreviewBox}>
-              {team.logo_url ? <img src={team.logo_url} alt="" style={logoPreviewImg}/> : <span>No Logo</span>}
+            <div style={teamAssetLogoStageV54}>
+              <div style={{...teamAssetLogoBackdropV54, background:`linear-gradient(135deg, ${getTeamPrimary(team)}88, rgba(15,23,42,.96))`, borderColor:getTeamSecondary(team)}}>
+                {team.logo_url ? <img src={team.logo_url} alt="" style={teamAssetLogoImgV54}/> : <span>No Logo</span>}
+              </div>
+              <b>{team.name}</b>
             </div>
-            <b>{team.name}</b>
+
             <input style={input} value={team.logo_url || ""} onChange={(e)=>updateRow("teams", team.id, "logo_url", e.target.value)} placeholder="Official Logo URL"/>
-            
             <input style={input} value={team.primary_color || ""} onChange={(e)=>updateRow("teams", team.id, "primary_color", e.target.value)} placeholder="Primary Color #000000"/>
             <input style={input} value={team.secondary_color || ""} onChange={(e)=>updateRow("teams", team.id, "secondary_color", e.target.value)} placeholder="Secondary Color #ffffff"/>
-            <input style={input} value={team.draft_prestige || ""} onChange={(e)=>updateRow("teams", team.id, "draft_prestige", e.target.value)} placeholder="Draft Prestige 0-5"/>
+
+            <label style={assetFieldLabelV54}>Prestige
+              <select style={input} value={team.draft_prestige || ""} onChange={(e)=>updateRow("teams", team.id, "draft_prestige", e.target.value)}>
+                {DRAFT_PRESTIGE_OPTIONS.map((value)=><option key={value} value={value}>{value ? `${value} Stars` : "Select Prestige"}</option>)}
+              </select>
+            </label>
+
             <input style={input} value={team.draft_overall || ""} onChange={(e)=>updateRow("teams", team.id, "draft_overall", e.target.value)} placeholder="Overall Rating"/>
             <input style={input} value={team.draft_offense || ""} onChange={(e)=>updateRow("teams", team.id, "draft_offense", e.target.value)} placeholder="Offense Rating"/>
             <input style={input} value={team.draft_defense || ""} onChange={(e)=>updateRow("teams", team.id, "draft_defense", e.target.value)} placeholder="Defense Rating"/>
@@ -3380,6 +3418,26 @@ function LogoManager({ teams, updateRow }) {
           </div>
         ))}
       </div>
+
+      <section style={conferenceLogoSectionV54}>
+        <div style={sectionTop}>
+          <div>
+            <h2 style={sectionTitle}>Conference Logos</h2>
+            <p style={mutedText}>Paste direct image URLs for conference logos. These will be available anywhere conference branding is used.</p>
+          </div>
+        </div>
+        <div style={conferenceLogoGridV54}>
+          {conferenceRows.map((row)=>(
+            <div key={row.conference_name} style={conferenceLogoCardV54}>
+              <div style={conferenceLogoPreviewV54}>
+                {row.logo_url ? <img src={row.logo_url} alt="" style={conferenceLogoImgV54}/> : <ConferenceLogoMark conference={row.conference_name} conferenceAssets={conferenceAssets} size={58}/>}
+              </div>
+              <b>{row.conference_name}</b>
+              <input style={input} value={row.logo_url || ""} onChange={(e)=>saveConferenceAsset(row.conference_name, "logo_url", e.target.value)} placeholder={`${row.conference_name} Logo URL`}/>
+            </div>
+          ))}
+        </div>
+      </section>
     </section>
   );
 }
@@ -5034,6 +5092,19 @@ function GlobalStyle() {
         --cfb-bg: #020617;
         --cfb-border: rgba(255,255,255,.08);
         --cfb-text: #f8fafc;
+      }
+
+      /* v54-assets-mobile */
+      @media (max-width: 720px) {
+        [style*="repeat(auto-fit, minmax(min(100%, 310px), 1fr))"],
+        [style*="repeat(auto-fit, minmax(min(100%, 260px), 1fr))"] {
+          grid-template-columns: 1fr !important;
+        }
+
+        input,
+        select {
+          width: 100% !important;
+        }
       }
 `}</style>
   );
@@ -7328,8 +7399,8 @@ const commishToolCard = {
 
 const logoManagerGrid = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-  gap: 14,
+  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 310px), 1fr))",
+  gap: 16,
   marginTop: 18,
 };
 
@@ -7337,6 +7408,8 @@ const logoManagerCard = {
   ...liquidGlassTile,
   display: "grid",
   gap: 10,
+  minWidth: 0,
+  overflow: "hidden",
 };
 
 const logoPreviewBox = {
@@ -9908,4 +9981,87 @@ const coachMenuLogoPlateV51 = {
   zIndex: 2,
   overflow: "visible",
   flexShrink: 0,
+};
+
+
+const teamAssetLogoStageV54 = {
+  display: "grid",
+  gap: 10,
+  justifyItems: "center",
+  textAlign: "center",
+};
+
+const teamAssetLogoBackdropV54 = {
+  width: "100%",
+  height: 128,
+  border: "1px solid rgba(255,255,255,.12)",
+  borderRadius: 18,
+  display: "grid",
+  placeItems: "center",
+  background: "rgba(255,255,255,.045)",
+  color: "rgba(255,255,255,.60)",
+  overflow: "hidden",
+};
+
+const teamAssetLogoImgV54 = {
+  maxWidth: "86%",
+  maxHeight: "86%",
+  objectFit: "contain",
+  objectPosition: "center center",
+  display: "block",
+};
+
+const assetFieldLabelV54 = {
+  display: "grid",
+  gap: 6,
+  color: "rgba(226,232,240,.82)",
+  fontSize: 12,
+  fontWeight: 950,
+  textTransform: "uppercase",
+  letterSpacing: ".08em",
+};
+
+const conferenceLogoSectionV54 = {
+  marginTop: 28,
+  paddingTop: 24,
+  borderTop: "1px solid rgba(255,255,255,.08)",
+};
+
+const conferenceLogoGridV54 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
+  gap: 14,
+  marginTop: 16,
+};
+
+const conferenceLogoCardV54 = {
+  ...liquidGlassTile,
+  display: "grid",
+  gap: 10,
+  justifyItems: "stretch",
+  minWidth: 0,
+};
+
+const conferenceLogoPreviewV54 = {
+  height: 104,
+  borderRadius: 16,
+  border: "1px solid rgba(255,255,255,.10)",
+  background: "rgba(255,255,255,.035)",
+  display: "grid",
+  placeItems: "center",
+  overflow: "hidden",
+};
+
+const conferenceLogoImgV54 = {
+  maxWidth: "82%",
+  maxHeight: "82%",
+  objectFit: "contain",
+  objectPosition: "center center",
+};
+
+const conferencePowerNameV54 = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  minWidth: 0,
 };
