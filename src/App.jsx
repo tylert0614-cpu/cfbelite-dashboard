@@ -220,7 +220,7 @@ function activeAssignmentsForLeague(assignments, teams) {
 function TeamLogoMark({ team, size = 34, faded = false, plate = false }) {
   const url = team?.logo_url || team?.logo || team?.image_url;
   const baseSize = Number(size) || 34;
-  const imageSize = Math.round(baseSize * (plate ? .92 : 1.08));
+  const imageSize = Math.round(baseSize * (plate ? 1.18 : 1.58));
 
   const wrapStyle = {
     width: baseSize,
@@ -232,9 +232,10 @@ function TeamLogoMark({ team, size = 34, faded = false, plate = false }) {
     alignItems: "center",
     justifyContent: "center",
     lineHeight: 0,
-    overflow: "hidden",
+    overflow: "visible",
     flexShrink: 0,
     opacity: faded ? .34 : 1,
+    position: "relative",
     background: plate ? "linear-gradient(180deg, rgba(255,255,255,.11), rgba(255,255,255,.035))" : "transparent",
     border: plate ? "1px solid rgba(255,255,255,.16)" : "0",
     boxShadow: plate ? "0 12px 30px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.12)" : "none",
@@ -243,7 +244,7 @@ function TeamLogoMark({ team, size = 34, faded = false, plate = false }) {
   if (!url) {
     const initials = String(team?.name || "CFB").split(" ").map((part)=>part[0]).join("").slice(0,3).toUpperCase();
     return (
-      <span style={{ ...wrapStyle, background: plate ? wrapStyle.background : "rgba(255,255,255,.08)", border: plate ? wrapStyle.border : "1px solid rgba(255,255,255,.14)", color:"#fff", fontWeight:1000, fontSize:Math.max(10,baseSize*.30) }}>
+      <span style={{ ...wrapStyle, overflow:"hidden", background: plate ? wrapStyle.background : "rgba(255,255,255,.08)", border: plate ? wrapStyle.border : "1px solid rgba(255,255,255,.14)", color:"#fff", fontWeight:1000, fontSize:Math.max(10,baseSize*.30) }}>
         {initials}
       </span>
     );
@@ -257,13 +258,15 @@ function TeamLogoMark({ team, size = 34, faded = false, plate = false }) {
         style={{
           width: imageSize,
           height: imageSize,
-          maxWidth: "100%",
-          maxHeight: "100%",
           objectFit: "contain",
           objectPosition: "center center",
           display: "block",
-          margin: "auto",
-          filter: faded ? "grayscale(.12)" : "drop-shadow(0 4px 10px rgba(0,0,0,.38))",
+          position: "absolute",
+          left: "50%",
+          top: "50%",
+          transform: "translate(-50%, -50%)",
+          filter: faded ? "grayscale(.12)" : "drop-shadow(0 4px 10px rgba(0,0,0,.40))",
+          pointerEvents: "none",
         }}
       />
     </span>
@@ -1874,7 +1877,7 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
             return (
               <button key={team?.id || row.teamName || row.rank} style={{...dashboardRankRowPro, background:`linear-gradient(100deg, ${primary}70, rgba(15,23,42,.92) 42%, ${secondary}28)`, borderColor:`${secondary}77`}} onClick={()=>team?.id && goToTeam(team.id)}>
                 <em style={dashboardRankNumberV47}>#{row.rank}</em>
-                <span style={dashboardTeamCellPro}><TeamLogoMark team={team} size={48}/><strong>{row.teamName || team?.name}</strong></span>
+                <span style={dashboardTeamCellPro}><TeamLogoMark team={team} size={56}/><strong>{row.teamName || team?.name}</strong></span>
                 <span>{row.user}</span>
                 <span>{row.record.wins}</span>
                 <span>{row.record.losses}</span>
@@ -4429,7 +4432,7 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
     <section style={coachPageV43}>
       <div style={{...coachHeroV43, borderColor:`${secondary}77`, background:`linear-gradient(135deg, ${primary}e8, rgba(2,6,23,.98) 58%)`}}>
         <div style={coachHeroIdentityV43}>
-          <TeamLogoMark team={currentTeam} size={104} plate/>
+          <TeamLogoMark team={currentTeam} size={112} plate/>
           <div>
             <div style={dashboardKickerPro}>{currentTeam?.name || "Unassigned Coach"}</div>
             <h1 style={coachNameV43}>{safeUser.discord_username || "Coach"}</h1>
@@ -4862,7 +4865,7 @@ function GlobalStyle() {
         }
 
         .cfb-draft-ticker-track {
-          animation-duration: 22s !important;
+          animation-duration: 54s !important;
         }
 
         table {
@@ -5142,7 +5145,7 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
         {(team?.logo_url) && <img src={team.logo_url} alt="" style={coachMenuLogoWatermark}/>}
         <span style={{ ...coachAccentStripe, background: accent }} />
         <span style={coachMenuLogoPlateV51}>
-          <TeamLogoMark team={team} size={68}/>
+          <TeamLogoMark team={team} size={82}/>
         </span>
         <span style={coachNavTextWrap}>
           <strong style={coachNavName}>{label}</strong>
@@ -7495,12 +7498,12 @@ const colorDrawerItem = {
 const coachDrawerItem = {
   position: "relative",
   width: "100%",
-  minHeight: 96,
+  minHeight: 112,
   borderRadius: 20,
-  padding: "12px 18px 12px 14px",
+  padding: "12px 20px 12px 14px",
   display: "flex",
   alignItems: "center",
-  gap: 16,
+  gap: 20,
   textAlign: "left",
   overflow: "hidden",
   cursor: "pointer",
@@ -8948,7 +8951,7 @@ const dashboardNewsRowPro = {
 const dashboardTeamCellPro = {
   display: "flex",
   alignItems: "center",
-  gap: 14,
+  gap: 18,
   minWidth: 0,
   lineHeight: 1,
 };
@@ -8990,16 +8993,16 @@ const dashboardHeaderButtonPro = {
 const dashboardRankRowPro = {
   width: "100%",
   display: "grid",
-  gridTemplateColumns: "58px minmax(190px,1.25fr) minmax(120px,.7fr) 54px 54px 80px 80px 78px 70px 82px",
-  gap: 10,
+  gridTemplateColumns: "58px minmax(230px,1.25fr) minmax(120px,.7fr) 54px 54px 80px 80px 78px 70px 82px",
+  gap: 12,
   alignItems: "center",
   border: "1px solid rgba(255,255,255,.08)",
   borderRadius: 14,
-  padding: "12px 14px",
+  padding: "13px 16px",
   color: "#f8fafc",
   textAlign: "left",
   cursor: "pointer",
-  minWidth: 940,
+  minWidth: 980,
 };
 
 
@@ -9335,7 +9338,7 @@ const draftTickerTrackV39 = {
   display: "inline-flex",
   gap: 28,
   minWidth: "max-content",
-  animation: "cfbDraftTickerScroll 32s linear infinite",
+  animation: "cfbDraftTickerScroll 72s linear infinite",
   paddingLeft: "100%",
 };
 
@@ -9891,10 +9894,10 @@ const warRoomRowV49 = {
 
 
 const coachMenuLogoPlateV51 = {
-  width: 78,
-  height: 78,
-  minWidth: 78,
-  borderRadius: 18,
+  width: 90,
+  height: 90,
+  minWidth: 90,
+  borderRadius: 20,
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
@@ -9903,6 +9906,6 @@ const coachMenuLogoPlateV51 = {
   boxShadow: "0 16px 34px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.13)",
   position: "relative",
   zIndex: 2,
-  overflow: "hidden",
+  overflow: "visible",
   flexShrink: 0,
 };
