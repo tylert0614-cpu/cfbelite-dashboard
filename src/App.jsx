@@ -219,43 +219,51 @@ function activeAssignmentsForLeague(assignments, teams) {
 
 function TeamLogoMark({ team, size = 34, faded = false, plate = false }) {
   const url = team?.logo_url || team?.logo || team?.image_url;
-  const plateStyle = plate ? {
-    width: size,
-    height: size,
-    borderRadius: Math.max(10, size * .24),
-    display: "inline-grid",
-    placeItems: "center",
-    background: "linear-gradient(180deg, rgba(255,255,255,.105), rgba(255,255,255,.035))",
-    border: "1px solid rgba(255,255,255,.16)",
-    boxShadow: "0 12px 30px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.12)",
-    overflow: "visible",
-    opacity: faded ? .32 : 1,
-  } : {
-    width: size,
-    height: size,
-    display: "inline-grid",
-    placeItems: "center",
-    overflow: "visible",
-    opacity: faded ? .32 : 1,
+  const baseSize = Number(size) || 34;
+  const imageSize = Math.round(baseSize * (plate ? .92 : 1.08));
+
+  const wrapStyle = {
+    width: baseSize,
+    height: baseSize,
+    minWidth: baseSize,
+    minHeight: baseSize,
+    borderRadius: plate ? Math.max(10, baseSize * .24) : Math.max(8, baseSize * .18),
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    lineHeight: 0,
+    overflow: "hidden",
+    flexShrink: 0,
+    opacity: faded ? .34 : 1,
+    background: plate ? "linear-gradient(180deg, rgba(255,255,255,.11), rgba(255,255,255,.035))" : "transparent",
+    border: plate ? "1px solid rgba(255,255,255,.16)" : "0",
+    boxShadow: plate ? "0 12px 30px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.12)" : "none",
   };
 
   if (!url) {
     const initials = String(team?.name || "CFB").split(" ").map((part)=>part[0]).join("").slice(0,3).toUpperCase();
-    return <span style={{ ...plateStyle, background: plate ? plateStyle.background : "rgba(255,255,255,.08)", border: plate ? plateStyle.border : "1px solid rgba(255,255,255,.14)", color:"#fff", fontWeight:1000, fontSize:Math.max(10,size*.30) }}>{initials}</span>;
+    return (
+      <span style={{ ...wrapStyle, background: plate ? wrapStyle.background : "rgba(255,255,255,.08)", border: plate ? wrapStyle.border : "1px solid rgba(255,255,255,.14)", color:"#fff", fontWeight:1000, fontSize:Math.max(10,baseSize*.30) }}>
+        {initials}
+      </span>
+    );
   }
 
-  const logoSize = Math.round(size * 1.72);
   return (
-    <span style={plateStyle}>
+    <span style={wrapStyle}>
       <img
         src={url}
         alt=""
         style={{
-          width: logoSize,
-          height: logoSize,
+          width: imageSize,
+          height: imageSize,
+          maxWidth: "100%",
+          maxHeight: "100%",
           objectFit: "contain",
-          filter: faded ? "grayscale(.12)" : "drop-shadow(0 4px 10px rgba(0,0,0,.42))",
+          objectPosition: "center center",
           display: "block",
+          margin: "auto",
+          filter: faded ? "grayscale(.12)" : "drop-shadow(0 4px 10px rgba(0,0,0,.38))",
         }}
       />
     </span>
@@ -1866,7 +1874,7 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
             return (
               <button key={team?.id || row.teamName || row.rank} style={{...dashboardRankRowPro, background:`linear-gradient(100deg, ${primary}70, rgba(15,23,42,.92) 42%, ${secondary}28)`, borderColor:`${secondary}77`}} onClick={()=>team?.id && goToTeam(team.id)}>
                 <em style={dashboardRankNumberV47}>#{row.rank}</em>
-                <span style={dashboardTeamCellPro}><TeamLogoMark team={team} size={50}/><strong>{row.teamName || team?.name}</strong></span>
+                <span style={dashboardTeamCellPro}><TeamLogoMark team={team} size={48}/><strong>{row.teamName || team?.name}</strong></span>
                 <span>{row.user}</span>
                 <span>{row.record.wins}</span>
                 <span>{row.record.losses}</span>
@@ -5134,7 +5142,7 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
         {(team?.logo_url) && <img src={team.logo_url} alt="" style={coachMenuLogoWatermark}/>}
         <span style={{ ...coachAccentStripe, background: accent }} />
         <span style={coachMenuLogoPlateV51}>
-          <TeamLogoMark team={team} size={72}/>
+          <TeamLogoMark team={team} size={68}/>
         </span>
         <span style={coachNavTextWrap}>
           <strong style={coachNavName}>{label}</strong>
@@ -7209,13 +7217,14 @@ const dangerButton = {
 
 const coachMenuLogoWatermark = {
   position: "absolute",
-  right: 14,
+  right: 16,
   top: "50%",
   transform: "translateY(-50%)",
-  width: 112,
-  height: 112,
+  width: 96,
+  height: 96,
   objectFit: "contain",
-  opacity: .30,
+  objectPosition: "center center",
+  opacity: .20,
   pointerEvents: "none",
   zIndex: 0,
   filter: "drop-shadow(0 0 18px rgba(255,255,255,.16))",
@@ -7491,7 +7500,7 @@ const coachDrawerItem = {
   padding: "12px 18px 12px 14px",
   display: "flex",
   alignItems: "center",
-  gap: 14,
+  gap: 16,
   textAlign: "left",
   overflow: "hidden",
   cursor: "pointer",
@@ -8941,6 +8950,7 @@ const dashboardTeamCellPro = {
   alignItems: "center",
   gap: 14,
   minWidth: 0,
+  lineHeight: 1,
 };
 
 const dashboardTopThreeMini = {
@@ -9881,16 +9891,18 @@ const warRoomRowV49 = {
 
 
 const coachMenuLogoPlateV51 = {
-  width: 82,
-  height: 82,
-  minWidth: 82,
-  borderRadius: 19,
-  display: "grid",
-  placeItems: "center",
+  width: 78,
+  height: 78,
+  minWidth: 78,
+  borderRadius: 18,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
   background: "linear-gradient(180deg, rgba(255,255,255,.13), rgba(255,255,255,.045))",
   border: "1px solid rgba(255,255,255,.18)",
   boxShadow: "0 16px 34px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.13)",
   position: "relative",
   zIndex: 2,
-  overflow: "visible",
+  overflow: "hidden",
+  flexShrink: 0,
 };
