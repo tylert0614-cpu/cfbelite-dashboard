@@ -3532,61 +3532,134 @@ function AllTeamsRatings({ teams = [] }) {
 
 function LogoManager({ teams, updateRow, conferenceAssets = [], saveConferenceAsset }) {
   const [searchText, setSearchText] = useState("");
+  const [assetDrafts, setAssetDrafts] = useState({});
+  const [conferenceDrafts, setConferenceDrafts] = useState({});
   const filtered = teams.filter((team)=>team.name.toLowerCase().includes(searchText.toLowerCase()));
   const conferenceRows = CONFERENCE_ASSET_NAMES.map((name)=>conferenceAssets.find((row)=>cleanConference(row.conference_name) === cleanConference(name)) || { conference_name:name, logo_url:"" });
+
+  function teamDraft(team) {
+    return assetDrafts[team.id] || {
+      logo_url: team.logo_url || "",
+      primary_color: team.primary_color || "",
+      secondary_color: team.secondary_color || "",
+      draft_prestige: team.draft_prestige || "",
+      draft_overall: team.draft_overall || "",
+      draft_offense: team.draft_offense || "",
+      draft_defense: team.draft_defense || "",
+    };
+  }
+
+  function setTeamDraft(teamId, field, value) {
+    setAssetDrafts((prev)=>({
+      ...prev,
+      [teamId]: {
+        ...(prev[teamId] || {}),
+        [field]: value,
+      },
+    }));
+  }
+
+  async function saveTeamAsset(team) {
+    const draft = teamDraft(team);
+    const fields = ["logo_url","primary_color","secondary_color","draft_prestige","draft_overall","draft_offense","draft_defense"];
+    for (const field of fields) {
+      const current = team[field] ?? "";
+      const next = draft[field] ?? "";
+      if (String(current) !== String(next)) {
+        await updateRow("teams", team.id, field, next);
+      }
+    }
+    setAssetDrafts((prev)=>{
+      const next = { ...prev };
+      delete next[team.id];
+      return next;
+    });
+  }
+
+  function confDraft(row) {
+    return conferenceDrafts[row.conference_name] ?? row.logo_url ?? "";
+  }
+
+  function setConfDraft(conferenceName, value) {
+    setConferenceDrafts((prev)=>({ ...prev, [conferenceName]: value }));
+  }
+
+  async function saveConfAsset(row) {
+    await saveConferenceAsset(row.conference_name, "logo_url", confDraft(row));
+    setConferenceDrafts((prev)=>{
+      const next = { ...prev };
+      delete next[row.conference_name];
+      return next;
+    });
+  }
 
   return (
     <section style={broadcastCard}>
       <h2 style={sectionTitle}>Team Assets Manager</h2>
-      <p style={mutedText}>Add official team logos, team colors, and draft-room ratings. Prestige uses half-star values from 0.5 to 5.</p>
+      <p style={mutedText}>Edit fields freely, then click Save Team Asset. This prevents the app from saving/reloading on every keystroke.</p>
       <SearchBox value={searchText} onChange={setSearchText}/>
       <div style={logoManagerGrid}>
-        {filtered.map((team)=>(
-          <div key={team.id} style={logoManagerCard}>
-            <div style={teamAssetLogoStageV54}>
-              <div style={{...teamAssetLogoBackdropV54, background:`linear-gradient(135deg, ${getTeamPrimary(team)}88, rgba(15,23,42,.96))`, borderColor:getTeamSecondary(team)}}>
-                {team.logo_url ? <img src={team.logo_url} alt="" style={teamAssetLogoImgV54}/> : <span>No Logo</span>}
+        {filtered.map((team)=>{
+          const draft = teamDraft(team);
+          const previewTeam = { ...team, ...draft };
+          const dirty = ["logo_url","primary_color","secondary_color","draft_prestige","draft_overall","draft_offense","draft_defense"].some((field)=>String(team[field] ?? "") !== String(draft[field] ?? ""));
+          return (
+            <div key={team.id} style={logoManagerCard}>
+              <div style={teamAssetLogoStageV54}>
+                <div style={{...teamAssetLogoBackdropV54, background:`linear-gradient(135deg, ${getTeamPrimary(previewTeam)}88, rgba(15,23,42,.96))`, borderColor:getTeamSecondary(previewTeam)}}>
+                  {draft.logo_url ? <img src={draft.logo_url} alt="" style={teamAssetLogoImgV54}/> : <span>No Logo</span>}
+                </div>
+                <b>{team.name}</b>
               </div>
-              <b>{team.name}</b>
+
+              <input style={input} value={draft.logo_url} onChange={(e)=>setTeamDraft(team.id, "logo_url", e.target.value)} placeholder="Official Logo URL"/>
+              <input style={input} value={draft.primary_color} onChange={(e)=>setTeamDraft(team.id, "primary_color", e.target.value)} placeholder="Primary Color #000000"/>
+              <input style={input} value={draft.secondary_color} onChange={(e)=>setTeamDraft(team.id, "secondary_color", e.target.value)} placeholder="Secondary Color #ffffff"/>
+
+              <label style={assetFieldLabelV54}>Prestige
+                <select style={input} value={draft.draft_prestige} onChange={(e)=>setTeamDraft(team.id, "draft_prestige", e.target.value)}>
+                  {DRAFT_PRESTIGE_OPTIONS.map((value)=><option key={value} value={value}>{value ? `${value} Stars` : "Select Prestige"}</option>)}
+                </select>
+              </label>
+
+              <input style={input} value={draft.draft_overall} onChange={(e)=>setTeamDraft(team.id, "draft_overall", e.target.value)} placeholder="Overall Rating"/>
+              <input style={input} value={draft.draft_offense} onChange={(e)=>setTeamDraft(team.id, "draft_offense", e.target.value)} placeholder="Offense Rating"/>
+              <input style={input} value={draft.draft_defense} onChange={(e)=>setTeamDraft(team.id, "draft_defense", e.target.value)} placeholder="Defense Rating"/>
+              <div style={draftAssetPreviewV40}>
+                <span style={prestigePreviewLineV57}>Prestige <PrestigeStars team={previewTeam} size={14}/> | OFF {previewTeam.draft_offense ?? previewTeam.offense_rating ?? previewTeam.off ?? "—"} | DEF {previewTeam.draft_defense ?? previewTeam.defense_rating ?? previewTeam.def ?? "—"} | OVR {previewTeam.draft_overall ?? previewTeam.overall_rating ?? previewTeam.ovr ?? "—"} · Board Score {draftTeamRating(previewTeam)}</span>
+              </div>
+              <button type="button" style={dirty ? saveAssetButtonDirtyV61 : saveAssetButtonV61} onClick={()=>saveTeamAsset(team)}>
+                {dirty ? "Save Team Asset" : "Saved"}
+              </button>
             </div>
-
-            <input style={input} value={team.logo_url || ""} onChange={(e)=>updateRow("teams", team.id, "logo_url", e.target.value)} placeholder="Official Logo URL"/>
-            <input style={input} value={team.primary_color || ""} onChange={(e)=>updateRow("teams", team.id, "primary_color", e.target.value)} placeholder="Primary Color #000000"/>
-            <input style={input} value={team.secondary_color || ""} onChange={(e)=>updateRow("teams", team.id, "secondary_color", e.target.value)} placeholder="Secondary Color #ffffff"/>
-
-            <label style={assetFieldLabelV54}>Prestige
-              <select style={input} value={team.draft_prestige || ""} onChange={(e)=>updateRow("teams", team.id, "draft_prestige", e.target.value)}>
-                {DRAFT_PRESTIGE_OPTIONS.map((value)=><option key={value} value={value}>{value ? `${value} Stars` : "Select Prestige"}</option>)}
-              </select>
-            </label>
-
-            <input style={input} value={team.draft_overall || ""} onChange={(e)=>updateRow("teams", team.id, "draft_overall", e.target.value)} placeholder="Overall Rating"/>
-            <input style={input} value={team.draft_offense || ""} onChange={(e)=>updateRow("teams", team.id, "draft_offense", e.target.value)} placeholder="Offense Rating"/>
-            <input style={input} value={team.draft_defense || ""} onChange={(e)=>updateRow("teams", team.id, "draft_defense", e.target.value)} placeholder="Defense Rating"/>
-            <div style={draftAssetPreviewV40}>
-              <span style={prestigePreviewLineV57}>Prestige <PrestigeStars team={team} size={14}/> | OFF {team.draft_offense ?? team.offense_rating ?? team.off ?? "—"} | DEF {team.draft_defense ?? team.defense_rating ?? team.def ?? "—"} | OVR {team.draft_overall ?? team.overall_rating ?? team.ovr ?? "—"} · Board Score {draftTeamRating(team)}</span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <section style={conferenceLogoSectionV54}>
         <div style={sectionTop}>
           <div>
             <h2 style={sectionTitle}>Conference Logos</h2>
-            <p style={mutedText}>Paste direct image URLs for conference logos. These will be available anywhere conference branding is used.</p>
+            <p style={mutedText}>Paste direct image URLs for conference logos, then click Save Conference Logo.</p>
           </div>
         </div>
         <div style={conferenceLogoGridV54}>
-          {conferenceRows.map((row)=>(
-            <div key={row.conference_name} style={conferenceLogoCardV54}>
-              <div style={conferenceLogoPreviewV54}>
-                {row.logo_url ? <img src={row.logo_url} alt="" style={conferenceLogoImgV54}/> : <ConferenceLogoMark conference={row.conference_name} conferenceAssets={conferenceAssets} size={58}/>}
+          {conferenceRows.map((row)=>{
+            const draftLogo = confDraft(row);
+            const dirty = String(row.logo_url || "") !== String(draftLogo || "");
+            return (
+              <div key={row.conference_name} style={conferenceLogoCardV54}>
+                <div style={conferenceLogoPreviewV54}>
+                  {draftLogo ? <img src={draftLogo} alt="" style={conferenceLogoImgV54}/> : <ConferenceLogoMark conference={row.conference_name} conferenceAssets={conferenceAssets} size={58}/>}
+                </div>
+                <b>{row.conference_name}</b>
+                <input style={input} value={draftLogo} onChange={(e)=>setConfDraft(row.conference_name, e.target.value)} placeholder={`${row.conference_name} Logo URL`}/>
+                <button type="button" style={dirty ? saveAssetButtonDirtyV61 : saveAssetButtonV61} onClick={()=>saveConfAsset(row)}>
+                  {dirty ? "Save Conference Logo" : "Saved"}
+                </button>
               </div>
-              <b>{row.conference_name}</b>
-              <input style={input} value={row.logo_url || ""} onChange={(e)=>saveConferenceAsset(row.conference_name, "logo_url", e.target.value)} placeholder={`${row.conference_name} Logo URL`}/>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
     </section>
@@ -10489,4 +10562,26 @@ const conferenceFilterPillActiveV60 = {
   fontWeight: 1000,
   cursor: "pointer",
   boxShadow: "0 0 18px rgba(212,175,55,.16)",
+};
+
+
+const saveAssetButtonV61 = {
+  border: "1px solid rgba(255,255,255,.10)",
+  background: "rgba(255,255,255,.045)",
+  color: "rgba(226,232,240,.78)",
+  borderRadius: 12,
+  padding: "11px 12px",
+  fontWeight: 1000,
+  cursor: "pointer",
+};
+
+const saveAssetButtonDirtyV61 = {
+  border: "1px solid rgba(212,175,55,.72)",
+  background: "linear-gradient(135deg, rgba(212,175,55,.95), rgba(180,83,9,.95))",
+  color: "#020617",
+  borderRadius: 12,
+  padding: "11px 12px",
+  fontWeight: 1000,
+  cursor: "pointer",
+  boxShadow: "0 12px 28px rgba(212,175,55,.18)",
 };
