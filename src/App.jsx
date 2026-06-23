@@ -833,7 +833,7 @@ export default function App() {
     await saveCommissionerRankings(next);
   }
 
-  const baseTabs = [["dashboard","Dashboard"],["draftRoom","CFBElite 27 Draft Room"],["commissionerCenter","Commissioner Center"],["logoManager","Team Assets"],["leagueDataCenter","League Data Center"],["seasonStats","Season Player Stats"],["teamStats","Team Stats"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["dynastyHOF","Dynasty Hall of Fame"],["rivalries","Rivalries"],["powerIndex","Power Index"],["eloRankings","User ELO"],["conferencePower","Conference Power"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["assignments","Users/Team Assignments"],["resultsManager","Results Manager"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...coachProfileUsers.map((user) => [`coach-${user.id}`, user.discord_username])];
+  const baseTabs = [["dashboard","Dashboard"],["draftRoom","CFBElite 27 Draft Room"],["commissionerCenter","Commissioner Center"],["logoManager","Team Assets"],["allTeamsRatings","All Teams Ratings"],["leagueDataCenter","League Data Center"],["seasonStats","Season Player Stats"],["teamStats","Team Stats"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["powerIndex","Power Index"],["eloRankings","User ELO"],["conferencePower","Conference Power"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["assignments","Users/Team Assignments"],["resultsManager","Results Manager"],["h2h","User vs User H2H"],["dynastyHOF","Head Coach Power Rankings"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...coachProfileUsers.map((user) => [`coach-${user.id}`, user.discord_username])];
   const tabs = useMemo(() => {
     const tabMap = new Map(baseTabs);
     const ordered = tabOrder
@@ -1270,6 +1270,7 @@ export default function App() {
     {activeTab === "powerIndex" && <DynastyPowerIndex users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}
     {activeTab === "commissionerCenter" && (adminUnlocked ? <CommissionerCenterSafe setActiveTab={setActiveTab} loadData={loadData}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>) }    
     {activeTab === "logoManager" && <LogoManager teams={teamOptions} updateRow={updateRow} conferenceAssets={conferenceAssets} saveConferenceAsset={saveConferenceAsset}/>}    
+    {activeTab === "allTeamsRatings" && <AllTeamsRatings teams={teamOptions}/>}    
     {activeTab === "leagueDataCenter" && <LeagueDataCenter teams={teamOptions} users={userOptions} assignments={assignments} results={results} currentYear={currentYear} currentWeek={currentWeek} setError={setError} loadData={loadData}/>}
     {activeTab === "conferencePower" && <ConferencePowerRankings teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
     {activeTab === "weeklyMedia" && <WeeklyMedia teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} weeklyMatchups={weeklyMatchups} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} currentWeek={currentWeek}/>}    
@@ -1891,7 +1892,7 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
           <span>CFBELITE AUTOMATIC RANKINGS</span>
           <h2>Sortable Power Table</h2>
         </div>
-        <div style={dashboardTableHeadPro}>
+        <div style={dashboardTableHeadPro} className="cfb-dashboard-power-table-head">
           {headerCells.map(([key,label])=>(
             <button key={key} style={dashboardHeaderButtonPro} onClick={()=>toggleRankingSort(key)}>
               {label}{rankingSort.key === key ? (rankingSort.direction === "asc" ? " ↑" : " ↓") : ""}
@@ -2383,13 +2384,39 @@ function draftNumberValue(value, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
-function draftPrestigeStars(team) {
+function draftPrestigeValue(team) {
   const raw = team?.draft_prestige ?? team?.school_prestige ?? team?.prestige_grade ?? team?.prestige ?? "";
-  if (raw === "" || raw === null || raw === undefined) return "—";
+  if (raw === "" || raw === null || raw === undefined) return null;
   const n = Number(raw);
-  if (!Number.isFinite(n)) return String(raw);
-  const clamped = Math.max(0, Math.min(5, n));
-  return "★".repeat(Math.round(clamped)) + (clamped < 5 ? "☆".repeat(5 - Math.round(clamped)) : "");
+  return Number.isFinite(n) ? Math.max(0, Math.min(5, n)) : null;
+}
+
+function draftPrestigeStars(team) {
+  const value = draftPrestigeValue(team);
+  if (value === null) return "—";
+  const fullStars = Math.floor(value);
+  const hasHalf = value % 1 >= 0.5;
+  const emptyStars = Math.max(0, 5 - fullStars - (hasHalf ? 1 : 0));
+  return `${"★".repeat(fullStars)}${hasHalf ? "★" : ""}${"☆".repeat(emptyStars)}`;
+}
+
+function PrestigeStars({ team, size = 15 }) {
+  const value = draftPrestigeValue(team);
+  if (value === null) return <span>—</span>;
+
+  return (
+    <span style={prestigeStarsWrapV57} aria-label={`${value} star prestige`}>
+      {[0,1,2,3,4].map((index)=>{
+        const fill = Math.max(0, Math.min(1, value - index));
+        return (
+          <span key={index} style={{...prestigeStarBoxV57, width:size, height:size, fontSize:size}}>
+            <span style={prestigeStarEmptyV57}>★</span>
+            <span style={{...prestigeStarFillV57, width:`${fill * 100}%`}}>★</span>
+          </span>
+        );
+      })}
+    </span>
+  );
 }
 
 function draftTeamRating(team) {
@@ -2612,7 +2639,12 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
         })
         .filter(Boolean)
         .sort((a,b)=>Number(a.pickNumber)-Number(b.pickNumber));
-      const row = { conference: conf, totalTeams: confTeams.length, ratedTeams: ratedTeams.length, avgOvr, avgOff, avgDef, avgPrestige, draftedTeams };
+      const count = conferenceCounts[conf] || 0;
+      const locked = lockedConferences.has(conf);
+      const firstTwoClosed = conferencesAtSix.slice(0, 2).includes(conf);
+      const closeAt = firstTwoClosed || conferencesAtSix.length < 2 ? 6 : 5;
+      const remainingToClose = Math.max(0, closeAt - count);
+      const row = { conference: conf, totalTeams: confTeams.length, ratedTeams: ratedTeams.length, avgOvr, avgOff, avgDef, avgPrestige, draftedTeams, count, locked, closeAt, remainingToClose };
       return { ...row, powerScore: draftConferencePowerScore(row) };
     })
     .sort((a,b)=>(Number(b.powerScore) || 0) - (Number(a.powerScore) || 0) || a.conference.localeCompare(b.conference));
@@ -3059,7 +3091,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
               <div style={draftBestRankV43}>#{index+1}</div>
               <div style={draftBestLogoV43}><TeamLogoMark team={team} size={52}/></div>
               <strong style={draftBestTeamNameV43}>{team.name}</strong>
-              <div style={draftBestStarsV43}>{draftPrestigeStars(team)}</div>
+              <div style={draftBestStarsV43}><PrestigeStars team={team} size={16}/></div>
               <div style={draftBestRatingsV43}>
                 <span>OVR <b>{team.draft_overall ?? team.overall_rating ?? team.ovr ?? "—"}</b></span>
                 <span>OFF <b>{team.draft_offense ?? team.offense_rating ?? team.off ?? "—"}</b></span>
@@ -3081,7 +3113,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
         <div style={warRoomModeGridV46}>
           <WarRoomList title="Best Offense Available" rows={bestOffenseAvailable} metric={(team)=>team.draft_offense ?? team.offense_rating ?? team.off ?? "—"} setSelectedTeamId={setSelectedTeamId}/>
           <WarRoomList title="Best Defense Available" rows={bestDefenseAvailable} metric={(team)=>team.draft_defense ?? team.defense_rating ?? team.def ?? "—"} setSelectedTeamId={setSelectedTeamId}/>
-          <WarRoomList title="Highest Prestige Available" rows={highestPrestigeAvailable} metric={(team)=>draftPrestigeStars(team)} setSelectedTeamId={setSelectedTeamId}/>
+          <WarRoomList title="Highest Prestige Available" rows={highestPrestigeAvailable} metric={(team)=><PrestigeStars team={team} size={14}/>}  setSelectedTeamId={setSelectedTeamId}/>
           <WarRoomList title="Best Value Available" rows={bestValueAvailable} metric={(team)=>draftTeamRating(team)} setSelectedTeamId={setSelectedTeamId}/>
         </div>
       </section>
@@ -3098,6 +3130,11 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
                 <span>#{index+1}</span>
                 <span style={conferencePowerNameV54}><ConferenceLogoMark conference={row.conference} conferenceAssets={conferenceAssets} size={30}/><strong>{row.conference}</strong></span>
                 <b>{row.powerScore}</b>
+              </div>
+              <div style={conferenceCapStatusV58}>
+                <span style={row.locked ? conferenceLockedPillV58 : conferenceOpenPillV58}>{row.locked ? "CLOSED" : "OPEN"}</span>
+                <b>{row.count} selected</b>
+                <small>{row.locked ? "Conference cap reached" : `${row.remainingToClose} more until close at ${row.closeAt}`}</small>
               </div>
               <div style={draftConferencePowerStatsV42}>
                 <span>OVR <b>{row.ratedTeams ? row.avgOvr : "—"}</b></span>
@@ -3179,7 +3216,9 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
                         <TeamLogoMark team={team} size={34}/>
                         <b>{team.name}</b>
                         <span>{cleanConference(team.conference)}</span>
-                        <small style={draftTileRatingsV40}>{draftRatingLine(team)}</small>
+                        <small style={draftTileRatingsV40}>
+                          <span style={prestigePreviewLineV57}>Prestige <PrestigeStars team={team} size={13}/> | OFF {team.draft_offense ?? team.offense_rating ?? team.off ?? "—"} | DEF {team.draft_defense ?? team.defense_rating ?? team.def ?? "—"} | OVR {team.draft_overall ?? team.overall_rating ?? team.ovr ?? "—"}</span>
+                        </small>
                         <strong style={draftTileScoreV40}>Board Score: {draftTeamRating(team)}</strong>
                       </button>
                     ))}
@@ -3190,23 +3229,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
           </div>
         </aside>
       </section>
-
-      <section style={draftConferenceGrid}>
-        {allowedConferences.map((conf) => {
-          const count = conferenceCounts[conf] || 0;
-          const locked = lockedConferences.has(conf);
-          return (
-            <div key={conf} style={locked ? draftConferenceTileLocked : draftConferenceTile}>
-              <div style={{display:"flex", justifyContent:"space-between", gap:8, alignItems:"center"}}>
-                <b>{conf}</b>
-                <span style={{ color: locked ? "#fecaca" : "#bbf7d0", fontWeight: 1000, fontSize: 12 }}>{locked ? "LOCKED" : "OPEN"}</span>
-              </div>
-              <span style={S.muted}>{count} selected</span>
-            </div>
-          );
-        })}
-      </section>
-    </section>
+</section>
   );
 }
 
@@ -3381,6 +3404,112 @@ function CommissionerCenterSafe({ setActiveTab, loadData }) {
   );
 }
 
+
+function AllTeamsRatings({ teams = [] }) {
+  const [filters, setFilters] = useState({ search:"", conference:"All", minOverall:"", minOffense:"", minDefense:"" });
+  const [sortConfig, setSortConfig] = useState({ key:"name", direction:"asc" });
+
+  const conferences = ["All", ...Array.from(new Set(teams.map((team)=>cleanConference(team.conference)).filter(Boolean))).sort()];
+  const rows = [...teams]
+    .filter((team)=>{
+      const nameMatch = !filters.search || `${team.name} ${cleanConference(team.conference)}`.toLowerCase().includes(filters.search.toLowerCase());
+      const confMatch = filters.conference === "All" || cleanConference(team.conference) === filters.conference;
+      const overall = draftNumberValue(team.draft_overall ?? team.overall_rating ?? team.ovr, 0);
+      const offense = draftNumberValue(team.draft_offense ?? team.offense_rating ?? team.off, 0);
+      const defense = draftNumberValue(team.draft_defense ?? team.defense_rating ?? team.def, 0);
+      const overallMatch = !filters.minOverall || overall >= Number(filters.minOverall);
+      const offenseMatch = !filters.minOffense || offense >= Number(filters.minOffense);
+      const defenseMatch = !filters.minDefense || defense >= Number(filters.minDefense);
+      return nameMatch && confMatch && overallMatch && offenseMatch && defenseMatch;
+    })
+    .sort((a,b)=>{
+      const key = sortConfig.key;
+      let av;
+      let bv;
+      if (key === "name") { av = a.name; bv = b.name; }
+      else if (key === "conference") { av = cleanConference(a.conference); bv = cleanConference(b.conference); }
+      else if (key === "prestige") { av = draftNumberValue(a.draft_prestige ?? a.school_prestige ?? a.prestige_grade, -1); bv = draftNumberValue(b.draft_prestige ?? b.school_prestige ?? b.prestige_grade, -1); }
+      else if (key === "overall") { av = draftNumberValue(a.draft_overall ?? a.overall_rating ?? a.ovr, -1); bv = draftNumberValue(b.draft_overall ?? b.overall_rating ?? b.ovr, -1); }
+      else if (key === "offense") { av = draftNumberValue(a.draft_offense ?? a.offense_rating ?? a.off, -1); bv = draftNumberValue(b.draft_offense ?? b.offense_rating ?? b.off, -1); }
+      else if (key === "defense") { av = draftNumberValue(a.draft_defense ?? a.defense_rating ?? a.def, -1); bv = draftNumberValue(b.draft_defense ?? b.defense_rating ?? b.def, -1); }
+      else { av = draftTeamRating(a) === "—" ? -1 : Number(draftTeamRating(a)); bv = draftTeamRating(b) === "—" ? -1 : Number(draftTeamRating(b)); }
+
+      let cmp;
+      if (typeof av === "string" || typeof bv === "string") cmp = String(av || "").localeCompare(String(bv || ""));
+      else cmp = Number(av) - Number(bv);
+      return sortConfig.direction === "asc" ? cmp : -cmp;
+    });
+
+  function toggleSort(key) {
+    setSortConfig((prev)=>({ key, direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc" }));
+  }
+
+  const columns = [
+    ["name", "Team"],
+    ["conference", "Conference"],
+    ["prestige", "Prestige"],
+    ["overall", "Overall"],
+    ["offense", "Offense"],
+    ["defense", "Defense"],
+    ["boardScore", "Board Score"],
+  ];
+
+  return (
+    <section style={broadcastCard}>
+      <div style={sectionTop}>
+        <div>
+          <h2 style={sectionTitle}>All Teams Ratings</h2>
+          <p style={mutedText}>Every user and non-user team listed alphabetically by default. Sort and filter ratings from one place.</p>
+        </div>
+      </div>
+
+      <div style={allTeamsFilterGridV58}>
+        <input style={input} value={filters.search} onChange={(e)=>setFilters((prev)=>({...prev, search:e.target.value}))} placeholder="Search team or conference..."/>
+        <select style={input} value={filters.conference} onChange={(e)=>setFilters((prev)=>({...prev, conference:e.target.value}))}>
+          {conferences.map((conf)=><option key={conf} value={conf}>{conf}</option>)}
+        </select>
+        <input style={input} value={filters.minOverall} onChange={(e)=>setFilters((prev)=>({...prev, minOverall:e.target.value}))} placeholder="Min Overall"/>
+        <input style={input} value={filters.minOffense} onChange={(e)=>setFilters((prev)=>({...prev, minOffense:e.target.value}))} placeholder="Min Offense"/>
+        <input style={input} value={filters.minDefense} onChange={(e)=>setFilters((prev)=>({...prev, minDefense:e.target.value}))} placeholder="Min Defense"/>
+      </div>
+
+      <div style={allTeamsTableWrapV58} className="cfb-table-scroll">
+        <table style={allTeamsTableV58}>
+          <thead>
+            <tr>
+              {columns.map(([key,label])=>(
+                <th key={key}>
+                  <button type="button" style={tableSortButtonV41} onClick={()=>toggleSort(key)}>
+                    {label}{sortConfig.key === key ? (sortConfig.direction === "asc" ? " ↑" : " ↓") : ""}
+                  </button>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((team)=>(
+              <tr key={team.id} style={{...allTeamsRowV58, background:`linear-gradient(90deg, ${getTeamPrimary(team)}88, rgba(15,23,42,.96))`, borderColor:getTeamSecondary(team)}}>
+                <td>
+                  <div style={allTeamsTeamCellV58}>
+                    <TeamLogoMark team={team} size={44}/>
+                    <b>{team.name}</b>
+                  </div>
+                </td>
+                <td>{cleanConference(team.conference) || "—"}</td>
+                <td><PrestigeStars team={team} size={15}/></td>
+                <td>{team.draft_overall ?? team.overall_rating ?? team.ovr ?? "—"}</td>
+                <td>{team.draft_offense ?? team.offense_rating ?? team.off ?? "—"}</td>
+                <td>{team.draft_defense ?? team.defense_rating ?? team.def ?? "—"}</td>
+                <td><b>{draftTeamRating(team)}</b></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 function LogoManager({ teams, updateRow, conferenceAssets = [], saveConferenceAsset }) {
   const [searchText, setSearchText] = useState("");
   const filtered = teams.filter((team)=>team.name.toLowerCase().includes(searchText.toLowerCase()));
@@ -3414,7 +3543,9 @@ function LogoManager({ teams, updateRow, conferenceAssets = [], saveConferenceAs
             <input style={input} value={team.draft_overall || ""} onChange={(e)=>updateRow("teams", team.id, "draft_overall", e.target.value)} placeholder="Overall Rating"/>
             <input style={input} value={team.draft_offense || ""} onChange={(e)=>updateRow("teams", team.id, "draft_offense", e.target.value)} placeholder="Offense Rating"/>
             <input style={input} value={team.draft_defense || ""} onChange={(e)=>updateRow("teams", team.id, "draft_defense", e.target.value)} placeholder="Defense Rating"/>
-            <div style={draftAssetPreviewV40}>{draftRatingLine(team)} · Board Score {draftTeamRating(team)}</div>
+            <div style={draftAssetPreviewV40}>
+              <span style={prestigePreviewLineV57}>Prestige <PrestigeStars team={team} size={14}/> | OFF {team.draft_offense ?? team.offense_rating ?? team.off ?? "—"} | DEF {team.draft_defense ?? team.defense_rating ?? team.def ?? "—"} | OVR {team.draft_overall ?? team.overall_rating ?? team.ovr ?? "—"} · Board Score {draftTeamRating(team)}</span>
+            </div>
           </div>
         ))}
       </div>
@@ -4334,11 +4465,11 @@ function CoachRings({ stats, superlatives }) {
 
 
 const fullTable = {
-  width: "100%",
+  width: "max-content",
+  minWidth: 920,
   borderCollapse: "separate",
   borderSpacing: 0,
   color: "#f8fafc",
-  minWidth: 920,
 };
 
 function SortableStatsTable({ title, rows = [], columns = [], emptyText = "No records yet." }) {
@@ -4361,38 +4492,45 @@ function SortableStatsTable({ title, rows = [], columns = [], emptyText = "No re
   }
 
   return (
-    <section style={coachFullWidthTableV41}>
+    <section style={coachFullWidthTableV41} className="cfb-scroll-card">
       <div style={sectionTop}>
         <h3 style={miniTitle}>{title}</h3>
         <span style={mutedText}>{rows.length} records</span>
       </div>
-      <div style={coachStatsTableWrapV41}>
-        <table style={fullTable}>
-          <thead>
-            <tr>
-              {columns.map((column)=>(
-                <th key={column.key}>
-                  <button type="button" style={tableSortButtonV41} onClick={()=>toggleSort(column.key)}>
-                    {column.label}{sortConfig.key === column.key ? (sortConfig.direction === "asc" ? " ↑" : " ↓") : ""}
-                  </button>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {sortedRows.length ? sortedRows.map((row, index)=>(
-              <tr key={row.id || `${title}-${index}`}>
-                {columns.map((column)=><td key={column.key}>{row[column.key] ?? "—"}</td>)}
+
+      {!sortedRows.length ? (
+        <div style={coachMobileEmptyStateV56}>
+          <b>{emptyText}</b>
+          <small>Use League Data Center to record this data.</small>
+        </div>
+      ) : (
+        <div style={coachStatsTableWrapV41} className="cfb-table-scroll">
+          <table style={fullTable}>
+            <thead>
+              <tr>
+                {columns.map((column)=>(
+                  <th key={column.key}>
+                    <button type="button" style={tableSortButtonV41} onClick={()=>toggleSort(column.key)}>
+                      {column.label}{sortConfig.key === column.key ? (sortConfig.direction === "asc" ? " ↑" : " ↓") : ""}
+                    </button>
+                  </th>
+                ))}
               </tr>
-            )) : (
-              <tr><td colSpan={columns.length}><div style={tableEmptyStateV43}>{emptyText}<br/><small>Use League Data Center → Team Stats / Player Stats to record this data.</small></div></td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {sortedRows.map((row, index)=>(
+                <tr key={row.id || `${title}-${index}`}>
+                  {columns.map((column)=><td key={column.key}>{row[column.key] ?? "—"}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   );
 }
+
 
 function CoachProfile({ user, users = [], teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting, seasonPlayerStats = [], teamSeasonStats = [] }) {
   const safeUser = user || {};
@@ -4487,7 +4625,7 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
 
 
   return (
-    <section style={coachPageV43}>
+    <section style={coachPageV43} className="cfb-coach-page cfb-coach-mobile-fix">
       <div style={{...coachHeroV43, borderColor:`${secondary}77`, background:`linear-gradient(135deg, ${primary}e8, rgba(2,6,23,.98) 58%)`}}>
         <div style={coachHeroIdentityV43}>
           <TeamLogoMark team={currentTeam} size={112} plate/>
@@ -4595,8 +4733,8 @@ function DynastyHallOfFame({ users, teams, assignments, results, allAmericans, a
     <section style={card}>
       <div style={sectionTop}>
         <div>
-          <h2 style={sectionTitle}>CFBElite Hall of Fame</h2>
-          <p style={mutedText}>All-time coach ranking powered by wins, national titles, conference titles, awards, Heismans, Top 10 wins, and prestige.</p>
+          <h2 style={sectionTitle}>Head Coach Power Rankings</h2>
+          <p style={mutedText}>All-time head coach power ranking powered by wins, national titles, conference titles, awards, Heismans, Top 10 wins, and prestige.</p>
         </div>
       </div>
       <div style={hofRankingGridV46}>
@@ -5104,6 +5242,118 @@ function GlobalStyle() {
         input,
         select {
           width: 100% !important;
+        }
+      }
+
+      /* v56-coach-mobile-scroll */
+      .cfb-table-scroll {
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        -webkit-overflow-scrolling: touch !important;
+        touch-action: pan-x pan-y !important;
+        max-width: 100% !important;
+        width: 100% !important;
+      }
+
+      .cfb-scroll-card {
+        max-width: 100% !important;
+        overflow: hidden !important;
+      }
+
+      .cfb-coach-page {
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+      }
+
+      @media (max-width: 760px) {
+        .cfb-coach-page table {
+          min-width: 920px !important;
+          width: max-content !important;
+        }
+
+        .cfb-coach-page h1,
+        .cfb-coach-page h2,
+        .cfb-coach-page h3 {
+          max-width: 100% !important;
+          overflow-wrap: normal !important;
+        }
+
+        .cfb-coach-page .cfb-table-scroll::-webkit-scrollbar {
+          height: 8px;
+        }
+
+        .cfb-coach-page .cfb-table-scroll::-webkit-scrollbar-thumb {
+          background: rgba(212,175,55,.5);
+          border-radius: 999px;
+        }
+      }
+
+      /* v58-coach-mobile-cleanup */
+      @media (max-width: 760px) {
+        .cfb-coach-mobile-fix {
+          display: grid !important;
+          gap: 14px !important;
+          overflow-x: hidden !important;
+          padding-bottom: 20px !important;
+        }
+
+        .cfb-coach-mobile-fix > section,
+        .cfb-coach-mobile-fix > div {
+          max-width: 100% !important;
+          overflow: hidden !important;
+        }
+
+        .cfb-coach-mobile-fix .cfb-table-scroll {
+          overflow-x: auto !important;
+          overflow-y: hidden !important;
+          -webkit-overflow-scrolling: touch !important;
+          touch-action: pan-x pan-y !important;
+          padding-bottom: 10px !important;
+        }
+
+        .cfb-coach-mobile-fix h1 {
+          font-size: clamp(34px, 12vw, 56px) !important;
+          line-height: .92 !important;
+        }
+
+        .cfb-coach-mobile-fix h2 {
+          font-size: clamp(26px, 8vw, 42px) !important;
+        }
+
+        .cfb-coach-mobile-fix h3 {
+          font-size: clamp(20px, 6vw, 28px) !important;
+        }
+
+        .cfb-coach-mobile-fix table {
+          min-width: 760px !important;
+          width: max-content !important;
+        }
+
+        .cfb-coach-mobile-fix td,
+        .cfb-coach-mobile-fix th {
+          white-space: nowrap !important;
+        }
+      }
+
+      /* v59-dashboard-table-align */
+      .cfb-dashboard-power-table-head,
+      .cfb-dashboard-power-table-list > * {
+        box-sizing: border-box !important;
+      }
+
+      @media (max-width: 760px) {
+        .cfb-dashboard-power-table-head {
+          min-width: 980px !important;
+          grid-template-columns: 58px minmax(230px,1.25fr) minmax(120px,.7fr) 54px 54px 80px 80px 78px 70px 82px !important;
+          gap: 12px !important;
+          padding-left: 16px !important;
+          padding-right: 16px !important;
+        }
+
+        .cfb-dashboard-power-table-list > * {
+          min-width: 980px !important;
+          grid-template-columns: 58px minmax(230px,1.25fr) minmax(120px,.7fr) 54px 54px 80px 80px 78px 70px 82px !important;
+          gap: 12px !important;
         }
       }
 `}</style>
@@ -5936,7 +6186,7 @@ function TeamPage({ team, standings, results, allResults, teams, assignments, al
   <div style={statsGrid}><Stat title="Overall" value={`${stat.wins??0}-${stat.losses??0}`}/><Stat title="Avg PF" value={rec.avgPf}/><Stat title="Avg PA" value={rec.avgPa}/><Stat title="Top 25" value={top25Wins(team.id, results)}/><Stat title="Top 25 Class" value={recruiting.filter((r)=>Number(r.rank) >= 1 && Number(r.rank) <= 25).length}/><Stat title="Awards" value={awards.length}/><Stat title="All-Americans" value={allAmericans.length}/><Stat title="Heismans" value={heismans.length}/><Stat title="Conf Titles" value={titleCount(team.id, results, "Conference Championship Week")}/><Stat title="Nattys" value={titleCount(team.id, results, "National Championship Week")}/><Stat title="Bowl" value={`${bowl.wins}-${bowl.losses}`}/><Stat title="SOR" value={strengthOfResult(team.id, teams, allResults)}/></div><div style={twoCol}><div style={miniCard}><h3>Recruiting Rankings</h3><div style={formGrid}><input placeholder="Year" value={newRecruiting.season_year} onChange={(e)=>setNewRecruiting({...newRecruiting,season_year:e.target.value})} style={input}/><input placeholder="Rank" value={newRecruiting.rank} onChange={(e)=>setNewRecruiting({...newRecruiting,rank:e.target.value})} style={input}/><button onClick={()=>addRecruiting(team.id)} style={button}>Add</button></div>{recruiting.map((r)=><div key={r.id} style={miniRow}>{r.season_year}: #{r.rank} <DeleteButton onClick={()=>deleteRow("recruiting_classes",r.id)}/></div>)}</div><div style={miniCard}><h3>History</h3><div style={formGrid}><input placeholder="Year" value={newHistory.season_year} onChange={(e)=>setNewHistory({...newHistory,season_year:e.target.value})} style={input}/><input placeholder="Record" value={newHistory.record} onChange={(e)=>setNewHistory({...newHistory,record:e.target.value})} style={input}/><button onClick={()=>addHistory(team.id)} style={button}>Add</button></div>{historyRows.map((r)=><div key={r.id} style={miniRow}><input value={r.season_year} onChange={(e)=>updateRow("team_history_records",r.id,"season_year",Number(e.target.value))} style={smallInput}/><input value={r.record || ""} onChange={(e)=>updateRow("team_history_records",r.id,"record",e.target.value)} style={smallInput}/><DeleteButton onClick={()=>deleteRow("team_history_records",r.id)}/></div>)}</div></div><Results rows={results} deleteResult={()=>{}} search="" setSearch={()=>{}}/><div style={twoCol}><MiniList title="All-Americans" rows={allAmericans.map((r)=>`${r.player_name} — ${r.type}, ${r.position}, ${r.season_year}`)}/><MiniList title="Awards" rows={awards.map((r)=>`${r.player_name} — ${r.award_name}, ${r.position}, ${r.season_year}`)}/><MiniList title="Heisman Winners" rows={heismans.map((r)=>`${r.player_name} — ${r.position}, ${r.season_year}`)}/></div></section>;
 }
 function MiniList({ title, rows }) { return <div style={miniCard}><h3>{title}</h3>{rows.map((r,i)=><div key={i} style={miniRow}>{r}</div>)}</div>; }
-function Table({ headers, children }) { return <div style={{overflowX:"auto",marginTop:20}}><table style={table}><thead><tr>{headers.map((h, index)=><th key={typeof h === "string" ? h : index} style={th}>{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div>; }
+function Table({ headers, children }) { return <div className="cfb-table-scroll" style={{overflowX:"auto",WebkitOverflowScrolling:"touch",marginTop:20,width:"100%",maxWidth:"100%"}}><table style={table}><thead><tr>{headers.map((h, index)=><th key={typeof h === "string" ? h : index} style={th}>{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div>; }
 function DeleteButton({ onClick }) { return <button onClick={onClick} style={deleteButton}>Delete</button>; }
 
 const page = {
@@ -6013,7 +6263,15 @@ const bracketGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(2
 const gameCard={display:"grid",gap:10,border:"1px solid rgba(255,255,255,.1)",borderRadius:16,padding:14,background:"rgba(7,7,12,.75)",marginBottom:14};
 const twoCol={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(320px, 1fr))",gap:20,marginTop:24};
 const twoColWide={display:"grid",gridTemplateColumns:"minmax(0, 3fr) minmax(280px, 1fr)",gap:20,marginTop:20};
-const miniCard={background:"rgba(7,7,12,.72)",border:"1px solid rgba(250,204,21,.14)",borderRadius:18,padding:18};
+const miniCard = {
+  background:"rgba(7,7,12,.72)",
+  border:"1px solid rgba(250,204,21,.14)",
+  borderRadius:18,
+  padding:18,
+  overflowX:"auto",
+  WebkitOverflowScrolling:"touch",
+  maxWidth:"100%",
+};
 const miniRow={borderBottom:"1px solid rgba(255,255,255,.08)",padding:"10px 0",color:"#e4e4e7"};
 const miniTitle={marginTop:0,color:"#facc15"};
 const recognitionGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(min(100%, 360px), 1fr))",gap:18,marginTop:22};
@@ -9038,16 +9296,16 @@ const dashboardTopThreeMini = {
 
 const dashboardTableHeadPro = {
   display: "grid",
-  gridTemplateColumns: "52px minmax(190px,1.25fr) minmax(120px,.7fr) 54px 54px 80px 80px 78px 70px 82px",
-  gap: 10,
+  gridTemplateColumns: "58px minmax(230px,1.25fr) minmax(120px,.7fr) 54px 54px 80px 80px 78px 70px 82px",
+  gap: 12,
   alignItems: "center",
-  color: "rgba(219,234,254,.72)",
-  textTransform: "uppercase",
+  padding: "0 16px 10px",
+  color: "#cbd5e1",
+  fontSize: 12,
+  fontWeight: 1000,
   letterSpacing: ".08em",
-  fontSize: 11,
-  fontWeight: 950,
-  padding: "0 14px 8px",
-  minWidth: 940,
+  textTransform: "uppercase",
+  minWidth: 980,
 };
 
 const dashboardHeaderButtonPro = {
@@ -9115,6 +9373,7 @@ const dashboardRankPanelFullV37 = {
   background: "#0f172a",
   boxShadow: "0 24px 70px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.035)",
   overflowX: "auto",
+  WebkitOverflowScrolling: "touch",
 };
 
 const draftBroadcastPageV37 = {
@@ -9517,6 +9776,7 @@ const draftBestScoreV41 = {
 const coachFullWidthTableV41 = {
   ...broadcastCard,
   width: "100%",
+  maxWidth: "100%",
   overflow: "hidden",
   borderRadius: 18,
   border: "1px solid rgba(71,85,105,.70)",
@@ -9525,8 +9785,13 @@ const coachFullWidthTableV41 = {
 
 const coachStatsTableWrapV41 = {
   width: "100%",
+  maxWidth: "100%",
   overflowX: "auto",
+  overflowY: "hidden",
+  WebkitOverflowScrolling: "touch",
+  touchAction: "pan-x pan-y",
   marginTop: 12,
+  paddingBottom: 6,
 };
 
 const tableSortButtonV41 = {
@@ -10063,5 +10328,115 @@ const conferencePowerNameV54 = {
   display: "flex",
   alignItems: "center",
   gap: 8,
+  minWidth: 0,
+};
+
+
+const coachMobileEmptyStateV56 = {
+  marginTop: 14,
+  padding: "18px",
+  borderRadius: 14,
+  background: "rgba(255,255,255,.035)",
+  border: "1px solid rgba(255,255,255,.07)",
+  color: "rgba(226,232,240,.86)",
+  display: "grid",
+  gap: 6,
+  lineHeight: 1.35,
+  whiteSpace: "normal",
+  overflowWrap: "break-word",
+};
+
+
+const prestigeStarsWrapV57 = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 1,
+  verticalAlign: "middle",
+};
+
+const prestigeStarBoxV57 = {
+  position: "relative",
+  display: "inline-block",
+  lineHeight: 1,
+  overflow: "hidden",
+  flexShrink: 0,
+};
+
+const prestigeStarEmptyV57 = {
+  color: "rgba(226,232,240,.36)",
+  display: "block",
+};
+
+const prestigeStarFillV57 = {
+  position: "absolute",
+  left: 0,
+  top: 0,
+  height: "100%",
+  overflow: "hidden",
+  color: "#d4af37",
+  display: "block",
+  whiteSpace: "nowrap",
+};
+
+const prestigePreviewLineV57 = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 5,
+  flexWrap: "wrap",
+};
+
+
+const conferenceCapStatusV58 = {
+  display: "grid",
+  gridTemplateColumns: "auto auto minmax(0, 1fr)",
+  gap: 8,
+  alignItems: "center",
+  padding: "8px 10px",
+  borderRadius: 12,
+  background: "rgba(255,255,255,.035)",
+  border: "1px solid rgba(255,255,255,.06)",
+};
+
+const conferenceOpenPillV58 = {
+  color: "#bbf7d0",
+  fontWeight: 1000,
+  fontSize: 12,
+};
+
+const conferenceLockedPillV58 = {
+  color: "#fecaca",
+  fontWeight: 1000,
+  fontSize: 12,
+};
+
+const allTeamsFilterGridV58 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 190px), 1fr))",
+  gap: 10,
+  margin: "16px 0",
+};
+
+const allTeamsTableWrapV58 = {
+  overflowX: "auto",
+  WebkitOverflowScrolling: "touch",
+  width: "100%",
+};
+
+const allTeamsTableV58 = {
+  width: "100%",
+  minWidth: 980,
+  borderCollapse: "separate",
+  borderSpacing: "0 8px",
+  color: "#f8fafc",
+};
+
+const allTeamsRowV58 = {
+  border: "1px solid rgba(255,255,255,.08)",
+};
+
+const allTeamsTeamCellV58 = {
+  display: "flex",
+  alignItems: "center",
+  gap: 14,
   minWidth: 0,
 };
