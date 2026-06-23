@@ -1954,7 +1954,7 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
         </div>
       </section>
 
-      <section style={dashboardFeatureGridV64}>
+      <section style={dashboardFeatureGridV64} className="cfb-dashboard-feature-grid-v68">
         <div style={coachSpotlightCardV64}>
           <div style={dashboardPanelHeaderPro}><span>COACH SPOTLIGHT</span><h2>Featured Coach</h2></div>
           {coachSpotlight ? (
@@ -3173,6 +3173,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
           {bestAvailableTeams.map((team, index)=>(
             <button key={team.id} style={{...draftBestTileV43, background:`linear-gradient(145deg, ${getTeamPrimary(team)}cc, rgba(2,6,23,.96))`, borderColor:getTeamSecondary(team)}} onClick={()=>setSelectedTeamId(team.id)}>
               <div style={draftBestRankV43}>#{index+1}</div>
+              <div style={draftConferenceBadgeV68}><ConferenceLogoMark conference={team.conference} conferenceAssets={conferenceAssets} size={30}/><small>{cleanConference(team.conference)}</small></div>
               <div style={draftBestLogoV43}><TeamLogoMark team={team} size={52}/></div>
               <strong style={draftBestTeamNameV43}>{team.name}</strong>
               <div style={draftBestStarsV43}><PrestigeStars team={team} size={16}/></div>
@@ -3297,7 +3298,10 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
                         background: `linear-gradient(135deg, ${team.primary_color || "#1f2937"}cc, rgba(15,23,42,.88))`,
                         borderColor: team.secondary_color || "#ffffff",
                       }} onClick={()=>setSelectedTeamId(team.id)}>
-                        <TeamLogoMark team={team} size={34}/>
+                        <div style={draftAvailableTopLineV68}>
+                          <TeamLogoMark team={team} size={34}/>
+                          <span style={draftConferencePillV68}><ConferenceLogoMark conference={team.conference} conferenceAssets={conferenceAssets} size={24}/>{cleanConference(team.conference)}</span>
+                        </div>
                         <b>{getTeamAbbreviation(team)} • {team.name}</b>
                         <span>{cleanConference(team.conference)}</span>
                         <small style={draftTileRatingsV40}>
@@ -4639,16 +4643,16 @@ function CoachProfile({ user, users = [], teams, assignments, results, allAmeric
 
   return (
     <section style={coachPageV43} className="cfb-coach-page cfb-coach-mobile-fix">
-      <div style={{...coachHeroV43, borderColor:`${secondary}77`, background:`linear-gradient(135deg, ${primary}e8, rgba(2,6,23,.98) 58%)`}}>
-        <div style={coachHeroIdentityV43}>
+      <div className="cfb-coach-hero-v68" style={{...coachHeroV43, borderColor:`${secondary}77`, background:`linear-gradient(135deg, ${primary}e8, rgba(2,6,23,.98) 58%)`}}>
+        <div className="cfb-coach-hero-identity-v68" style={coachHeroIdentityV43}>
           <TeamLogoMark team={currentTeam} size={112} plate/>
           <div>
             <div style={dashboardKickerPro}>{currentTeam?.name || "Unassigned Coach"}</div>
-            <h1 style={coachNameV43}>{safeUser.discord_username || "Coach"}</h1>
+            <h1 className="cfb-coach-name-v68" style={coachNameV43}>{safeUser.discord_username || "Coach"}</h1>
             <p style={coachSubV37}>CFBElite Coach Profile</p>
           </div>
         </div>
-        <div style={coachHeroMetricsV45}>
+        <div className="cfb-coach-hero-metrics-v68" style={coachHeroMetricsV45}>
           <div style={coachHeroMetricV45}><span>Record</span><b>{stats?.wins||0}-{stats?.losses||0}</b></div>
           <div style={coachHeroMetricV45}><span>Prestige</span><b>{coachPrestigeScore}</b><small>{coachPrestigeTier.stars} {coachPrestigeTier.label}</small></div>
 
@@ -5355,6 +5359,107 @@ function GlobalStyle() {
           grid-template-columns: 1fr !important;
         }
       }
+
+      /* v68-mobile-layout-fixes */
+      @media (max-width: 760px) {
+        body {
+          overflow-x: hidden !important;
+        }
+
+        [style*="clamp(44px, 8vw, 92px)"] {
+          font-size: clamp(40px, 12vw, 56px) !important;
+          line-height: .92 !important;
+          max-width: calc(100vw - 72px) !important;
+          white-space: normal !important;
+        }
+
+        [style*="minmax(0, 1.35fr) minmax(260px, .65fr)"] {
+          grid-template-columns: 1fr !important;
+        }
+
+        .cfb-dashboard-tile-grid-v68,
+        [style*="repeat(auto-fit, minmax(240px, 1fr))"] {
+          grid-template-columns: 1fr !important;
+        }
+
+        .cfb-dashboard-feature-grid-v68 {
+          grid-template-columns: 1fr !important;
+        }
+
+        [style*="minmax(0, 1.15fr) minmax(280px, .75fr) minmax(280px, .85fr)"] {
+          grid-template-columns: 1fr !important;
+        }
+
+        .cfb-dashboard-power-table-head,
+        .cfb-dashboard-power-table-list > * {
+          min-width: 1120px !important;
+          grid-template-columns: 64px minmax(260px, 1.4fr) minmax(150px,.8fr) 64px 64px 86px 86px 86px 82px 92px !important;
+        }
+
+        .cfb-coach-hero-v68 {
+          grid-template-columns: 1fr !important;
+          padding: 18px !important;
+          border-radius: 22px !important;
+          min-width: 0 !important;
+        }
+
+        .cfb-coach-hero-identity-v68 {
+          grid-template-columns: 84px minmax(0,1fr) !important;
+          gap: 12px !important;
+          align-items: center !important;
+        }
+
+        .cfb-coach-hero-identity-v68 [style*="width: 112px"],
+        .cfb-coach-hero-identity-v68 [style*="width:112px"] {
+          width: 84px !important;
+          height: 84px !important;
+          min-width: 84px !important;
+          min-height: 84px !important;
+        }
+
+        .cfb-coach-name-v68 {
+          font-size: clamp(34px, 12vw, 52px) !important;
+          line-height: .9 !important;
+          letter-spacing: -.055em !important;
+          max-width: 100% !important;
+          overflow-wrap: anywhere !important;
+        }
+
+        .cfb-coach-hero-metrics-v68 {
+          grid-template-columns: 1fr 1fr !important;
+          width: 100% !important;
+        }
+
+        .cfb-coach-mobile-fix > section,
+        .cfb-coach-mobile-fix > div {
+          overflow: hidden !important;
+        }
+
+        .cfb-table-scroll,
+        .cfb-scroll-card {
+          max-width: 100% !important;
+          overflow-x: auto !important;
+          -webkit-overflow-scrolling: touch !important;
+        }
+
+        .cfb-results-manager {
+          overflow-x: hidden !important;
+        }
+      }
+
+      @media (max-width: 520px) {
+        [style*="clamp(44px, 8vw, 92px)"] {
+          font-size: 42px !important;
+        }
+
+        .cfb-coach-hero-identity-v68 {
+          grid-template-columns: 76px minmax(0,1fr) !important;
+        }
+
+        .cfb-coach-name-v68 {
+          font-size: 38px !important;
+        }
+      }
 `}</style>
   );
 }
@@ -5827,6 +5932,69 @@ function Standings({ rows, search, setSearch, goToTeam, teams, results, draggedS
           </tr>
         ))}
       </Table>
+    </section>
+  );
+}
+
+
+function ResultsManager({ rows = [], teams = [], users = [], assignments = [], updateRow = async()=>{}, deleteRow = async()=>{} }) {
+  const [query, setQuery] = useState("");
+  const filtered = (rows || []).filter((row)=>{
+    const haystack = [
+      row.week,
+      row.season_year,
+      row.team_1?.name,
+      row.team_2?.name,
+      row.user_1?.discord_username,
+      row.user_2?.discord_username,
+      ...(Array.isArray(row.tags) ? row.tags : []),
+    ].join(" ").toLowerCase();
+    return !query || haystack.includes(query.toLowerCase());
+  });
+
+  return (
+    <section style={broadcastCard} className="cfb-results-manager cfb-scroll-card">
+      <div style={sectionTop}>
+        <div>
+          <h2 style={sectionTitle}>Results Manager</h2>
+          <p style={mutedText}>Review, search, and delete recorded results. Use League Data Center to enter new games.</p>
+        </div>
+        <SearchBox value={query} onChange={setQuery}/>
+      </div>
+      <div className="cfb-table-scroll" style={tableScrollWrapV68}>
+        <table style={wideManagerTableV68}>
+          <thead>
+            <tr>
+              <th>Year</th>
+              <th>Week</th>
+              <th>Team 1</th>
+              <th>User 1</th>
+              <th>Score</th>
+              <th>Team 2</th>
+              <th>User 2</th>
+              <th>Tags</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length ? filtered.map((row)=>(
+              <tr key={row.id}>
+                <td>{row.season_year}</td>
+                <td>{row.week}</td>
+                <td><TeamBroadcastMark team={row.team_1 || teams.find((team)=>team.id===row.team_1_id)} size={30}/></td>
+                <td>{row.user_1?.discord_username || users.find((u)=>u.id===row.team_1_user_id)?.discord_username || "CPU"}</td>
+                <td><b>{row.team_1_score}-{row.team_2_score}</b></td>
+                <td><TeamBroadcastMark team={row.team_2 || teams.find((team)=>team.id===row.team_2_id)} size={30}/></td>
+                <td>{row.user_2?.discord_username || users.find((u)=>u.id===row.team_2_user_id)?.discord_username || "CPU"}</td>
+                <td>{Array.isArray(row.tags) ? row.tags.join(", ") : row.tags || "—"}</td>
+                <td><DeleteButton onClick={()=>deleteRow("game_results", row.id)}/></td>
+              </tr>
+            )) : (
+              <tr><td colSpan={9} style={td}>No results recorded yet.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
@@ -10620,4 +10788,57 @@ const dashboardConferenceTopV66 = {
   display: "inline-flex",
   alignItems: "center",
   gap: 6,
+};
+
+
+const draftConferenceBadgeV68 = {
+  position: "absolute",
+  right: 10,
+  top: 10,
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  padding: "5px 7px",
+  borderRadius: 999,
+  background: "rgba(2,6,23,.54)",
+  border: "1px solid rgba(255,255,255,.14)",
+  color: "rgba(248,250,252,.86)",
+  fontWeight: 900,
+  fontSize: 10,
+  letterSpacing: ".04em",
+  textTransform: "uppercase",
+};
+
+const draftAvailableTopLineV68 = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 8,
+};
+
+const draftConferencePillV68 = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 5,
+  padding: "4px 6px",
+  borderRadius: 999,
+  background: "rgba(2,6,23,.42)",
+  border: "1px solid rgba(255,255,255,.12)",
+  fontSize: 10,
+  fontWeight: 900,
+  color: "rgba(248,250,252,.88)",
+};
+
+const tableScrollWrapV68 = {
+  overflowX: "auto",
+  WebkitOverflowScrolling: "touch",
+  maxWidth: "100%",
+};
+
+const wideManagerTableV68 = {
+  minWidth: 1100,
+  width: "100%",
+  borderCollapse: "separate",
+  borderSpacing: 0,
+  color: "#f8fafc",
 };
