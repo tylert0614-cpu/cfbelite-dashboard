@@ -3173,7 +3173,10 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
           {bestAvailableTeams.map((team, index)=>(
             <button key={team.id} style={{...draftBestTileV43, background:`linear-gradient(145deg, ${getTeamPrimary(team)}cc, rgba(2,6,23,.96))`, borderColor:getTeamSecondary(team)}} onClick={()=>setSelectedTeamId(team.id)}>
               <div style={draftBestRankV43}>#{index+1}</div>
-              <div style={draftConferenceBadgeV68}><ConferenceLogoMark conference={team.conference} conferenceAssets={conferenceAssets} size={30}/><small>{cleanConference(team.conference)}</small></div>
+              <div style={draftConferenceBadgeV69} title={cleanConference(team.conference)}>
+                <ConferenceLogoMark conference={team.conference} conferenceAssets={conferenceAssets} size={24}/>
+                <span>{cleanConference(team.conference)}</span>
+              </div>
               <div style={draftBestLogoV43}><TeamLogoMark team={team} size={52}/></div>
               <strong style={draftBestTeamNameV43}>{team.name}</strong>
               <div style={draftBestStarsV43}><PrestigeStars team={team} size={16}/></div>
@@ -5458,6 +5461,14 @@ function GlobalStyle() {
 
         .cfb-coach-name-v68 {
           font-size: 38px !important;
+        }
+      }
+
+      /* v69-best-available-conference-badge */
+      @media (max-width: 760px) {
+        [style*="max-width: calc(100% - 68px)"] {
+          font-size: 9px !important;
+          padding: 4px 6px !important;
         }
       }
 `}</style>
@@ -10842,3 +10853,29 @@ const wideManagerTableV68 = {
   borderSpacing: 0,
   color: "#f8fafc",
 };
+
+
+const draftConferenceBadgeV69 = {
+  position: "absolute",
+  right: 10,
+  top: 10,
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  maxWidth: "calc(100% - 68px)",
+  padding: "5px 8px",
+  borderRadius: 999,
+  background: "rgba(2,6,23,.66)",
+  border: "1px solid rgba(255,255,255,.16)",
+  color: "rgba(248,250,252,.92)",
+  fontWeight: 1000,
+  fontSize: 10,
+  letterSpacing: ".04em",
+  textTransform: "uppercase",
+  boxShadow: "0 10px 24px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.08)",
+  backdropFilter: "blur(10px)",
+  overflow: "hidden",
+  whiteSpace: "nowrap",
+  textOverflow: "ellipsis",
+};
+
