@@ -3406,14 +3406,26 @@ function CommissionerCenterSafe({ setActiveTab, loadData }) {
 
 
 function AllTeamsRatings({ teams = [] }) {
-  const [filters, setFilters] = useState({ search:"", conference:"All", minOverall:"", minOffense:"", minDefense:"" });
+  const [filters, setFilters] = useState({ search:"", conferences:[], minOverall:"", minOffense:"", minDefense:"" });
   const [sortConfig, setSortConfig] = useState({ key:"name", direction:"asc" });
 
-  const conferences = ["All", ...Array.from(new Set(teams.map((team)=>cleanConference(team.conference)).filter(Boolean))).sort()];
+  const conferences = Array.from(new Set(teams.map((team)=>cleanConference(team.conference)).filter(Boolean))).sort();
+  const allSelected = !filters.conferences.length;
+
+  function toggleConference(conf) {
+    setFilters((prev)=>{
+      const current = new Set(prev.conferences || []);
+      if (current.has(conf)) current.delete(conf);
+      else current.add(conf);
+      return { ...prev, conferences:Array.from(current).sort() };
+    });
+  }
+
   const rows = [...teams]
     .filter((team)=>{
-      const nameMatch = !filters.search || `${team.name} ${cleanConference(team.conference)}`.toLowerCase().includes(filters.search.toLowerCase());
-      const confMatch = filters.conference === "All" || cleanConference(team.conference) === filters.conference;
+      const conf = cleanConference(team.conference);
+      const nameMatch = !filters.search || `${team.name} ${conf}`.toLowerCase().includes(filters.search.toLowerCase());
+      const confMatch = allSelected || filters.conferences.includes(conf);
       const overall = draftNumberValue(team.draft_overall ?? team.overall_rating ?? team.ovr, 0);
       const offense = draftNumberValue(team.draft_offense ?? team.offense_rating ?? team.off, 0);
       const defense = draftNumberValue(team.draft_defense ?? team.defense_rating ?? team.def, 0);
@@ -3465,13 +3477,21 @@ function AllTeamsRatings({ teams = [] }) {
 
       <div style={allTeamsFilterGridV58}>
         <input style={input} value={filters.search} onChange={(e)=>setFilters((prev)=>({...prev, search:e.target.value}))} placeholder="Search team or conference..."/>
-        <select style={input} value={filters.conference} onChange={(e)=>setFilters((prev)=>({...prev, conference:e.target.value}))}>
-          {conferences.map((conf)=><option key={conf} value={conf}>{conf}</option>)}
-        </select>
         <input style={input} value={filters.minOverall} onChange={(e)=>setFilters((prev)=>({...prev, minOverall:e.target.value}))} placeholder="Min Overall"/>
         <input style={input} value={filters.minOffense} onChange={(e)=>setFilters((prev)=>({...prev, minOffense:e.target.value}))} placeholder="Min Offense"/>
         <input style={input} value={filters.minDefense} onChange={(e)=>setFilters((prev)=>({...prev, minDefense:e.target.value}))} placeholder="Min Defense"/>
       </div>
+
+      <div style={conferenceMultiFilterV60}>
+        <button type="button" style={allSelected ? conferenceFilterPillActiveV60 : conferenceFilterPillV60} onClick={()=>setFilters((prev)=>({...prev, conferences:[]}))}>All Conferences</button>
+        {conferences.map((conf)=>(
+          <button type="button" key={conf} style={filters.conferences.includes(conf) ? conferenceFilterPillActiveV60 : conferenceFilterPillV60} onClick={()=>toggleConference(conf)}>
+            {conf}
+          </button>
+        ))}
+      </div>
+
+      <p style={mutedText}>{rows.length} teams shown{allSelected ? "" : ` • ${filters.conferences.join(", ")}`}</p>
 
       <div style={allTeamsTableWrapV58} className="cfb-table-scroll">
         <table style={allTeamsTableV58}>
@@ -3595,7 +3615,8 @@ function LeagueDataCenter({ teams, users, assignments, results = [], currentYear
       .map((assignment)=>String(assignment.team_id))
   );
   const automaticRankRows = computerRankingRows(teams, currentSeasonResultsForRanks, assignments, users)
-    .filter((row)=>userControlledTeamIdsForRanks.has(String(row.team?.id)));
+    .filter((row)=>userControlledTeamIdsForRanks.has(String(row.team?.id)))
+    .map((row, index)=>({ ...row, rank:index + 1 }));
   const automaticRankMap = new Map(automaticRankRows.map((row)=>[String(row.team?.id), row.rank]));
   const autoRankForTeam = (teamId) => userControlledTeamIdsForRanks.has(String(teamId)) ? (automaticRankMap.get(String(teamId)) || "") : "";
   const setResultTeam = (field, teamId) => {
@@ -3679,7 +3700,7 @@ function LeagueDataCenter({ teams, users, assignments, results = [], currentYear
       <div style={dataCenterTabs}>{tabs.map(([key,label])=><button key={key} style={{...dataCenterTab, borderColor: activeForm===key ? "#facc15" : "rgba(255,255,255,.16)"}} onClick={()=>setActiveForm(key)}>{label}</button>)}</div>
 
       {activeForm === "results" && <div style={entryPanel}><h3 style={miniTitle}>Results</h3><div style={entryGrid}>
-        <select style={input} value={result.season_year} onChange={(e)=>{ const nextYear=e.target.value; const yearResults=(results || []).filter((row)=>String(row.season_year)===String(nextYear)); const userTeamIds=new Set(assignments.filter((a)=>a.status==="Active" && a.discord_user_id && a.team_id).map((a)=>String(a.team_id))); const rankRows=computerRankingRows(teams, yearResults, assignments, users).filter((row)=>userTeamIds.has(String(row.team?.id))); const rankMap=new Map(rankRows.map((row)=>[String(row.team?.id), row.rank])); setResult({...result, season_year:nextYear, team_1_rank: userTeamIds.has(String(result.team_1_id)) ? (rankMap.get(String(result.team_1_id)) || "") : "", team_2_rank: userTeamIds.has(String(result.team_2_id)) ? (rankMap.get(String(result.team_2_id)) || "") : ""}); }}>{YEARS.map((year)=><option key={year}>{year}</option>)}</select>
+        <select style={input} value={result.season_year} onChange={(e)=>{ const nextYear=e.target.value; const yearResults=(results || []).filter((row)=>String(row.season_year)===String(nextYear)); const userTeamIds=new Set(assignments.filter((a)=>a.status==="Active" && a.discord_user_id && a.team_id).map((a)=>String(a.team_id))); const rankRows=computerRankingRows(teams, yearResults, assignments, users).filter((row)=>userTeamIds.has(String(row.team?.id))).map((row,index)=>({...row, rank:index+1})); const rankMap=new Map(rankRows.map((row)=>[String(row.team?.id), row.rank])); setResult({...result, season_year:nextYear, team_1_rank: userTeamIds.has(String(result.team_1_id)) ? (rankMap.get(String(result.team_1_id)) || "") : "", team_2_rank: userTeamIds.has(String(result.team_2_id)) ? (rankMap.get(String(result.team_2_id)) || "") : ""}); }}>{YEARS.map((year)=><option key={year}>{year}</option>)}</select>
         <select style={input} value={result.week} onChange={(e)=>setResult({...result, week:e.target.value})}>{WEEKS.map((week)=><option key={week}>{week}</option>)}</select>
         <select style={input} value={result.team_1_id} onChange={(e)=>setResultTeam("team_1_id", e.target.value)}><option value="">Team 1</option>{teams.map((team)=><option key={team.id} value={team.id}>{team.name}</option>)}</select>
         <div style={autoUserBox}>Discord User: <b>{resultTeam1User?.discord_username || "CPU / Unassigned"}</b></div>
@@ -5382,7 +5403,7 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
     { title: "Media", keys: ["logoManager", "leagueDataCenter", "seasonStats", "teamStats", "recruitingRankings", "dynastyTimeline"] },
     { title: "Dynasty Legacy", keys: ["dynastyRecords", "rivalries", "powerIndex",  "coachingTree"] },
     { title: "Rankings", keys: ["eloRankings", "conferencePower"] },
-    { title: "League History", keys: ["coachHOF", "playerHOF", "h2h"] },
+    { title: "League History", keys: ["coachHOF", "playerHOF", "h2h", "dynastyHOF"] },
     { title: "Recognition", keys: ["allAmericans", "awards", "heismans", "nationalChampions"] },
     { title: "Admin", keys: ["assignments"] },
   ];
@@ -5407,7 +5428,7 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
 
     if (["commissionerCenter", "assignments", "weeklyMatchups"].includes(tabKey)) return admin;
     if (["eloRankings", "conferencePower", "powerIndex"].includes(tabKey)) return ranking;
-    if (["coachHOF", "playerHOF", "allAmericans", "awards", "heismans", "nationalChampions"].includes(tabKey)) return recognition;
+    if (["coachHOF", "playerHOF", "dynastyHOF", "allAmericans", "awards", "heismans", "nationalChampions"].includes(tabKey)) return recognition;
     return premium;
   }
 
@@ -10439,4 +10460,33 @@ const allTeamsTeamCellV58 = {
   alignItems: "center",
   gap: 14,
   minWidth: 0,
+};
+
+
+const conferenceMultiFilterV60 = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 8,
+  margin: "10px 0 14px",
+};
+
+const conferenceFilterPillV60 = {
+  border: "1px solid rgba(255,255,255,.12)",
+  background: "rgba(15,23,42,.88)",
+  color: "#f8fafc",
+  borderRadius: 999,
+  padding: "9px 12px",
+  fontWeight: 950,
+  cursor: "pointer",
+};
+
+const conferenceFilterPillActiveV60 = {
+  border: "1px solid rgba(212,175,55,.72)",
+  background: "linear-gradient(135deg, rgba(212,175,55,.30), rgba(15,23,42,.92))",
+  color: "#fef3c7",
+  borderRadius: 999,
+  padding: "9px 12px",
+  fontWeight: 1000,
+  cursor: "pointer",
+  boxShadow: "0 0 18px rgba(212,175,55,.16)",
 };
