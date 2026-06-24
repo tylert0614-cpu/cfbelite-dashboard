@@ -3173,8 +3173,8 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
           {bestAvailableTeams.map((team, index)=>(
             <button key={team.id} style={{...draftBestTileV43, background:`linear-gradient(145deg, ${getTeamPrimary(team)}cc, rgba(2,6,23,.96))`, borderColor:getTeamSecondary(team)}} onClick={()=>setSelectedTeamId(team.id)}>
               <div style={draftBestRankV43}>#{index+1}</div>
-              <div style={draftConferenceBadgeV69} title={cleanConference(team.conference)}>
-                <ConferenceLogoMark conference={team.conference} conferenceAssets={conferenceAssets} size={24}/>
+              <div style={draftConferenceBadgeV70} title={cleanConference(team.conference)}>
+                <ConferenceLogoMark conference={team.conference} conferenceAssets={conferenceAssets} size={22}/>
                 <span>{cleanConference(team.conference)}</span>
               </div>
               <div style={draftBestLogoV43}><TeamLogoMark team={team} size={52}/></div>
@@ -5469,6 +5469,17 @@ function GlobalStyle() {
         [style*="max-width: calc(100% - 68px)"] {
           font-size: 9px !important;
           padding: 4px 6px !important;
+        }
+      }
+
+      /* v70-best-available-badge-anchor-fix */
+      @media (max-width: 760px) {
+        [style*="position: absolute"][style*="max-width: calc(100% - 72px)"] {
+          max-width: 48% !important;
+          font-size: 9px !important;
+          padding: 4px 6px !important;
+          right: 10px !important;
+          top: 10px !important;
         }
       }
 `}</style>
@@ -10034,6 +10045,7 @@ const draftConferencePowerStatsV42 = {
 
 
 const draftBestTileV43 = {
+  position: "relative",
   display: "grid",
   gridTemplateColumns: "1fr",
   gap: 8,
@@ -10877,5 +10889,33 @@ const draftConferenceBadgeV69 = {
   overflow: "hidden",
   whiteSpace: "nowrap",
   textOverflow: "ellipsis",
+};
+
+
+
+const draftConferenceBadgeV70 = {
+  position: "absolute",
+  right: 10,
+  top: 10,
+  zIndex: 3,
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  maxWidth: "calc(100% - 72px)",
+  padding: "5px 8px",
+  borderRadius: 999,
+  background: "rgba(2,6,23,.72)",
+  border: "1px solid rgba(255,255,255,.18)",
+  color: "rgba(248,250,252,.94)",
+  fontWeight: 1000,
+  fontSize: 10,
+  letterSpacing: ".05em",
+  textTransform: "uppercase",
+  boxShadow: "0 10px 24px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.08)",
+  backdropFilter: "blur(10px)",
+  overflow: "hidden",
+  whiteSpace: "nowrap",
+  textOverflow: "ellipsis",
+  pointerEvents: "none",
 };
 
