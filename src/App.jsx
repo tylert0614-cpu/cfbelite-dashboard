@@ -7359,7 +7359,11 @@ const healthWarn = {
 
   async function revealDraftPick(pickNumber) {
     const now = new Date().toISOString();
-    const nextPick = Number(pickNumber) + 1;
+    const nextPickNumber = Number(pickNumber) + 1;
+
+    const revealedPick = draftPicks27.find((pick)=>Number(pick.pick_number) === Number(pickNumber));
+    const selectedTeam = teamOptions.find((team)=>String(team.id) === String(revealedPick?.team_id)) || revealedPick?.teams || null;
+    const nextPick = draftPicks27.find((pick)=>Number(pick.pick_number) === Number(nextPickNumber)) || null;
 
     const { error: revealError } = await supabase
       .from("cfb27_draft_picks")
@@ -7368,7 +7372,7 @@ const healthWarn = {
 
     const { error: settingsError } = await supabase
       .from("cfb27_draft_settings")
-      .upsert({ id: 1, current_pick: nextPick, is_live: true, updated_at: now }, { onConflict: "id" });
+      .upsert({ id: 1, current_pick: nextPickNumber, is_live: true, updated_at: now }, { onConflict: "id" });
 
     if (revealError || settingsError) {
       setError(`Draft reveal failed: ${(revealError || settingsError).message}`);
@@ -7378,9 +7382,43 @@ const healthWarn = {
     await supabase
       .from("cfb27_draft_picks")
       .update({ timer_started_at: now, timer_minutes: draftSettings27.timer_minutes || 10, status: "on_clock" })
-      .eq("pick_number", nextPick);
+      .eq("pick_number", nextPickNumber);
 
-    setError("Pick revealed. Next user is now on the clock.");
+    if (revealedPick && selectedTeam) {
+      const { error: discordError } = await supabase.functions.invoke("discord-draft-pick", {
+        body: {
+          pick: {
+            pick_number: revealedPick.pick_number,
+            discord_username: revealedPick.discord_username || revealedPick.discord_users?.discord_username || "User TBD",
+          },
+          team: {
+            name: selectedTeam.name,
+            abbreviation: getTeamAbbreviation(selectedTeam),
+            conference: cleanConference(selectedTeam.conference),
+            logo_url: selectedTeam.logo_url || "",
+            primary_color: getTeamPrimary(selectedTeam),
+            secondary_color: getTeamSecondary(selectedTeam),
+            draft_prestige: selectedTeam.draft_prestige ?? selectedTeam.school_prestige ?? selectedTeam.prestige_grade ?? "",
+            draft_overall: selectedTeam.draft_overall ?? selectedTeam.overall_rating ?? selectedTeam.ovr ?? "",
+            draft_offense: selectedTeam.draft_offense ?? selectedTeam.offense_rating ?? selectedTeam.off ?? "",
+            draft_defense: selectedTeam.draft_defense ?? selectedTeam.defense_rating ?? selectedTeam.def ?? "",
+            board_score: draftTeamRating(selectedTeam),
+          },
+          next_pick: nextPick ? {
+            pick_number: nextPick.pick_number,
+            discord_username: nextPick.discord_username || nextPick.discord_users?.discord_username || "User TBD",
+          } : null,
+        },
+      });
+
+      if (discordError) {
+        setError(`Pick revealed, but Discord announcement failed: ${discordError.message}`);
+        await loadData();
+        return;
+      }
+    }
+
+    setError("Pick revealed, Discord notified, and next user is now on the clock.");
     await loadData();
   }
 
