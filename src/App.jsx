@@ -121,6 +121,14 @@ function cleanConference(value) {
     .trim();
 }
 
+function isDraftAvailable(team) {
+  if (!team) return false;
+  const value = team.draft_available ?? team.is_draft_available ?? team.available_for_draft ?? team.draft_eligible;
+  if (value === undefined || value === null || value === "") return true;
+  if (typeof value === "boolean") return value;
+  return !["false", "no", "n", "0", "banned", "unavailable"].includes(String(value).trim().toLowerCase());
+}
+
 function getHelmetUrl(team) {
   return team?.logo_url || team?.logo || team?.image_url || "";
 }
@@ -2637,6 +2645,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
 
   const availableTeams = teams
     .filter((team) => eligibleTeamNames.has(team.name))
+    .filter((team) => isDraftAvailable(team))
     .filter((team) => allowedConferences.includes(cleanConference(team.conference)))
     .filter((team) => !lockedConferences.has(cleanConference(team.conference)))
     .filter((team) => !reservedTeamIds.has(String(team.id)))
@@ -2705,7 +2714,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
 
   const draftConferencePowerRows = allowedConferences
     .map((conf) => {
-      const confTeams = teams.filter((team)=>eligibleTeamNames.has(team.name) && cleanConference(team.conference) === conf);
+      const confTeams = teams.filter((team)=>eligibleTeamNames.has(team.name) && isDraftAvailable(team) && cleanConference(team.conference) === conf);
       const ratedTeams = confTeams.filter((team)=>draftTeamRating(team) !== "—");
       const avgOvr = draftRatingAverage(ratedTeams.map((team)=>team.draft_overall ?? team.overall_rating ?? team.ovr)) ?? 0;
       const avgOff = draftRatingAverage(ratedTeams.map((team)=>team.draft_offense ?? team.offense_rating ?? team.off)) ?? 0;
@@ -3632,6 +3641,7 @@ function LogoManager({ teams, updateRow, conferenceAssets = [], saveConferenceAs
       primary_color: team.primary_color || "",
       secondary_color: team.secondary_color || "",
       abbreviation: team.abbreviation || "",
+      draft_available: isDraftAvailable(team) ? "true" : "false",
       draft_prestige: team.draft_prestige || "",
       draft_overall: team.draft_overall || "",
       draft_offense: team.draft_offense || "",
@@ -3650,6 +3660,7 @@ function LogoManager({ teams, updateRow, conferenceAssets = [], saveConferenceAs
       primary_color: team.primary_color || "",
       secondary_color: team.secondary_color || "",
       abbreviation: team.abbreviation || "",
+      draft_available: isDraftAvailable(team) ? "true" : "false",
       draft_prestige: team.draft_prestige || "",
       draft_overall: team.draft_overall || "",
       draft_offense: team.draft_offense || "",
@@ -3668,7 +3679,7 @@ function LogoManager({ teams, updateRow, conferenceAssets = [], saveConferenceAs
   async function saveTeamAsset(team) {
     const draft = teamDraft(team);
     const touched = assetDrafts[team.id] || {};
-    const fields = ["logo_url","primary_color","secondary_color","abbreviation","draft_prestige","draft_overall","draft_offense","draft_defense"];
+    const fields = ["logo_url","primary_color","secondary_color","abbreviation","draft_available","draft_prestige","draft_overall","draft_offense","draft_defense"];
     for (const field of fields) {
       if (!(field in touched)) continue;
       const current = team[field] ?? "";
@@ -3725,6 +3736,11 @@ function LogoManager({ teams, updateRow, conferenceAssets = [], saveConferenceAs
               <input style={input} value={draft.primary_color} onChange={(e)=>setTeamDraft(team.id, "primary_color", e.target.value)} placeholder="Primary Color #000000"/>
               <input style={input} value={draft.secondary_color} onChange={(e)=>setTeamDraft(team.id, "secondary_color", e.target.value)} placeholder="Secondary Color #ffffff"/>
               <input style={input} value={draft.abbreviation} onChange={(e)=>setTeamDraft(team.id, "abbreviation", e.target.value.toUpperCase())} placeholder="Abbreviation"/>
+              <label style={assetFieldLabelV54}>Draft Availability</label>
+              <select style={input} value={String(draft.draft_available ?? "true")} onChange={(e)=>setTeamDraft(team.id, "draft_available", e.target.value)}>
+                <option value="true">Available for Draft</option>
+                <option value="false">Banned / Unavailable</option>
+              </select>
 
               <label style={assetFieldLabelV54}>Prestige
                 <select style={input} value={draft.draft_prestige} onChange={(e)=>setTeamDraft(team.id, "draft_prestige", e.target.value)}>
@@ -7361,14 +7377,29 @@ const healthWarn = {
     const now = new Date().toISOString();
     const nextPickNumber = Number(pickNumber) + 1;
 
-    const revealedPick = draftPicks27.find((pick)=>Number(pick.pick_number) === Number(pickNumber));
-    const selectedTeam = teamOptions.find((team)=>String(team.id) === String(revealedPick?.team_id)) || revealedPick?.teams || null;
-    const nextPick = draftPicks27.find((pick)=>Number(pick.pick_number) === Number(nextPickNumber)) || null;
+    const { data: freshPick, error: freshPickError } = await supabase
+      .from("cfb27_draft_picks")
+      .select("*, teams(*), discord_users(discord_username)")
+      .eq("pick_number", Number(pickNumber))
+      .single();
+
+    if (freshPickError) {
+      setError(`Draft reveal failed before Discord lookup: ${freshPickError.message}`);
+      return;
+    }
+
+    const selectedTeam = freshPick?.teams || teamOptions.find((team)=>String(team.id) === String(freshPick?.team_id)) || null;
+
+    const { data: freshNextPick } = await supabase
+      .from("cfb27_draft_picks")
+      .select("*, discord_users(discord_username)")
+      .eq("pick_number", nextPickNumber)
+      .maybeSingle();
 
     const { error: revealError } = await supabase
       .from("cfb27_draft_picks")
       .update({ status: "picked" })
-      .eq("pick_number", pickNumber);
+      .eq("pick_number", Number(pickNumber));
 
     const { error: settingsError } = await supabase
       .from("cfb27_draft_settings")
@@ -7384,40 +7415,50 @@ const healthWarn = {
       .update({ timer_started_at: now, timer_minutes: draftSettings27.timer_minutes || 10, status: "on_clock" })
       .eq("pick_number", nextPickNumber);
 
-    if (revealedPick && selectedTeam) {
-      const { error: discordError } = await supabase.functions.invoke("discord-draft-pick", {
-        body: {
-          pick: {
-            pick_number: revealedPick.pick_number,
-            discord_username: revealedPick.discord_username || revealedPick.discord_users?.discord_username || "User TBD",
-          },
-          team: {
-            name: selectedTeam.name,
-            abbreviation: getTeamAbbreviation(selectedTeam),
-            conference: cleanConference(selectedTeam.conference),
-            logo_url: selectedTeam.logo_url || "",
-            primary_color: getTeamPrimary(selectedTeam),
-            secondary_color: getTeamSecondary(selectedTeam),
-            draft_prestige: selectedTeam.draft_prestige ?? selectedTeam.school_prestige ?? selectedTeam.prestige_grade ?? "",
-            draft_overall: selectedTeam.draft_overall ?? selectedTeam.overall_rating ?? selectedTeam.ovr ?? "",
-            draft_offense: selectedTeam.draft_offense ?? selectedTeam.offense_rating ?? selectedTeam.off ?? "",
-            draft_defense: selectedTeam.draft_defense ?? selectedTeam.defense_rating ?? selectedTeam.def ?? "",
-            board_score: draftTeamRating(selectedTeam),
-          },
-          next_pick: nextPick ? {
-            pick_number: nextPick.pick_number,
-            discord_username: nextPick.discord_username || nextPick.discord_users?.discord_username || "User TBD",
-          } : null,
-        },
-      });
-
-      if (discordError) {
-        setError(`Pick revealed, but Discord announcement failed: ${discordError.message}`);
-        await loadData();
-        return;
-      }
+    if (!selectedTeam) {
+      setError(`Pick #${pickNumber} was revealed, but Discord was skipped because no team is attached to that pick. Click Pick Is In first, wait for the staged pick to show, then Reveal.`);
+      await loadData();
+      return;
     }
 
+    const discordBody = {
+      pick: {
+        pick_number: freshPick.pick_number,
+        discord_username: freshPick.discord_username || freshPick.discord_users?.discord_username || "User TBD",
+      },
+      team: {
+        name: selectedTeam.name,
+        abbreviation: getTeamAbbreviation(selectedTeam),
+        conference: cleanConference(selectedTeam.conference),
+        logo_url: selectedTeam.logo_url || "",
+        primary_color: getTeamPrimary(selectedTeam),
+        secondary_color: getTeamSecondary(selectedTeam),
+        draft_prestige: selectedTeam.draft_prestige ?? selectedTeam.school_prestige ?? selectedTeam.prestige_grade ?? "",
+        draft_overall: selectedTeam.draft_overall ?? selectedTeam.overall_rating ?? selectedTeam.ovr ?? "",
+        draft_offense: selectedTeam.draft_offense ?? selectedTeam.offense_rating ?? selectedTeam.off ?? "",
+        draft_defense: selectedTeam.draft_defense ?? selectedTeam.defense_rating ?? selectedTeam.def ?? "",
+        board_score: draftTeamRating(selectedTeam),
+      },
+      next_pick: freshNextPick ? {
+        pick_number: freshNextPick.pick_number,
+        discord_username: freshNextPick.discord_username || freshNextPick.discord_users?.discord_username || "User TBD",
+      } : null,
+    };
+
+    console.log("Calling discord-draft-pick function", discordBody);
+
+    const { data: discordData, error: discordError } = await supabase.functions.invoke("discord-draft-pick", {
+      body: discordBody,
+    });
+
+    if (discordError) {
+      console.error("Discord draft function failed", discordError);
+      setError(`Pick revealed, but Discord announcement failed: ${discordError.message || JSON.stringify(discordError)}`);
+      await loadData();
+      return;
+    }
+
+    console.log("Discord draft function response", discordData);
     setError("Pick revealed, Discord notified, and next user is now on the clock.");
     await loadData();
   }
