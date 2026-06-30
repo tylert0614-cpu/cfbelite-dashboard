@@ -779,12 +779,11 @@ export default function App() {
   );
   const activeTeamOptions = useMemo(() => teamOptions.filter((team) => activeTeamIds.has(team.id)), [teamOptions, activeTeamIds]);
   const selectedTeam = activeTab.startsWith("team-") ? teams.find((team) => `team-${team.id}` === activeTab) : null;
-  const coachProfileUsers = useMemo(() =>
-    userOptions
-      .filter((user) => user?.id && user?.discord_username)
-      .sort((a, b) => String(a.discord_username || '').localeCompare(String(b.discord_username || ''))),
-    [userOptions]
-  );
+  const coachProfileUsers = useMemo(() => {
+    return [...userOptions.filter((user) => user?.id && user?.discord_username)].sort((a, b) =>
+      String(a.discord_username || '').localeCompare(String(b.discord_username || ''))
+    );
+  }, [userOptions]);
   const selectedCoach = activeTab.startsWith("coach-") ? (coachProfileUsers.find((user) => `coach-${user.id}` === activeTab) || users.find((user) => `coach-${user.id}` === activeTab) || null) : null;
   const currentYearResults = results.filter((r) => String(r.season_year) === String(currentYear));
   const orderedStandings = standingsOrder.length
@@ -2575,7 +2574,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
   }, [settings?.paused]);
 
   const eligibleTeamNames = new Set([
-    "Army Black Knights","Charlotte 49ers","East Carolina Pirates","Florida Atlantic Owls","Memphis Tigers","Navy Midshipmen","North Texas Mean Green","Rice Owls","South Florida Bulls","USF Bulls","Temple Owls","Tulane Green Wave","Tulsa Golden Hurricane","UAB Blazers","UTSA Roadrunners",
+    "Army Black Knights","Charlotte 49ers","East Carolina Pirates","Florida Atlantic Owls","Memphis Tigers","Navy Midshipmen","North Texas Mean Green","Rice Owls","South Florida Bulls","USF Bulls","Connecticut","UCONN","UConn","Connecticut Huskies","UCONN Huskies","UConn Huskies","Temple Owls","Tulane Green Wave","Tulsa Golden Hurricane","UAB Blazers","UTSA Roadrunners",
     "Delaware Fightin’ Blue Hens","FIU Panthers","Jacksonville State Gamecocks","Kennesaw State Owls","Liberty Flames","Middle Tennessee Blue Raiders","Missouri State Bears","New Mexico State Aggies","Sam Houston Bearkats","Western Kentucky Hilltoppers",
     "Akron Zips","Ball State Cardinals","Bowling Green Falcons","Buffalo Bulls","Central Michigan Chippewas","Eastern Michigan Eagles","Kent State Golden Flashes","Miami (OH) RedHawks","Ohio Bobcats","Sacramento State Hornets","Sacremento State","Toledo Rockets","UMass Minutemen","Western Michigan Broncos",
     "Air Force Falcons","Hawaii Rainbow Warriors","Nevada Wolf Pack","New Mexico Lobos","North Dakota State","North Dakota State Bison","Northern Illinois Huskies","San Jose State Spartans","UNLV Rebels","UTEP Miners","Wyoming Cowboys",
@@ -2647,7 +2646,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
   });
 
   const availableTeams = teams
-    .filter((team) => eligibleTeamNames.has(team.name))
+    .filter((team) => eligibleTeamNames.has(team.name) || (/uconn|connecticut/i.test(String(team.name || "")) && cleanConference(team.conference) === "American"))
     .filter((team) => isDraftAvailable(team))
     .filter((team) => allowedConferences.includes(cleanConference(team.conference)))
     .filter((team) => !lockedConferences.has(cleanConference(team.conference)))
@@ -2717,7 +2716,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
 
   const draftConferencePowerRows = allowedConferences
     .map((conf) => {
-      const confTeams = teams.filter((team)=>eligibleTeamNames.has(team.name) && isDraftAvailable(team) && cleanConference(team.conference) === conf);
+      const confTeams = teams.filter((team)=>(eligibleTeamNames.has(team.name) || (/uconn|connecticut/i.test(String(team.name || "")) && cleanConference(team.conference) === "American")) && isDraftAvailable(team) && cleanConference(team.conference) === conf);
       const ratedTeams = confTeams.filter((team)=>draftTeamRating(team) !== "—");
       const avgOvr = draftRatingAverage(ratedTeams.map((team)=>team.draft_overall ?? team.overall_rating ?? team.ovr)) ?? 0;
       const avgOff = draftRatingAverage(ratedTeams.map((team)=>team.draft_offense ?? team.offense_rating ?? team.off)) ?? 0;
