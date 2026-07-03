@@ -780,9 +780,19 @@ export default function App() {
   const activeTeamOptions = useMemo(() => teamOptions.filter((team) => activeTeamIds.has(team.id)), [teamOptions, activeTeamIds]);
   const selectedTeam = activeTab.startsWith("team-") ? teams.find((team) => `team-${team.id}` === activeTab) : null;
   const coachProfileUsers = useMemo(() => {
-    return [...userOptions.filter((user) => user?.id && user?.discord_username)]
-      .sort((a,b)=>String(a.discord_username || "").localeCompare(String(b.discord_username || "")));
-  }, [userOptions]);
+    const map = new Map();
+
+    [...(userOptions || []), ...(users || [])].forEach((user) => {
+      if (!user?.id || !user?.discord_username) return;
+      const name = String(user.discord_username).trim();
+      if (!name) return;
+      map.set(String(user.id), { ...user, discord_username: name });
+    });
+
+    return [...map.values()]
+      .sort((a,b)=>String(a.discord_username || "").localeCompare(String(b.discord_username || ""), undefined, { sensitivity:"base" }));
+  }, [userOptions, users]);
+
   const selectedCoach = activeTab.startsWith("coach-") ? (coachProfileUsers.find((user) => `coach-${user.id}` === activeTab) || users.find((user) => `coach-${user.id}` === activeTab) || null) : null;
   const currentYearResults = results.filter((r) => String(r.season_year) === String(currentYear));
   const orderedStandings = standingsOrder.length
@@ -2559,14 +2569,15 @@ function draftTeamRating(team) {
   const nilStart = draftNormalizeNil(nilStartRaw, 4065);
   const nilBudget = draftNormalizeNil(nilBudgetRaw, 12500);
 
+  // v79 formula: roster strength must lead. NIL and pipeline are tiebreaker/supporting factors.
   const rating =
-    (ovr * 0.30) +
+    (ovr * 0.45) +
     (off * 0.15) +
     (def * 0.15) +
-    (prestige * 0.15) +
-    (pipeline * 0.10) +
-    (nilStart * 0.075) +
-    (nilBudget * 0.075);
+    (prestige * 0.12) +
+    (pipeline * 0.05) +
+    (nilStart * 0.04) +
+    (nilBudget * 0.04);
 
   return Number(rating.toFixed(1));
 }
@@ -2576,7 +2587,7 @@ function draftConferencePowerScore(row) {
   const pipeline = row.avgPipeline || 0;
   const nilStart = draftNormalizeNil(row.avgNilStart || 0, 4065);
   const nilBudget = draftNormalizeNil(row.avgNilBudget || 0, 12500);
-  const score = (row.avgOvr * 0.30) + (row.avgOff * 0.15) + (row.avgDef * 0.15) + (prestigeRating * 0.15) + (pipeline * 0.10) + (nilStart * 0.075) + (nilBudget * 0.075);
+  const score = (row.avgOvr * 0.45) + (row.avgOff * 0.15) + (row.avgDef * 0.15) + (prestigeRating * 0.12) + (pipeline * 0.05) + (nilStart * 0.04) + (nilBudget * 0.04);
   return Number(score.toFixed(1));
 }
 
@@ -2710,28 +2721,36 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
 
 
   function draftSortValue(team, key) {
+    if (key === "name") return String(team?.name || "");
     if (key === "boardScore") {
       const score = draftTeamRating(team);
       return score === "—" ? -1 : Number(score);
     }
-    if (key === "overall") return draftNumberValue(team.draft_overall ?? team.overall_rating ?? team.ovr, -1);
-    if (key === "offense") return draftNumberValue(team.draft_offense ?? team.offense_rating ?? team.off, -1);
-    if (key === "defense") return draftNumberValue(team.draft_defense ?? team.defense_rating ?? team.def, -1);
-    if (key === "prestige") return draftNumberValue(team.draft_prestige ?? team.school_prestige ?? team.prestige_grade, -1);
-    if (key === "pipeline") return draftNumberValue(team.pipeline_grade ?? team.draft_pipeline_grade ?? team.pipeline_rating, -1);
-    if (key === "nilStart") return draftNumberValue(team.starting_nil ?? team.draft_starting_nil ?? team.available_nil, -1);
-    if (key === "nilBudget") return draftNumberValue(team.overall_nil_budget ?? team.draft_nil_budget ?? team.nil_budget, -1);
-    return String(team.name || "");
+    if (key === "overall") return draftNumberValue(team?.draft_overall ?? team?.overall_rating ?? team?.ovr, -1);
+    if (key === "offense") return draftNumberValue(team?.draft_offense ?? team?.offense_rating ?? team?.off, -1);
+    if (key === "defense") return draftNumberValue(team?.draft_defense ?? team?.defense_rating ?? team?.def, -1);
+    if (key === "prestige") return draftNumberValue(team?.draft_prestige ?? team?.school_prestige ?? team?.prestige_grade, -1);
+    if (key === "pipeline") return draftNumberValue(team?.pipeline_grade ?? team?.draft_pipeline_grade ?? team?.pipeline_rating, -1);
+    if (key === "nilStart") return draftNumberValue(getStartingNil(team), -1);
+    if (key === "nilBudget") return draftNumberValue(getOverallNilBudget(team), -1);
+    return String(team?.name || "");
   }
 
   function sortConferenceTeams(list) {
     return [...list].sort((a,b)=>{
-      if (conferenceTeamSort === "name") return String(a.name || "").localeCompare(String(b.name || ""));
+      if (conferenceTeamSort === "name") {
+        return String(a?.name || "").localeCompare(String(b?.name || ""));
+      }
+
       const av = draftSortValue(a, conferenceTeamSort);
       const bv = draftSortValue(b, conferenceTeamSort);
-      return Number(bv) - Number(av) || String(a.name || "").localeCompare(String(b.name || ""));
+
+      return Number(bv) - Number(av)
+        || String(a?.name || "").localeCompare(String(b?.name || ""));
     });
   }
+
+  const sortedAvailableTeams = sortConferenceTeams(availableTeams);
 
   const availableTeamsByConference = allowedConferences
     .map((conf) => ({
@@ -3341,7 +3360,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
           <div style={S.eyebrow}>Available Teams · {availableTeams.length}</div>
           <input style={{ ...S.input, marginTop: 12 }} value={teamSearch} onChange={(e) => setTeamSearch(e.target.value)} placeholder="Search available teams or conference..." />
           <div style={draftConferenceSortBarV48}>
-            <span>Sort conference teams by</span>
+            <span>Sort available teams by</span>
             <select style={draftConferenceSortSelectV48} value={conferenceTeamSort} onChange={(e)=>setConferenceTeamSort(e.target.value)}>
               <option value="name">Team Name A-Z</option>
               <option value="boardScore">Board Score</option>
@@ -3349,46 +3368,38 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
               <option value="offense">Offensive Rating</option>
               <option value="defense">Defensive Rating</option>
               <option value="prestige">Prestige</option>
-                    <option value="pipeline">Pipeline</option>
-                    <option value="nilStart">Starting NIL</option>
-                    <option value="nilBudget">Overall NIL</option>
+              <option value="pipeline">Pipeline</option>
+              <option value="nilStart">Starting NIL</option>
+              <option value="nilBudget">Overall NIL</option>
             </select>
           </div>
-          <div style={S.availableConferenceStack}>
-            {availableTeamsByConference.map((group) => (
-              <div key={group.conference} style={S.availableConferenceGroup}>
-                <div style={{
-                  ...S.availableConferenceHeader,
-                  background: group.locked ? "rgba(127,29,29,.76)" : "rgba(255,255,255,.08)",
-                  borderColor: group.locked ? "rgba(248,113,113,.70)" : "rgba(255,255,255,.18)",
-                }}>
-                  <span>{group.locked ? "🔒 " : ""}{group.conference}</span>
-                  <b>{group.locked ? "LOCKED" : `${group.teams.length} Remaining`}</b>
+
+          <div style={draftSortStatusV80}>
+            Showing {sortedAvailableTeams.length} teams • Sorted by {conferenceTeamSort === "name" ? "Team Name A-Z" : conferenceTeamSort === "boardScore" ? "Board Score" : conferenceTeamSort === "overall" ? "Overall Rating" : conferenceTeamSort === "offense" ? "Offensive Rating" : conferenceTeamSort === "defense" ? "Defensive Rating" : conferenceTeamSort === "prestige" ? "Prestige" : conferenceTeamSort === "pipeline" ? "Pipeline" : conferenceTeamSort === "nilStart" ? "Starting NIL" : "Overall NIL"}
+          </div>
+          <div style={draftAvailableBestGridV79}>
+            {sortedAvailableTeams.map((team, index)=>(
+              <button key={team.id} style={{...draftBestTileV43, minHeight:188, background:`linear-gradient(145deg, ${getTeamPrimary(team)}cc, rgba(2,6,23,.96))`, borderColor:getTeamSecondary(team)}} onClick={()=>setSelectedTeamId(team.id)}>
+                <div style={draftBestRankV43}>#{index+1}</div>
+                <div style={draftConferenceBadgeV70} title={cleanConference(team.conference)}>
+                  <ConferenceLogoMark conference={team.conference} conferenceAssets={conferenceAssets} size={22}/>
+                  <span>{cleanConference(team.conference)}</span>
                 </div>
-                {!group.locked && (
-                  <div style={draftAvailableGridV37}>
-                    {group.teams.map((team) => (
-                      <button key={team.id} style={{
-                        ...draftAvailableTileV37,
-                        background: `linear-gradient(135deg, ${team.primary_color || "#1f2937"}cc, rgba(15,23,42,.88))`,
-                        borderColor: team.secondary_color || "#ffffff",
-                      }} onClick={()=>setSelectedTeamId(team.id)}>
-                        <div style={draftAvailableTopLineV68}>
-                          <TeamLogoMark team={team} size={34}/>
-                          <span style={draftConferencePillV68}><ConferenceLogoMark conference={team.conference} conferenceAssets={conferenceAssets} size={24}/>{cleanConference(team.conference)}</span>
-                        </div>
-                        <b>{getTeamAbbreviation(team)} • {team.name}</b>
-                        <span>{cleanConference(team.conference)}</span>
-                        <small style={draftTileRatingsV40}>
-                          <span style={prestigePreviewLineV57}>Prestige <PrestigeStars team={team} size={13}/> | OFF {team.draft_offense ?? team.offense_rating ?? team.off ?? "—"} | DEF {team.draft_defense ?? team.defense_rating ?? team.def ?? "—"} | OVR {team.draft_overall ?? team.overall_rating ?? team.ovr ?? "—"}</span>
-                          <span style={draftNilCompactLineV77}>PIPE {getPipelineGrade(team)} | NIL {formatNilBudget(getStartingNil(team))}/{formatNilBudget(getOverallNilBudget(team))}</span>
-                        </small>
-                        <strong style={draftTileScoreV40}>Board Score: {draftTeamRating(team)}</strong>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+                <div style={draftBestLogoV43}><TeamLogoMark team={team} size={52}/></div>
+                <strong style={draftBestTeamNameV43}>{team.name}</strong>
+                <div style={draftBestStarsV43}><PrestigeStars team={team} size={15}/></div>
+                <div style={draftBestRatingsV43}>
+                  <span>OVR <b>{team.draft_overall ?? team.overall_rating ?? team.ovr ?? "—"}</b></span>
+                  <span>OFF <b>{team.draft_offense ?? team.offense_rating ?? team.off ?? "—"}</b></span>
+                  <span>DEF <b>{team.draft_defense ?? team.defense_rating ?? team.def ?? "—"}</b></span>
+                </div>
+                <div style={draftNilPipelineMiniV77}>
+                  <span>PIPE <b>{getPipelineGrade(team)}</b></span>
+                  <span>NIL START <b>{formatNilBudget(getStartingNil(team))}</b></span>
+                  <span>NIL TOTAL <b>{formatNilBudget(getOverallNilBudget(team))}</b></span>
+                </div>
+                <div style={draftBestScoreBoxV43}><span>Board Score</span><b>{draftTeamRating(team)}</b></div>
+              </button>
             ))}
           </div>
         </aside>
@@ -5586,6 +5597,27 @@ function GlobalStyle() {
       @media (max-width: 760px) {
         [style*="grid-template-columns: repeat(3, 1fr)"][style*="NIL"] {
           grid-template-columns: 1fr !important;
+        }
+      }
+
+      /* v78-coach-tabs-alpha-fit */
+      [style*="coach"] button,
+      [style*="No active team"] {
+        min-width: 0 !important;
+      }
+
+      @media (max-width: 760px) {
+        [style*="No active team"] {
+          font-size: clamp(10px, 2.8vw, 12px) !important;
+          line-height: 1.15 !important;
+          overflow-wrap: anywhere !important;
+        }
+      }
+
+      /* v79-available-best-grid */
+      @media (max-width: 760px) {
+        [style*="repeat(auto-fill, minmax(190px, 1fr))"] {
+          grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)) !important;
         }
       }
 `}</style>
@@ -11108,4 +11140,22 @@ const draftNilCompactLineV77 = {
   marginTop: 5,
   color: "rgba(248,250,252,.78)",
   fontWeight: 900,
+};
+
+
+const draftAvailableBestGridV79 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))",
+  gap: 12,
+  alignItems: "stretch",
+};
+
+
+const draftSortStatusV80 = {
+  color: "rgba(226,232,240,.78)",
+  fontSize: 12,
+  fontWeight: 900,
+  letterSpacing: ".04em",
+  textTransform: "uppercase",
+  margin: "8px 0 12px",
 };
