@@ -780,9 +780,8 @@ export default function App() {
   const activeTeamOptions = useMemo(() => teamOptions.filter((team) => activeTeamIds.has(team.id)), [teamOptions, activeTeamIds]);
   const selectedTeam = activeTab.startsWith("team-") ? teams.find((team) => `team-${team.id}` === activeTab) : null;
   const coachProfileUsers = useMemo(() => {
-    return [...userOptions.filter((user) => user?.id && user?.discord_username)].sort((a, b) =>
-      String(a.discord_username || '').localeCompare(String(b.discord_username || ''))
-    );
+    return [...userOptions.filter((user) => user?.id && user?.discord_username)]
+      .sort((a,b)=>String(a.discord_username || "").localeCompare(String(b.discord_username || "")));
   }, [userOptions]);
   const selectedCoach = activeTab.startsWith("coach-") ? (coachProfileUsers.find((user) => `coach-${user.id}` === activeTab) || users.find((user) => `coach-${user.id}` === activeTab) || null) : null;
   const currentYearResults = results.filter((r) => String(r.season_year) === String(currentYear));
@@ -2478,6 +2477,33 @@ function draftNumberValue(value, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function draftNormalizeNil(value, maxValue) {
+  const n = draftNumberValue(value, 0);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.max(0, Math.min(100, (n / maxValue) * 100));
+}
+
+function formatNilBudget(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "—";
+  return `$${Math.round(n).toLocaleString()}`;
+}
+
+function getPipelineGrade(team) {
+  const raw = team?.pipeline_grade ?? team?.draft_pipeline_grade ?? team?.pipeline_rating;
+  if (raw === "" || raw === null || raw === undefined) return "—";
+  const n = Number(raw);
+  return Number.isFinite(n) ? Number(n.toFixed(1)) : "—";
+}
+
+function getStartingNil(team) {
+  return team?.starting_nil ?? team?.draft_starting_nil ?? team?.available_nil;
+}
+
+function getOverallNilBudget(team) {
+  return team?.overall_nil_budget ?? team?.draft_nil_budget ?? team?.nil_budget;
+}
+
 function draftPrestigeValue(team) {
   const raw = team?.draft_prestige ?? team?.school_prestige ?? team?.prestige_grade ?? team?.prestige ?? "";
   if (raw === "" || raw === null || raw === undefined) return null;
@@ -2518,21 +2544,39 @@ function draftTeamRating(team) {
   const ovrRaw = team?.draft_overall ?? team?.overall_rating ?? team?.ovr;
   const offRaw = team?.draft_offense ?? team?.offense_rating ?? team?.off;
   const defRaw = team?.draft_defense ?? team?.defense_rating ?? team?.def;
-  const hasAny = [prestigeRaw, ovrRaw, offRaw, defRaw].some((value)=>value !== "" && value !== null && value !== undefined);
+  const pipelineRaw = team?.pipeline_grade ?? team?.draft_pipeline_grade ?? team?.pipeline_rating;
+  const nilStartRaw = getStartingNil(team);
+  const nilBudgetRaw = getOverallNilBudget(team);
+
+  const hasAny = [prestigeRaw, ovrRaw, offRaw, defRaw, pipelineRaw, nilStartRaw, nilBudgetRaw].some((value)=>value !== "" && value !== null && value !== undefined);
   if (!hasAny) return "—";
-  const prestige = Math.max(0, Math.min(5, draftNumberValue(prestigeRaw, 0)));
-  const prestigeRating = prestige * 20;
+
+  const prestige = Math.max(0, Math.min(5, draftNumberValue(prestigeRaw, 0))) * 20;
   const ovr = draftNumberValue(ovrRaw, 0);
   const off = draftNumberValue(offRaw, 0);
   const def = draftNumberValue(defRaw, 0);
-  const rating = (ovr * 0.40) + (off * 0.20) + (def * 0.20) + (prestigeRating * 0.20);
+  const pipeline = Math.max(0, Math.min(100, draftNumberValue(pipelineRaw, 0)));
+  const nilStart = draftNormalizeNil(nilStartRaw, 4065);
+  const nilBudget = draftNormalizeNil(nilBudgetRaw, 12500);
+
+  const rating =
+    (ovr * 0.30) +
+    (off * 0.15) +
+    (def * 0.15) +
+    (prestige * 0.15) +
+    (pipeline * 0.10) +
+    (nilStart * 0.075) +
+    (nilBudget * 0.075);
+
   return Number(rating.toFixed(1));
 }
-
 function draftConferencePowerScore(row) {
   if (!row || !row.ratedTeams) return "—";
   const prestigeRating = row.avgPrestige * 20;
-  const score = (row.avgOvr * 0.40) + (row.avgOff * 0.20) + (row.avgDef * 0.20) + (prestigeRating * 0.20);
+  const pipeline = row.avgPipeline || 0;
+  const nilStart = draftNormalizeNil(row.avgNilStart || 0, 4065);
+  const nilBudget = draftNormalizeNil(row.avgNilBudget || 0, 12500);
+  const score = (row.avgOvr * 0.30) + (row.avgOff * 0.15) + (row.avgDef * 0.15) + (prestigeRating * 0.15) + (pipeline * 0.10) + (nilStart * 0.075) + (nilBudget * 0.075);
   return Number(score.toFixed(1));
 }
 
@@ -2546,7 +2590,10 @@ function draftRatingLine(team) {
   const off = team?.draft_offense ?? team?.offense_rating ?? team?.off ?? "—";
   const def = team?.draft_defense ?? team?.defense_rating ?? team?.def ?? "—";
   const ovr = team?.draft_overall ?? team?.overall_rating ?? team?.ovr ?? "—";
-  return `Prestige ${draftPrestigeStars(team)} | OFF ${off} | DEF ${def} | OVR ${ovr}`;
+  const pipe = team?.pipeline_grade ?? team?.draft_pipeline_grade ?? team?.pipeline_rating ?? "—";
+  const nilStart = getStartingNil(team);
+  const nilBudget = getOverallNilBudget(team);
+  return `Prestige ${draftPrestigeStars(team)} | OVR ${ovr} | OFF ${off} | DEF ${def} | PIPE ${pipe} | NIL ${formatNilBudget(nilStart)}/${formatNilBudget(nilBudget)}`;
 }
 
 function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferenceAssets = [], startClock, pauseClock, resumeClock, announcePick, revealPick, undoPick }) {
@@ -2671,6 +2718,9 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
     if (key === "offense") return draftNumberValue(team.draft_offense ?? team.offense_rating ?? team.off, -1);
     if (key === "defense") return draftNumberValue(team.draft_defense ?? team.defense_rating ?? team.def, -1);
     if (key === "prestige") return draftNumberValue(team.draft_prestige ?? team.school_prestige ?? team.prestige_grade, -1);
+    if (key === "pipeline") return draftNumberValue(team.pipeline_grade ?? team.draft_pipeline_grade ?? team.pipeline_rating, -1);
+    if (key === "nilStart") return draftNumberValue(team.starting_nil ?? team.draft_starting_nil ?? team.available_nil, -1);
+    if (key === "nilBudget") return draftNumberValue(team.overall_nil_budget ?? team.draft_nil_budget ?? team.nil_budget, -1);
     return String(team.name || "");
   }
 
@@ -2722,6 +2772,9 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
       const avgOff = draftRatingAverage(ratedTeams.map((team)=>team.draft_offense ?? team.offense_rating ?? team.off)) ?? 0;
       const avgDef = draftRatingAverage(ratedTeams.map((team)=>team.draft_defense ?? team.defense_rating ?? team.def)) ?? 0;
       const avgPrestige = draftRatingAverage(ratedTeams.map((team)=>team.draft_prestige ?? team.school_prestige ?? team.prestige_grade)) ?? 0;
+      const avgPipeline = draftRatingAverage(ratedTeams.map((team)=>team.pipeline_grade ?? team.draft_pipeline_grade ?? team.pipeline_rating)) ?? 0;
+      const avgNilStart = draftRatingAverage(ratedTeams.map((team)=>team.starting_nil ?? team.draft_starting_nil ?? team.available_nil)) ?? 0;
+      const avgNilBudget = draftRatingAverage(ratedTeams.map((team)=>team.overall_nil_budget ?? team.draft_nil_budget ?? team.nil_budget)) ?? 0;
       const draftedTeams = localPicks
         .map((pick)=>{
           const team = teams.find((t)=>String(t.id)===String(pick.team_id)) || pick.teams;
@@ -2739,7 +2792,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
       const firstTwoClosed = conferencesAtSix.slice(0, 2).includes(conf);
       const closeAt = firstTwoClosed || conferencesAtSix.length < 2 ? 6 : 5;
       const remainingToClose = Math.max(0, closeAt - count);
-      const row = { conference: conf, totalTeams: confTeams.length, ratedTeams: ratedTeams.length, avgOvr, avgOff, avgDef, avgPrestige, draftedTeams, count, locked, closeAt, remainingToClose };
+      const row = { conference: conf, totalTeams: confTeams.length, ratedTeams: ratedTeams.length, avgOvr, avgOff, avgDef, avgPrestige, avgPipeline, avgNilStart, avgNilBudget, draftedTeams, count, locked, closeAt, remainingToClose };
       return { ...row, powerScore: draftConferencePowerScore(row) };
     })
     .sort((a,b)=>(Number(b.powerScore) || 0) - (Number(a.powerScore) || 0) || a.conference.localeCompare(b.conference));
@@ -3196,6 +3249,11 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
                 <span>OFF <b>{team.draft_offense ?? team.offense_rating ?? team.off ?? "—"}</b></span>
                 <span>DEF <b>{team.draft_defense ?? team.defense_rating ?? team.def ?? "—"}</b></span>
               </div>
+              <div style={draftNilPipelineMiniV77}>
+                <span>PIPE <b>{getPipelineGrade(team)}</b></span>
+                <span>NIL START <b>{formatNilBudget(getStartingNil(team))}</b></span>
+                <span>NIL TOTAL <b>{formatNilBudget(getOverallNilBudget(team))}</b></span>
+              </div>
               <div style={draftBestScoreBoxV43}><span>Board Score</span><b>{draftTeamRating(team)}</b></div>
             </button>
           ))}
@@ -3291,6 +3349,9 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
               <option value="offense">Offensive Rating</option>
               <option value="defense">Defensive Rating</option>
               <option value="prestige">Prestige</option>
+                    <option value="pipeline">Pipeline</option>
+                    <option value="nilStart">Starting NIL</option>
+                    <option value="nilBudget">Overall NIL</option>
             </select>
           </div>
           <div style={S.availableConferenceStack}>
@@ -3320,6 +3381,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
                         <span>{cleanConference(team.conference)}</span>
                         <small style={draftTileRatingsV40}>
                           <span style={prestigePreviewLineV57}>Prestige <PrestigeStars team={team} size={13}/> | OFF {team.draft_offense ?? team.offense_rating ?? team.off ?? "—"} | DEF {team.draft_defense ?? team.defense_rating ?? team.def ?? "—"} | OVR {team.draft_overall ?? team.overall_rating ?? team.ovr ?? "—"}</span>
+                          <span style={draftNilCompactLineV77}>PIPE {getPipelineGrade(team)} | NIL {formatNilBudget(getStartingNil(team))}/{formatNilBudget(getOverallNilBudget(team))}</span>
                         </small>
                         <strong style={draftTileScoreV40}>Board Score: {draftTeamRating(team)}</strong>
                       </button>
@@ -3648,6 +3710,9 @@ function LogoManager({ teams, updateRow, conferenceAssets = [], saveConferenceAs
       draft_overall: team.draft_overall || "",
       draft_offense: team.draft_offense || "",
       draft_defense: team.draft_defense || "",
+      pipeline_grade: team.pipeline_grade || team.draft_pipeline_grade || team.pipeline_rating || "",
+      starting_nil: team.starting_nil || team.draft_starting_nil || team.available_nil || "",
+      overall_nil_budget: team.overall_nil_budget || team.draft_nil_budget || team.nil_budget || "",
     };
     return {
       ...base,
@@ -3667,6 +3732,9 @@ function LogoManager({ teams, updateRow, conferenceAssets = [], saveConferenceAs
       draft_overall: team.draft_overall || "",
       draft_offense: team.draft_offense || "",
       draft_defense: team.draft_defense || "",
+      pipeline_grade: team.pipeline_grade || team.draft_pipeline_grade || team.pipeline_rating || "",
+      starting_nil: team.starting_nil || team.draft_starting_nil || team.available_nil || "",
+      overall_nil_budget: team.overall_nil_budget || team.draft_nil_budget || team.nil_budget || "",
     } : {};
     setAssetDrafts((prev)=>({
       ...prev,
@@ -3681,7 +3749,7 @@ function LogoManager({ teams, updateRow, conferenceAssets = [], saveConferenceAs
   async function saveTeamAsset(team) {
     const draft = teamDraft(team);
     const touched = assetDrafts[team.id] || {};
-    const fields = ["logo_url","primary_color","secondary_color","abbreviation","draft_available","draft_prestige","draft_overall","draft_offense","draft_defense"];
+    const fields = ["logo_url","primary_color","secondary_color","abbreviation","draft_available","draft_prestige","draft_overall","draft_offense","draft_defense","pipeline_grade","starting_nil","overall_nil_budget"];
     for (const field of fields) {
       if (!(field in touched)) continue;
       const current = team[field] ?? "";
@@ -3753,6 +3821,9 @@ function LogoManager({ teams, updateRow, conferenceAssets = [], saveConferenceAs
               <input style={input} value={draft.draft_overall} onChange={(e)=>setTeamDraft(team.id, "draft_overall", e.target.value)} placeholder="Overall Rating"/>
               <input style={input} value={draft.draft_offense} onChange={(e)=>setTeamDraft(team.id, "draft_offense", e.target.value)} placeholder="Offense Rating"/>
               <input style={input} value={draft.draft_defense} onChange={(e)=>setTeamDraft(team.id, "draft_defense", e.target.value)} placeholder="Defense Rating"/>
+              <input style={input} value={draft.pipeline_grade} onChange={(e)=>setTeamDraft(team.id, "pipeline_grade", e.target.value)} placeholder="Pipeline Grade 0-100"/>
+              <input style={input} value={draft.starting_nil} onChange={(e)=>setTeamDraft(team.id, "starting_nil", e.target.value)} placeholder="Starting Available NIL 0-100"/>
+              <input style={input} value={draft.overall_nil_budget} onChange={(e)=>setTeamDraft(team.id, "overall_nil_budget", e.target.value)} placeholder="Overall NIL Budget 0-100"/>
               <div style={draftAssetPreviewV40}>
                 <span style={prestigePreviewLineV57}>Prestige <PrestigeStars team={previewTeam} size={14}/> | OFF {previewTeam.draft_offense ?? previewTeam.offense_rating ?? previewTeam.off ?? "—"} | DEF {previewTeam.draft_defense ?? previewTeam.defense_rating ?? previewTeam.def ?? "—"} | OVR {previewTeam.draft_overall ?? previewTeam.overall_rating ?? previewTeam.ovr ?? "—"} · Board Score {draftTeamRating(previewTeam)}</span>
               </div>
@@ -5498,6 +5569,23 @@ function GlobalStyle() {
           padding: 4px 6px !important;
           right: 10px !important;
           top: 10px !important;
+        }
+      }
+
+      /* v76-coach-card-name-fit */
+      [style*="No active team"] {
+        overflow-wrap: anywhere;
+      }
+      @media (max-width: 760px) {
+        [style*="No active team"] {
+          font-size: clamp(11px, 2.6vw, 13px) !important;
+        }
+      }
+
+      /* v77-nil-pipeline-draft-cards */
+      @media (max-width: 760px) {
+        [style*="grid-template-columns: repeat(3, 1fr)"][style*="NIL"] {
+          grid-template-columns: 1fr !important;
         }
       }
 `}</style>
@@ -11000,3 +11088,24 @@ const draftConferenceBadgeV70 = {
   pointerEvents: "none",
 };
 
+
+
+const draftNilPipelineMiniV77 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(3, 1fr)",
+  gap: 8,
+  width: "100%",
+  padding: "8px 0",
+  borderTop: "1px solid rgba(255,255,255,.12)",
+  borderBottom: "1px solid rgba(255,255,255,.10)",
+  color: "rgba(248,250,252,.80)",
+  fontSize: 11,
+  fontWeight: 800,
+};
+
+const draftNilCompactLineV77 = {
+  display: "block",
+  marginTop: 5,
+  color: "rgba(248,250,252,.78)",
+  fontWeight: 900,
+};
