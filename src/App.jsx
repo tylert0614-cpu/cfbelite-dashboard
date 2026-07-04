@@ -950,6 +950,39 @@ export default function App() {
     setLoading(false);
   }
   useEffect(() => { loadData(); }, []);
+  async function refreshDraftRoomState() {
+    const [picksRes, settingsRes] = await Promise.all([
+      supabase.from("cfb27_draft_picks").select("*, teams(*), discord_users(discord_username)").order("pick_number"),
+      supabase.from("cfb27_draft_settings").select("*").eq("id", 1).single(),
+    ]);
+
+    if (!picksRes.error) setDraftPicks27(picksRes.data || []);
+    if (!settingsRes.error && settingsRes.data) setDraftSettings27(settingsRes.data);
+  }
+
+  useEffect(() => {
+    const draftChannel = supabase
+      .channel("cfb27-draft-room-live-sync")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "cfb27_draft_settings" },
+        () => refreshDraftRoomState()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "cfb27_draft_picks" },
+        () => refreshDraftRoomState()
+      )
+      .subscribe();
+
+    // Polling fallback so every browser stays synced even if Supabase Realtime is delayed/disabled.
+    const pollId = window.setInterval(refreshDraftRoomState, 5000);
+
+    return () => {
+      window.clearInterval(pollId);
+      supabase.removeChannel(draftChannel);
+    };
+  }, []);
 
   async function submitResult() {
     const team1Score = scoreNumber(newResult.team_1_score); const team2Score = scoreNumber(newResult.team_2_score);
@@ -2631,6 +2664,12 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
     setLocalPaused(Boolean(settings?.paused));
   }, [settings?.paused]);
 
+  useEffect(() => {
+    const nextCurrentPick = Number(settings?.current_pick || 1);
+    setManualPickNumber(nextCurrentPick);
+    setTimerMinutes(settings?.timer_minutes || 10);
+  }, [settings?.current_pick, settings?.timer_minutes]);
+
   const eligibleTeamNames = new Set([
     "Army Black Knights","Charlotte 49ers","East Carolina Pirates","Florida Atlantic Owls","Memphis Tigers","Navy Midshipmen","North Texas Mean Green","Rice Owls","South Florida Bulls","USF Bulls","Connecticut","UCONN","UConn","Connecticut Huskies","UCONN Huskies","UConn Huskies","Temple Owls","Tulane Green Wave","Tulsa Golden Hurricane","UAB Blazers","UTSA Roadrunners",
     "Delaware Fightin’ Blue Hens","FIU Panthers","Jacksonville State Gamecocks","Kennesaw State Owls","Liberty Flames","Middle Tennessee Blue Raiders","Missouri State Bears","New Mexico State Aggies","Sam Houston Bearkats","Western Kentucky Hilltoppers",
@@ -2654,12 +2693,13 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
 
   const allowedConferences = ["American", "CUSA", "MAC", "Mountain West", "PAC 12", "Sun Belt"];
   const sortedPicks = [...(localPicks || [])].sort((a, b) => Number(a.pick_number || 0) - Number(b.pick_number || 0));
+  const currentPickNumber = Number(settings?.current_pick || manualPickNumber || 1);
   const currentPick =
+    sortedPicks.find((pick) => Number(pick.pick_number) === currentPickNumber) ||
     sortedPicks.find((pick) => Number(pick.pick_number) === Number(manualPickNumber || 1)) ||
-    sortedPicks.find((pick) => Number(pick.pick_number) === 1) ||
     sortedPicks.find((pick) => !pick.team_id || pick.status === "pick_is_in") ||
     sortedPicks[0] ||
-    { pick_number: 1, discord_username: "User TBD", status: "pending" };
+    { pick_number: currentPickNumber || 1, discord_username: "User TBD", status: "pending" };
 
   const displayPick = localClock && Number(localClock.pick_number) === Number(currentPick?.pick_number)
     ? { ...currentPick, timer_started_at: localClock.timer_started_at, timer_minutes: localClock.timer_minutes, status: currentPick.status === "picked" ? "picked" : "on_clock" }
