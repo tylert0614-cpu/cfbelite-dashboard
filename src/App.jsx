@@ -778,27 +778,71 @@ export default function App() {
     [assignments, currentYear]
   );
   const activeTeamOptions = useMemo(() => teamOptions.filter((team) => activeTeamIds.has(team.id)), [teamOptions, activeTeamIds]);
-  const selectedTeam = activeTab.startsWith("team-") ? teams.find((team) => `team-${team.id}` === activeTab) : null;
+  const selectedTeamRaw = activeTab.startsWith("team-") ? teams.find((team) => `team-${team.id}` === activeTab) : null;
+  function assignmentForTeam(teamId) {
+    return assignments.find((row) => String(row.team_id) === String(teamId) && assignmentActiveForYear(row, currentYear)) ||
+      assignments.find((row) => String(row.team_id) === String(teamId) && row.status === "Active") ||
+      assignments.find((row) => String(row.team_id) === String(teamId) && row.discord_user_id);
+  }
+  function assignmentForUser(userId) {
+    return assignments.find((row) => String(row.discord_user_id) === String(userId) && assignmentActiveForYear(row, currentYear)) ||
+      assignments.find((row) => String(row.discord_user_id) === String(userId) && row.status === "Active") ||
+      assignments.find((row) => String(row.discord_user_id) === String(userId) && row.team_id);
+  }
+  const selectedTeamAssignedCoachId = selectedTeamRaw ? assignmentForTeam(selectedTeamRaw.id)?.discord_user_id : null;
+  const selectedTeam = selectedTeamRaw && !selectedTeamAssignedCoachId ? selectedTeamRaw : null;
   const coachProfileUsers = useMemo(() => {
+    const removedNames = new Set(["bigben71695", "brassmonkey345", "brassmonkey345.", "brassmonkey345"]);
     const map = new Map();
 
     [...(userOptions || []), ...(users || [])].forEach((user) => {
       if (!user?.id || !user?.discord_username) return;
       const name = String(user.discord_username).trim();
-      if (!name) return;
-      map.set(String(user.id), { ...user, discord_username: name });
+      if (!name || removedNames.has(name.toLowerCase())) return;
+
+      const assignment =
+        assignments.find((row) => String(row.discord_user_id) === String(user.id) && assignmentActiveForYear(row, currentYear)) ||
+        assignments.find((row) => String(row.discord_user_id) === String(user.id) && row.status === "Active") ||
+        assignments.find((row) => String(row.discord_user_id) === String(user.id) && row.team_id);
+
+      const team = teams.find((item) => String(item.id) === String(assignment?.team_id));
+      map.set(String(user.id), {
+        ...user,
+        discord_username: name,
+        activeTeamName: team?.name || "",
+        activeTeamId: team?.id || null,
+      });
     });
 
     return [...map.values()]
-      .sort((a,b)=>String(a.discord_username || "").localeCompare(String(b.discord_username || ""), undefined, { sensitivity:"base" }));
-  }, [userOptions, users]);
+      .sort((a,b)=>{
+        const aTeam = a.activeTeamName || "ZZZZZ";
+        const bTeam = b.activeTeamName || "ZZZZZ";
+        return aTeam.localeCompare(bTeam, undefined, { sensitivity:"base" })
+          || String(a.discord_username || "").localeCompare(String(b.discord_username || ""), undefined, { sensitivity:"base" });
+      });
+  }, [userOptions, users, assignments, teams, currentYear]);
 
-  const selectedCoach = activeTab.startsWith("coach-") ? (coachProfileUsers.find((user) => `coach-${user.id}` === activeTab) || users.find((user) => `coach-${user.id}` === activeTab) || null) : null;
+  const selectedCoach =
+    activeTab.startsWith("coach-")
+      ? (coachProfileUsers.find((user) => `coach-${user.id}` === activeTab) || users.find((user) => `coach-${user.id}` === activeTab) || null)
+      : selectedTeamAssignedCoachId
+        ? (coachProfileUsers.find((user) => String(user.id) === String(selectedTeamAssignedCoachId)) || users.find((user) => String(user.id) === String(selectedTeamAssignedCoachId)) || null)
+        : null;
   const currentYearResults = results.filter((r) => String(r.season_year) === String(currentYear));
   const orderedStandings = standingsOrder.length
     ? standingsOrder.map((id) => standings.find((row) => row.team_id === id)).filter(Boolean)
     : standings;
-  function goToTeam(teamId) { setActiveTab(`team-${teamId}`); }
+  function goToTeam(teamId) {
+    const assignment = assignmentForTeam(teamId);
+
+    if (assignment?.discord_user_id) {
+      setActiveTab(`coach-${assignment.discord_user_id}`);
+      return;
+    }
+
+    setActiveTab(`team-${teamId}`);
+  }
   async function saveCommissionerRankings(order) {
     const activeOrder = order.filter((teamId) => activeTeamIds.has(teamId));
     const payload = activeOrder.map((teamId, index) => ({
@@ -843,7 +887,7 @@ export default function App() {
     await saveCommissionerRankings(next);
   }
 
-  const baseTabs = [["dashboard","Dashboard"],["draftRoom","CFBElite 27 Draft Room"],["commissionerCenter","Commissioner Center"],["logoManager","Team Assets"],["allTeamsRatings","All Teams Ratings"],["leagueDataCenter","League Data Center"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["powerIndex","All Time Head Coach Rankings"],["eloRankings","User ELO"],["conferencePower","Conference Power"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["assignments","Users/Team Assignments"],["resultsManager","Results Manager"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...coachProfileUsers.map((user) => [`coach-${user.id}`, user.discord_username])];
+  const baseTabs = [["dashboard","Dashboard"],["draftRoom","CFBElite 27 Draft Room"],["commissionerCenter","Commissioner Center"],["logoManager","Team Assets"],["allTeamsRatings","All Teams Ratings"],["leagueDataCenter","League Data Center"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["powerIndex","All Time Head Coach Rankings"],["eloRankings","User ELO"],["conferencePower","Conference Power"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["assignments","Users/Team Assignments"],["resultsManager","Results Manager"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...coachProfileUsers.map((user) => [`coach-${user.id}`, user.activeTeamName || user.discord_username])];
   const tabs = useMemo(() => {
     const tabMap = new Map(baseTabs);
     const ordered = tabOrder
@@ -5695,7 +5739,14 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
   const hiddenWhenLocked = new Set(["assignments", "commissionerCenter"]);
   const visibleGroups = groups.map((group) => ({ ...group, keys: group.keys.filter((key) => adminUnlocked || !hiddenWhenLocked.has(key)) })).filter((group) => group.keys.length > 0);
   const usedKeys = new Set(visibleGroups.flatMap((group) => group.keys));
-  const coachTabs = tabs.filter(([key]) => key.startsWith("coach-"));
+  const coachTabs = tabs
+    .filter(([key]) => key.startsWith("coach-"))
+    .sort(([aKey, aLabel], [bKey, bLabel]) => {
+      const aTeam = teamForCoachTab(aKey)?.name || "ZZZZZ";
+      const bTeam = teamForCoachTab(bKey)?.name || "ZZZZZ";
+      return aTeam.localeCompare(bTeam, undefined, { sensitivity:"base" })
+        || String(aLabel || "").localeCompare(String(bLabel || ""), undefined, { sensitivity:"base" });
+    });
   const otherTabs = tabs.filter(([key]) => !usedKeys.has(key) && !key.startsWith("coach-"));
 
   function handleSelect(key) {
@@ -5748,13 +5799,22 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
   function teamForCoachTab(tabKey) {
     const userId = tabKey.replace("coach-", "");
     const assignment =
-      assignments.find((row) => row.discord_user_id === userId && assignmentActiveForYear(row, currentYear)) ||
-      assignments.find((row) => row.discord_user_id === userId && row.status === "Active");
-    return teams.find((team) => team.id === assignment?.team_id);
+      assignments.find((row) => String(row.discord_user_id) === String(userId) && assignmentActiveForYear(row, currentYear)) ||
+      assignments.find((row) => String(row.discord_user_id) === String(userId) && row.status === "Active") ||
+      assignments.find((row) => String(row.discord_user_id) === String(userId) && row.team_id);
+    return teams.find((team) => String(team.id) === String(assignment?.team_id));
+  }
+
+  function userForCoachTab(tabKey) {
+    const userId = tabKey.replace("coach-", "");
+    return users.find((user) => String(user.id) === String(userId));
   }
 
   function CoachNavButton({ tabKey, label }) {
     const team = teamForCoachTab(tabKey);
+    const user = userForCoachTab(tabKey);
+    const teamName = team?.name || label || "No active team";
+    const userName = user?.discord_username || label || "Coach";
     const primary = team?.primary_color || "#111827";
     const secondary = team?.secondary_color || "rgba(250,204,21,.45)";
     const accent = team?.accent_color || "#facc15";
@@ -5779,9 +5839,9 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
         <span style={coachMenuLogoPlateV51}>
           <TeamLogoMark team={team} size={82}/>
         </span>
-        <span style={coachNavTextWrap}>
-          <strong style={coachNavName}>{label}</strong>
-          <small style={coachNavTeam}>{team?.name || "No active team"}</small>
+        <span style={coachNavTextWrapV83}>
+          <strong style={coachNavTeamNameV83}>{teamName}</strong>
+          <small style={coachNavUserNameV83}>{userName}</small>
         </span>
         {active && <span style={activeSpark}>●</span>}
       </button>
@@ -11198,4 +11258,57 @@ const draftSortStatusV80 = {
   letterSpacing: ".04em",
   textTransform: "uppercase",
   margin: "8px 0 12px",
+};
+
+
+const coachNavTeamNameV82 = {
+  display: "block",
+  fontSize: "clamp(18px, 3.4vw, 27px)",
+  lineHeight: .92,
+  letterSpacing: "-.045em",
+  fontWeight: 1000,
+  color: "#fff",
+  textShadow: "0 10px 26px rgba(0,0,0,.30)",
+  overflowWrap: "anywhere",
+};
+
+const coachNavUserNameV82 = {
+  display: "block",
+  marginTop: 5,
+  color: "rgba(248,250,252,.84)",
+  fontSize: "clamp(11px, 2.4vw, 13px)",
+  lineHeight: 1.05,
+  fontWeight: 900,
+  overflowWrap: "anywhere",
+};
+
+
+const coachNavTextWrapV83 = {
+  position: "relative",
+  zIndex: 2,
+  minWidth: 0,
+  display: "grid",
+  gap: 4,
+  alignContent: "center",
+};
+
+const coachNavTeamNameV83 = {
+  display: "block",
+  color: "#fff",
+  fontSize: "clamp(16px, 3.4vw, 26px)",
+  lineHeight: .94,
+  letterSpacing: "-.055em",
+  fontWeight: 1000,
+  overflowWrap: "anywhere",
+  textShadow: "0 10px 26px rgba(0,0,0,.35)",
+};
+
+const coachNavUserNameV83 = {
+  display: "block",
+  color: "rgba(248,250,252,.84)",
+  fontSize: "clamp(11px, 2.2vw, 13px)",
+  lineHeight: 1.05,
+  fontWeight: 900,
+  overflowWrap: "anywhere",
+  textTransform: "none",
 };
