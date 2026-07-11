@@ -887,7 +887,7 @@ export default function App() {
     await saveCommissionerRankings(next);
   }
 
-  const baseTabs = [["dashboard","Dashboard"],["draftRoom","CFBElite 27 Draft Room"],["commissionerCenter","Commissioner Center"],["logoManager","Team Assets"],["allTeamsRatings","All Teams Ratings"],["leagueDataCenter","League Data Center"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["powerIndex","All Time Head Coach Rankings"],["eloRankings","User ELO"],["conferencePower","Conference Power"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["assignments","Users/Team Assignments"],["resultsManager","Results Manager"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...coachProfileUsers.map((user) => [`coach-${user.id}`, user.activeTeamName || user.discord_username])];
+  const baseTabs = [["dashboard","Dashboard"],["draftRoom","CFBElite 27 Draft Room"],["schedule","GameCenter"],["commissionerCenter","Commissioner Center"],["logoManager","Team Assets"],["allTeamsRatings","All Teams Ratings"],["leagueDataCenter","League Data Center"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["powerIndex","All Time Head Coach Rankings"],["eloRankings","User ELO"],["conferencePower","Conference Power"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["assignments","Users/Team Assignments"],["resultsManager","Results Manager"],["h2h","User vs User H2H"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],...coachProfileUsers.map((user) => [`coach-${user.id}`, user.activeTeamName || user.discord_username])];
   const tabs = useMemo(() => {
     const tabMap = new Map(baseTabs);
     const ordered = tabOrder
@@ -1349,7 +1349,8 @@ export default function App() {
 
   return <><GlobalStyle/><div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={isErrorMessage(error) ? errorBox : successBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} draggedTab={draggedTab} setDraggedTab={setDraggedTab} reorderTabs={reorderTabs} adminUnlocked={adminUnlocked} adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin} teams={teamOptions} assignments={assignments} currentYear={currentYear} users={userOptions}/>
     {activeTab === "draftRoom" && <DraftRoom teams={teamOptions} users={userOptions} picks={draftPicks27} settings={draftSettings27} conferenceAssets={conferenceAssets} startClock={startDraftClock} pauseClock={pauseDraftClock} resumeClock={resumeDraftClock} announcePick={announceDraftPick} revealPick={revealDraftPick} undoPick={undoDraftPick}/>}     
-    {activeTab === "dashboard" && <DashboardRedesign teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} teamSeasonStats={teamSeasonStats} currentYear={currentYear} currentWeek={currentWeek} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} saveSettings={saveLeagueSettings} goToTeam={goToTeam} sortState={userSort} setSortState={setUserSort}/>}
+    {activeTab === "dashboard" && <DashboardRedesign teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} weeklyMatchups={weeklyMatchups} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} teamSeasonStats={teamSeasonStats} currentYear={currentYear} currentWeek={currentWeek} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} saveSettings={saveLeagueSettings} goToTeam={goToTeam} setActiveTab={setActiveTab} sortState={userSort} setSortState={setUserSort}/>}
+    {activeTab === "schedule" && <GameCenter teams={teamOptions} users={userOptions} assignments={assignments} weeklyMatchups={weeklyMatchups} results={results} currentWeek={currentWeek}/>}
     {activeTab === "eloRankings" && <EloRankings users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
     {activeTab === "dynastyRecords" && <DynastyRecords users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} seasonPlayerStats={seasonPlayerStats} teamSeasonStats={teamSeasonStats}/>}    
 {activeTab === "rivalries" && <Rivalries users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
@@ -1851,13 +1852,167 @@ function dynastyHallOfFameScore(row = {}) {
   ).toFixed(1));
 }
 
-function DashboardRedesign({ teams, users, assignments, results, allResults, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats, currentYear, currentWeek, setCurrentYear, setCurrentWeek, saveSettings, goToTeam, sortState, setSortState }) {
+
+function GameCenter({ teams = [], users = [], assignments = [], weeklyMatchups = [], results = [], currentWeek = "Week 1" }) {
+  const [weekFilter, setWeekFilter] = useState(String(currentWeek || "Week 1"));
+  const [teamFilter, setTeamFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  const seasonResults = (results || []).filter((row)=>String(row.season_year)==="2026");
+  const rankings = computerRankingRows(teams, seasonResults, assignments, users);
+  const rankMap = new Map(rankings.map((row,index)=>[String(row.team?.id), index+1]));
+  const weeks = Array.from(new Set((weeklyMatchups || []).filter((row)=>String(row.season_year)==="2026").map((row)=>String(row.week))))
+    .sort((a,b)=>Number(a.replace(/\D/g,""))-Number(b.replace(/\D/g,"")));
+
+  function matchupResult(row) {
+    return seasonResults.find((game)=>
+      String(game.week)===String(row.week) &&
+      (
+        (String(game.team_1_id)===String(row.team_1_id) && String(game.team_2_id)===String(row.team_2_id)) ||
+        (String(game.team_1_id)===String(row.team_2_id) && String(game.team_2_id)===String(row.team_1_id))
+      )
+    ) || null;
+  }
+
+  function coachName(teamId, explicitUserId) {
+    const userId = explicitUserId ||
+      assignments.find((row)=>String(row.team_id)===String(teamId) && row.status==="Active")?.discord_user_id;
+    return users.find((user)=>String(user.id)===String(userId))?.discord_username || "User TBD";
+  }
+
+  const allRows = (weeklyMatchups || [])
+    .filter((row)=>String(row.season_year)==="2026")
+    .map((row)=>{
+      const team1 = row.team_1 || teams.find((team)=>String(team.id)===String(row.team_1_id));
+      const team2 = row.team_2 || teams.find((team)=>String(team.id)===String(row.team_2_id));
+      const result = matchupResult(row);
+      return {
+        ...row,
+        team1,
+        team2,
+        result,
+        rank1:rankMap.get(String(row.team_1_id)) || "—",
+        rank2:rankMap.get(String(row.team_2_id)) || "—",
+        user1:coachName(row.team_1_id,row.team_1_user_id),
+        user2:coachName(row.team_2_id,row.team_2_user_id),
+      };
+    });
+
+  const rows = allRows.filter((row)=>{
+    const weekMatch = weekFilter==="all" || String(row.week)===String(weekFilter);
+    const haystack = `${row.team1?.name||""} ${row.team2?.name||""} ${row.user1} ${row.user2}`.toLowerCase();
+    const teamMatch = !teamFilter || haystack.includes(teamFilter.toLowerCase());
+    const statusMatch = statusFilter==="all" || (statusFilter==="final" ? Boolean(row.result) : !row.result);
+    return weekMatch && teamMatch && statusMatch;
+  });
+
+  const gameOfWeek = [...rows].sort((a,b)=>{
+    const av=(Number(a.rank1)||99)+(Number(a.rank2)||99);
+    const bv=(Number(b.rank1)||99)+(Number(b.rank2)||99);
+    return av-bv;
+  })[0] || null;
+
+  return (
+    <section style={gameCenterPageV87}>
+      <div style={gameCenterHeroV87}>
+        <div>
+          <span style={eyebrow}>CFBElite 2026</span>
+          <h1 style={gameCenterTitleV87}>GameCenter</h1>
+          <p style={mutedText}>User-vs-user schedule with live automated rankings, team logos, coaches, and final scores.</p>
+        </div>
+        <div style={gameCenterHeroStatV87}><b>{allRows.length}</b><span>Scheduled Games</span></div>
+      </div>
+
+      <div className="cfb-gamecenter-filters-v87" style={gameCenterFiltersV87}>
+        <select style={input} value={weekFilter} onChange={(e)=>setWeekFilter(e.target.value)}>
+          <option value="all">All Weeks</option>
+          {weeks.map((week)=><option key={week} value={week}>{week}</option>)}
+        </select>
+        <input style={input} value={teamFilter} onChange={(e)=>setTeamFilter(e.target.value)} placeholder="Search team or Discord user"/>
+        <select style={input} value={statusFilter} onChange={(e)=>setStatusFilter(e.target.value)}>
+          <option value="all">All Games</option>
+          <option value="upcoming">Upcoming</option>
+          <option value="final">Final</option>
+        </select>
+      </div>
+
+      {gameOfWeek && (
+        <div style={{...gameCenterFeaturedV87, background:`linear-gradient(135deg, ${getTeamPrimary(gameOfWeek.team1)}88, rgba(2,6,23,.96), ${getTeamPrimary(gameOfWeek.team2)}66)`}}>
+          <div style={gameCenterFeaturedLabelV87}>★★★★★ GAME OF THE WEEK</div>
+          <div style={gameCenterFeaturedTeamsV87}>
+            <GameCenterTeam team={gameOfWeek.team1} rank={gameOfWeek.rank1} user={gameOfWeek.user1}/>
+            <div style={gameCenterVsV87}>{gameOfWeek.result ? "FINAL" : "VS"}</div>
+            <GameCenterTeam team={gameOfWeek.team2} rank={gameOfWeek.rank2} user={gameOfWeek.user2}/>
+          </div>
+        </div>
+      )}
+
+      <div style={gameCenterGridV87}>
+        {rows.length ? rows.map((row)=>(
+          <div key={row.id || `${row.week}-${row.team_1_id}-${row.team_2_id}`} style={{...gameCenterCardV87, borderColor:`${getTeamSecondary(row.team1)}55`}}>
+            <div style={gameCenterCardTopV87}><span>{row.week}</span><b>{row.result ? "FINAL" : "UPCOMING"}</b></div>
+            <div style={gameCenterMatchupV87}>
+              <GameCenterTeam team={row.team1} rank={row.rank1} user={row.user1} compact/>
+              <div style={gameCenterVsV87}>{row.result ? scoreForScheduledTeam(row.result,row.team_1_id) : "VS"}</div>
+              <GameCenterTeam team={row.team2} rank={row.rank2} user={row.user2} compact/>
+            </div>
+            {row.result && <div style={gameCenterFinalScoreV87}>{scoreForScheduledTeam(row.result,row.team_1_id)} - {scoreForScheduledTeam(row.result,row.team_2_id)}</div>}
+          </div>
+        )) : <div style={tableEmptyStateV43}>No matchups match the selected filters.</div>}
+      </div>
+    </section>
+  );
+}
+
+function scoreForScheduledTeam(result, teamId) {
+  if (!result) return "—";
+  if (String(result.team_1_id)===String(teamId)) return result.team_1_score;
+  if (String(result.team_2_id)===String(teamId)) return result.team_2_score;
+  return "—";
+}
+
+function GameCenterTeam({ team, rank, user, compact = false }) {
+  return (
+    <div style={compact ? gameCenterTeamCompactV87 : gameCenterTeamV87}>
+      <b style={gameCenterRankV87}>#{rank}</b>
+      <TeamLogoMark team={team} size={compact ? 46 : 78}/>
+      <strong>{team?.name || "Team TBD"}</strong>
+      <small>{user || "User TBD"}</small>
+    </div>
+  );
+}
+
+function DashboardRedesign({ teams, users, assignments, results, allResults, weeklyMatchups = [], allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats, currentYear, currentWeek, setCurrentYear, setCurrentWeek, saveSettings, goToTeam, setActiveTab, sortState, setSortState }) {
   const [rankingSort, setRankingSort] = useState({ key: "rating", direction: "desc" });
   const activeAssignments = activeAssignmentsForLeague(assignments, teams);
   const activeCoachCount = activeAssignments.length;
   const currentSeasonResults = results.filter((r)=>String(r.season_year)===String(currentYear));
   const rankings = computerRankingRows(teams, currentSeasonResults, assignments, users);
   const prestigeRows = typeof dynastyPrestigeRows === "function" ? dynastyPrestigeRows(teams, assignments, allResults, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats).slice(0,5) : [];
+
+  const dashboardWeek = String(currentWeek || "Week 1");
+  const dashboardScheduleRows = (weeklyMatchups || [])
+    .filter((row)=>String(row.season_year) === "2026" && String(row.week) === dashboardWeek)
+    .map((row)=>{
+      const team1 = row.team_1 || teams.find((team)=>String(team.id)===String(row.team_1_id));
+      const team2 = row.team_2 || teams.find((team)=>String(team.id)===String(row.team_2_id));
+      const result = (allResults || []).find((game)=>
+        String(game.season_year) === "2026" &&
+        String(game.week) === String(row.week) &&
+        (
+          (String(game.team_1_id)===String(row.team_1_id) && String(game.team_2_id)===String(row.team_2_id)) ||
+          (String(game.team_1_id)===String(row.team_2_id) && String(game.team_2_id)===String(row.team_1_id))
+        )
+      );
+      const rank1 = rankings.findIndex((item)=>String(item.team?.id)===String(row.team_1_id)) + 1;
+      const rank2 = rankings.findIndex((item)=>String(item.team?.id)===String(row.team_2_id)) + 1;
+      return { ...row, team1, team2, result, rank1:rank1 || "—", rank2:rank2 || "—" };
+    });
+  const dashboardGameOfWeek = [...dashboardScheduleRows].sort((a,b)=>{
+    const aScore = (Number(a.rank1)||99) + (Number(a.rank2)||99);
+    const bScore = (Number(b.rank1)||99) + (Number(b.rank2)||99);
+    return aScore-bScore;
+  })[0] || null;
 
   const rankingDetails = rankings.map((row, index) => {
     const team = teams.find((team)=>team.id===row.team?.id) || row.team || teams.find((team)=>team.name===row.teamName);
@@ -2099,6 +2254,33 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, all
             )) : <div style={mutedText}>No results recorded yet.</div>}
           </div>
         </div>
+      </section>
+
+      <section style={dashboardSchedulePanelV87}>
+        <div style={dashboardPanelHeaderPro}>
+          <span>2026 USER VS USER SCHEDULE</span>
+          <h2>{dashboardWeek}</h2>
+        </div>
+        {dashboardGameOfWeek && (
+          <button style={{...dashboardGameOfWeekV87, background:`linear-gradient(135deg, ${getTeamPrimary(dashboardGameOfWeek.team1)}88, rgba(2,6,23,.96), ${getTeamPrimary(dashboardGameOfWeek.team2)}66)`}} onClick={()=>setActiveTab?.("schedule")}>
+            <div style={dashboardGameEyebrowV87}>GAME OF THE WEEK</div>
+            <div style={dashboardMatchupRowV87}>
+              <div style={dashboardMatchupTeamV87}><b>#{dashboardGameOfWeek.rank1}</b><TeamLogoMark team={dashboardGameOfWeek.team1} size={54}/><span>{getTeamAbbreviation(dashboardGameOfWeek.team1)}</span></div>
+              <strong>VS</strong>
+              <div style={dashboardMatchupTeamV87}><b>#{dashboardGameOfWeek.rank2}</b><TeamLogoMark team={dashboardGameOfWeek.team2} size={54}/><span>{getTeamAbbreviation(dashboardGameOfWeek.team2)}</span></div>
+            </div>
+          </button>
+        )}
+        <div style={dashboardScheduleGridV87}>
+          {dashboardScheduleRows.length ? dashboardScheduleRows.slice(0,6).map((row)=>(
+            <button key={row.id || `${row.week}-${row.team_1_id}-${row.team_2_id}`} style={dashboardScheduleCardV87} onClick={()=>setActiveTab?.("schedule")}>
+              <div style={dashboardScheduleSideV87}><b>#{row.rank1}</b><TeamLogoMark team={row.team1} size={34}/><span>{getTeamAbbreviation(row.team1)}</span></div>
+              <strong>{row.result ? "FINAL" : "VS"}</strong>
+              <div style={dashboardScheduleSideV87}><b>#{row.rank2}</b><TeamLogoMark team={row.team2} size={34}/><span>{getTeamAbbreviation(row.team2)}</span></div>
+            </button>
+          )) : <div style={mutedText}>No user games scheduled for {dashboardWeek}.</div>}
+        </div>
+        <button style={dashboardScheduleLinkV87} onClick={()=>setActiveTab?.("schedule")}>Open Full GameCenter →</button>
       </section>
 
       <section style={dashboardWirePanelV38}>
@@ -5704,6 +5886,17 @@ function GlobalStyle() {
           grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)) !important;
         }
       }
+
+      /* v86-coach-menu-logo-bleed-fix */
+      .coach-menu-logo-plate-v86,
+      .coach-menu-logo-plate-v86 * {
+      
+      /* v87-gamecenter-mobile */
+      @media (max-width: 760px) {
+        .cfb-gamecenter-filters-v87 { grid-template-columns: 1fr !important; }
+      }
+  overflow: hidden !important;
+      }
 `}</style>
   );
 }
@@ -5722,11 +5915,11 @@ function Header({ loading, reload }) {
     </header>
   );
 }
-function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reorderTabs, adminUnlocked, adminCodeInput, setAdminCodeInput, unlockAdmin, teams = [], assignments = [], currentYear, users = []}) {
+function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reorderTabs, adminUnlocked, adminCodeInput, setAdminCodeInput, unlockAdmin, teams = [], assignments = [], currentYear, users: navUsers = []}) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const groups = [
-    { title: "Main", keys: ["dashboard", "draftRoom"] },
+    { title: "Main", keys: ["dashboard", "draftRoom", "schedule"] },
     { title: "League Data", keys: ["logoManager", "allTeamsRatings", "leagueDataCenter", "recruitingRankings", "resultsManager"] },
     { title: "Dynasty Legacy", keys: ["dynastyTimeline", "dynastyRecords", "rivalries", "h2h"] },
     { title: "Rankings", keys: ["powerIndex", "eloRankings", "conferencePower"] },
@@ -5807,7 +6000,7 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
 
   function userForCoachTab(tabKey) {
     const userId = tabKey.replace("coach-", "");
-    return (users || []).find((user) => String(user.id) === String(userId));
+    return (navUsers || []).find((user) => String(user.id) === String(userId));
   }
 
   function CoachNavButton({ tabKey, label }) {
@@ -5836,10 +6029,10 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
       >
         {(team?.logo_url) && <img src={team.logo_url} alt="" style={coachMenuLogoWatermark}/>}
         <span style={{ ...coachAccentStripe, background: accent }} />
-        <span style={coachMenuLogoPlateV51}>
-          <TeamLogoMark team={team} size={82}/>
+        <span className="coach-menu-logo-plate-v86" style={coachMenuLogoPlateV86}>
+          <TeamLogoMark team={team} size={68} plate/>
         </span>
-        <span style={coachNavTextWrapV83}>
+        <span style={coachNavTextWrapV86}>
           <strong style={coachNavTeamNameV83}>{teamName}</strong>
           <small style={coachNavUserNameV83}>{userName}</small>
         </span>
@@ -11312,3 +11505,62 @@ const coachNavUserNameV83 = {
   overflowWrap: "anywhere",
   textTransform: "none",
 };
+
+
+const coachMenuLogoPlateV86 = {
+  position: "relative",
+  zIndex: 3,
+  width: 88,
+  height: 88,
+  minWidth: 88,
+  minHeight: 88,
+  borderRadius: 20,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  overflow: "hidden",
+  background: "linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.04))",
+  border: "1px solid rgba(255,255,255,.20)",
+  boxShadow: "0 14px 30px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.15)",
+};
+
+const coachNavTextWrapV86 = {
+  position: "relative",
+  zIndex: 4,
+  minWidth: 0,
+  display: "grid",
+  gap: 4,
+  alignContent: "center",
+  overflow: "hidden",
+  paddingLeft: 8,
+};
+
+
+const gameCenterPageV87 = { display:"grid", gap:18 };
+const gameCenterHeroV87 = { ...liquidGlassPanel, display:"flex", justifyContent:"space-between", alignItems:"center", gap:18, padding:24, background:"radial-gradient(circle at 0 0, rgba(250,204,21,.16), transparent 35%), linear-gradient(135deg, rgba(2,6,23,.98), rgba(15,23,42,.96))" };
+const gameCenterTitleV87 = { margin:"4px 0", fontSize:"clamp(42px,8vw,86px)", lineHeight:.88, letterSpacing:"-.07em", fontWeight:1000, color:"#fff" };
+const gameCenterHeroStatV87 = { minWidth:150, textAlign:"center", padding:18, borderRadius:18, background:"rgba(255,255,255,.06)", border:"1px solid rgba(255,255,255,.12)" };
+const gameCenterHeroStatV87b = {};
+const gameCenterFiltersV87 = { display:"grid", gridTemplateColumns:"180px minmax(220px,1fr) 180px", gap:10 };
+const gameCenterFeaturedV87 = { borderRadius:24, border:"1px solid rgba(255,255,255,.16)", padding:20, boxShadow:"0 24px 60px rgba(0,0,0,.32)" };
+const gameCenterFeaturedLabelV87 = { textAlign:"center", color:"#facc15", fontWeight:1000, letterSpacing:".12em", fontSize:12 };
+const gameCenterFeaturedTeamsV87 = { display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:20, alignItems:"center", marginTop:14 };
+const gameCenterVsV87 = { fontWeight:1000, fontSize:18, color:"#f8fafc", textAlign:"center" };
+const gameCenterGridV87 = { display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(310px,1fr))", gap:14 };
+const gameCenterCardV87 = { borderRadius:20, border:"1px solid rgba(255,255,255,.12)", background:"linear-gradient(145deg,rgba(15,23,42,.96),rgba(2,6,23,.98))", padding:16, boxShadow:"0 16px 38px rgba(0,0,0,.26)" };
+const gameCenterCardTopV87 = { display:"flex", justifyContent:"space-between", color:"rgba(226,232,240,.78)", fontSize:11, fontWeight:1000, letterSpacing:".08em" };
+const gameCenterMatchupV87 = { display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:10, alignItems:"center", marginTop:14 };
+const gameCenterTeamV87 = { display:"grid", justifyItems:"center", gap:6, textAlign:"center", color:"#fff" };
+const gameCenterTeamCompactV87 = { display:"grid", justifyItems:"center", gap:4, textAlign:"center", color:"#fff", minWidth:0 };
+const gameCenterRankV87 = { color:"#facc15", fontSize:13 };
+const gameCenterFinalScoreV87 = { textAlign:"center", marginTop:12, fontSize:22, fontWeight:1000, color:"#fff" };
+
+const dashboardSchedulePanelV87 = { ...liquidGlassPanel, padding:18, display:"grid", gap:14 };
+const dashboardGameOfWeekV87 = { border:"1px solid rgba(250,204,21,.28)", borderRadius:20, padding:16, color:"#fff", cursor:"pointer" };
+const dashboardGameEyebrowV87 = { textAlign:"center", color:"#facc15", fontWeight:1000, letterSpacing:".12em", fontSize:11 };
+const dashboardMatchupRowV87 = { display:"grid", gridTemplateColumns:"1fr auto 1fr", alignItems:"center", gap:12, marginTop:12 };
+const dashboardMatchupTeamV87 = { display:"flex", alignItems:"center", justifyContent:"center", gap:8, fontWeight:1000 };
+const dashboardScheduleGridV87 = { display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(230px,1fr))", gap:10 };
+const dashboardScheduleCardV87 = { display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:8, alignItems:"center", padding:10, borderRadius:14, background:"rgba(15,23,42,.78)", border:"1px solid rgba(255,255,255,.10)", color:"#fff", cursor:"pointer" };
+const dashboardScheduleSideV87 = { display:"flex", alignItems:"center", gap:5, minWidth:0, fontSize:12, fontWeight:1000 };
+const dashboardScheduleLinkV87 = { justifySelf:"end", border:0, background:"transparent", color:"#facc15", fontWeight:1000, cursor:"pointer" };
