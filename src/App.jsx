@@ -1350,7 +1350,7 @@ export default function App() {
   return <><GlobalStyle/><div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={isErrorMessage(error) ? errorBox : successBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} draggedTab={draggedTab} setDraggedTab={setDraggedTab} reorderTabs={reorderTabs} adminUnlocked={adminUnlocked} adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin} teams={teamOptions} assignments={assignments} currentYear={currentYear} users={userOptions}/>
     {activeTab === "draftRoom" && <DraftRoom teams={teamOptions} users={userOptions} picks={draftPicks27} settings={draftSettings27} conferenceAssets={conferenceAssets} startClock={startDraftClock} pauseClock={pauseDraftClock} resumeClock={resumeDraftClock} announcePick={announceDraftPick} revealPick={revealDraftPick} undoPick={undoDraftPick}/>}     
     {activeTab === "dashboard" && <DashboardRedesign teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} weeklyMatchups={weeklyMatchups} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} teamSeasonStats={teamSeasonStats} currentYear={currentYear} currentWeek={currentWeek} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} saveSettings={saveLeagueSettings} goToTeam={goToTeam} setActiveTab={setActiveTab} sortState={userSort} setSortState={setUserSort}/>}
-    {activeTab === "schedule" && <GameCenter teams={teamOptions} users={userOptions} assignments={assignments} weeklyMatchups={weeklyMatchups} results={results} currentWeek={currentWeek}/>}
+    {activeTab === "schedule" && <GameCenter teams={teamOptions} users={userOptions} assignments={assignments} weeklyMatchups={weeklyMatchups} results={results} currentWeek={currentWeek} adminUnlocked={adminUnlocked} loadData={loadData}/>}
     {activeTab === "eloRankings" && <EloRankings users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
     {activeTab === "dynastyRecords" && <DynastyRecords users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} seasonPlayerStats={seasonPlayerStats} teamSeasonStats={teamSeasonStats}/>}    
 {activeTab === "rivalries" && <Rivalries users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
@@ -1853,13 +1853,14 @@ function dynastyHallOfFameScore(row = {}) {
 }
 
 
-function GameCenter({ teams = [], users = [], assignments = [], weeklyMatchups = [], results = [], currentWeek = "Week 1" }) {
+function GameCenter({ teams = [], users = [], assignments = [], weeklyMatchups = [], results = [], currentWeek = "Week 1", adminUnlocked = false, loadData = async()=>{} }) {
   const [weekFilter, setWeekFilter] = useState(String(currentWeek || "Week 1"));
   const [teamFilter, setTeamFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
   const seasonResults = (results || []).filter((row)=>String(row.season_year)==="2026");
-  const rankings = computerRankingRows(teams, seasonResults, assignments, users);
+  const activeUserTeamIds = new Set(assignments.filter((row)=>row.status==="Active" && row.discord_user_id && row.team_id).map((row)=>String(row.team_id)));
+  const rankings = computerRankingRows(teams, seasonResults, assignments, users).filter((row)=>activeUserTeamIds.has(String(row.team?.id)));
   const rankMap = new Map(rankings.map((row,index)=>[String(row.team?.id), index+1]));
   const weeks = Array.from(new Set((weeklyMatchups || []).filter((row)=>String(row.season_year)==="2026").map((row)=>String(row.week))))
     .sort((a,b)=>Number(a.replace(/\D/g,""))-Number(b.replace(/\D/g,"")));
@@ -1898,6 +1899,23 @@ function GameCenter({ teams = [], users = [], assignments = [], weeklyMatchups =
       };
     });
 
+  async function selectGameOfWeek(row) {
+    const { error: clearError } = await supabase
+      .from("weekly_matchups")
+      .update({ is_game_of_week:false })
+      .eq("season_year", Number(row.season_year || 2026))
+      .eq("week", String(row.week));
+    if (clearError) return window.alert(clearError.message);
+
+    const { error: setError } = await supabase
+      .from("weekly_matchups")
+      .update({ is_game_of_week:true })
+      .eq("id", row.id);
+    if (setError) return window.alert(setError.message);
+
+    await loadData();
+  }
+
   const rows = allRows.filter((row)=>{
     const weekMatch = weekFilter==="all" || String(row.week)===String(weekFilter);
     const haystack = `${row.team1?.name||""} ${row.team2?.name||""} ${row.user1} ${row.user2}`.toLowerCase();
@@ -1906,7 +1924,7 @@ function GameCenter({ teams = [], users = [], assignments = [], weeklyMatchups =
     return weekMatch && teamMatch && statusMatch;
   });
 
-  const gameOfWeek = [...rows].sort((a,b)=>{
+  const gameOfWeek = rows.find((row)=>row.is_game_of_week) || [...rows].sort((a,b)=>{
     const av=(Number(a.rank1)||99)+(Number(a.rank2)||99);
     const bv=(Number(b.rank1)||99)+(Number(b.rank2)||99);
     return av-bv;
@@ -1950,13 +1968,18 @@ function GameCenter({ teams = [], users = [], assignments = [], weeklyMatchups =
       <div style={gameCenterGridV87}>
         {rows.length ? rows.map((row)=>(
           <div key={row.id || `${row.week}-${row.team_1_id}-${row.team_2_id}`} style={{...gameCenterCardV87, borderColor:`${getTeamSecondary(row.team1)}55`}}>
-            <div style={gameCenterCardTopV87}><span>{row.week}</span><b>{row.result ? "FINAL" : "UPCOMING"}</b></div>
+            <div style={gameCenterCardTopV87}><span>{row.week}</span><b>{row.is_game_of_week ? "★ GAME OF THE WEEK" : row.result ? "FINAL" : "UPCOMING"}</b></div>
             <div style={gameCenterMatchupV87}>
               <GameCenterTeam team={row.team1} rank={row.rank1} user={row.user1} compact/>
               <div style={gameCenterVsV87}>{row.result ? scoreForScheduledTeam(row.result,row.team_1_id) : "VS"}</div>
               <GameCenterTeam team={row.team2} rank={row.rank2} user={row.user2} compact/>
             </div>
             {row.result && <div style={gameCenterFinalScoreV87}>{scoreForScheduledTeam(row.result,row.team_1_id)} - {scoreForScheduledTeam(row.result,row.team_2_id)}</div>}
+            <div className="cfb-gamecenter-meta-v89" style={gameCenterMetaV89}>
+              <span>{cleanConference(row.team1?.conference)} vs {cleanConference(row.team2?.conference)}</span>
+              <span>{Number(row.rank1) <= 25 && Number(row.rank2) <= 25 ? "Top 25 Matchup" : Number(row.rank1) <= 25 || Number(row.rank2) <= 25 ? "Ranked Team Featured" : "User Matchup"}</span>
+            </div>
+            {adminUnlocked && <button style={gameCenterGotwButtonV89} onClick={()=>selectGameOfWeek(row)}>{row.is_game_of_week ? "Selected Game of the Week" : "Make Game of the Week"}</button>}
           </div>
         )) : <div style={tableEmptyStateV43}>No matchups match the selected filters.</div>}
       </div>
@@ -1991,8 +2014,9 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, wee
   const prestigeRows = typeof dynastyPrestigeRows === "function" ? dynastyPrestigeRows(teams, assignments, allResults, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats).slice(0,5) : [];
 
   const dashboardWeek = String(currentWeek || "Week 1");
+  const dashboardRankMap = new Map(rankings.map((item,index)=>[String(item.team?.id), index+1]));
   const dashboardScheduleRows = (weeklyMatchups || [])
-    .filter((row)=>String(row.season_year) === "2026" && String(row.week) === dashboardWeek)
+    .filter((row)=>String(row.season_year) === "2026")
     .map((row)=>{
       const team1 = row.team_1 || teams.find((team)=>String(team.id)===String(row.team_1_id));
       const team2 = row.team_2 || teams.find((team)=>String(team.id)===String(row.team_2_id));
@@ -2004,13 +2028,13 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, wee
           (String(game.team_1_id)===String(row.team_2_id) && String(game.team_2_id)===String(row.team_1_id))
         )
       );
-      const rank1 = rankings.findIndex((item)=>String(item.team?.id)===String(row.team_1_id)) + 1;
-      const rank2 = rankings.findIndex((item)=>String(item.team?.id)===String(row.team_2_id)) + 1;
-      return { ...row, team1, team2, result, rank1:rank1 || "—", rank2:rank2 || "—" };
-    });
-  const dashboardGameOfWeek = [...dashboardScheduleRows].sort((a,b)=>{
-    const aScore = (Number(a.rank1)||99) + (Number(a.rank2)||99);
-    const bScore = (Number(b.rank1)||99) + (Number(b.rank2)||99);
+      return { ...row, team1, team2, result, rank1:dashboardRankMap.get(String(row.team_1_id)) || "—", rank2:dashboardRankMap.get(String(row.team_2_id)) || "—" };
+    })
+    .sort((a,b)=>Number(String(a.week).replace(/\D/g,""))-Number(String(b.week).replace(/\D/g,"")));
+  const dashboardWeeks = Array.from({length:14},(_,index)=>`Week ${index}`);
+  const dashboardGameOfWeek = dashboardScheduleRows.find((row)=>row.is_game_of_week) || [...dashboardScheduleRows].sort((a,b)=>{
+    const aScore=(Number(a.rank1)||99)+(Number(a.rank2)||99);
+    const bScore=(Number(b.rank1)||99)+(Number(b.rank2)||99);
     return aScore-bScore;
   })[0] || null;
 
@@ -2101,8 +2125,12 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, wee
       const wins = confResults.reduce((sum,row)=>sum + Number(row.wins || 0), 0);
       const losses = confResults.reduce((sum,row)=>sum + Number(row.losses || 0), 0);
       const avgRating = confRankingRows.length ? confRankingRows.reduce((sum,row)=>sum + Number(row.rating || 0), 0) / confRankingRows.length : 0;
-      const topTeam = confRankingRows.sort((a,b)=>Number(a.rank)-Number(b.rank))[0];
-      return { conference, teams:confTeams.length, wins, losses, avgRating:Number(avgRating.toFixed(1)), topTeam };
+      const avgRank = confRankingRows.length ? confRankingRows.reduce((sum,row)=>sum + Number(row.rank || 0),0) / confRankingRows.length : 0;
+      const top25 = confRankingRows.filter((row)=>Number(row.rank)<=25).length;
+      const games = wins + losses;
+      const winPct = games ? (wins / games) * 100 : 0;
+      const topTeam = [...confRankingRows].sort((a,b)=>Number(a.rank)-Number(b.rank))[0];
+      return { conference, teams:confTeams.length, wins, losses, avgRating:Number(avgRating.toFixed(1)), avgRank:Number(avgRank.toFixed(1)), top25, winPct:Number(winPct.toFixed(1)), topTeam };
     })
     .sort((a,b)=>b.avgRating-a.avgRating || b.wins-a.wins)
     .slice(0,6);
@@ -2205,7 +2233,7 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, wee
         </div>
       </section>
 
-      <section style={dashboardFeatureGridV64} className="cfb-dashboard-feature-grid-v68">
+      <section style={dashboardFeatureGridV89} className="cfb-dashboard-feature-grid-v89">
         <div style={coachSpotlightCardV64}>
           <div style={dashboardPanelHeaderPro}><span>COACH SPOTLIGHT</span><h2>Featured Coach</h2></div>
           {coachSpotlight ? (
@@ -2220,67 +2248,27 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, wee
                   <small>{coachSpotlight.record.wins}-{coachSpotlight.record.losses}</small>
                   <small>SOR {coachSpotlight.sor}</small>
                   <small>{coachSpotlight.top10} Top 10 Wins</small>
-                  <small>{coachSpotlight.streak ? `${coachSpotlight.streak}W Streak` : "No streak yet"}</small>
                 </div>
               </div>
             </div>
           ) : <div style={mutedText}>No coach spotlight yet.</div>}
         </div>
 
-        <div style={dashboardMiniPanelV64}>
-          <div style={dashboardPanelHeaderPro}><span>CONFERENCE POWER</span><h2>Snapshot</h2></div>
-          <div style={dashboardMiniListV64}>
+        <div style={dashboardConferencePowerWideV89}>
+          <div style={dashboardPanelHeaderPro}><span>CONFERENCE POWER</span><h2>League Snapshot</h2></div>
+          <div className="cfb-conference-power-head-v89" style={dashboardConferenceHeadV89}>
+            <span>Rank</span><span>Conference</span><span>Top Team</span><span>Avg Rank</span><span>Top 25</span><span>Record</span><span>Win %</span><span>Rating</span>
+          </div>
+          <div style={dashboardConferenceRowsV89}>
             {conferenceSnapshotRows.length ? conferenceSnapshotRows.map((row,index)=>(
-              <div key={row.conference} style={{...dashboardMiniRowV64, background:`linear-gradient(90deg, ${getTeamPrimary(row.topTeam?.team)}55, rgba(15,23,42,.94))`, borderColor:`${getTeamSecondary(row.topTeam?.team)}55`}}>
-                <b>#{index+1}</b>
-                <span>{row.conference}</span>
-                <small style={dashboardConferenceTopV66}>{row.topTeam?.team ? <><TeamLogoMark team={row.topTeam.team} size={24}/>{getTeamAbbreviation(row.topTeam.team)}</> : `${row.wins}-${row.losses}`}</small>
-                <strong>{row.avgRating}</strong>
+              <div key={row.conference} className="cfb-conference-power-row-v89" style={{...dashboardConferenceRowV89, background:`linear-gradient(90deg, ${getTeamPrimary(row.topTeam?.team)}44, rgba(15,23,42,.94))`, borderColor:`${getTeamSecondary(row.topTeam?.team)}55`}}>
+                <b>#{index+1}</b><span>{row.conference}</span>
+                <span style={dashboardConferenceTopV66}>{row.topTeam?.team ? <><TeamLogoMark team={row.topTeam.team} size={24}/>{getTeamAbbreviation(row.topTeam.team)}</> : "—"}</span>
+                <span>{row.avgRank || "—"}</span><span>{row.top25}</span><span>{row.wins}-{row.losses}</span><span>{row.winPct}%</span><strong>{row.avgRating}</strong>
               </div>
             )) : <div style={mutedText}>No conference data yet.</div>}
           </div>
         </div>
-
-        <div style={dashboardMiniPanelV64}>
-          <div style={dashboardPanelHeaderPro}><span>RECENT RESULTS</span><h2>Latest Games</h2></div>
-          <div style={dashboardMiniListV64}>
-            {recentResultsRows.length ? recentResultsRows.map((row)=>(
-              <div key={row.id || `${row.team_1_id}-${row.team_2_id}-${row.week}`} style={{...dashboardResultRowV64, background:`linear-gradient(100deg, ${getTeamPrimary(row.winner || row.team1)}66, rgba(15,23,42,.94), ${getTeamSecondary(row.winner || row.team2)}22)`, borderColor:`${getTeamSecondary(row.winner || row.team1)}66`}}>
-                <span>{row.week}</span>
-                <b style={dashboardResultTeamV66}><TeamLogoMark team={row.team1} size={28}/>{getTeamAbbreviation(row.team1)} {row.score1}</b>
-                <b style={dashboardResultTeamV66}><TeamLogoMark team={row.team2} size={28}/>{getTeamAbbreviation(row.team2)} {row.score2}</b>
-                <small>{row.winner?.name ? `${getTeamAbbreviation(row.winner)} wins` : "Final"}</small>
-              </div>
-            )) : <div style={mutedText}>No results recorded yet.</div>}
-          </div>
-        </div>
-      </section>
-
-      <section style={dashboardSchedulePanelV87}>
-        <div style={dashboardPanelHeaderPro}>
-          <span>2026 USER VS USER SCHEDULE</span>
-          <h2>{dashboardWeek}</h2>
-        </div>
-        {dashboardGameOfWeek && (
-          <button style={{...dashboardGameOfWeekV87, background:`linear-gradient(135deg, ${getTeamPrimary(dashboardGameOfWeek.team1)}88, rgba(2,6,23,.96), ${getTeamPrimary(dashboardGameOfWeek.team2)}66)`}} onClick={()=>setActiveTab?.("schedule")}>
-            <div style={dashboardGameEyebrowV87}>GAME OF THE WEEK</div>
-            <div style={dashboardMatchupRowV87}>
-              <div style={dashboardMatchupTeamV87}><b>#{dashboardGameOfWeek.rank1}</b><TeamLogoMark team={dashboardGameOfWeek.team1} size={54}/><span>{getTeamAbbreviation(dashboardGameOfWeek.team1)}</span></div>
-              <strong>VS</strong>
-              <div style={dashboardMatchupTeamV87}><b>#{dashboardGameOfWeek.rank2}</b><TeamLogoMark team={dashboardGameOfWeek.team2} size={54}/><span>{getTeamAbbreviation(dashboardGameOfWeek.team2)}</span></div>
-            </div>
-          </button>
-        )}
-        <div style={dashboardScheduleGridV87}>
-          {dashboardScheduleRows.length ? dashboardScheduleRows.slice(0,6).map((row)=>(
-            <button key={row.id || `${row.week}-${row.team_1_id}-${row.team_2_id}`} style={dashboardScheduleCardV87} onClick={()=>setActiveTab?.("schedule")}>
-              <div style={dashboardScheduleSideV87}><b>#{row.rank1}</b><TeamLogoMark team={row.team1} size={34}/><span>{getTeamAbbreviation(row.team1)}</span></div>
-              <strong>{row.result ? "FINAL" : "VS"}</strong>
-              <div style={dashboardScheduleSideV87}><b>#{row.rank2}</b><TeamLogoMark team={row.team2} size={34}/><span>{getTeamAbbreviation(row.team2)}</span></div>
-            </button>
-          )) : <div style={mutedText}>No user games scheduled for {dashboardWeek}.</div>}
-        </div>
-        <button style={dashboardScheduleLinkV87} onClick={()=>setActiveTab?.("schedule")}>Open Full GameCenter →</button>
       </section>
 
       <section style={dashboardWirePanelV38}>
@@ -2290,6 +2278,40 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, wee
             <div key={index} style={dashboardNewsRowPro}><span>{item.icon || "🏈"}</span><div style={wireTextStackV45}><b>{item.title}</b><small>{item.meta}</small></div></div>
           )) : <div style={mutedText}>No storylines yet. Add results in League Data Center.</div>}
         </div>
+      </section>
+
+      <section style={dashboardSchedulePanelV89}>
+        <div style={dashboardPanelHeaderPro}><span>SEASON HUB</span><h2>GAMECENTER</h2></div>
+        {dashboardGameOfWeek && (
+          <button style={{...dashboardGameOfWeekV87, background:`linear-gradient(135deg, ${getTeamPrimary(dashboardGameOfWeek.team1)}88, rgba(2,6,23,.96), ${getTeamPrimary(dashboardGameOfWeek.team2)}66)`}} onClick={()=>setActiveTab?.("schedule")}>
+            <div style={dashboardGameEyebrowV87}>★ GAME OF THE WEEK • {dashboardGameOfWeek.week}</div>
+            <div style={dashboardMatchupRowV87}>
+              <div style={dashboardMatchupTeamV87}><b>#{dashboardGameOfWeek.rank1}</b><TeamLogoMark team={dashboardGameOfWeek.team1} size={54}/><span>{getTeamAbbreviation(dashboardGameOfWeek.team1)}</span></div>
+              <strong>{dashboardGameOfWeek.result ? "FINAL" : "VS"}</strong>
+              <div style={dashboardMatchupTeamV87}><b>#{dashboardGameOfWeek.rank2}</b><TeamLogoMark team={dashboardGameOfWeek.team2} size={54}/><span>{getTeamAbbreviation(dashboardGameOfWeek.team2)}</span></div>
+            </div>
+          </button>
+        )}
+        <div className="cfb-dashboard-season-weeks-v89" style={dashboardSeasonWeeksV89}>
+          {dashboardWeeks.map((week)=>{
+            const weekRows = dashboardScheduleRows.filter((row)=>String(row.week)===week);
+            return (
+              <div key={week} style={dashboardWeekGroupV89}>
+                <div style={dashboardWeekHeaderV89}><b>{week}</b><span>{weekRows.length} game{weekRows.length===1?"":"s"}</span></div>
+                <div style={dashboardWeekGamesV89}>
+                  {weekRows.length ? weekRows.map((row)=>(
+                    <button key={row.id || `${row.week}-${row.team_1_id}-${row.team_2_id}`} style={dashboardScheduleCardV89} onClick={()=>setActiveTab?.("schedule")}>
+                      <div style={dashboardScheduleSideV87}><b>#{row.rank1}</b><TeamLogoMark team={row.team1} size={32}/><span>{getTeamAbbreviation(row.team1)}</span></div>
+                      <strong>{row.result ? "FINAL" : "VS"}</strong>
+                      <div style={dashboardScheduleSideV87}><b>#{row.rank2}</b><TeamLogoMark team={row.team2} size={32}/><span>{getTeamAbbreviation(row.team2)}</span></div>
+                    </button>
+                  )) : <small style={mutedText}>No user games.</small>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <button style={dashboardScheduleLinkV87} onClick={()=>setActiveTab?.("schedule")}>Open Full GameCenter →</button>
       </section>
 
     </div>
@@ -5896,6 +5918,20 @@ function GlobalStyle() {
         .cfb-gamecenter-filters-v87 { grid-template-columns: 1fr !important; }
       }
   overflow: hidden !important;
+      }
+
+      @media (max-width: 900px) {
+        .cfb-dashboard-feature-grid-v89 { grid-template-columns: 1fr !important; }
+        .cfb-conference-power-head-v89 { display:none !important; }
+        .cfb-conference-power-row-v89 { grid-template-columns:46px 1.3fr .9fr .8fr !important; }
+        .cfb-conference-power-row-v89 > span:nth-child(4),
+        .cfb-conference-power-row-v89 > span:nth-child(5),
+        .cfb-conference-power-row-v89 > span:nth-child(6),
+        .cfb-conference-power-row-v89 > span:nth-child(7) { display:none !important; }
+      }
+      @media (max-width: 620px) {
+        .cfb-gamecenter-meta-v89 { display:grid !important; grid-template-columns:1fr !important; }
+        .cfb-dashboard-season-weeks-v89 { grid-template-columns:1fr !important; }
       }
 `}</style>
   );
@@ -11564,3 +11600,18 @@ const dashboardScheduleGridV87 = { display:"grid", gridTemplateColumns:"repeat(a
 const dashboardScheduleCardV87 = { display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:8, alignItems:"center", padding:10, borderRadius:14, background:"rgba(15,23,42,.78)", border:"1px solid rgba(255,255,255,.10)", color:"#fff", cursor:"pointer" };
 const dashboardScheduleSideV87 = { display:"flex", alignItems:"center", gap:5, minWidth:0, fontSize:12, fontWeight:1000 };
 const dashboardScheduleLinkV87 = { justifySelf:"end", border:0, background:"transparent", color:"#facc15", fontWeight:1000, cursor:"pointer" };
+
+
+const gameCenterMetaV89 = { display:"flex", justifyContent:"space-between", gap:8, marginTop:12, color:"rgba(226,232,240,.72)", fontSize:10, fontWeight:900, textTransform:"uppercase", letterSpacing:".05em" };
+const gameCenterGotwButtonV89 = { width:"100%", marginTop:12, border:"1px solid rgba(250,204,21,.35)", borderRadius:12, padding:"9px 12px", background:"rgba(250,204,21,.10)", color:"#facc15", fontWeight:1000, cursor:"pointer" };
+const dashboardFeatureGridV89 = { display:"grid", gridTemplateColumns:"minmax(300px,.75fr) minmax(0,1.5fr)", gap:16 };
+const dashboardConferencePowerWideV89 = { ...liquidGlassPanel, padding:18, minWidth:0 };
+const dashboardConferenceHeadV89 = { display:"grid", gridTemplateColumns:"60px 1.3fr 1fr 80px 70px 90px 70px 80px", gap:10, padding:"0 12px 8px", color:"rgba(226,232,240,.58)", fontSize:10, fontWeight:1000, textTransform:"uppercase", letterSpacing:".06em" };
+const dashboardConferenceRowsV89 = { display:"grid", gap:8 };
+const dashboardConferenceRowV89 = { display:"grid", gridTemplateColumns:"60px 1.3fr 1fr 80px 70px 90px 70px 80px", gap:10, alignItems:"center", padding:"10px 12px", borderRadius:14, border:"1px solid rgba(255,255,255,.10)", color:"#fff", fontSize:12 };
+const dashboardSchedulePanelV89 = { ...liquidGlassPanel, padding:18, display:"grid", gap:14 };
+const dashboardSeasonWeeksV89 = { display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(310px,1fr))", gap:12 };
+const dashboardWeekGroupV89 = { borderRadius:16, padding:12, background:"rgba(15,23,42,.68)", border:"1px solid rgba(255,255,255,.10)" };
+const dashboardWeekHeaderV89 = { display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10, color:"#fff" };
+const dashboardWeekGamesV89 = { display:"grid", gap:8 };
+const dashboardScheduleCardV89 = { display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:8, alignItems:"center", padding:9, borderRadius:12, background:"rgba(2,6,23,.72)", border:"1px solid rgba(255,255,255,.08)", color:"#fff", cursor:"pointer" };
