@@ -1005,6 +1005,29 @@ export default function App() {
   }
 
   useEffect(() => {
+    const gameCenterChannel = supabase
+      .channel("cfbelite-gamecenter-live-sync")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "game_results" },
+        () => loadData()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "weekly_matchups" },
+        () => loadData()
+      )
+      .subscribe();
+
+    const gameCenterPollId = window.setInterval(loadData, 10000);
+
+    return () => {
+      window.clearInterval(gameCenterPollId);
+      supabase.removeChannel(gameCenterChannel);
+    };
+  }, []);
+
+  useEffect(() => {
     const draftChannel = supabase
       .channel("cfb27-draft-room-live-sync")
       .on(
@@ -1926,7 +1949,8 @@ function GameCenter({ teams = [], users = [], assignments = [], weeklyMatchups =
     return weekMatch && teamMatch && statusMatch;
   });
 
-  const gameOfWeek = rows.find((row)=>row.is_game_of_week) || [...rows].sort((a,b)=>{
+  const currentWeekRows = allRows.filter((row)=>String(row.week)===String(currentWeek));
+  const gameOfWeek = currentWeekRows.find((row)=>row.is_game_of_week) || [...currentWeekRows].sort((a,b)=>{
     const av=(Number(a.rank1)||99)+(Number(a.rank2)||99);
     const bv=(Number(b.rank1)||99)+(Number(b.rank2)||99);
     return av-bv;
@@ -2009,9 +2033,9 @@ function scoreForScheduledTeam(result, teamId) {
 function GameCenterTeam({ team, rank, user, compact = false }) {
   return (
     <div style={compact ? gameCenterTeamCompactV90 : gameCenterTeamV90}>
-      <div style={gameCenterRankLogoV90}>
-        <b style={gameCenterRankV90}>#{rank}</b>
+      <div style={gameCenterRankLogoV91}>
         <TeamLogoMark team={team} size={compact ? 48 : 78}/>
+        <b style={gameCenterRankBadgeV91}>#{rank}</b>
       </div>
       <strong style={gameCenterTeamNameV90}>{team?.name || "Team TBD"}</strong>
       <small style={gameCenterUserV90}>{user || "User TBD"}</small>
@@ -2046,7 +2070,8 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, wee
     })
     .sort((a,b)=>Number(String(a.week).replace(/\D/g,""))-Number(String(b.week).replace(/\D/g,"")));
   const dashboardWeeks = Array.from({length:14},(_,index)=>`Week ${index}`);
-  const dashboardGameOfWeek = dashboardScheduleRows.find((row)=>row.is_game_of_week) || [...dashboardScheduleRows].sort((a,b)=>{
+  const dashboardCurrentWeekRows = dashboardScheduleRows.filter((row)=>String(row.week)===dashboardWeek);
+  const dashboardGameOfWeek = dashboardCurrentWeekRows.find((row)=>row.is_game_of_week) || [...dashboardCurrentWeekRows].sort((a,b)=>{
     const aScore=(Number(a.rank1)||99)+(Number(a.rank2)||99);
     const bScore=(Number(b.rank1)||99)+(Number(b.rank2)||99);
     return aScore-bScore;
@@ -2282,6 +2307,13 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, wee
                 </span>
                 <span style={dashboardConferenceTopV66}>{row.topTeam?.team ? <><TeamLogoMark team={row.topTeam.team} size={24}/>{getTeamAbbreviation(row.topTeam.team)}</> : "—"}</span>
                 <span>{row.avgRank || "—"}</span><span>{row.top10}</span><span>{row.wins}-{row.losses}</span><span>{row.winPct}%</span><strong>{row.avgRating}</strong>
+                <div className="cfb-conference-mobile-metrics-v91" style={dashboardConferenceMobileMetricsV91}>
+                  <span><small>AVG RANK</small><b>{row.avgRank || "—"}</b></span>
+                  <span><small>TOP 10</small><b>{row.top10}</b></span>
+                  <span><small>RECORD</small><b>{row.wins}-{row.losses}</b></span>
+                  <span><small>WIN %</small><b>{row.winPct}%</b></span>
+                  <span><small>RATING</small><b>{row.avgRating}</b></span>
+                </div>
               </div>
             )) : <div style={mutedText}>No conference data yet.</div>}
           </div>
@@ -5962,6 +5994,43 @@ function GlobalStyle() {
         .cfb-conference-power-row-v89 {
           grid-template-columns:42px 54px 1fr 64px !important;
           gap:6px !important;
+        }
+      }
+
+      /* v91-gamecenter-live-and-mobile */
+      @media (max-width: 900px) {
+        .cfb-conference-power-row-v89 {
+          grid-template-columns:42px 58px minmax(0,1fr) 64px !important;
+          gap:8px !important;
+        }
+        .cfb-conference-power-row-v89 > span:nth-child(4),
+        .cfb-conference-power-row-v89 > span:nth-child(5),
+        .cfb-conference-power-row-v89 > span:nth-child(6),
+        .cfb-conference-power-row-v89 > span:nth-child(7) {
+          display:none !important;
+        }
+        .cfb-conference-mobile-metrics-v91 {
+          display:grid !important;
+        }
+        .cfb-conference-mobile-metrics-v91 span {
+          display:grid !important;
+          gap:3px;
+          text-align:center;
+          min-width:0;
+        }
+        .cfb-conference-mobile-metrics-v91 small {
+          font-size:8px;
+          color:rgba(226,232,240,.58);
+          font-weight:1000;
+        }
+        .cfb-conference-mobile-metrics-v91 b {
+          font-size:11px;
+          color:#fff;
+        }
+      }
+      @media (max-width: 560px) {
+        .cfb-conference-mobile-metrics-v91 {
+          grid-template-columns:repeat(3,minmax(0,1fr)) !important;
         }
       }
 `}</style>
@@ -11725,3 +11794,44 @@ const gameCenterUserV90 = {
   color:"rgba(248,250,252,.82)",
   lineHeight:1.05,
 };
+
+
+const gameCenterRankLogoV91 = {
+  position:"relative",
+  display:"inline-grid",
+  placeItems:"center",
+  minWidth:64,
+  minHeight:64,
+};
+
+const gameCenterRankBadgeV91 = {
+  position:"absolute",
+  top:-4,
+  right:-8,
+  zIndex:5,
+  minWidth:30,
+  height:24,
+  padding:"0 7px",
+  borderRadius:999,
+  display:"inline-flex",
+  alignItems:"center",
+  justifyContent:"center",
+  background:"#facc15",
+  color:"#111827",
+  border:"2px solid rgba(2,6,23,.95)",
+  boxShadow:"0 8px 18px rgba(0,0,0,.35)",
+  fontSize:11,
+  fontWeight:1000,
+  lineHeight:1,
+};
+
+const dashboardConferenceMobileMetricsV91 = {
+  display:"none",
+  gridColumn:"1 / -1",
+  gridTemplateColumns:"repeat(5,minmax(0,1fr))",
+  gap:6,
+  marginTop:8,
+  paddingTop:8,
+  borderTop:"1px solid rgba(255,255,255,.10)",
+};
+
