@@ -1349,8 +1349,8 @@ export default function App() {
 
   return <><GlobalStyle/><div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={isErrorMessage(error) ? errorBox : successBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} draggedTab={draggedTab} setDraggedTab={setDraggedTab} reorderTabs={reorderTabs} adminUnlocked={adminUnlocked} adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin} teams={teamOptions} assignments={assignments} currentYear={currentYear} users={userOptions}/>
     {activeTab === "draftRoom" && <DraftRoom teams={teamOptions} users={userOptions} picks={draftPicks27} settings={draftSettings27} conferenceAssets={conferenceAssets} startClock={startDraftClock} pauseClock={pauseDraftClock} resumeClock={resumeDraftClock} announcePick={announceDraftPick} revealPick={revealDraftPick} undoPick={undoDraftPick}/>}     
-    {activeTab === "dashboard" && <DashboardRedesign teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} weeklyMatchups={weeklyMatchups} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} teamSeasonStats={teamSeasonStats} currentYear={currentYear} currentWeek={currentWeek} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} saveSettings={saveLeagueSettings} goToTeam={goToTeam} setActiveTab={setActiveTab} sortState={userSort} setSortState={setUserSort}/>}
-    {activeTab === "schedule" && <GameCenter teams={teamOptions} users={userOptions} assignments={assignments} weeklyMatchups={weeklyMatchups} results={results} currentWeek={currentWeek} adminUnlocked={adminUnlocked} loadData={loadData}/>}
+    {activeTab === "dashboard" && <DashboardRedesign teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} weeklyMatchups={weeklyMatchups} conferenceAssets={conferenceAssets} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} teamSeasonStats={teamSeasonStats} currentYear={currentYear} currentWeek={currentWeek} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)}));}} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value}));}} saveSettings={saveLeagueSettings} goToTeam={goToTeam} setActiveTab={setActiveTab} sortState={userSort} setSortState={setUserSort}/>}
+    {activeTab === "schedule" && <GameCenter teams={teamOptions} users={userOptions} assignments={assignments} weeklyMatchups={weeklyMatchups} results={results} currentWeek={currentWeek} conferenceAssets={conferenceAssets} adminUnlocked={adminUnlocked} loadData={loadData}/>}
     {activeTab === "eloRankings" && <EloRankings users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
     {activeTab === "dynastyRecords" && <DynastyRecords users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} seasonPlayerStats={seasonPlayerStats} teamSeasonStats={teamSeasonStats}/>}    
 {activeTab === "rivalries" && <Rivalries users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
@@ -1853,8 +1853,8 @@ function dynastyHallOfFameScore(row = {}) {
 }
 
 
-function GameCenter({ teams = [], users = [], assignments = [], weeklyMatchups = [], results = [], currentWeek = "Week 1", adminUnlocked = false, loadData = async()=>{} }) {
-  const [weekFilter, setWeekFilter] = useState(String(currentWeek || "Week 1"));
+function GameCenter({ teams = [], users = [], assignments = [], weeklyMatchups = [], results = [], currentWeek = "Week 1", conferenceAssets = [], adminUnlocked = false, loadData = async()=>{} }) {
+  const [weekFilter, setWeekFilter] = useState("all");
   const [teamFilter, setTeamFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
@@ -1917,10 +1917,12 @@ function GameCenter({ teams = [], users = [], assignments = [], weeklyMatchups =
   }
 
   const rows = allRows.filter((row)=>{
-    const weekMatch = weekFilter==="all" || String(row.week)===String(weekFilter);
+    const normalizedWeekFilter = String(weekFilter || "all").trim().toLowerCase();
+    const normalizedStatusFilter = String(statusFilter || "all").trim().toLowerCase();
+    const weekMatch = normalizedWeekFilter === "all" || normalizedWeekFilter.startsWith("all week") || String(row.week).toLowerCase()===normalizedWeekFilter;
     const haystack = `${row.team1?.name||""} ${row.team2?.name||""} ${row.user1} ${row.user2}`.toLowerCase();
     const teamMatch = !teamFilter || haystack.includes(teamFilter.toLowerCase());
-    const statusMatch = statusFilter==="all" || (statusFilter==="final" ? Boolean(row.result) : !row.result);
+    const statusMatch = normalizedStatusFilter === "all" || normalizedStatusFilter.startsWith("all game") || (normalizedStatusFilter==="final" ? Boolean(row.result) : !row.result);
     return weekMatch && teamMatch && statusMatch;
   });
 
@@ -1939,6 +1941,10 @@ function GameCenter({ teams = [], users = [], assignments = [], weeklyMatchups =
           <p style={mutedText}>User-vs-user schedule with live automated rankings, team logos, coaches, and final scores.</p>
         </div>
         <div style={gameCenterHeroStatV87}><b>{allRows.length}</b><span>Scheduled Games</span></div>
+      </div>
+
+      <div style={gameCenterControlNoteV90}>
+        <b>Commissioner Control:</b> Use “Choose as Game of the Week” on any matchup card.
       </div>
 
       <div className="cfb-gamecenter-filters-v87" style={gameCenterFiltersV87}>
@@ -1976,10 +1982,16 @@ function GameCenter({ teams = [], users = [], assignments = [], weeklyMatchups =
             </div>
             {row.result && <div style={gameCenterFinalScoreV87}>{scoreForScheduledTeam(row.result,row.team_1_id)} - {scoreForScheduledTeam(row.result,row.team_2_id)}</div>}
             <div className="cfb-gamecenter-meta-v89" style={gameCenterMetaV89}>
-              <span>{cleanConference(row.team1?.conference)} vs {cleanConference(row.team2?.conference)}</span>
+              <span style={gameCenterConferenceLogosV90}>
+                <ConferenceLogoMark conference={row.team1?.conference} conferenceAssets={conferenceAssets} size={22}/>
+                <b>VS</b>
+                <ConferenceLogoMark conference={row.team2?.conference} conferenceAssets={conferenceAssets} size={22}/>
+              </span>
               <span>{Number(row.rank1) <= 25 && Number(row.rank2) <= 25 ? "Top 25 Matchup" : Number(row.rank1) <= 25 || Number(row.rank2) <= 25 ? "Ranked Team Featured" : "User Matchup"}</span>
             </div>
-            {adminUnlocked && <button style={gameCenterGotwButtonV89} onClick={()=>selectGameOfWeek(row)}>{row.is_game_of_week ? "Selected Game of the Week" : "Make Game of the Week"}</button>}
+            <button style={gameCenterGotwButtonV89} onClick={()=>selectGameOfWeek(row)}>
+              {row.is_game_of_week ? "★ Selected Game of the Week" : "☆ Choose as Game of the Week"}
+            </button>
           </div>
         )) : <div style={tableEmptyStateV43}>No matchups match the selected filters.</div>}
       </div>
@@ -1996,16 +2008,18 @@ function scoreForScheduledTeam(result, teamId) {
 
 function GameCenterTeam({ team, rank, user, compact = false }) {
   return (
-    <div style={compact ? gameCenterTeamCompactV87 : gameCenterTeamV87}>
-      <b style={gameCenterRankV87}>#{rank}</b>
-      <TeamLogoMark team={team} size={compact ? 46 : 78}/>
-      <strong>{team?.name || "Team TBD"}</strong>
-      <small>{user || "User TBD"}</small>
+    <div style={compact ? gameCenterTeamCompactV90 : gameCenterTeamV90}>
+      <div style={gameCenterRankLogoV90}>
+        <b style={gameCenterRankV90}>#{rank}</b>
+        <TeamLogoMark team={team} size={compact ? 48 : 78}/>
+      </div>
+      <strong style={gameCenterTeamNameV90}>{team?.name || "Team TBD"}</strong>
+      <small style={gameCenterUserV90}>{user || "User TBD"}</small>
     </div>
   );
 }
 
-function DashboardRedesign({ teams, users, assignments, results, allResults, weeklyMatchups = [], allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats, currentYear, currentWeek, setCurrentYear, setCurrentWeek, saveSettings, goToTeam, setActiveTab, sortState, setSortState }) {
+function DashboardRedesign({ teams, users, assignments, results, allResults, weeklyMatchups = [], conferenceAssets = [], allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats, currentYear, currentWeek, setCurrentYear, setCurrentWeek, saveSettings, goToTeam, setActiveTab, sortState, setSortState }) {
   const [rankingSort, setRankingSort] = useState({ key: "rating", direction: "desc" });
   const activeAssignments = activeAssignmentsForLeague(assignments, teams);
   const activeCoachCount = activeAssignments.length;
@@ -2126,11 +2140,11 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, wee
       const losses = confResults.reduce((sum,row)=>sum + Number(row.losses || 0), 0);
       const avgRating = confRankingRows.length ? confRankingRows.reduce((sum,row)=>sum + Number(row.rating || 0), 0) / confRankingRows.length : 0;
       const avgRank = confRankingRows.length ? confRankingRows.reduce((sum,row)=>sum + Number(row.rank || 0),0) / confRankingRows.length : 0;
-      const top25 = confRankingRows.filter((row)=>Number(row.rank)<=25).length;
+      const top10 = confRankingRows.filter((row)=>Number(row.rank)<=10).length;
       const games = wins + losses;
       const winPct = games ? (wins / games) * 100 : 0;
       const topTeam = [...confRankingRows].sort((a,b)=>Number(a.rank)-Number(b.rank))[0];
-      return { conference, teams:confTeams.length, wins, losses, avgRating:Number(avgRating.toFixed(1)), avgRank:Number(avgRank.toFixed(1)), top25, winPct:Number(winPct.toFixed(1)), topTeam };
+      return { conference, teams:confTeams.length, wins, losses, avgRating:Number(avgRating.toFixed(1)), avgRank:Number(avgRank.toFixed(1)), top10, winPct:Number(winPct.toFixed(1)), topTeam };
     })
     .sort((a,b)=>b.avgRating-a.avgRating || b.wins-a.wins)
     .slice(0,6);
@@ -2257,14 +2271,17 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, wee
         <div style={dashboardConferencePowerWideV89}>
           <div style={dashboardPanelHeaderPro}><span>CONFERENCE POWER</span><h2>League Snapshot</h2></div>
           <div className="cfb-conference-power-head-v89" style={dashboardConferenceHeadV89}>
-            <span>Rank</span><span>Conference</span><span>Top Team</span><span>Avg Rank</span><span>Top 25</span><span>Record</span><span>Win %</span><span>Rating</span>
+            <span>Rank</span><span>Conference</span><span>Top Team</span><span>Avg Rank</span><span>Top 10</span><span>Record</span><span>Win %</span><span>Rating</span>
           </div>
           <div style={dashboardConferenceRowsV89}>
             {conferenceSnapshotRows.length ? conferenceSnapshotRows.map((row,index)=>(
               <div key={row.conference} className="cfb-conference-power-row-v89" style={{...dashboardConferenceRowV89, background:`linear-gradient(90deg, ${getTeamPrimary(row.topTeam?.team)}44, rgba(15,23,42,.94))`, borderColor:`${getTeamSecondary(row.topTeam?.team)}55`}}>
-                <b>#{index+1}</b><span>{row.conference}</span>
+                <b>#{index+1}</b>
+                <span style={dashboardConferenceLogoCellV90} title={row.conference}>
+                  <ConferenceLogoMark conference={row.conference} conferenceAssets={conferenceAssets} size={34}/>
+                </span>
                 <span style={dashboardConferenceTopV66}>{row.topTeam?.team ? <><TeamLogoMark team={row.topTeam.team} size={24}/>{getTeamAbbreviation(row.topTeam.team)}</> : "—"}</span>
-                <span>{row.avgRank || "—"}</span><span>{row.top25}</span><span>{row.wins}-{row.losses}</span><span>{row.winPct}%</span><strong>{row.avgRating}</strong>
+                <span>{row.avgRank || "—"}</span><span>{row.top10}</span><span>{row.wins}-{row.losses}</span><span>{row.winPct}%</span><strong>{row.avgRating}</strong>
               </div>
             )) : <div style={mutedText}>No conference data yet.</div>}
           </div>
@@ -2301,9 +2318,9 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, wee
                 <div style={dashboardWeekGamesV89}>
                   {weekRows.length ? weekRows.map((row)=>(
                     <button key={row.id || `${row.week}-${row.team_1_id}-${row.team_2_id}`} style={dashboardScheduleCardV89} onClick={()=>setActiveTab?.("schedule")}>
-                      <div style={dashboardScheduleSideV87}><b>#{row.rank1}</b><TeamLogoMark team={row.team1} size={32}/><span>{getTeamAbbreviation(row.team1)}</span></div>
+                      <div style={dashboardScheduleSideV90}><b>#{row.rank1}</b><TeamLogoMark team={row.team1} size={34}/><span>{getTeamAbbreviation(row.team1)}</span></div>
                       <strong>{row.result ? "FINAL" : "VS"}</strong>
-                      <div style={dashboardScheduleSideV87}><b>#{row.rank2}</b><TeamLogoMark team={row.team2} size={32}/><span>{getTeamAbbreviation(row.team2)}</span></div>
+                      <div style={dashboardScheduleSideV90}><b>#{row.rank2}</b><TeamLogoMark team={row.team2} size={34}/><span>{getTeamAbbreviation(row.team2)}</span></div>
                     </button>
                   )) : <small style={mutedText}>No user games.</small>}
                 </div>
@@ -5932,6 +5949,20 @@ function GlobalStyle() {
       @media (max-width: 620px) {
         .cfb-gamecenter-meta-v89 { display:grid !important; grid-template-columns:1fr !important; }
         .cfb-dashboard-season-weeks-v89 { grid-template-columns:1fr !important; }
+      }
+
+      /* v90-gamecenter-fixes */
+      @media (max-width: 620px) {
+        .cfb-gamecenter-filters-v87 {
+          grid-template-columns:1fr !important;
+        }
+        .cfb-gamecenter-card-v89 {
+          min-width:0 !important;
+        }
+        .cfb-conference-power-row-v89 {
+          grid-template-columns:42px 54px 1fr 64px !important;
+          gap:6px !important;
+        }
       }
 `}</style>
   );
@@ -11615,3 +11646,82 @@ const dashboardWeekGroupV89 = { borderRadius:16, padding:12, background:"rgba(15
 const dashboardWeekHeaderV89 = { display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10, color:"#fff" };
 const dashboardWeekGamesV89 = { display:"grid", gap:8 };
 const dashboardScheduleCardV89 = { display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:8, alignItems:"center", padding:9, borderRadius:12, background:"rgba(2,6,23,.72)", border:"1px solid rgba(255,255,255,.08)", color:"#fff", cursor:"pointer" };
+
+
+const gameCenterControlNoteV90 = {
+  padding:"10px 14px",
+  borderRadius:12,
+  background:"rgba(250,204,21,.08)",
+  border:"1px solid rgba(250,204,21,.22)",
+  color:"rgba(248,250,252,.90)",
+  fontSize:12,
+};
+
+const gameCenterConferenceLogosV90 = {
+  display:"inline-flex",
+  alignItems:"center",
+  justifyContent:"center",
+  gap:8,
+};
+
+const dashboardConferenceLogoCellV90 = {
+  display:"flex",
+  alignItems:"center",
+  justifyContent:"flex-start",
+};
+
+const dashboardScheduleSideV90 = {
+  display:"grid",
+  gridTemplateColumns:"34px 38px minmax(0,1fr)",
+  alignItems:"center",
+  justifyItems:"center",
+  gap:6,
+  minWidth:0,
+  fontSize:12,
+  fontWeight:1000,
+};
+
+const gameCenterTeamV90 = {
+  display:"grid",
+  justifyItems:"center",
+  alignContent:"start",
+  gap:7,
+  textAlign:"center",
+  color:"#fff",
+  minWidth:0,
+};
+
+const gameCenterTeamCompactV90 = {
+  display:"grid",
+  justifyItems:"center",
+  alignContent:"start",
+  gap:5,
+  textAlign:"center",
+  color:"#fff",
+  minWidth:0,
+};
+
+const gameCenterRankLogoV90 = {
+  display:"grid",
+  justifyItems:"center",
+  alignItems:"center",
+  gap:3,
+  minHeight:72,
+};
+
+const gameCenterRankV90 = {
+  color:"#facc15",
+  fontSize:13,
+  lineHeight:1,
+};
+
+const gameCenterTeamNameV90 = {
+  display:"block",
+  lineHeight:1.05,
+  minHeight:"2.1em",
+};
+
+const gameCenterUserV90 = {
+  color:"rgba(248,250,252,.82)",
+  lineHeight:1.05,
+};
