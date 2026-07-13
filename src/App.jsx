@@ -891,7 +891,7 @@ export default function App() {
     await saveCommissionerRankings(next);
   }
 
-  const baseTabs = [["dashboard","Home"],["schedule","GameCenter"],["playoffPicture","Playoff Picture"],["mediaCenter","Media Center"],["allTeamsRatings","Teams"],["eloRankings","User ELO"],["powerIndex","All-Time Coach Rankings"],["conferencePower","Conference Power"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["h2h","User vs User H2H"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],["commissionerCenter","Commissioner Center"],["weeklyMatchups","Schedule Manager"],["userManager","Discord Users"],["assignments","Team Assignments"],["leagueDataCenter","League Data Center"],["resultsManager","Results Manager"],["logoManager","Team Assets"],["draftRoom","CFBElite 27 Draft Room"],...coachProfileUsers.map((user) => [`coach-${user.id}`, user.activeTeamName || user.discord_username])];
+  const baseTabs = [["dashboard","Home"],["schedule","GameCenter"],["allTeamsRatings","Teams"],["eloRankings","User ELO"],["powerIndex","All-Time Coach Rankings"],["conferencePower","Conference Power"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["h2h","User vs User H2H"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],["commissionerCenter","Commissioner Center"],["weeklyMatchups","Schedule Manager"],["userManager","Discord Users"],["assignments","Team Assignments"],["leagueDataCenter","League Data Center"],["resultsManager","Results Manager"],["logoManager","Team Assets"],["draftRoom","CFBElite 27 Draft Room"],...coachProfileUsers.map((user) => [`coach-${user.id}`, user.activeTeamName || user.discord_username])];
   const tabs = useMemo(() => {
     const tabMap = new Map(baseTabs);
     const ordered = tabOrder
@@ -1481,8 +1481,6 @@ export default function App() {
     {activeTab === "draftRoom" && <DraftRoom teams={teamOptions} users={userOptions} picks={draftPicks27} settings={draftSettings27} conferenceAssets={conferenceAssets} startClock={startDraftClock} pauseClock={pauseDraftClock} resumeClock={resumeDraftClock} announcePick={announceDraftPick} revealPick={revealDraftPick} undoPick={undoDraftPick}/>}     
     {activeTab === "dashboard" && <DashboardV2 teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} weeklyMatchups={weeklyMatchups} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} teamSeasonStats={teamSeasonStats} currentYear={currentYear} currentWeek={currentWeek} advanceAt={advanceAt} rankingSnapshots={rankingSnapshots} adminUnlocked={adminUnlocked} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)})); setNewWeeklyMatchup((prev)=>({...prev,season_year:Number(value)}));}} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value})); setNewWeeklyMatchup((prev)=>({...prev,week:value}));}} saveSettings={saveLeagueSettings} goToTeam={goToTeam} setActiveTab={setActiveTab}/>}
     {activeTab === "schedule" && <GameCenterV2 teams={teamOptions} users={userOptions} assignments={assignments} weeklyMatchups={weeklyMatchups} results={results} currentYear={currentYear} currentWeek={currentWeek} conferenceAssets={conferenceAssets} adminUnlocked={adminUnlocked} loadData={loadData} setActiveTab={setActiveTab}/>}
-    {activeTab === "playoffPicture" && <PlayoffPictureV2 teams={teamOptions} users={userOptions} assignments={assignments} results={results} currentYear={currentYear} setActiveTab={setActiveTab}/>}
-    {activeTab === "mediaCenter" && <MediaCenterV2 teams={activeTeamOptions} users={userOptions} assignments={assignments} results={results} weeklyMatchups={weeklyMatchups} currentYear={currentYear} currentWeek={currentWeek}/>}
     {activeTab === "eloRankings" && <EloRankings users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
     {activeTab === "dynastyRecords" && <DynastyRecords users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} seasonPlayerStats={seasonPlayerStats} teamSeasonStats={teamSeasonStats}/>}    
 {activeTab === "rivalries" && <Rivalries users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
@@ -2347,11 +2345,6 @@ function GameCenterV2({ teams = [], users = [], assignments = [], weeklyMatchups
     setNotice(`${row.team1?.name} vs ${row.team2?.name} selected as Game of the Week.`); await loadData();
   }
 
-  function discordPost(row) {
-    const score=row.result?`${scoreForScheduledTeam(row.result,row.team_1_id)}-${scoreForScheduledTeam(row.result,row.team_2_id)}`:"Upcoming";
-    return `🏈 CFBElite 27 ${row.week}\n${row.team1?.name} vs ${row.team2?.name}\n${row.user1} vs ${row.user2}\n${score}${row.stream_url?`\nStream: ${row.stream_url}`:""}${row.vod_url?`\nVOD: ${row.vod_url}`:""}`;
-  }
-
   return <section className="cfb-v2-page" style={v2Page}>
     <div style={v2PageHero}>
       <div><span style={v2Eyebrow}>CFBELITE 27 • {currentYear}</span><h1 style={v2PageTitle}>GameCenter</h1><p style={v2PageSub}>Every user matchup, final score, stream, and featured game in one broadcast-style hub.</p></div>
@@ -2365,7 +2358,6 @@ function GameCenterV2({ teams = [], users = [], assignments = [], weeklyMatchups
         <div style={v2FeaturedScore}>{featured.result?<><b>{scoreForScheduledTeam(featured.result,featured.team_1_id)}–{scoreForScheduledTeam(featured.result,featured.team_2_id)}</b><span>FINAL</span></>:<><b>VS</b><span>UPCOMING</span></>}</div>
         <V2MatchupTeam team={featured.team2} rank={featured.rank2} user={featured.user2}/>
       </div>
-      <div style={v2InlineActions}><button style={v2GhostButton} onClick={()=>downloadMatchupGraphic({...featured,seasonYear:currentYear,label:featured.result?"FINAL SCORE":"GAME OF THE WEEK"})}>Download Graphic</button><button style={v2GhostButton} onClick={async()=>setNotice(await copyLeagueText(discordPost(featured))?"Discord post copied.":"Copy was blocked by the browser.")}>Copy Discord Post</button></div>
     </div>}
     <div style={v2FilterBar}>
       <div className="cfb-v2-week-tabs" style={v2WeekTabs}><button style={weekFilter==="all"?v2WeekTabActive:v2WeekTab} onClick={()=>setWeekFilter("all")}>All</button>{weeks.map((week)=><button key={week} style={weekFilter===week?v2WeekTabActive:v2WeekTab} onClick={()=>setWeekFilter(week)}>{week}</button>)}</div>
@@ -2380,7 +2372,7 @@ function GameCenterV2({ teams = [], users = [], assignments = [], weeklyMatchups
       </div>
       <div style={v2GameMeta}><span><ConferenceLogoMark conference={row.team1?.conference} conferenceAssets={conferenceAssets} size={22}/> vs <ConferenceLogoMark conference={row.team2?.conference} conferenceAssets={conferenceAssets} size={22}/></span><span>{row.scheduled_at?new Date(row.scheduled_at).toLocaleString():"Time TBD"}</span></div>
       {(row.stream_url||row.vod_url||row.notes)&&<div style={v2GameLinks}>{row.stream_url&&<a href={row.stream_url} target="_blank" rel="noreferrer">Live Stream</a>}{row.vod_url&&<a href={row.vod_url} target="_blank" rel="noreferrer">Watch VOD</a>}{row.notes&&<span>{row.notes}</span>}</div>}
-      <div style={v2CardActions}><button onClick={()=>downloadMatchupGraphic({...row,seasonYear:currentYear,label:row.result?"FINAL SCORE":"MATCHUP"})}>Graphic</button><button onClick={async()=>setNotice(await copyLeagueText(discordPost(row))?"Discord post copied.":"Copy was blocked by the browser.")}>Copy Post</button>{adminUnlocked&&<button onClick={()=>chooseGame(row)}>{row.is_game_of_week?"★ Featured":"☆ Feature"}</button>}</div>
+      {adminUnlocked&&<div style={v2CardActions}><button onClick={()=>chooseGame(row)}>{row.is_game_of_week?"★ Featured":"☆ Feature"}</button></div>}
     </article>):<div style={v2Empty}>No matchups match these filters.</div>}</div>
   </section>;
 }
@@ -2391,6 +2383,54 @@ function V2MatchupTeam({team,rank,user,compact=false,side}) {
     <div style={v2LogoRank}><TeamLogoMark team={team} size={compact?52:94} plate/>{rank&&<b>#{rank}</b>}</div>
     <strong>{team?.name||"Team TBD"}</strong><span>{user||"User TBD"}</span>
   </div>;
+}
+
+function conferencePowerData({ teams = [], users = [], assignments = [], results = [], allResults = [], allAmericans = [], awards = [], heismans = [], nationalChampions = [], recruiting = [] }) {
+  const activeAssignments = assignments.filter((assignment)=>assignment.status === "Active" && assignment.team_id && assignment.discord_user_id);
+  const activeTeamIds = new Set(activeAssignments.map((assignment)=>assignment.team_id));
+  const activeTeams = teams.filter((team)=>activeTeamIds.has(team.id));
+  const rankingRows = computerRankingRows(activeTeams, results, assignments, users);
+  const eloRows = userEloRows(users, assignments, allResults.length ? allResults : results);
+  const eloMap = new Map(eloRows.map((row)=>[row.user.id,row.adjustedElo || row.elo]));
+  const rankingMap = new Map(rankingRows.map((row)=>[row.team.id,row]));
+  const conferenceMap = new Map();
+
+  activeTeams.forEach((team)=>{
+    const conference = normalizeDraftConference(team.conference) || "Unassigned";
+    if (!conferenceMap.has(conference)) conferenceMap.set(conference,{conference,teams:0,recordWins:0,recordLosses:0,teamScore:0,eloScore:0,nattys:0,confTitles:0,recruitingScore:0,recruitingCount:0,allAmericans:0,awards:0,heismans:0,top25:0});
+    const row = conferenceMap.get(conference);
+    const ranking = rankingMap.get(team.id);
+    const rec = recordFromResults(team.id,results);
+    const activeAssignment = activeAssignments.find((assignment)=>assignment.team_id===team.id);
+    const userElo = eloMap.get(activeAssignment?.discord_user_id) || 1500;
+    const fullResults = allResults.length ? allResults : results;
+    const bestRecruit = recruiting.filter((item)=>item.team_id===team.id && Number(item.rank)>0).sort((a,b)=>Number(a.rank)-Number(b.rank))[0];
+    row.teams += 1;
+    row.recordWins += rec.wins;
+    row.recordLosses += rec.losses;
+    row.teamScore += ranking?.score || 0;
+    row.eloScore += Math.max(0,Math.min(100,(userElo-1300)/4));
+    row.nattys += nationalChampions.filter((item)=>item.team_id===team.id).length + titleCount(team.id,fullResults,"National Championship Week");
+    row.confTitles += titleCount(team.id,fullResults,"Conference Championship Week");
+    row.allAmericans += allAmericans.filter((item)=>item.team_id===team.id).length;
+    row.awards += awards.filter((item)=>item.team_id===team.id).length;
+    row.heismans += heismans.filter((item)=>item.team_id===team.id).length;
+    if (ranking?.rank<=25) row.top25 += 1;
+    if (bestRecruit) { row.recruitingScore += Math.max(0,101-Number(bestRecruit.rank)); row.recruitingCount += 1; }
+  });
+
+  return [...conferenceMap.values()].map((row)=>{
+    const games=row.recordWins+row.recordLosses;
+    const performance=row.teams?row.teamScore/row.teams:0;
+    const userStrength=row.teams?row.eloScore/row.teams:0;
+    const winPct=games?row.recordWins/games:0;
+    const championshipScore=Math.min(100,(row.nattys*28)+(row.confTitles*10));
+    const recruitingAvg=row.recruitingCount?row.recruitingScore/row.recruitingCount:45;
+    const recognitionScore=Math.min(100,(row.allAmericans*2.2)+(row.awards*4)+(row.heismans*10));
+    const currentPerformanceScore=(performance*.75)+(winPct*25)+(row.top25*1.2);
+    const power=(currentPerformanceScore*.40)+(userStrength*.25)+(championshipScore*.15)+(recruitingAvg*.10)+(recognitionScore*.10);
+    return {...row,games,winPct,performance,userStrength,championshipScore,recruitingAvg,recognitionScore,currentPerformanceScore,power:Number(power.toFixed(1))};
+  }).sort((a,b)=>b.power-a.power);
 }
 
 function DashboardV2({ teams = [], users = [], assignments = [], results = [], allResults = [], weeklyMatchups = [], allAmericans = [], awards = [], heismans = [], nationalChampions = [], recruiting = [], teamSeasonStats = [], currentYear, currentWeek, advanceAt, setCurrentYear, setCurrentWeek, saveSettings, goToTeam, setActiveTab, rankingSnapshots = [], adminUnlocked = false }) {
@@ -2420,6 +2460,11 @@ function DashboardV2({ teams = [], users = [], assignments = [], results = [], a
   const wire=typeof dynastyWireItems==="function"?dynastyWireItems({rankingDetails:rankings.map((row)=>({...row,record:recordFromResults(row.team.id,seasonResults),user:assignedCoachName(row.team.id,null,users,assignments,currentYear)})),results:allResults,teams,recruiting,prestigeRows,currentYear}):[];
   const progress=weekGames.length?Math.round((completed.length/weekGames.length)*100):0;
   const visibleRankings=showAllRankings?rankings:rankings.slice(0,10);
+  const topUsers=rankings.slice(0,3).map((row)=>({name:assignedCoachName(row.team.id,null,users,assignments,currentYear),detail:`#${row.rank} ${row.teamName}`,value:row.rating.toFixed(1),team:row.team}));
+  const topConferences=conferencePowerData({teams,users,assignments,results:seasonResults,allResults,allAmericans,awards,heismans,nationalChampions,recruiting}).slice(0,3).map((row,index)=>({name:row.conference,detail:`#${index+1} Conference`,value:row.power.toFixed(1)}));
+  const topSor=[...rankings].filter((row)=>row.games>0).sort((a,b)=>b.sor-a.sor).slice(0,3).map((row)=>({name:row.teamName,detail:assignedCoachName(row.team.id,null,users,assignments,currentYear),value:row.sor.toFixed(1),team:row.team}));
+  const topAvgPf=[...rankings].filter((row)=>row.games>0).sort((a,b)=>b.avgPf-a.avgPf).slice(0,3).map((row)=>({name:row.teamName,detail:assignedCoachName(row.team.id,null,users,assignments,currentYear),value:row.avgPf.toFixed(1),team:row.team}));
+  const topAvgPa=[...rankings].filter((row)=>row.games>0).sort((a,b)=>a.avgPa-b.avgPa).slice(0,3).map((row)=>({name:row.teamName,detail:assignedCoachName(row.team.id,null,users,assignments,currentYear),value:row.avgPa.toFixed(1),team:row.team}));
 
   return <main className="cfb-v2-page" style={v2Page}>
     <section style={v2DashboardHero}>
@@ -2428,11 +2473,12 @@ function DashboardV2({ teams = [], users = [], assignments = [], results = [], a
       {adminUnlocked&&<div style={v2HeroControls}><select value={currentYear} onChange={(e)=>setCurrentYear(e.target.value)} style={v2Input}>{YEARS.map((year)=><option key={year}>{year}</option>)}</select><select value={currentWeek} onChange={(e)=>setCurrentWeek(e.target.value)} style={v2Input}>{WEEKS.map((week)=><option key={week}>{week}</option>)}</select><button style={v2PrimaryButton} onClick={saveSettings}>Save League Week</button></div>}
     </section>
 
-    <section className="cfb-v2-kpi-grid" style={v2KpiGrid}>
-      <V2Kpi label="Week Progress" value={`${completed.length}/${weekGames.length}`} sub={`${progress}% complete`} tone="#22c55e"/>
-      <V2Kpi label="Games Remaining" value={remaining.length} sub={remaining.length?"Still to be played":"Week complete"} tone="#60a5fa"/>
-      <V2Kpi label="Missing VOD" value={missingVod} sub="Completed user games" tone={missingVod?"#f97316":"#22c55e"}/>
-      <V2Kpi label="Active Coaches" value={activeAssignments.length} sub={`${unassignedUsers} unassigned user${unassignedUsers===1?"":"s"}`} tone="#facc15"/>
+    <section className="cfb-v2-leader-grid" style={v2LeaderGrid}>
+      <V2LeaderTile label="Top 3 Ranked Users" rows={topUsers} metric="Rating"/>
+      <V2LeaderTile label="Top 3 Conferences" rows={topConferences} metric="Power"/>
+      <V2LeaderTile label="Top 3 SOR" rows={topSor} metric="SOR"/>
+      <V2LeaderTile label="Top 3 Avg PF" rows={topAvgPf} metric="PF"/>
+      <V2LeaderTile label="Top 3 Avg PA" rows={topAvgPa} metric="PA"/>
     </section>
 
     <section className="cfb-v2-home-grid" style={v2HomeGrid}>
@@ -2447,14 +2493,17 @@ function DashboardV2({ teams = [], users = [], assignments = [], results = [], a
 
       <div style={v2Panel}>
         <div style={v2PanelHeader}><div><span style={v2Eyebrow}>ACTION CENTER</span><h2>Still to Play</h2></div><span style={v2CountPill}>{remaining.length}</span></div>
-        <div style={v2CompactList}>{remaining.length?remaining.slice(0,8).map((row)=><button key={row.id} style={v2CompactGame} onClick={()=>setActiveTab?.("schedule")}><span><TeamLogoMark team={row.team1} size={30}/>{getTeamAbbreviation(row.team1)}</span><b>vs</b><span>{getTeamAbbreviation(row.team2)}<TeamLogoMark team={row.team2} size={30}/></span></button>):<div style={v2SuccessState}>✓ Every scheduled game is complete.</div>}</div>
+        <div style={v2CompactList}>{remaining.length?remaining.slice(0,8).map((row)=><button key={row.id} style={v2CompactGame} onClick={()=>setActiveTab?.("schedule")}><span style={v2CompactTeam}><span style={v2CompactLogo}><TeamLogoMark team={row.team1} size={26}/></span><span>{getTeamAbbreviation(row.team1)}</span></span><b style={v2CompactVs}>VS</b><span style={{...v2CompactTeam,justifyContent:"flex-end"}}><span>{getTeamAbbreviation(row.team2)}</span><span style={v2CompactLogo}><TeamLogoMark team={row.team2} size={26}/></span></span></button>):<div style={v2SuccessState}>✓ Every scheduled game is complete.</div>}</div>
       </div>
     </section>
 
     <section className="cfb-v2-home-grid" style={v2HomeGrid}>
       <div style={v2Panel}>
         <div style={v2PanelHeader}><div><span style={v2Eyebrow}>LIVE LADDER</span><h2>Automatic Rankings</h2></div><button style={v2TextButton} onClick={()=>setShowAllRankings((value)=>!value)}>{showAllRankings?"Show Top 10":"View All"}</button></div>
-        <div style={v2RankingList}>{visibleRankings.map((row)=><button key={row.team.id} style={{...v2RankingRow,borderColor:`${getTeamSecondary(row.team)}44`}} onClick={()=>goToTeam?.(row.team.id)}><b>#{row.rank}</b><TeamLogoMark team={row.team} size={42}/><span style={v2RankingTeam}><strong>{row.teamName}</strong><small>{assignedCoachName(row.team.id,null,users,assignments,currentYear)}</small></span><span>{row.wins}-{row.losses}</span><RankingMovement currentRank={row.rank} previousRank={previousMap.get(String(row.team.id))}/><strong>{row.rating.toFixed(1)}</strong></button>)}</div>
+        <div style={v2RankingTableScroll}>
+          <div style={v2RankingTableHead}><span>Rank</span><span>Team / User</span><span>Move</span><span>Record</span><span>SOR</span><span>Rating</span><span>Avg PA</span><span>Avg PF</span><span>Top 10 Wins</span></div>
+          <div style={v2RankingList}>{visibleRankings.map((row)=><button key={row.team.id} style={{...v2RankingRow,borderColor:`${getTeamSecondary(row.team)}44`}} onClick={()=>goToTeam?.(row.team.id)}><b>#{row.rank}</b><span style={v2RankingIdentity}><span style={v2RankingLogo}><TeamLogoMark team={row.team} size={38}/></span><span style={v2RankingTeam}><strong>{row.teamName}</strong><small>{assignedCoachName(row.team.id,null,users,assignments,currentYear)}</small></span></span><RankingMovement currentRank={row.rank} previousRank={previousMap.get(String(row.team.id))}/><span>{row.wins}-{row.losses}</span><span>{row.sor.toFixed(1)}</span><strong>{row.rating.toFixed(1)}</strong><span>{row.avgPa.toFixed(1)}</span><span>{row.avgPf.toFixed(1)}</span><span>{row.top10}</span></button>)}</div>
+        </div>
       </div>
       <div style={v2Panel}>
         <div style={v2PanelHeader}><div><span style={v2Eyebrow}>RECENT FINALS</span><h2>Latest Results</h2></div><button style={v2TextButton} onClick={()=>setActiveTab?.("schedule")}>All Games →</button></div>
@@ -2467,13 +2516,17 @@ function DashboardV2({ teams = [], users = [], assignments = [], results = [], a
 
     <section className="cfb-v2-home-grid" style={v2HomeGrid}>
       <div style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>COACH SPOTLIGHT</span><h2>League Leader</h2></div></div>{topCoach?<div style={v2CoachSpotlight}><TeamLogoMark team={topCoach.team} size={92} plate/><div><span>{topCoach.teamName}</span><h3>{assignedCoachName(topCoach.team.id,null,users,assignments,currentYear)}</h3><p>Currently ranked #{topCoach.rank} with a {topCoach.wins}-{topCoach.losses} record, {topCoach.sor.toFixed?.(1)||topCoach.sor} SOR, and a {topCoach.rating.toFixed(1)} automatic rating.</p></div></div>:<div style={v2Empty}>No rankings available yet.</div>}</div>
-      <div style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>DYNASTY WIRE</span><h2>League Headlines</h2></div><button style={v2TextButton} onClick={()=>setActiveTab?.("mediaCenter")}>Media Center →</button></div><div style={v2WireList}>{wire.slice(0,6).map((item,index)=><div key={index}><span>{item.icon||"🏈"}</span><div><b>{item.title}</b><small>{item.meta}</small></div></div>)}</div></div>
+      <div style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>DYNASTY WIRE</span><h2>League Headlines</h2></div></div><div style={v2WireList}>{wire.slice(0,6).map((item,index)=><div key={index}><span>{item.icon||"🏈"}</span><div><b>{item.title}</b><small>{item.meta}</small></div></div>)}</div></div>
     </section>
   </main>;
 }
 
 function V2Kpi({label,value,sub,tone}) {
   return <div style={{...v2Kpi,borderTopColor:tone}}><span>{label}</span><b>{value}</b><small>{sub}</small></div>;
+}
+
+function V2LeaderTile({label,rows=[],metric}) {
+  return <article style={v2LeaderTile}><div style={v2LeaderHeader}><span>{label}</span><small>{metric}</small></div><div style={v2LeaderRows}>{rows.length?rows.map((row,index)=><div key={`${label}-${row.name}-${index}`} style={v2LeaderRow}><b>{index+1}</b>{row.team?<span style={v2LeaderLogo}><TeamLogoMark team={row.team} size={26}/></span>:<span style={v2LeaderMonogram}>{String(row.name||"?").slice(0,2).toUpperCase()}</span>}<span><strong>{row.name}</strong><small>{row.detail}</small></span><em>{row.value}</em></div>):<div style={v2LeaderEmpty}>No games recorded</div>}</div></article>;
 }
 
 function PlayoffPictureV2({teams=[],users=[],assignments=[],results=[],currentYear,setActiveTab}) {
@@ -6602,6 +6655,7 @@ function GlobalStyle() {
       @media (max-width: 1050px) {
         .cfb-v2-home-grid, .cfb-v2-admin-grid { grid-template-columns:1fr !important; }
         .cfb-v2-kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
+        .cfb-v2-leader-grid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
         .cfb-v2-game-grid, .cfb-v2-media-grid, .cfb-v2-user-grid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
       }
       @media (max-width: 760px) {
@@ -6614,6 +6668,7 @@ function GlobalStyle() {
       }
       @media (max-width: 520px) {
         .cfb-v2-kpi-grid, .cfb-v2-coach-strip { grid-template-columns:1fr !important; }
+        .cfb-v2-leader-grid { grid-template-columns:1fr !important; }
         .cfb-v2-page { gap:12px !important; }
       }
 `}</style>
@@ -6638,7 +6693,7 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
   const [menuOpen, setMenuOpen] = useState(false);
 
   const groups = [
-    { title: "League Hub", keys: ["dashboard", "schedule", "playoffPicture", "mediaCenter"] },
+    { title: "League Hub", keys: ["dashboard", "schedule"] },
     { title: "Rankings", keys: ["eloRankings", "powerIndex", "conferencePower", "recruitingRankings"] },
     { title: "Teams", keys: ["allTeamsRatings"] },
     { title: "Dynasty Legacy", keys: ["dynastyTimeline", "dynastyRecords", "rivalries", "h2h"] },
@@ -6675,7 +6730,7 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
     const recognition = ["#141128", "#c4b5fd", "#ffffff"];
     const admin = ["#2a123f", "#f97316", "#ffffff"];
 
-    if (["dashboard", "schedule", "playoffPicture", "mediaCenter", "draftRoom"].includes(tabKey)) return main;
+    if (["dashboard", "schedule", "draftRoom"].includes(tabKey)) return main;
     if (["logoManager", "allTeamsRatings", "leagueDataCenter", "recruitingRankings", "resultsManager"].includes(tabKey)) return data;
     if (["dynastyTimeline", "dynastyRecords", "rivalries", "h2h"].includes(tabKey)) return legacy;
     if (["powerIndex", "eloRankings", "conferencePower"].includes(tabKey)) return ranking;
@@ -6772,7 +6827,7 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
       </div>
 
       <nav className="cfb-mobile-nav-v2" style={v2MobileNav} aria-label="Primary mobile navigation">
-        {[["dashboard","Home","⌂"],["schedule","Games","◫"],["playoffPicture","Playoff","♜"],["allTeamsRatings","Teams","◉"]].map(([key,label,icon])=><button key={key} type="button" style={activeTab===key?v2MobileNavActive:v2MobileNavButton} onClick={()=>handleSelect(key)}><b>{icon}</b><span>{label}</span></button>)}
+        {[["dashboard","Home","⌂"],["schedule","Games","◫"],["conferencePower","Conferences","◆"],["allTeamsRatings","Teams","◉"]].map(([key,label,icon])=><button key={key} type="button" style={activeTab===key?v2MobileNavActive:v2MobileNavButton} onClick={()=>handleSelect(key)}><b>{icon}</b><span>{label}</span></button>)}
         <button type="button" style={v2MobileNavButton} onClick={()=>setMenuOpen(true)}><b>☰</b><span>More</span></button>
       </nav>
 
@@ -12430,15 +12485,15 @@ const dashboardConferenceMobileMetricsV91 = {
 };
 
 // CFBElite v2 presentation system
-const v2Page={display:"grid",gap:18,width:"100%",paddingBottom:24};
-const v2PageHero={display:"flex",alignItems:"center",justifyContent:"space-between",gap:22,flexWrap:"wrap",padding:"clamp(20px,3vw,34px)",borderRadius:24,background:"linear-gradient(135deg,rgba(46,16,101,.88),rgba(15,23,42,.97) 56%,rgba(30,64,175,.35))",border:"1px solid rgba(250,204,21,.22)",boxShadow:"0 22px 70px rgba(0,0,0,.28)"};
-const v2Eyebrow={display:"block",color:"#facc15",fontSize:11,fontWeight:1000,letterSpacing:".14em",textTransform:"uppercase",marginBottom:8};
+const v2Page={display:"grid",gap:16,width:"100%",paddingBottom:24};
+const v2PageHero={display:"flex",alignItems:"center",justifyContent:"space-between",gap:22,flexWrap:"wrap",padding:"clamp(20px,3vw,34px)",borderRadius:10,background:"radial-gradient(circle at 88% 0%,rgba(220,38,38,.16),transparent 34%),linear-gradient(118deg,#05070c,#101827 64%,#080b12)",border:"1px solid rgba(255,255,255,.13)",borderTop:"4px solid #dc2626",boxShadow:"0 22px 60px rgba(0,0,0,.34)"};
+const v2Eyebrow={display:"block",color:"#facc15",fontSize:11,fontWeight:1000,letterSpacing:".17em",textTransform:"uppercase",marginBottom:8};
 const v2PageTitle={margin:0,fontSize:"clamp(40px,5.4vw,72px)",lineHeight:.96,letterSpacing:"-.055em",fontWeight:1000,color:"#fff"};
 const v2DashboardTitle={...v2PageTitle,fontSize:"clamp(38px,5vw,66px)",maxWidth:760};
 const v2PageSub={margin:"10px 0 0",color:"#cbd5e1",fontSize:"clamp(13px,1.5vw,16px)",lineHeight:1.55,maxWidth:760};
-const v2Panel={background:"linear-gradient(155deg,rgba(15,23,42,.96),rgba(2,6,23,.985))",border:"1px solid rgba(148,163,184,.15)",borderRadius:20,padding:"clamp(16px,2.2vw,26px)",boxShadow:"0 16px 46px rgba(0,0,0,.24)",minWidth:0,overflow:"hidden"};
+const v2Panel={background:"linear-gradient(155deg,rgba(14,19,30,.985),rgba(4,7,13,.995))",border:"1px solid rgba(255,255,255,.11)",borderRadius:10,padding:"clamp(16px,2.2vw,26px)",boxShadow:"0 16px 42px rgba(0,0,0,.28)",minWidth:0,overflow:"hidden"};
 const v2PanelHeader={display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:16,flexWrap:"wrap",marginBottom:18};
-const v2PrimaryButton={border:"1px solid rgba(253,230,138,.55)",borderRadius:11,padding:"11px 15px",background:"linear-gradient(135deg,#facc15,#d97706)",color:"#111827",fontWeight:1000,cursor:"pointer",boxShadow:"0 10px 24px rgba(250,204,21,.14)"};
+const v2PrimaryButton={border:"1px solid #ef4444",borderRadius:5,padding:"11px 15px",background:"linear-gradient(135deg,#dc2626,#991b1b)",color:"#fff",fontWeight:1000,cursor:"pointer",boxShadow:"0 10px 24px rgba(220,38,38,.16)",textTransform:"uppercase",letterSpacing:".04em"};
 const v2GhostButton={border:"1px solid rgba(148,163,184,.32)",borderRadius:11,padding:"10px 14px",background:"rgba(15,23,42,.78)",color:"#f8fafc",fontWeight:900,cursor:"pointer"};
 const v2TextButton={border:0,background:"transparent",color:"#facc15",fontWeight:900,cursor:"pointer",padding:4};
 const v2DangerSoft={border:"1px solid rgba(248,113,113,.30)",borderRadius:11,padding:"10px 13px",background:"rgba(127,29,29,.22)",color:"#fecaca",fontWeight:900,cursor:"pointer"};
@@ -12458,12 +12513,27 @@ const v2AdvanceCard={display:"grid",gap:4,padding:"16px 18px",borderRadius:16,ba
 const v2HeroControls={gridColumn:"1/-1",display:"flex",gap:10,flexWrap:"wrap",paddingTop:14,borderTop:"1px solid rgba(255,255,255,.08)"};
 const v2KpiGrid={display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:14};
 const v2Kpi={display:"grid",gap:5,padding:"17px 18px",borderRadius:16,background:"rgba(15,23,42,.94)",border:"1px solid rgba(148,163,184,.14)",borderTop:"3px solid #60a5fa",boxShadow:"0 14px 34px rgba(0,0,0,.20)"};
+const v2LeaderGrid={display:"grid",gridTemplateColumns:"repeat(5,minmax(0,1fr))",gap:10};
+const v2LeaderTile={display:"grid",alignContent:"start",minWidth:0,background:"linear-gradient(165deg,#111827,#070a10)",border:"1px solid rgba(255,255,255,.12)",borderTop:"3px solid #dc2626",borderRadius:8,boxShadow:"0 16px 38px rgba(0,0,0,.25)",overflow:"hidden"};
+const v2LeaderHeader={display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,padding:"12px 13px",borderBottom:"1px solid rgba(255,255,255,.10)",color:"#f8fafc",fontSize:11,fontWeight:1000,textTransform:"uppercase",letterSpacing:".065em"};
+const v2LeaderRows={display:"grid",padding:"5px 10px 9px"};
+const v2LeaderRow={display:"grid",gridTemplateColumns:"18px 30px minmax(0,1fr) auto",alignItems:"center",gap:7,minWidth:0,padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,.07)"};
+const v2LeaderLogo={width:30,height:30,display:"grid",placeItems:"center",overflow:"hidden"};
+const v2LeaderMonogram={width:27,height:27,display:"grid",placeItems:"center",borderRadius:4,background:"#1f2937",color:"#facc15",fontSize:9,fontWeight:1000};
+const v2LeaderEmpty={padding:16,color:"#64748b",fontSize:12,textAlign:"center"};
 const v2HomeGrid={display:"grid",gridTemplateColumns:"minmax(0,1.35fr) minmax(320px,.75fr)",gap:18,alignItems:"start"};
 const v2HomeFeatured={display:"grid",gridTemplateColumns:"minmax(0,1fr) auto minmax(0,1fr)",gap:20,alignItems:"center",padding:"24px 18px",borderRadius:18,border:"1px solid rgba(255,255,255,.10)"};
 const v2CompactList={display:"grid",gap:9};
-const v2CompactGame={display:"grid",gridTemplateColumns:"1fr auto 1fr",alignItems:"center",gap:8,width:"100%",padding:"10px 12px",borderRadius:12,border:"1px solid rgba(148,163,184,.14)",background:"rgba(255,255,255,.035)",color:"#fff",cursor:"pointer"};
+const v2CompactGame={display:"grid",gridTemplateColumns:"minmax(0,1fr) 34px minmax(0,1fr)",alignItems:"center",gap:8,width:"100%",padding:"10px 12px",borderRadius:6,border:"1px solid rgba(148,163,184,.16)",background:"rgba(255,255,255,.035)",color:"#fff",cursor:"pointer",overflow:"hidden"};
+const v2CompactTeam={display:"flex",alignItems:"center",gap:7,minWidth:0,overflow:"hidden",whiteSpace:"nowrap",fontWeight:800};
+const v2CompactLogo={width:30,height:30,minWidth:30,display:"grid",placeItems:"center",overflow:"hidden"};
+const v2CompactVs={textAlign:"center",fontSize:10,letterSpacing:".1em",color:"#94a3b8"};
 const v2RankingList={display:"grid",gap:8};
-const v2RankingRow={display:"grid",gridTemplateColumns:"42px 48px minmax(140px,1fr) 64px 60px 68px",alignItems:"center",gap:8,width:"100%",padding:"10px 12px",borderRadius:13,border:"1px solid rgba(148,163,184,.14)",background:"rgba(255,255,255,.035)",color:"#fff",cursor:"pointer",textAlign:"left"};
+const v2RankingTableScroll={overflowX:"auto",paddingBottom:3};
+const v2RankingTableHead={display:"grid",gridTemplateColumns:"54px minmax(210px,1.35fr) 62px 72px 70px 78px 76px 76px 98px",alignItems:"center",gap:9,minWidth:900,padding:"9px 12px",background:"#05070c",borderBottom:"2px solid #dc2626",color:"#94a3b8",fontSize:10,fontWeight:1000,letterSpacing:".07em",textTransform:"uppercase"};
+const v2RankingRow={display:"grid",gridTemplateColumns:"54px minmax(210px,1.35fr) 62px 72px 70px 78px 76px 76px 98px",alignItems:"center",gap:9,minWidth:900,width:"100%",padding:"10px 12px",borderRadius:4,border:"1px solid rgba(148,163,184,.14)",borderLeft:"3px solid #dc2626",background:"rgba(255,255,255,.035)",color:"#fff",cursor:"pointer",textAlign:"left"};
+const v2RankingIdentity={display:"grid",gridTemplateColumns:"42px minmax(0,1fr)",alignItems:"center",gap:9,minWidth:0};
+const v2RankingLogo={width:40,height:40,display:"grid",placeItems:"center",overflow:"hidden"};
 const v2RankingTeam={display:"grid",gap:2,minWidth:0};
 const v2MovementUp={color:"#86efac",fontSize:12,fontWeight:1000};
 const v2MovementDown={color:"#fca5a5",fontSize:12,fontWeight:1000};
@@ -12487,7 +12557,7 @@ const v2WeekTab={border:"1px solid rgba(148,163,184,.22)",borderRadius:999,paddi
 const v2WeekTabActive={...v2WeekTab,background:"#facc15",borderColor:"#fde68a",color:"#111827"};
 const v2FilterInputs={display:"grid",gridTemplateColumns:"minmax(220px,1fr) 180px auto",gap:10};
 const v2GameGrid={display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:14};
-const v2GameCard={display:"grid",gap:14,padding:16,borderRadius:18,background:"linear-gradient(155deg,rgba(15,23,42,.96),rgba(2,6,23,.99))",border:"1px solid rgba(148,163,184,.16)",boxShadow:"0 16px 42px rgba(0,0,0,.24)",minWidth:0};
+const v2GameCard={display:"grid",gap:14,padding:16,borderRadius:8,background:"linear-gradient(155deg,rgba(14,19,30,.985),rgba(4,7,13,.995))",border:"1px solid rgba(255,255,255,.12)",borderTop:"3px solid #dc2626",boxShadow:"0 16px 42px rgba(0,0,0,.28)",minWidth:0};
 const v2GameCardTop={display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,color:"#cbd5e1",fontSize:12,fontWeight:900};
 const v2FinalBadge={padding:"5px 8px",borderRadius:999,background:"rgba(22,163,74,.18)",color:"#86efac",border:"1px solid rgba(74,222,128,.24)"};
 const v2UpcomingBadge={...v2FinalBadge,background:"rgba(37,99,235,.18)",color:"#bfdbfe",borderColor:"rgba(96,165,250,.24)"};
@@ -12527,7 +12597,7 @@ const v2FormWin={display:"inline-grid",placeItems:"center",width:24,height:24,bo
 const v2FormLoss={...v2FormWin,background:"#991b1b",color:"#fee2e2"};
 const v2NextOpponent={display:"flex",alignItems:"center",gap:7};
 
-const v2MobileNav={position:"fixed",left:"max(10px,env(safe-area-inset-left))",right:"max(10px,env(safe-area-inset-right))",bottom:"max(10px,env(safe-area-inset-bottom))",zIndex:150,gridTemplateColumns:"repeat(5,1fr)",gap:5,padding:7,borderRadius:18,background:"rgba(2,6,23,.94)",border:"1px solid rgba(250,204,21,.22)",backdropFilter:"blur(18px)",boxShadow:"0 18px 60px rgba(0,0,0,.48)"};
+const v2MobileNav={position:"fixed",left:"max(10px,env(safe-area-inset-left))",right:"max(10px,env(safe-area-inset-right))",bottom:"max(10px,env(safe-area-inset-bottom))",zIndex:150,gridTemplateColumns:"repeat(4,1fr)",gap:5,padding:7,borderRadius:10,background:"rgba(2,6,23,.96)",border:"1px solid rgba(255,255,255,.16)",borderTop:"3px solid #dc2626",backdropFilter:"blur(18px)",boxShadow:"0 18px 60px rgba(0,0,0,.48)"};
 const v2MobileNavButton={display:"grid",justifyItems:"center",gap:2,padding:"7px 3px",border:0,borderRadius:11,background:"transparent",color:"#94a3b8",fontSize:10,fontWeight:900,cursor:"pointer"};
 const v2MobileNavActive={...v2MobileNavButton,background:"rgba(250,204,21,.15)",color:"#facc15"};
 
