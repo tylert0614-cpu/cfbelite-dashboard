@@ -377,7 +377,7 @@ function activeAssignmentsForYear(assignments, year) {
 }
 
 function activeTeamIdsForYear(assignments, year) {
-  return new Set(activeAssignmentsForYear(assignments, year).map((assignment) => assignment.team_id).filter(Boolean));
+  return new Set(activeAssignmentsForYear(assignments, year).map((assignment) => String(assignment.team_id)).filter(Boolean));
 }
 
 function teamNameById(teamId, teams) {
@@ -780,7 +780,7 @@ export default function App() {
     () => activeTeamIdsForYear(assignments, currentYear),
     [assignments, currentYear]
   );
-  const activeTeamOptions = useMemo(() => teamOptions.filter((team) => activeTeamIds.has(team.id)), [teamOptions, activeTeamIds]);
+  const activeTeamOptions = useMemo(() => teamOptions.filter((team) => activeTeamIds.has(String(team.id))), [teamOptions, activeTeamIds]);
   const selectedTeamRaw = activeTab.startsWith("team-") ? teams.find((team) => `team-${team.id}` === activeTab) : null;
   function assignmentForTeam(teamId) {
     return assignments.find((row) => String(row.team_id) === String(teamId) && assignmentActiveForYear(row, currentYear)) ||
@@ -848,7 +848,7 @@ export default function App() {
     setActiveTab(`team-${teamId}`);
   }
   async function saveCommissionerRankings(order) {
-    const activeOrder = order.filter((teamId) => activeTeamIds.has(teamId));
+    const activeOrder = order.filter((teamId) => activeTeamIds.has(String(teamId)));
     const payload = activeOrder.map((teamId, index) => ({
       team_id: teamId,
       rank: index + 1,
@@ -1479,7 +1479,7 @@ export default function App() {
 
   return <><GlobalStyle/><div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={isErrorMessage(error) ? errorBox : successBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} draggedTab={draggedTab} setDraggedTab={setDraggedTab} reorderTabs={reorderTabs} adminUnlocked={adminUnlocked} adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin} teams={teamOptions} assignments={assignments} currentYear={currentYear} users={userOptions}/>
     {activeTab === "draftRoom" && <DraftRoom teams={teamOptions} users={userOptions} picks={draftPicks27} settings={draftSettings27} conferenceAssets={conferenceAssets} startClock={startDraftClock} pauseClock={pauseDraftClock} resumeClock={resumeDraftClock} announcePick={announceDraftPick} revealPick={revealDraftPick} undoPick={undoDraftPick}/>}     
-    {activeTab === "dashboard" && <DashboardV2 teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} weeklyMatchups={weeklyMatchups} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} teamSeasonStats={teamSeasonStats} currentYear={currentYear} currentWeek={currentWeek} advanceAt={advanceAt} rankingSnapshots={rankingSnapshots} adminUnlocked={adminUnlocked} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)})); setNewWeeklyMatchup((prev)=>({...prev,season_year:Number(value)}));}} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value})); setNewWeeklyMatchup((prev)=>({...prev,week:value}));}} saveSettings={saveLeagueSettings} goToTeam={goToTeam} setActiveTab={setActiveTab}/>}
+    {activeTab === "dashboard" && <DashboardV2 teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} weeklyMatchups={weeklyMatchups} conferenceAssets={conferenceAssets} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} teamSeasonStats={teamSeasonStats} currentYear={currentYear} currentWeek={currentWeek} advanceAt={advanceAt} rankingSnapshots={rankingSnapshots} adminUnlocked={adminUnlocked} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)})); setNewWeeklyMatchup((prev)=>({...prev,season_year:Number(value)}));}} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value})); setNewWeeklyMatchup((prev)=>({...prev,week:value}));}} saveSettings={saveLeagueSettings} goToTeam={goToTeam} setActiveTab={setActiveTab}/>}
     {activeTab === "schedule" && <GameCenterV2 teams={teamOptions} users={userOptions} assignments={assignments} weeklyMatchups={weeklyMatchups} results={results} currentYear={currentYear} currentWeek={currentWeek} conferenceAssets={conferenceAssets} adminUnlocked={adminUnlocked} loadData={loadData} setActiveTab={setActiveTab}/>}
     {activeTab === "eloRankings" && <EloRankings users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
     {activeTab === "dynastyRecords" && <DynastyRecords users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} seasonPlayerStats={seasonPlayerStats} teamSeasonStats={teamSeasonStats}/>}    
@@ -1489,7 +1489,7 @@ export default function App() {
     {activeTab === "logoManager" && <LogoManager teams={teamOptions} updateRow={updateRow} conferenceAssets={conferenceAssets} saveConferenceAsset={saveConferenceAsset}/>}    
     {activeTab === "allTeamsRatings" && <AllTeamsRatings teams={teamOptions}/>}    
     {activeTab === "leagueDataCenter" && <LeagueDataCenter teams={teamOptions} users={userOptions} assignments={assignments} results={results} currentYear={currentYear} currentWeek={currentWeek} setError={setError} loadData={loadData}/>}
-    {activeTab === "conferencePower" && <ConferencePowerRankings teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
+    {activeTab === "conferencePower" && <ConferencePowerRankings teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} conferenceAssets={conferenceAssets} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
     {activeTab === "weeklyMedia" && <WeeklyMedia teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} weeklyMatchups={weeklyMatchups} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} currentWeek={currentWeek}/>}    
     {activeTab === "weeklyMatchups" && (adminUnlocked ? <ScheduleManagerV2 rows={weeklyMatchups} newMatchup={newWeeklyMatchup} setNewMatchup={setNewWeeklyMatchup} teams={activeTeamOptions} users={activeUserOptions} assignments={assignments} currentYear={currentYear} currentWeek={currentWeek} addMatchup={addWeeklyMatchup} deleteRow={deleteRow} matchupImportText={matchupImportText} setMatchupImportText={setMatchupImportText} importWeeklyMatchups={importWeeklyMatchups} loadData={loadData} setError={setError}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>) }    
     {activeTab === "userManager" && (adminUnlocked ? <UserManagerV2 users={userOptions} assignments={assignments} teams={teamOptions} addDiscordUser={addDiscordUser} renameDiscordUser={renameDiscordUser} setDiscordUserActive={setDiscordUserActive}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>) }
@@ -2361,7 +2361,7 @@ function GameCenterV2({ teams = [], users = [], assignments = [], weeklyMatchups
     </div>}
     <div style={v2FilterBar}>
       <div className="cfb-v2-week-tabs" style={v2WeekTabs}><button style={weekFilter==="all"?v2WeekTabActive:v2WeekTab} onClick={()=>setWeekFilter("all")}>All</button>{weeks.map((week)=><button key={week} style={weekFilter===week?v2WeekTabActive:v2WeekTab} onClick={()=>setWeekFilter(week)}>{week}</button>)}</div>
-      <div style={v2FilterInputs}><input style={v2Input} value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Search team or Discord user"/><select style={v2Input} value={statusFilter} onChange={(e)=>setStatusFilter(e.target.value)}><option value="all">All Games</option><option value="upcoming">Upcoming</option><option value="final">Final</option></select>{adminUnlocked&&<button style={v2PrimaryButton} onClick={()=>setActiveTab?.("weeklyMatchups")}>Manage Schedule</button>}</div>
+      <div className="cfb-v2-filter-inputs" style={v2FilterInputs}><input style={v2Input} value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Search team or Discord user"/><select style={v2Input} value={statusFilter} onChange={(e)=>setStatusFilter(e.target.value)}><option value="all">All Games</option><option value="upcoming">Upcoming</option><option value="final">Final</option></select>{adminUnlocked&&<button style={v2PrimaryButton} onClick={()=>setActiveTab?.("weeklyMatchups")}>Manage Schedule</button>}</div>
     </div>
     <div className="cfb-v2-game-grid" style={v2GameGrid}>{rows.length?rows.map((row)=><article key={row.id||`${row.week}-${row.team_1_id}-${row.team_2_id}`} style={{...v2GameCard,borderColor:`${getTeamSecondary(row.team1)}55`}}>
       <div style={v2GameCardTop}><span>{row.week}</span><b style={row.result?v2FinalBadge:v2UpcomingBadge}>{row.result?"FINAL":"UPCOMING"}</b></div>
@@ -2387,8 +2387,8 @@ function V2MatchupTeam({team,rank,user,compact=false,side}) {
 
 function conferencePowerData({ teams = [], users = [], assignments = [], results = [], allResults = [], allAmericans = [], awards = [], heismans = [], nationalChampions = [], recruiting = [] }) {
   const activeAssignments = assignments.filter((assignment)=>assignment.status === "Active" && assignment.team_id && assignment.discord_user_id);
-  const activeTeamIds = new Set(activeAssignments.map((assignment)=>assignment.team_id));
-  const activeTeams = teams.filter((team)=>activeTeamIds.has(team.id));
+  const activeTeamIds = new Set(activeAssignments.map((assignment)=>String(assignment.team_id)));
+  const activeTeams = teams.filter((team)=>activeTeamIds.has(String(team.id)));
   const rankingRows = computerRankingRows(activeTeams, results, assignments, users);
   const eloRows = userEloRows(users, assignments, allResults.length ? allResults : results);
   const eloMap = new Map(eloRows.map((row)=>[row.user.id,row.adjustedElo || row.elo]));
@@ -2433,8 +2433,7 @@ function conferencePowerData({ teams = [], users = [], assignments = [], results
   }).sort((a,b)=>b.power-a.power);
 }
 
-function DashboardV2({ teams = [], users = [], assignments = [], results = [], allResults = [], weeklyMatchups = [], allAmericans = [], awards = [], heismans = [], nationalChampions = [], recruiting = [], teamSeasonStats = [], currentYear, currentWeek, advanceAt, setCurrentYear, setCurrentWeek, saveSettings, goToTeam, setActiveTab, rankingSnapshots = [], adminUnlocked = false }) {
-  const [showAllRankings,setShowAllRankings]=useState(false);
+function DashboardV2({ teams = [], users = [], assignments = [], results = [], allResults = [], weeklyMatchups = [], conferenceAssets = [], allAmericans = [], awards = [], heismans = [], nationalChampions = [], recruiting = [], teamSeasonStats = [], currentYear, currentWeek, advanceAt, setCurrentYear, setCurrentWeek, saveSettings, goToTeam, setActiveTab, rankingSnapshots = [], adminUnlocked = false }) {
   const now=useLiveClock(30000);
   const countdown=countdownParts(advanceAt,now);
   const seasonResults=(allResults||results||[]).filter((row)=>String(row.season_year)===String(currentYear));
@@ -2459,15 +2458,16 @@ function DashboardV2({ teams = [], users = [], assignments = [], results = [], a
   const prestigeRows=typeof dynastyPrestigeRows==="function"?dynastyPrestigeRows(teams,assignments,allResults,allAmericans,awards,heismans,nationalChampions,recruiting,teamSeasonStats).slice(0,5):[];
   const wire=typeof dynastyWireItems==="function"?dynastyWireItems({rankingDetails:rankings.map((row)=>({...row,record:recordFromResults(row.team.id,seasonResults),user:assignedCoachName(row.team.id,null,users,assignments,currentYear)})),results:allResults,teams,recruiting,prestigeRows,currentYear}):[];
   const progress=weekGames.length?Math.round((completed.length/weekGames.length)*100):0;
-  const visibleRankings=showAllRankings?rankings:rankings.slice(0,10);
+  const visibleRankings=rankings;
   const topUsers=rankings.slice(0,3).map((row)=>({name:assignedCoachName(row.team.id,null,users,assignments,currentYear),detail:`#${row.rank} ${row.teamName}`,value:row.rating.toFixed(1),team:row.team}));
-  const topConferences=conferencePowerData({teams,users,assignments,results:seasonResults,allResults,allAmericans,awards,heismans,nationalChampions,recruiting}).slice(0,3).map((row,index)=>({name:row.conference,detail:`#${index+1} Conference`,value:row.power.toFixed(1)}));
+  const conferenceRows=conferencePowerData({teams,users,assignments,results:seasonResults,allResults,allAmericans,awards,heismans,nationalChampions,recruiting});
+  const topConferences=conferenceRows.slice(0,3).map((row,index)=>({name:row.conference,conference:row.conference,detail:`#${index+1} Conference`,value:row.power.toFixed(1)}));
   const topSor=[...rankings].filter((row)=>row.games>0).sort((a,b)=>b.sor-a.sor).slice(0,3).map((row)=>({name:row.teamName,detail:assignedCoachName(row.team.id,null,users,assignments,currentYear),value:row.sor.toFixed(1),team:row.team}));
   const topAvgPf=[...rankings].filter((row)=>row.games>0).sort((a,b)=>b.avgPf-a.avgPf).slice(0,3).map((row)=>({name:row.teamName,detail:assignedCoachName(row.team.id,null,users,assignments,currentYear),value:row.avgPf.toFixed(1),team:row.team}));
   const topAvgPa=[...rankings].filter((row)=>row.games>0).sort((a,b)=>a.avgPa-b.avgPa).slice(0,3).map((row)=>({name:row.teamName,detail:assignedCoachName(row.team.id,null,users,assignments,currentYear),value:row.avgPa.toFixed(1),team:row.team}));
 
   return <main className="cfb-v2-page" style={v2Page}>
-    <section style={v2DashboardHero}>
+    <section className="cfb-v2-dashboard-hero" style={v2DashboardHero}>
       <div><span style={v2Eyebrow}>CFBELITE 27 • DYNASTY HQ</span><h1 style={v2DashboardTitle}>This Week in CFBElite</h1><p style={v2PageSub}>{currentYear} season • {currentWeek} • Live league operations and competition hub</p></div>
       <div style={v2AdvanceCard}><span>Next Advancement</span><b>{countdown?.label||"Not scheduled"}</b><small>{advanceAt?new Date(advanceAt).toLocaleString():"Commissioner can set the deadline"}</small></div>
       {adminUnlocked&&<div style={v2HeroControls}><select value={currentYear} onChange={(e)=>setCurrentYear(e.target.value)} style={v2Input}>{YEARS.map((year)=><option key={year}>{year}</option>)}</select><select value={currentWeek} onChange={(e)=>setCurrentWeek(e.target.value)} style={v2Input}>{WEEKS.map((week)=><option key={week}>{week}</option>)}</select><button style={v2PrimaryButton} onClick={saveSettings}>Save League Week</button></div>}
@@ -2475,7 +2475,7 @@ function DashboardV2({ teams = [], users = [], assignments = [], results = [], a
 
     <section className="cfb-v2-leader-grid" style={v2LeaderGrid}>
       <V2LeaderTile label="Top 3 Ranked Users" rows={topUsers} metric="Rating"/>
-      <V2LeaderTile label="Top 3 Conferences" rows={topConferences} metric="Power"/>
+      <V2LeaderTile label="Top 3 Conferences" rows={topConferences} metric="Power" conferenceAssets={conferenceAssets}/>
       <V2LeaderTile label="Top 3 SOR" rows={topSor} metric="SOR"/>
       <V2LeaderTile label="Top 3 Avg PF" rows={topAvgPf} metric="PF"/>
       <V2LeaderTile label="Top 3 Avg PA" rows={topAvgPa} metric="PA"/>
@@ -2499,10 +2499,10 @@ function DashboardV2({ teams = [], users = [], assignments = [], results = [], a
 
     <section className="cfb-v2-home-grid" style={v2HomeGrid}>
       <div style={v2Panel}>
-        <div style={v2PanelHeader}><div><span style={v2Eyebrow}>LIVE LADDER</span><h2>Automatic Rankings</h2></div><button style={v2TextButton} onClick={()=>setShowAllRankings((value)=>!value)}>{showAllRankings?"Show Top 10":"View All"}</button></div>
+        <div style={v2PanelHeader}><div><span style={v2Eyebrow}>LIVE LADDER</span><h2>Automatic Rankings</h2></div><span style={v2CountPill}>{rankings.length} Active Teams</span></div>
         <div style={v2RankingTableScroll}>
-          <div style={v2RankingTableHead}><span>Rank</span><span>Team / User</span><span>Move</span><span>Record</span><span>SOR</span><span>Rating</span><span>Avg PA</span><span>Avg PF</span><span>Top 10 Wins</span></div>
-          <div style={v2RankingList}>{visibleRankings.map((row)=><button key={row.team.id} style={{...v2RankingRow,borderColor:`${getTeamSecondary(row.team)}44`}} onClick={()=>goToTeam?.(row.team.id)}><b>#{row.rank}</b><span style={v2RankingIdentity}><span style={v2RankingLogo}><TeamLogoMark team={row.team} size={38}/></span><span style={v2RankingTeam}><strong>{row.teamName}</strong><small>{assignedCoachName(row.team.id,null,users,assignments,currentYear)}</small></span></span><RankingMovement currentRank={row.rank} previousRank={previousMap.get(String(row.team.id))}/><span>{row.wins}-{row.losses}</span><span>{row.sor.toFixed(1)}</span><strong>{row.rating.toFixed(1)}</strong><span>{row.avgPa.toFixed(1)}</span><span>{row.avgPf.toFixed(1)}</span><span>{row.top10}</span></button>)}</div>
+          <div className="cfb-v2-ranking-head" style={v2RankingTableHead}><span>Rank</span><span>Team / User</span><span>Move</span><span>Record</span><span>SOR</span><span>Rating</span><span>Avg PA</span><span>Avg PF</span><span>Top 10 Wins</span></div>
+          <div style={v2RankingList}>{visibleRankings.map((row)=><button className="cfb-v2-ranking-row" key={row.team.id} style={{...v2RankingRow,borderColor:`${getTeamSecondary(row.team)}44`}} onClick={()=>goToTeam?.(row.team.id)}><b>#{row.rank}</b><span style={v2RankingIdentity}><span style={v2RankingLogo}><TeamLogoMark team={row.team} size={38}/></span><span style={v2RankingTeam}><strong>{row.teamName}</strong><small>{assignedCoachName(row.team.id,null,users,assignments,currentYear)}</small></span></span><RankingMovement currentRank={row.rank} previousRank={previousMap.get(String(row.team.id))}/><span>{row.wins}-{row.losses}</span><span>{row.sor.toFixed(1)}</span><strong>{row.rating.toFixed(1)}</strong><span>{row.avgPa.toFixed(1)}</span><span>{row.avgPf.toFixed(1)}</span><span>{row.top10}</span></button>)}</div>
         </div>
       </div>
       <div style={v2Panel}>
@@ -2511,6 +2511,14 @@ function DashboardV2({ teams = [], users = [], assignments = [], results = [], a
           const team1=row.team_1||teams.find((team)=>String(team.id)===String(row.team_1_id)); const team2=row.team_2||teams.find((team)=>String(team.id)===String(row.team_2_id));
           return <div key={row.id} style={v2ResultRow}><span><TeamLogoMark team={team1} size={30}/>{getTeamAbbreviation(team1)}</span><b>{row.team_1_score}–{row.team_2_score}</b><span>{getTeamAbbreviation(team2)}<TeamLogoMark team={team2} size={30}/></span><small>{row.week}</small></div>;
         }):<div style={v2Empty}>No final scores recorded yet.</div>}</div>
+      </div>
+    </section>
+
+    <section style={v2Panel}>
+      <div style={v2PanelHeader}><div><span style={v2Eyebrow}>CONFERENCE REPORT</span><h2>Conference Power Rankings</h2></div><button style={v2TextButton} onClick={()=>setActiveTab?.("conferencePower")}>Full Conference Page →</button></div>
+      <div className="cfb-v2-conference-scroll" style={v2ConferenceTableScroll}>
+        <div style={v2ConferenceTableHead}><span>#</span><span>Conference</span><span>Power</span><span>Performance</span><span>User ELO</span><span>Titles</span><span>Recruiting</span><span>Recognition</span><span>Record</span><span>Users</span></div>
+        {conferenceRows.map((row,index)=><div key={row.conference} style={v2ConferenceTableRow}><b>#{index+1}</b><span style={v2ConferenceIdentity}><ConferenceLogoMark conference={row.conference} conferenceAssets={conferenceAssets} size={34}/><strong>{row.conference}</strong></span><strong>{row.power.toFixed(1)}</strong><span>{row.currentPerformanceScore.toFixed(1)}</span><span>{row.userStrength.toFixed(1)}</span><span>{row.championshipScore.toFixed(1)}</span><span>{row.recruitingAvg.toFixed(1)}</span><span>{row.recognitionScore.toFixed(1)}</span><span>{row.recordWins}-{row.recordLosses}</span><span>{row.teams}</span></div>)}
       </div>
     </section>
 
@@ -2525,8 +2533,8 @@ function V2Kpi({label,value,sub,tone}) {
   return <div style={{...v2Kpi,borderTopColor:tone}}><span>{label}</span><b>{value}</b><small>{sub}</small></div>;
 }
 
-function V2LeaderTile({label,rows=[],metric}) {
-  return <article style={v2LeaderTile}><div style={v2LeaderHeader}><span>{label}</span><small>{metric}</small></div><div style={v2LeaderRows}>{rows.length?rows.map((row,index)=><div key={`${label}-${row.name}-${index}`} style={v2LeaderRow}><b>{index+1}</b>{row.team?<span style={v2LeaderLogo}><TeamLogoMark team={row.team} size={26}/></span>:<span style={v2LeaderMonogram}>{String(row.name||"?").slice(0,2).toUpperCase()}</span>}<span><strong>{row.name}</strong><small>{row.detail}</small></span><em>{row.value}</em></div>):<div style={v2LeaderEmpty}>No games recorded</div>}</div></article>;
+function V2LeaderTile({label,rows=[],metric,conferenceAssets=[]}) {
+  return <article style={v2LeaderTile}><div style={v2LeaderHeader}><span>{label}</span><small>{metric}</small></div><div style={v2LeaderRows}>{rows.length?rows.map((row,index)=><div key={`${label}-${row.name}-${index}`} style={v2LeaderRow}><b>{index+1}</b>{row.team?<span style={v2LeaderLogo}><TeamLogoMark team={row.team} size={26}/></span>:row.conference?<span style={v2LeaderLogo}><ConferenceLogoMark conference={row.conference} conferenceAssets={conferenceAssets} size={26}/></span>:<span style={v2LeaderMonogram}>{String(row.name||"?").slice(0,2).toUpperCase()}</span>}<span style={v2LeaderText}><strong>{row.name}</strong><small>{row.detail}</small></span><em style={v2LeaderValue}>{row.value}</em></div>):<div style={v2LeaderEmpty}>No games recorded</div>}</div></article>;
 }
 
 function PlayoffPictureV2({teams=[],users=[],assignments=[],results=[],currentYear,setActiveTab}) {
@@ -3005,10 +3013,10 @@ function CommissionerCenter({ currentYear, currentWeek, setActiveTab, saveLeague
 }
 
 
-function ConferencePowerRankings({ teams, users, assignments, results, allResults = [], allAmericans = [], awards = [], heismans = [], nationalChampions = [], recruiting = [] }) {
+function ConferencePowerRankings({ teams, users, assignments, results, allResults = [], conferenceAssets = [], allAmericans = [], awards = [], heismans = [], nationalChampions = [], recruiting = [] }) {
   const activeAssignments = assignments.filter((assignment)=>assignment.status === "Active" && assignment.team_id && assignment.discord_user_id);
-  const activeTeamIds = new Set(activeAssignments.map((assignment)=>assignment.team_id));
-  const activeTeams = teams.filter((team)=>activeTeamIds.has(team.id));
+  const activeTeamIds = new Set(activeAssignments.map((assignment)=>String(assignment.team_id)));
+  const activeTeams = teams.filter((team)=>activeTeamIds.has(String(team.id)));
   const rankingRows = computerRankingRows(activeTeams, results, assignments, users);
   const eloRows = userEloRows(users, assignments, allResults.length ? allResults : results);
   const eloMap = new Map(eloRows.map((row) => [row.user.id, row.adjustedElo || row.elo]));
@@ -3097,7 +3105,7 @@ function ConferencePowerRankings({ teams, users, assignments, results, allResult
         {ranked.map((row,index)=>(
           <tr key={row.conference} style={trStyle}>
             <td style={rankCell}>#{index+1}</td>
-            <td style={teamCell}>{row.conference}</td>
+            <td style={teamCell}><span style={v2ConferenceIdentity}><ConferenceLogoMark conference={row.conference} conferenceAssets={conferenceAssets} size={34}/><strong>{row.conference}</strong></span></td>
             <td style={scoreCell}>{row.power}</td>
             <td style={td}>{row.currentPerformanceScore.toFixed(1)}</td>
             <td style={td}>{row.userStrength.toFixed(1)}</td>
@@ -6647,6 +6655,8 @@ function GlobalStyle() {
       .cfb-v2-week-tabs { scrollbar-width: thin; }
       .cfb-v2-week-tabs::-webkit-scrollbar { height: 6px; }
       .cfb-v2-week-tabs::-webkit-scrollbar-thumb { background: rgba(148,163,184,.35); border-radius: 999px; }
+      .cfb-v2-ranking-row > span, .cfb-v2-ranking-row > strong { white-space:nowrap; }
+      .cfb-v2-conference-scroll, .cfb-v2-ranking-table-scroll { scrollbar-width:thin; scrollbar-color:rgba(220,38,38,.7) rgba(255,255,255,.06); }
       .cfb-mobile-nav-v2 { display:none !important; }
       @keyframes cfbV2Fade { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:none; } }
       @media (prefers-reduced-motion: reduce) {
@@ -6661,10 +6671,14 @@ function GlobalStyle() {
       @media (max-width: 760px) {
         body { padding-bottom:82px; }
         .cfb-mobile-nav-v2 { display:grid !important; }
+        .cfb-v2-dashboard-hero { grid-template-columns:1fr !important; align-items:start !important; }
+        .cfb-v2-dashboard-hero > * { min-width:0 !important; width:100% !important; }
+        .cfb-v2-filter-inputs { grid-template-columns:1fr !important; }
         .cfb-v2-featured-matchup { grid-template-columns:1fr !important; }
         .cfb-v2-game-grid, .cfb-v2-media-grid, .cfb-v2-user-grid, .cfb-v2-bye-grid, .cfb-v2-playoff-grid, .cfb-v2-form-grid { grid-template-columns:1fr !important; }
         .cfb-v2-coach-strip { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
         .cfb-v2-page h1 { font-size:clamp(34px,10vw,50px) !important; }
+        .cfb-v2-ranking-head, .cfb-v2-ranking-row { min-width:850px !important; }
       }
       @media (max-width: 520px) {
         .cfb-v2-kpi-grid, .cfb-v2-coach-strip { grid-template-columns:1fr !important; }
@@ -12520,6 +12534,8 @@ const v2LeaderRows={display:"grid",padding:"5px 10px 9px"};
 const v2LeaderRow={display:"grid",gridTemplateColumns:"18px 30px minmax(0,1fr) auto",alignItems:"center",gap:7,minWidth:0,padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,.07)"};
 const v2LeaderLogo={width:30,height:30,display:"grid",placeItems:"center",overflow:"hidden"};
 const v2LeaderMonogram={width:27,height:27,display:"grid",placeItems:"center",borderRadius:4,background:"#1f2937",color:"#facc15",fontSize:9,fontWeight:1000};
+const v2LeaderText={display:"grid",gap:2,minWidth:0,overflow:"hidden"};
+const v2LeaderValue={fontStyle:"normal",fontWeight:1000,color:"#facc15",fontSize:12};
 const v2LeaderEmpty={padding:16,color:"#64748b",fontSize:12,textAlign:"center"};
 const v2HomeGrid={display:"grid",gridTemplateColumns:"minmax(0,1.35fr) minmax(320px,.75fr)",gap:18,alignItems:"start"};
 const v2HomeFeatured={display:"grid",gridTemplateColumns:"minmax(0,1fr) auto minmax(0,1fr)",gap:20,alignItems:"center",padding:"24px 18px",borderRadius:18,border:"1px solid rgba(255,255,255,.10)"};
@@ -12535,6 +12551,10 @@ const v2RankingRow={display:"grid",gridTemplateColumns:"54px minmax(210px,1.35fr
 const v2RankingIdentity={display:"grid",gridTemplateColumns:"42px minmax(0,1fr)",alignItems:"center",gap:9,minWidth:0};
 const v2RankingLogo={width:40,height:40,display:"grid",placeItems:"center",overflow:"hidden"};
 const v2RankingTeam={display:"grid",gap:2,minWidth:0};
+const v2ConferenceTableScroll={overflowX:"auto",border:"1px solid rgba(255,255,255,.10)",borderRadius:6};
+const v2ConferenceTableHead={display:"grid",gridTemplateColumns:"48px minmax(190px,1.3fr) 74px 96px 80px 74px 90px 96px 84px 60px",alignItems:"center",gap:10,minWidth:940,padding:"10px 12px",background:"#05070c",borderBottom:"2px solid #dc2626",color:"#94a3b8",fontSize:10,fontWeight:1000,letterSpacing:".07em",textTransform:"uppercase"};
+const v2ConferenceTableRow={display:"grid",gridTemplateColumns:"48px minmax(190px,1.3fr) 74px 96px 80px 74px 90px 96px 84px 60px",alignItems:"center",gap:10,minWidth:940,padding:"11px 12px",borderBottom:"1px solid rgba(255,255,255,.08)",background:"rgba(255,255,255,.025)",color:"#e5e7eb",fontSize:12};
+const v2ConferenceIdentity={display:"flex",alignItems:"center",gap:10,minWidth:0,whiteSpace:"nowrap"};
 const v2MovementUp={color:"#86efac",fontSize:12,fontWeight:1000};
 const v2MovementDown={color:"#fca5a5",fontSize:12,fontWeight:1000};
 const v2MovementEven={color:"#64748b",fontSize:12,fontWeight:1000};
