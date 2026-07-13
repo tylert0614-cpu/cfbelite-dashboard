@@ -241,14 +241,14 @@ function ConferenceLogoMark({ conference, conferenceAssets = [], size = 42 }) {
 function TeamLogoMark({ team, size = 34, faded = false, plate = false }) {
   const url = team?.logo_url || team?.logo || team?.image_url;
   const baseSize = Number(size) || 34;
-  const imageSize = Math.round(baseSize * (plate ? 1.18 : 1.58));
+  const imageSize = Math.round(baseSize * (plate ? 1.35 : 1.58));
 
   const wrapStyle = {
     width: baseSize,
     height: baseSize,
     minWidth: baseSize,
     minHeight: baseSize,
-    borderRadius: plate ? Math.max(10, baseSize * .24) : Math.max(8, baseSize * .18),
+    borderRadius: 0,
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
@@ -257,15 +257,15 @@ function TeamLogoMark({ team, size = 34, faded = false, plate = false }) {
     flexShrink: 0,
     opacity: faded ? .34 : 1,
     position: "relative",
-    background: plate ? "linear-gradient(180deg, rgba(255,255,255,.11), rgba(255,255,255,.035))" : "transparent",
-    border: plate ? "1px solid rgba(255,255,255,.16)" : "0",
-    boxShadow: plate ? "0 12px 30px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.12)" : "none",
+    background: "transparent",
+    border: 0,
+    boxShadow: "none",
   };
 
   if (!url) {
     const initials = String(team?.name || "CFB").split(" ").map((part)=>part[0]).join("").slice(0,3).toUpperCase();
     return (
-      <span style={{ ...wrapStyle, overflow:"hidden", background: plate ? wrapStyle.background : "rgba(255,255,255,.08)", border: plate ? wrapStyle.border : "1px solid rgba(255,255,255,.14)", color:"#fff", fontWeight:1000, fontSize:Math.max(10,baseSize*.30) }}>
+      <span style={{ ...wrapStyle, overflow:"hidden", color:"#fff", fontWeight:1000, fontSize:Math.max(10,baseSize*.30) }}>
         {initials}
       </span>
     );
@@ -12496,6 +12496,14 @@ const dashboardConferenceMobileMetricsV91 = {
   marginTop:8,
   paddingTop:8,
   borderTop:"1px solid rgba(255,255,255,.10)",
+};
+
+const actionRow = {
+  display:"flex",
+  alignItems:"center",
+  gap:10,
+  flexWrap:"wrap",
+  marginTop:14,
 };
 
 // CFBElite v2 presentation system
