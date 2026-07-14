@@ -772,6 +772,13 @@ export default function App() {
   const [adminUnlocked, setAdminUnlocked] = useState(false);
   const [adminCodeInput, setAdminCodeInput] = useState("");
   const [matchupImportText, setMatchupImportText] = useState("");
+  const [discordSession, setDiscordSession] = useState(null);
+  const [linkedDiscordUser, setLinkedDiscordUser] = useState(null);
+  const [sportsbook, setSportsbook] = useState({
+    boards: [], lines: [], picks: [], markets: [], options: [], futurePicks: [],
+    badges: [], badgeAwards: [], seasonStandings: [], allTimeStandings: [], champions: [],
+  });
+  const [sportsbookBusy, setSportsbookBusy] = useState(false);
 
   const teamOptions = useMemo(() => [...teams].sort((a, b) => a.name.localeCompare(b.name)), [teams]);
   const userOptions = useMemo(() => [...users].sort((a, b) => a.discord_username.localeCompare(b.discord_username)), [users]);
@@ -891,7 +898,7 @@ export default function App() {
     await saveCommissionerRankings(next);
   }
 
-  const baseTabs = [["dashboard","Home"],["schedule","GameCenter"],["allTeamsRatings","Teams"],["eloRankings","User ELO"],["powerIndex","All-Time Coach Rankings"],["conferencePower","Conference Power"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["h2h","User vs User H2H"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],["commissionerCenter","Commissioner Center"],["weeklyMatchups","Schedule Manager"],["userManager","Discord Users"],["assignments","Team Assignments"],["leagueDataCenter","League Data Center"],["resultsManager","Results Manager"],["logoManager","Team Assets"],["draftRoom","CFBElite 27 Draft Room"],...coachProfileUsers.map((user) => [`coach-${user.id}`, user.activeTeamName || user.discord_username])];
+  const baseTabs = [["dashboard","Home"],["schedule","GameCenter"],["eliteBooks","Elite Books"],["sportsbookHistory","All-Time Sportsbook"],["myTeam","My Team"],["allTeamsRatings","Teams"],["eloRankings","User ELO"],["powerIndex","All-Time Coach Rankings"],["conferencePower","Conference Power"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["h2h","User vs User H2H"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],["commissionerCenter","Commissioner Center"],["sportsbookManager","Elite Books Manager"],["weeklyMatchups","Schedule Manager"],["userManager","Discord Users"],["assignments","Team Assignments"],["leagueDataCenter","League Data Center"],["resultsManager","Results Manager"],["logoManager","Team Assets"],["draftRoom","CFBElite 27 Draft Room"],...coachProfileUsers.map((user) => [`coach-${user.id}`, user.activeTeamName || user.discord_username])];
   const tabs = useMemo(() => {
     const tabMap = new Map(baseTabs);
     const ordered = tabOrder
@@ -1005,7 +1012,23 @@ export default function App() {
     }
     setLoading(false);
   }
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); loadEliteBooksData(); }, []);
+  useEffect(() => {
+    if (!supabase.auth?.getSession) return undefined;
+    let active = true;
+    supabase.auth.getSession().then(({ data })=>{
+      if (!active) return;
+      const nextSession = data?.session || null;
+      setDiscordSession(nextSession);
+      if (nextSession) linkDiscordIdentity(nextSession);
+    });
+    const authListener = supabase.auth.onAuthStateChange?.((_event, nextSession)=>{
+      setDiscordSession(nextSession || null);
+      if (nextSession) linkDiscordIdentity(nextSession);
+      else setLinkedDiscordUser(null);
+    });
+    return ()=>{ active=false; authListener?.data?.subscription?.unsubscribe?.(); };
+  }, []);
   async function refreshDraftRoomState() {
     const [picksRes, settingsRes] = await Promise.all([
       supabase.from("cfb27_draft_picks").select("*, teams(*), discord_users(discord_username)").order("pick_number"),
@@ -1038,6 +1061,16 @@ export default function App() {
       window.clearInterval(gameCenterPollId);
       supabase.removeChannel(gameCenterChannel);
     };
+  }, []);
+
+  useEffect(() => {
+    const booksChannel = supabase
+      .channel("cfbelite-elite-books-live-sync")
+      .on("postgres_changes", { event: "*", schema: "public", table: "sportsbook_picks" }, loadEliteBooksData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "sportsbook_future_picks" }, loadEliteBooksData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "sportsbook_lines" }, loadEliteBooksData)
+      .subscribe();
+    return ()=>supabase.removeChannel(booksChannel);
   }, []);
 
   useEffect(() => {
@@ -1226,6 +1259,113 @@ export default function App() {
     setError("");
     await loadData();
   }
+
+  async function loadEliteBooksData() {
+    const names = ["sportsbook_boards","sportsbook_lines","sportsbook_picks","sportsbook_future_markets","sportsbook_future_options","sportsbook_future_picks","sportsbook_badges","sportsbook_badge_awards","elite_books_standings","elite_books_all_time_standings","sportsbook_season_champions"];
+    try {
+      const responses = await Promise.all(names.map((name)=>supabase.from(name).select("*")));
+      setSportsbook({
+        boards: responses[0].error ? [] : (responses[0].data || []),
+        lines: responses[1].error ? [] : (responses[1].data || []),
+        picks: responses[2].error ? [] : (responses[2].data || []),
+        markets: responses[3].error ? [] : (responses[3].data || []),
+        options: responses[4].error ? [] : (responses[4].data || []),
+        futurePicks: responses[5].error ? [] : (responses[5].data || []),
+        badges: responses[6].error ? [] : (responses[6].data || []),
+        badgeAwards: responses[7].error ? [] : (responses[7].data || []),
+        seasonStandings: responses[8].error ? [] : (responses[8].data || []),
+        allTimeStandings: responses[9].error ? [] : (responses[9].data || []),
+        champions: responses[10].error ? [] : (responses[10].data || []),
+      });
+    } catch (_) {
+      // Elite Books remains gracefully unavailable until its migration is installed.
+    }
+  }
+
+  async function linkDiscordIdentity(session = discordSession) {
+    if (!session?.user || typeof supabase.rpc !== "function") return null;
+    const { data, error: linkError } = await supabase.rpc("link_my_discord_user");
+    if (linkError) { setError(`Discord account link failed: ${linkError.message}`); return null; }
+    const row = Array.isArray(data) ? data[0] : data;
+    setLinkedDiscordUser(row || null);
+    await loadEliteBooksData();
+    return row;
+  }
+
+  async function signInWithDiscord() {
+    if (!supabase.auth?.signInWithOAuth) { setError("Discord sign-in will be available after Supabase Auth is configured."); return; }
+    const { error: signInError } = await supabase.auth.signInWithOAuth({ provider: "discord", options: { redirectTo: window.location.origin } });
+    if (signInError) setError(`Discord sign-in failed: ${signInError.message}`);
+  }
+
+  async function signOutDiscord() {
+    if (supabase.auth?.signOut) await supabase.auth.signOut();
+    setDiscordSession(null); setLinkedDiscordUser(null); await loadEliteBooksData();
+  }
+
+  async function submitSportsbookPick(lineId, pickType, teamId) {
+    if (!discordSession?.user) { setError("Sign in with Discord before making an Elite Books pick."); return false; }
+    setSportsbookBusy(true);
+    const { error: pickError } = await supabase.rpc("submit_elite_books_pick", { p_line_id: lineId, p_pick_type: pickType, p_team_id: String(teamId) });
+    setSportsbookBusy(false);
+    if (pickError) { setError(`Pick not saved: ${pickError.message}`); return false; }
+    setError("Elite Books pick locked in."); await loadEliteBooksData(); return true;
+  }
+
+  async function submitFuturePick(optionId) {
+    if (!discordSession?.user) { setError("Sign in with Discord before making a futures pick."); return false; }
+    setSportsbookBusy(true);
+    const { error: pickError } = await supabase.rpc("submit_elite_books_future", { p_option_id: optionId });
+    setSportsbookBusy(false);
+    if (pickError) { setError(`Future pick not saved: ${pickError.message}`); return false; }
+    setError("Futures selection locked in."); await loadEliteBooksData(); return true;
+  }
+
+  async function generateSportsbookBoard() {
+    setSportsbookBusy(true);
+    const { error: generationError } = await supabase.rpc("generate_elite_books_board", { p_season: Number(currentYear), p_week: currentWeek });
+    setSportsbookBusy(false);
+    if (generationError) { setError(`Board generation failed: ${generationError.message}`); return false; }
+    setError(`${currentYear} ${currentWeek} Elite Books board generated.`); await loadEliteBooksData(); return true;
+  }
+
+  async function seedSportsbookFutures() {
+    setSportsbookBusy(true);
+    const { error: seedError } = await supabase.rpc("seed_elite_books_futures", { p_season: Number(currentYear), p_lock_at: advanceAt || null });
+    setSportsbookBusy(false);
+    if (seedError) { setError(`Futures setup failed: ${seedError.message}`); return false; }
+    setError(`${currentYear} futures markets created.`); await loadEliteBooksData(); return true;
+  }
+
+  async function settleFutureMarket(marketId, optionId) {
+    const { error: settleError } = await supabase.rpc("settle_elite_books_future", { p_market_id: marketId, p_option_id: optionId });
+    if (settleError) { setError(`Future settlement failed: ${settleError.message}`); return false; }
+    setError("Futures market settled."); await loadEliteBooksData(); return true;
+  }
+
+  async function setMatchupBettingLock(lineId, locked) {
+    setSportsbookBusy(true);
+    const { error: lockError }=await supabase.rpc("set_elite_books_matchup_lock",{p_line_id:lineId,p_locked:locked,p_reason:locked?"Game started":""});
+    setSportsbookBusy(false);
+    if(lockError){setError(`Matchup lock failed: ${lockError.message}`);return false;}
+    setError(locked?"Betting locked for that matchup.":"Betting reopened for that matchup.");
+    await loadEliteBooksData(); return true;
+  }
+
+  async function updateSportsbookSeed(userId, seed) {
+    const value=Math.max(1,Math.min(99,Number(seed)||50));
+    const { error: seedError }=await supabase.rpc("set_elite_books_seed",{p_user_id:String(userId),p_seed:value});
+    if(seedError){setError(`Power seed save failed: ${seedError.message}`);return false;}
+    setUsers((rows)=>rows.map((row)=>String(row.id)===String(userId)?{...row,sportsbook_seed:value}:row));
+    setError("Preseason sportsbook power seed saved."); return true;
+  }
+  async function updateSportsbookTeamSeed(teamId, seed) {
+    const value=Math.max(1,Math.min(99,Number(seed)||70));
+    const { error: seedError }=await supabase.rpc("set_elite_books_team_seed",{p_team_id:String(teamId),p_seed:value});
+    if(seedError){setError(`Team rating save failed: ${seedError.message}`);return false;}
+    setTeams((rows)=>rows.map((team)=>String(team.id)===String(teamId)?{...team,sportsbook_team_seed:value}:team));
+    setError("Preseason team overall saved."); return true;
+  }
   async function addDiscordUser(discordUsername) {
     const name = String(discordUsername || "").trim();
     if (!name) { setError("Enter a Discord username first."); return false; }
@@ -1256,6 +1396,15 @@ export default function App() {
     if (updateError) { setError(`Discord user status update failed: ${updateError.message}. Run the v2 Supabase migration first.`); return false; }
     setError(`Discord user ${isActive ? "activated" : "deactivated"}.`);
     await loadData();
+    return true;
+  }
+  async function setDiscordCommissionerStatus(userId, enabled) {
+    const { data, error: commissionerError }=await supabase.rpc("set_elite_books_commissioner",{p_user_id:String(userId),p_enabled:Boolean(enabled)});
+    if(commissionerError){setError(`Commissioner status update failed: ${commissionerError.message}`);return false;}
+    const updated=Array.isArray(data)?data[0]:data;
+    setUsers((rows)=>rows.map((user)=>String(user.id)===String(userId)?{...user,is_commissioner:Boolean(enabled)}:user));
+    if(String(linkedDiscordUser?.id)===String(userId))setLinkedDiscordUser((user)=>({...user,...updated,is_commissioner:Boolean(enabled)}));
+    setError(`${updated?.discord_username||"Discord user"} ${enabled?"is now a commissioner":"is no longer a commissioner"}.`);
     return true;
   }
   async function addAssignment() {
@@ -1477,22 +1626,26 @@ export default function App() {
     }
   }
 
-  return <><GlobalStyle/><div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={isErrorMessage(error) ? errorBox : successBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} draggedTab={draggedTab} setDraggedTab={setDraggedTab} reorderTabs={reorderTabs} adminUnlocked={adminUnlocked} adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin} teams={teamOptions} assignments={assignments} currentYear={currentYear} users={userOptions}/>
+  return <><GlobalStyle/><div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={isErrorMessage(error) ? errorBox : successBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} draggedTab={draggedTab} setDraggedTab={setDraggedTab} reorderTabs={reorderTabs} adminUnlocked={adminUnlocked} adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin} teams={teamOptions} assignments={assignments} currentYear={currentYear} users={userOptions} discordSession={discordSession} linkedDiscordUser={linkedDiscordUser} signInWithDiscord={signInWithDiscord} signOutDiscord={signOutDiscord}/>
     {activeTab === "draftRoom" && <DraftRoom teams={teamOptions} users={userOptions} picks={draftPicks27} settings={draftSettings27} conferenceAssets={conferenceAssets} startClock={startDraftClock} pauseClock={pauseDraftClock} resumeClock={resumeDraftClock} announcePick={announceDraftPick} revealPick={revealDraftPick} undoPick={undoDraftPick}/>}     
-    {activeTab === "dashboard" && <DashboardV2 teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} weeklyMatchups={weeklyMatchups} conferenceAssets={conferenceAssets} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} teamSeasonStats={teamSeasonStats} currentYear={currentYear} currentWeek={currentWeek} advanceAt={advanceAt} rankingSnapshots={rankingSnapshots} adminUnlocked={adminUnlocked} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)})); setNewWeeklyMatchup((prev)=>({...prev,season_year:Number(value)}));}} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value})); setNewWeeklyMatchup((prev)=>({...prev,week:value}));}} saveSettings={saveLeagueSettings} goToTeam={goToTeam} setActiveTab={setActiveTab}/>}
+    {activeTab === "dashboard" && <DashboardV2 teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} weeklyMatchups={weeklyMatchups} conferenceAssets={conferenceAssets} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} teamSeasonStats={teamSeasonStats} currentYear={currentYear} currentWeek={currentWeek} advanceAt={advanceAt} rankingSnapshots={rankingSnapshots} adminUnlocked={adminUnlocked} sportsbook={sportsbook} linkedDiscordUser={linkedDiscordUser} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)})); setNewWeeklyMatchup((prev)=>({...prev,season_year:Number(value)}));}} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value})); setNewWeeklyMatchup((prev)=>({...prev,week:value}));}} saveSettings={saveLeagueSettings} goToTeam={goToTeam} setActiveTab={setActiveTab}/>} 
+    {activeTab === "eliteBooks" && <EliteBooks sportsbook={sportsbook} teams={activeTeamOptions} users={userOptions} assignments={assignments} results={results} weeklyMatchups={weeklyMatchups} conferenceAssets={conferenceAssets} currentYear={currentYear} currentWeek={currentWeek} advanceAt={advanceAt} discordSession={discordSession} linkedDiscordUser={linkedDiscordUser} busy={sportsbookBusy} signInWithDiscord={signInWithDiscord} signOutDiscord={signOutDiscord} submitPick={submitSportsbookPick} submitFuture={submitFuturePick} setActiveTab={setActiveTab}/>} 
+    {activeTab === "sportsbookHistory" && <EliteBooksHistory sportsbook={sportsbook} users={userOptions} currentYear={currentYear} setActiveTab={setActiveTab}/>} 
+    {activeTab === "myTeam" && <MyTeamHub linkedDiscordUser={linkedDiscordUser} discordSession={discordSession} teams={activeTeamOptions} users={userOptions} assignments={assignments} results={results} weeklyMatchups={weeklyMatchups} sportsbook={sportsbook} currentYear={currentYear} currentWeek={currentWeek} signInWithDiscord={signInWithDiscord} setActiveTab={setActiveTab}/>} 
     {activeTab === "schedule" && <GameCenterV2 teams={teamOptions} users={userOptions} assignments={assignments} weeklyMatchups={weeklyMatchups} results={results} currentYear={currentYear} currentWeek={currentWeek} conferenceAssets={conferenceAssets} adminUnlocked={adminUnlocked} loadData={loadData} setActiveTab={setActiveTab}/>}
     {activeTab === "eloRankings" && <EloRankings users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
     {activeTab === "dynastyRecords" && <DynastyRecords users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} seasonPlayerStats={seasonPlayerStats} teamSeasonStats={teamSeasonStats}/>}    
 {activeTab === "rivalries" && <Rivalries users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
     {activeTab === "powerIndex" && <DynastyPowerIndex users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}
     {activeTab === "commissionerCenter" && (adminUnlocked ? <CommissionerCenterV2 currentYear={currentYear} currentWeek={currentWeek} advanceAt={advanceAt} setAdvanceAt={setAdvanceAt} setActiveTab={setActiveTab} saveLeagueSettings={saveLeagueSettings} saveCurrentRankingSnapshot={saveCurrentRankingSnapshot} loadData={loadData} teams={teamOptions} users={userOptions} assignments={assignments} results={results} weeklyMatchups={weeklyMatchups} awards={awards} allAmericans={allAmericans} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>) }    
+    {activeTab === "sportsbookManager" && (adminUnlocked ? <EliteBooksManager sportsbook={sportsbook} users={userOptions} teams={activeTeamOptions} assignments={assignments} currentYear={currentYear} currentWeek={currentWeek} advanceAt={advanceAt} busy={sportsbookBusy} linkedDiscordUser={linkedDiscordUser} generateBoard={generateSportsbookBoard} seedFutures={seedSportsbookFutures} settleFuture={settleFutureMarket} setMatchupLock={setMatchupBettingLock} updateSeed={updateSportsbookSeed} updateTeamSeed={updateSportsbookTeamSeed} loadData={loadEliteBooksData}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>)}
     {activeTab === "logoManager" && <LogoManager teams={teamOptions} updateRow={updateRow} conferenceAssets={conferenceAssets} saveConferenceAsset={saveConferenceAsset}/>}    
     {activeTab === "allTeamsRatings" && <AllTeamsRatings teams={teamOptions}/>}    
     {activeTab === "leagueDataCenter" && <LeagueDataCenter teams={teamOptions} users={userOptions} assignments={assignments} results={results} currentYear={currentYear} currentWeek={currentWeek} setError={setError} loadData={loadData}/>}
     {activeTab === "conferencePower" && <ConferencePowerRankings teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} conferenceAssets={conferenceAssets} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
     {activeTab === "weeklyMedia" && <WeeklyMedia teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} weeklyMatchups={weeklyMatchups} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} currentWeek={currentWeek}/>}    
     {activeTab === "weeklyMatchups" && (adminUnlocked ? <ScheduleManagerV2 rows={weeklyMatchups} newMatchup={newWeeklyMatchup} setNewMatchup={setNewWeeklyMatchup} teams={activeTeamOptions} users={activeUserOptions} assignments={assignments} currentYear={currentYear} currentWeek={currentWeek} addMatchup={addWeeklyMatchup} deleteRow={deleteRow} matchupImportText={matchupImportText} setMatchupImportText={setMatchupImportText} importWeeklyMatchups={importWeeklyMatchups} loadData={loadData} setError={setError}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>) }    
-    {activeTab === "userManager" && (adminUnlocked ? <UserManagerV2 users={userOptions} assignments={assignments} teams={teamOptions} addDiscordUser={addDiscordUser} renameDiscordUser={renameDiscordUser} setDiscordUserActive={setDiscordUserActive}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>) }
+    {activeTab === "userManager" && (adminUnlocked ? <UserManagerV2 users={userOptions} assignments={assignments} teams={teamOptions} linkedDiscordUser={linkedDiscordUser} addDiscordUser={addDiscordUser} renameDiscordUser={renameDiscordUser} setDiscordUserActive={setDiscordUserActive} setDiscordCommissionerStatus={setDiscordCommissionerStatus}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>) }
 {activeTab === "recruitingRankings" && <RecruitingRankings rows={recruiting} teams={teamOptions} users={userOptions} assignments={assignments} currentYear={currentYear} loadData={loadData} deleteRow={deleteRow} updateRow={updateRow}/>}    
     {activeTab === "dynastyTimeline" && <DynastyTimeline results={results} teams={teamOptions} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}
     {activeTab === "coachHOF" && <CoachHallOfFame users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}    
@@ -1505,7 +1658,7 @@ export default function App() {
     {activeTab === "heismans" && (adminUnlocked ? <Heismans rows={heismans} teams={teamOptions} addRow={addHeisman} updateRow={updateRow} deleteRow={deleteRow} drafts={draftHeismans} setDrafts={setDraftHeismans} saveDraft={saveDraft} getDraft={getDraft}/> : <TrophyGalleryV2 title="Heisman Winners" eyebrow="COLLEGE FOOTBALL'S HIGHEST HONOR" rows={heismans} teams={teamOptions} users={userOptions}/>)}    
     {activeTab === "nationalChampions" && (adminUnlocked ? <NationalChampions rows={nationalChampions} teams={teamOptions} users={userOptions} addRow={addNationalChampion} updateRow={updateRow} deleteRow={deleteRow} drafts={draftChampions} setDrafts={setDraftChampions} saveDraft={saveDraft} getDraft={getDraft}/> : <TrophyGalleryV2 title="National Champions" eyebrow="CFBELITE TITLE HISTORY" rows={nationalChampions} teams={teamOptions} users={userOptions} champions/>)}        
     {selectedTeam && <TeamPage team={selectedTeam} standings={standings.find((row)=>row.team_id===selectedTeam.id)} results={currentYearResults} allResults={results} teams={teamOptions} assignments={assignments} allAmericans={allAmericans} awards={awards} heismans={heismans} recruiting={recruiting} historyRows={historyRows} addRecruiting={addRecruiting} addHistory={addHistory} updateRow={updateRow} deleteRow={deleteRow} newRecruiting={newRecruiting} setNewRecruiting={setNewRecruiting} newHistory={newHistory} setNewHistory={setNewHistory}/>}    
-    {selectedCoach && <CoachProfile user={selectedCoach} users={userOptions} teams={teamOptions} assignments={assignments} results={results} weeklyMatchups={weeklyMatchups} currentYear={currentYear} currentWeek={currentWeek} rankingSnapshots={rankingSnapshots} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} seasonPlayerStats={seasonPlayerStats} teamSeasonStats={teamSeasonStats}/>}    
+    {selectedCoach && <CoachProfile user={selectedCoach} users={userOptions} teams={teamOptions} assignments={assignments} results={results} weeklyMatchups={weeklyMatchups} currentYear={currentYear} currentWeek={currentWeek} rankingSnapshots={rankingSnapshots} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} seasonPlayerStats={seasonPlayerStats} teamSeasonStats={teamSeasonStats} sportsbook={sportsbook}/>}    
   </div></div></>;
 }
 
@@ -2433,7 +2586,128 @@ function conferencePowerData({ teams = [], users = [], assignments = [], results
   }).sort((a,b)=>b.power-a.power);
 }
 
-function DashboardV2({ teams = [], users = [], assignments = [], results = [], allResults = [], weeklyMatchups = [], conferenceAssets = [], allAmericans = [], awards = [], heismans = [], nationalChampions = [], recruiting = [], teamSeasonStats = [], currentYear, currentWeek, advanceAt, setCurrentYear, setCurrentWeek, saveSettings, goToTeam, setActiveTab, rankingSnapshots = [], adminUnlocked = false }) {
+function formatAmericanOdds(value) {
+  const number=Number(value||0); return number>0?`+${number}`:`${number}`;
+}
+
+function currentSportsbookBoard(sportsbook,currentYear,currentWeek) {
+  return (sportsbook?.boards||[]).find((row)=>String(row.season_year)===String(currentYear)&&String(row.week)===String(currentWeek));
+}
+
+function sportsbookUserId(linkedDiscordUser) { return linkedDiscordUser?.id==null?null:String(linkedDiscordUser.id); }
+
+function CurrentWeekTicker({teams=[],weeklyMatchups=[],results=[],currentYear,currentWeek,setActiveTab}) {
+  const rows=(weeklyMatchups||[]).filter((row)=>String(row.season_year)===String(currentYear)&&String(row.week)===String(currentWeek)).map((row)=>{
+    const team1=row.team_1||teams.find((team)=>String(team.id)===String(row.team_1_id));
+    const team2=row.team_2||teams.find((team)=>String(team.id)===String(row.team_2_id));
+    const result=scheduledResultFor(row,results,currentYear);
+    return {...row,team1,team2,result};
+  });
+  return <section className="elite-ticker" aria-label={`${currentWeek} GameCenter ticker`}>
+    <button type="button" className="elite-ticker-label" onClick={()=>setActiveTab?.("schedule")}><span>LIVE</span><b>{currentWeek}</b><small>GameCenter</small></button>
+    <div className="elite-ticker-track">{rows.length?rows.map((row)=><button type="button" key={row.id} className="elite-ticker-game" onClick={()=>setActiveTab?.("schedule")}>
+      <span><TeamLogoMark team={row.team1} size={26}/><b>{getTeamAbbreviation(row.team1)}</b></span>
+      {row.result?<strong>{scoreForScheduledTeam(row.result,row.team_1_id)}–{scoreForScheduledTeam(row.result,row.team_2_id)}</strong>:<strong>VS</strong>}
+      <span><b>{getTeamAbbreviation(row.team2)}</b><TeamLogoMark team={row.team2} size={26}/></span>
+      <em>{row.result?"FINAL":row.scheduled_at?new Date(row.scheduled_at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}):"TBD"}</em>
+    </button>):<div className="elite-ticker-empty">No games are listed for {currentWeek}.</div>}</div>
+  </section>;
+}
+
+function EliteBooksHomePanel({sportsbook={},linkedDiscordUser,currentYear,currentWeek,setActiveTab}) {
+  const seasonRows=(sportsbook.seasonStandings||[]).filter((row)=>String(row.season_year)===String(currentYear)).sort((a,b)=>Number(b.total_points)-Number(a.total_points));
+  const board=currentSportsbookBoard(sportsbook,currentYear,currentWeek);
+  const myId=sportsbookUserId(linkedDiscordUser);
+  const mine=seasonRows.find((row)=>String(row.discord_user_id)===myId);
+  const myBadges=(sportsbook.badgeAwards||[]).filter((row)=>String(row.discord_user_id)===myId&&String(row.season_year)===String(currentYear));
+  return <section className="elite-books-home">
+    <div className="elite-books-home-brand"><span>CFBELITE 27 SPORTSBOOK</span><h2>ELITE <i>BOOKS</i></h2><p>Current-week picks. Dynamic points. Season-long bragging rights.</p><button type="button" onClick={()=>setActiveTab?.("eliteBooks")}>Enter the Sportsbook →</button></div>
+    <div className="elite-books-home-board"><div><span>{currentWeek} BOARD</span><b className={`elite-status elite-status-${board?.status||"draft"}`}>{String(board?.status||"awaiting lines").toUpperCase()}</b></div><strong>{(sportsbook.lines||[]).filter((line)=>String(line.board_id)===String(board?.id)).length}</strong><small>Games on the board</small></div>
+    <div className="elite-books-home-leaders"><span>SEASON LEADERS</span>{seasonRows.slice(0,3).map((row,index)=><div key={row.discord_user_id}><b>#{index+1}</b><strong>{row.discord_username||"Discord Coach"}</strong><em>{row.total_points} pts</em></div>)}{!seasonRows.length&&<small>Standings begin after the first graded pick.</small>}</div>
+    <div className="elite-books-home-me"><span>MY TICKET</span>{linkedDiscordUser?<><strong>{mine?.total_points||0} PTS</strong><small>{mine?.correct_picks||0} correct • {myBadges.length} badge{myBadges.length===1?"":"s"}</small><button type="button" onClick={()=>setActiveTab?.("myTeam")}>View My Hub</button></>:<><strong>DISCORD LOGIN</strong><small>Sign in to lock picks to your profile.</small></>}</div>
+  </section>;
+}
+
+function EliteBooks({sportsbook={},teams=[],users=[],assignments=[],results=[],weeklyMatchups=[],conferenceAssets=[],currentYear,currentWeek,advanceAt,discordSession,linkedDiscordUser,busy,signInWithDiscord,signOutDiscord,submitPick,submitFuture,setActiveTab}) {
+  const board=currentSportsbookBoard(sportsbook,currentYear,currentWeek);
+  const lines=(sportsbook.lines||[]).filter((line)=>String(line.board_id)===String(board?.id));
+  const myId=sportsbookUserId(linkedDiscordUser);
+  const myPicks=(sportsbook.picks||[]).filter((pick)=>String(pick.discord_user_id)===myId);
+  const standings=(sportsbook.seasonStandings||[]).filter((row)=>String(row.season_year)===String(currentYear)).sort((a,b)=>Number(b.total_points)-Number(a.total_points));
+  const markets=(sportsbook.markets||[]).filter((row)=>String(row.season_year)===String(currentYear));
+  const rankings=computerRankingRows(teams,results.filter((row)=>String(row.season_year)===String(currentYear)),assignments,users);
+  const rankMap=new Map(rankings.map((row)=>[String(row.team.id),row.rank]));
+  const matchupMap=new Map((weeklyMatchups||[]).map((row)=>[String(row.id),row]));
+  const now=Date.now();
+  const locked=!board||board.status!=="open"||(board.locks_at&&new Date(board.locks_at).getTime()<=now);
+  const marketLabel={national_champion:"National Champion",conference_champion:"Conference Champion",heath_hurley_coty:"Heath Hurley COTY",most_improved_team:"Most Improved Team"};
+  function teamFor(id){return teams.find((team)=>String(team.id)===String(id));}
+  function linePick(line,type){return myPicks.find((pick)=>String(pick.line_id)===String(line.id)&&pick.pick_type===type);}
+  function pickButton(line,type,team,oddsOrSpread){
+    const picked=linePick(line,type); const active=String(picked?.selected_team_id)===String(team?.id);
+    const points=type==="moneyline"?moneylinePointPreview(oddsOrSpread):spreadPointPreview(oddsOrSpread);
+    return <button disabled={busy||locked||line.is_betting_locked||!discordSession} className={`elite-pick-button ${active?"selected":""}`} onClick={()=>submitPick(line.id,type,team.id)}><span>{getTeamAbbreviation(team)}</span><b>{type==="moneyline"?formatAmericanOdds(oddsOrSpread):formatSpread(oddsOrSpread)}</b><small>{points} PT{points===1?"":"S"}</small></button>;
+  }
+  return <main className="cfb-v2-page elite-books-page">
+    <div className="elite-books-hero"><div><span>CFBELITE 27 PRESENTS</span><h1>ELITE <i>BOOKS</i></h1><p>Beat the line. Build your card. Own the season.</p><div className="elite-books-rule-pills"><b>✓ Current week only</b><b>✓ Odds lock with your pick</b><b>✓ Underdogs earn more</b></div></div><div className="elite-auth-card">{discordSession?<><span>BETTING AS</span><strong>{linkedDiscordUser?.discord_username||discordSession.user?.user_metadata?.user_name||"Discord Member"}</strong><small>Scores stay tied to your Discord identity.</small><button type="button" onClick={signOutDiscord}>Sign out</button></>:<><span>YOUR CARD STARTS HERE</span><strong>Sign in with Discord</strong><small>Your picks, points, futures and badges follow your account.</small><button type="button" onClick={signInWithDiscord}>Continue with Discord</button></>}</div></div>
+    <CurrentWeekTicker teams={teams} weeklyMatchups={weeklyMatchups} results={results} currentYear={currentYear} currentWeek={currentWeek} setActiveTab={setActiveTab}/>
+    <div className="elite-books-scorebar"><div><span>BOARD</span><b>{currentWeek}</b></div><div><span>STATUS</span><b className={`elite-status elite-status-${board?.status||"draft"}`}>{String(board?.status||"NOT PUBLISHED").toUpperCase()}</b></div><div><span>LOCK</span><b>{board?.locks_at?new Date(board.locks_at).toLocaleString():advanceAt?new Date(advanceAt).toLocaleString():"Commissioner deadline"}</b></div><div><span>MY PICKS</span><b>{myPicks.filter((pick)=>String(pick.board_id)===String(board?.id)).length}</b></div></div>
+    <section className="elite-books-layout">
+      <div className="elite-books-main"><div className="elite-section-head"><div><span>WEEKLY BOARD</span><h2>Moneyline & Spread</h2></div><small>Home team is listed second • every correct pick earns at least +1</small></div>
+        {lines.length?<div className="elite-lines-grid">{lines.map((line)=>{const m=matchupMap.get(String(line.matchup_id)); const t1=teamFor(line.team_1_id)||m?.team_1; const t2=teamFor(line.team_2_id)||m?.team_2; return <article className={`elite-line-card ${line.is_betting_locked?"betting-closed":""}`} key={line.id} style={{"--team-one":getTeamPrimary(t1),"--team-two":getTeamPrimary(t2)}}><header><span>{currentWeek}</span>{line.settled_at?<b>FINAL</b>:line.is_betting_locked?<b>BETTING CLOSED</b>:line.is_frozen?<b>LINE LOCKED</b>:<b>OPEN</b>}</header><div className="elite-line-matchup"><div><TeamLogoMark team={t1} size={70}/><b>#{line.team_1_rank||rankMap.get(String(t1?.id))||"—"}</b><strong>{t1?.name}</strong></div><span>VS</span><div><TeamLogoMark team={t2} size={70}/><b>#{line.team_2_rank||rankMap.get(String(t2?.id))||"—"}</b><strong>{t2?.name}</strong></div></div>{line.settled_at&&<div className="elite-final-score"><b>{line.team_1_score}</b><span>FINAL</span><b>{line.team_2_score}</b></div>}{line.is_betting_locked&&<div className="elite-betting-closed"><b>BETTING LOCKED</b><span>{line.betting_lock_reason||"Game started"}</span></div>}<div className="elite-market"><label>MONEYLINE</label>{pickButton(line,"moneyline",t1,line.team_1_moneyline)}{pickButton(line,"moneyline",t2,line.team_2_moneyline)}</div><div className="elite-market"><label>SPREAD</label>{pickButton(line,"spread",t1,line.team_1_spread)}{pickButton(line,"spread",t2,line.team_2_spread)}</div><footer><span>Model edge: {Math.abs(Number(line.projected_margin||0)).toFixed(1)} pts</span><span>{line.is_betting_locked?"Matchup closed":line.is_frozen?"Opening line frozen":"Live model line"}</span></footer></article>})}</div>:<div className="elite-empty"><b>THE BOARD IS BEING BUILT</b><span>The commissioner can generate {currentWeek} lines after the Elite Books migration is installed.</span></div>}
+      </div>
+      <aside className="elite-books-sidebar"><div className="elite-section-head"><div><span>LEADERBOARD</span><h2>{currentYear} Standings</h2></div><button onClick={()=>setActiveTab?.("sportsbookHistory")}>All-Time →</button></div><div className="elite-leaderboard">{standings.length?standings.map((row,index)=><div key={row.discord_user_id} className={String(row.discord_user_id)===myId?"me":""}><b>#{index+1}</b><span><strong>{row.discord_username}</strong><small>{row.correct_picks}/{row.graded_picks} correct</small></span><em>{row.total_points} pts</em></div>):<div className="elite-empty-small">No graded cards yet.</div>}</div><EliteBadgeRail sportsbook={sportsbook} discordUserId={myId} currentYear={currentYear}/></aside>
+    </section>
+    <section className="elite-futures"><div className="elite-section-head"><div><span>SEASON FUTURES</span><h2>Call Your Shot</h2></div><small>Longer odds pay more bonus points • payouts lock when selected</small></div>{markets.length?<div className="elite-futures-grid">{markets.map((market)=>{const options=(sportsbook.options||[]).filter((option)=>String(option.market_id)===String(market.id)).sort((a,b)=>Number(a.american_odds)-Number(b.american_odds)); const existing=(sportsbook.futurePicks||[]).find((pick)=>String(pick.discord_user_id)===myId&&String(pick.market_id)===String(market.id)); return <article className="elite-future-card" key={market.id}><header><div>{market.market_type==="conference_champion"&&<ConferenceLogoMark conference={market.conference_name} conferenceAssets={conferenceAssets} size={38}/>}<span><small>{market.conference_name||"CFBELITE 27"}</small><strong>{market.title||marketLabel[market.market_type]}</strong></span></div><b>{market.status.toUpperCase()}</b></header><div className="elite-future-options">{options.map((option)=>{const team=option.team_id?teamFor(option.team_id):null; const selected=String(existing?.option_id)===String(option.id); return <button className={selected?"selected":""} disabled={busy||market.status!=="open"||!discordSession} key={option.id} onClick={()=>submitFuture(option.id)}>{team?<TeamLogoMark team={team} size={34}/>:<span className="elite-coach-avatar">{option.selection_label.slice(0,1).toUpperCase()}</span>}<span><strong>{option.selection_label}</strong><small>{formatAmericanOdds(option.american_odds)}</small></span><em>{option.bonus_points} pts</em></button>})}</div></article>})}</div>:<div className="elite-empty"><b>FUTURES OPENING SOON</b><span>National Champion, Conference Champions and Heath Hurley COTY begin in Season 1. Most Improved Team automatically joins in Season 2.</span></div>}</section>
+  </main>;
+}
+
+function formatSpread(value){const number=Number(value||0);return number>0?`+${number.toFixed(1)}`:number.toFixed(1);}
+function moneylinePointPreview(odds){const n=Number(odds||0);return n<100?1:n<200?2:n<400?3:n<700?4:5;}
+function spreadPointPreview(spread){const n=Number(spread||0);return n<7?1:n<14?2:n<21?3:4;}
+
+function EliteBadgeRail({sportsbook={},discordUserId,currentYear}) {
+  const defs=new Map((sportsbook.badges||[]).map((badge)=>[badge.code,badge]));
+  const awards=(sportsbook.badgeAwards||[]).filter((row)=>(!discordUserId||String(row.discord_user_id)===String(discordUserId))&&String(row.season_year)===String(currentYear)).slice(0,6);
+  return <div className="elite-badge-rail"><div><span>RECOGNITION</span><b>Badges & Heat Checks</b></div>{awards.length?awards.map((award)=>{const badge=defs.get(award.badge_code)||{};return <span key={award.id} title={badge.description}><i>{badge.icon||"★"}</i><strong>{badge.title||award.badge_code}</strong></span>}):<small>Perfect cards, heaters, underdog hits—and even cold tickets—show up here.</small>}</div>;
+}
+
+function EliteBooksHistory({sportsbook={},users=[],currentYear,setActiveTab}) {
+  const rows=[...(sportsbook.allTimeStandings||[])].sort((a,b)=>Number(b.total_points)-Number(a.total_points));
+  const champions=[...(sportsbook.champions||[])].sort((a,b)=>Number(b.season_year)-Number(a.season_year));
+  const defs=new Map((sportsbook.badges||[]).map((badge)=>[badge.code,badge]));
+  return <main className="cfb-v2-page elite-books-page"><div className="elite-history-hero"><div><span>THE LEDGER</span><h1>All-Time Sportsbook</h1><p>Every completed season preserved. New-year standings reset; legacy never does.</p></div><button onClick={()=>setActiveTab?.("eliteBooks")}>Back to Elite Books</button></div><section className="elite-history-grid"><div className="elite-history-table"><div className="elite-section-head"><div><span>CAREER BOARD</span><h2>All-Time Points</h2></div></div>{rows.length?rows.map((row,index)=><div key={row.discord_user_id}><b>#{index+1}</b><span><strong>{row.discord_username}</strong><small>{row.correct_picks}/{row.graded_picks} correct • {row.seasons} season{Number(row.seasons)===1?"":"s"}</small></span><em>{row.total_points} pts</em></div>):<div className="elite-empty-small">Career standings begin after the first graded season.</div>}</div><aside className="elite-champions"><div className="elite-section-head"><div><span>CHAMPIONS</span><h2>Season Winners</h2></div></div>{champions.length?champions.map((row)=><div key={row.season_year}><b>{row.season_year}</b><strong>{row.discord_username||users.find((user)=>String(user.id)===String(row.discord_user_id))?.discord_username||row.discord_user_id}</strong><span>{row.total_points} points</span></div>):<p>The first Elite Books champion will be crowned after {currentYear}.</p>}</aside></section><section className="elite-badge-gallery"><div className="elite-section-head"><div><span>TROPHY CASE</span><h2>Recognition System</h2></div></div><div>{[...defs.values()].map((badge)=><article key={badge.code}><i>{badge.icon}</i><strong>{badge.title}</strong><small>{badge.description}</small></article>)}</div></section></main>;
+}
+
+function MyTeamHub({linkedDiscordUser,discordSession,teams=[],users=[],assignments=[],results=[],weeklyMatchups=[],sportsbook={},currentYear,currentWeek,signInWithDiscord,setActiveTab}) {
+  if(!discordSession||!linkedDiscordUser)return <main className="cfb-v2-page"><section className="elite-myteam-login"><span>PERSONALIZED LEAGUE HUB</span><h1>My Team</h1><p>Sign in with Discord to see your team, next opponent, sportsbook card, futures and badges in one place.</p><button onClick={signInWithDiscord}>Continue with Discord</button></section></main>;
+  const assignment=assignments.find((row)=>String(row.discord_user_id)===String(linkedDiscordUser.id)&&assignmentActiveForYear(row,currentYear));
+  const team=teams.find((row)=>String(row.id)===String(assignment?.team_id));
+  const next=(weeklyMatchups||[]).find((row)=>String(row.season_year)===String(currentYear)&&String(row.week)===String(currentWeek)&&(String(row.team_1_id)===String(team?.id)||String(row.team_2_id)===String(team?.id)));
+  const opponent=teams.find((row)=>String(row.id)===String(String(next?.team_1_id)===String(team?.id)?next?.team_2_id:next?.team_1_id));
+  const season=(sportsbook.seasonStandings||[]).find((row)=>String(row.season_year)===String(currentYear)&&String(row.discord_user_id)===String(linkedDiscordUser.id));
+  const futurePicks=(sportsbook.futurePicks||[]).filter((pick)=>String(pick.discord_user_id)===String(linkedDiscordUser.id));
+  return <main className="cfb-v2-page"><section className="elite-myteam-hero" style={{"--my-primary":getTeamPrimary(team),"--my-secondary":getTeamSecondary(team)}}><TeamLogoMark team={team} size={120}/><div><span>{currentYear} PERSONAL HQ</span><h1>{team?.name||"Team assignment pending"}</h1><p>{linkedDiscordUser.discord_username}</p></div><button onClick={()=>setActiveTab?.(`coach-${linkedDiscordUser.id}`)}>Full Coach Profile →</button></section><section className="elite-myteam-grid"><article><span>NEXT UP • {currentWeek}</span>{next?<><div><TeamLogoMark team={opponent} size={74}/><strong>{opponent?.name}</strong></div><small>{next.scheduled_at?new Date(next.scheduled_at).toLocaleString():"Time TBD"}</small></>:<p>No current-week matchup listed.</p>}<button onClick={()=>setActiveTab?.("schedule")}>Open GameCenter</button></article><article><span>ELITE BOOKS</span><strong className="elite-myteam-points">{season?.total_points||0} PTS</strong><small>{season?.correct_picks||0} correct picks</small><button onClick={()=>setActiveTab?.("eliteBooks")}>Build My Card</button></article><article><span>MY FUTURES</span>{futurePicks.length?<b>{futurePicks.length} selection{futurePicks.length===1?"":"s"} locked</b>:<b>No futures selected</b>}<small>All current-year futures are also shown on your coach profile.</small><button onClick={()=>setActiveTab?.("eliteBooks")}>View Futures</button></article></section><EliteBadgeRail sportsbook={sportsbook} discordUserId={linkedDiscordUser.id} currentYear={currentYear}/></main>;
+}
+
+function EliteBooksManager({sportsbook={},users=[],teams=[],assignments=[],currentYear,currentWeek,advanceAt,busy,linkedDiscordUser,generateBoard,seedFutures,settleFuture,setMatchupLock,updateSeed,updateTeamSeed,loadData}) {
+  const [settlements,setSettlements]=useState({});
+  const board=currentSportsbookBoard(sportsbook,currentYear,currentWeek);
+  const currentLines=(sportsbook.lines||[]).filter((line)=>String(line.board_id)===String(board?.id));
+  const markets=(sportsbook.markets||[]).filter((row)=>String(row.season_year)===String(currentYear));
+  const teamFor=(id)=>teams.find((team)=>String(team.id)===String(id));
+  const teamForUser=(userId)=>{const assignment=assignments.find((row)=>String(row.discord_user_id)===String(userId)&&assignmentActiveForYear(row,currentYear));return teamFor(assignment?.team_id);};
+  return <main className="cfb-v2-page">
+    <div style={v2PageHero}><div><span style={v2Eyebrow}>COMMISSIONER OPERATIONS</span><h1 style={v2PageTitle}>Elite Books Manager</h1><p style={v2PageSub}>Generate the current board, manually close betting as games begin, open futures and settle season awards.</p></div><button style={v2GhostButton} onClick={loadData}>Refresh</button></div>
+    {!linkedDiscordUser?.is_commissioner&&<div style={v2Notice}>For protected sportsbook writes, sign in with Discord and mark that linked user as <b>is_commissioner = true</b> in Supabase. The commissioner code remains an emergency UI lock.</div>}
+    <section className="elite-manager-grid"><article><span>CURRENT BOARD</span><h2>{currentYear} • {currentWeek}</h2><p>{board?`${board.status.toUpperCase()} • ${currentLines.length} generated lines`:"No board generated yet"}</p><small>Lock deadline: {board?.locks_at||advanceAt?new Date(board?.locks_at||advanceAt).toLocaleString():"Not set"}</small><button disabled={busy} onClick={generateBoard}>{busy?"Working…":"Generate / Refresh Lines"}</button></article><article><span>SEASON FUTURES</span><h2>Four market system</h2><p>National Champion, conference champions, Heath Hurley COTY and—beginning in Season 2—Most Improved Team.</p><button disabled={busy} onClick={seedFutures}>{busy?"Working…":"Create / Refresh Futures"}</button></article></section>
+    <section style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>LIVE BETTING CONTROL</span><h2>Matchup Locks</h2></div><small style={mutedText}>Select Lock Betting as soon as a game starts. Existing picks remain recorded, but no new or changed picks are accepted.</small></div><div className="elite-matchup-locks">{currentLines.length?currentLines.map((line)=>{const t1=teamFor(line.team_1_id);const t2=teamFor(line.team_2_id);return <div key={line.id} className={line.is_betting_locked?"locked":""}><span><TeamLogoMark team={t1} size={34}/><strong>{getTeamAbbreviation(t1)}</strong></span><b>VS</b><span><TeamLogoMark team={t2} size={34}/><strong>{getTeamAbbreviation(t2)}</strong></span><em>{line.is_betting_locked?`LOCKED${line.betting_locked_at?` • ${new Date(line.betting_locked_at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}`:""}`:"BETTING OPEN"}</em><button disabled={busy||Boolean(line.settled_at)} onClick={()=>setMatchupLock(line.id,!line.is_betting_locked)}>{line.is_betting_locked?"Reopen Betting":"Lock Betting"}</button></div>}):<div style={v2Empty}>Generate the current board to manage matchup locks.</div>}</div></section>
+    <section style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>PRESEASON MODEL</span><h2>Coach & Team Foundation</h2></div><small style={mutedText}>Your imported user skill and team overall ratings drive the opening lines. Their influence automatically declines as actual results accumulate.</small></div><div className="elite-seed-grid">{users.filter((user)=>user.is_active!==false).map((user)=>{const team=teamForUser(user.id);return <article key={user.id}><div><TeamLogoMark team={team} size={40}/><span><strong>{user.discord_username}</strong><small>{team?.name||"No active team"}</small></span></div><label><span>User Skill</span><input type="number" min="1" max="99" defaultValue={user.sportsbook_seed||50} onBlur={(event)=>updateSeed(user.id,event.target.value)}/></label><label><span>Team OVR</span><input type="number" min="1" max="99" disabled={!team} defaultValue={team?.sportsbook_team_seed||70} onBlur={(event)=>team&&updateTeamSeed(team.id,event.target.value)}/></label>{user.sportsbook_notes&&<p>{user.sportsbook_notes}</p>}</article>})}</div></section>
+    <section style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>FUTURES SETTLEMENT</span><h2>Declare Winners</h2></div></div><div className="elite-manager-markets">{markets.map((market)=>{const options=(sportsbook.options||[]).filter((row)=>String(row.market_id)===String(market.id));return <div key={market.id}><span><strong>{market.title}</strong><small>{market.status}</small></span><select value={settlements[market.id]||""} onChange={(event)=>setSettlements({...settlements,[market.id]:event.target.value})}><option value="">Select winner…</option>{options.map((option)=><option key={option.id} value={option.id}>{option.selection_label}</option>)}</select><button disabled={!settlements[market.id]||market.status==="settled"} onClick={()=>settleFuture(market.id,settlements[market.id])}>Settle</button></div>})}{!markets.length&&<div style={v2Empty}>Create the season futures first.</div>}</div></section>
+  </main>;
+}
+
+function DashboardV2({ teams = [], users = [], assignments = [], results = [], allResults = [], weeklyMatchups = [], conferenceAssets = [], allAmericans = [], awards = [], heismans = [], nationalChampions = [], recruiting = [], teamSeasonStats = [], currentYear, currentWeek, advanceAt, setCurrentYear, setCurrentWeek, saveSettings, goToTeam, setActiveTab, rankingSnapshots = [], adminUnlocked = false, sportsbook = {}, linkedDiscordUser = null }) {
   const now=useLiveClock(30000);
   const countdown=countdownParts(advanceAt,now);
   const seasonResults=(allResults||results||[]).filter((row)=>String(row.season_year)===String(currentYear));
@@ -2472,6 +2746,10 @@ function DashboardV2({ teams = [], users = [], assignments = [], results = [], a
       <div style={v2AdvanceCard}><span>Next Advancement</span><b>{countdown?.label||"Not scheduled"}</b><small>{advanceAt?new Date(advanceAt).toLocaleString():"Commissioner can set the deadline"}</small></div>
       {adminUnlocked&&<div style={v2HeroControls}><select value={currentYear} onChange={(e)=>setCurrentYear(e.target.value)} style={v2Input}>{YEARS.map((year)=><option key={year}>{year}</option>)}</select><select value={currentWeek} onChange={(e)=>setCurrentWeek(e.target.value)} style={v2Input}>{WEEKS.map((week)=><option key={week}>{week}</option>)}</select><button style={v2PrimaryButton} onClick={saveSettings}>Save League Week</button></div>}
     </section>
+
+    <CurrentWeekTicker teams={teams} weeklyMatchups={weeklyMatchups} results={allResults} currentYear={currentYear} currentWeek={currentWeek} setActiveTab={setActiveTab}/>
+
+    <EliteBooksHomePanel sportsbook={sportsbook} linkedDiscordUser={linkedDiscordUser} currentYear={currentYear} currentWeek={currentWeek} setActiveTab={setActiveTab}/>
 
     <section className="cfb-v2-leader-grid" style={v2LeaderGrid}>
       <V2LeaderTile label="Top 3 Ranked Users" rows={topUsers} metric="Rating"/>
@@ -3155,7 +3433,7 @@ function BackupExportPanel({ teams, users, assignments, results, awards, allAmer
     ["recruiting.csv", recruiting],
   ];
 
-  return <div style={miniCard}><h3 style={miniTitle}>Backup / Export CSV</h3><p style={mutedText}>Commissioner-only quick exports for backup or audit purposes.</p><div style={actionRow}>{exports.map(([filename, rows])=><button key={filename} type="button" style={ghostButton} onClick={()=>downloadCsv(filename, rows)}>{filename}</button>)}</div></div>;
+  return <div style={miniCard}><h3 style={miniTitle}>Backup / Export CSV</h3><p style={mutedText}>Commissioner-only quick exports for backup or audit purposes.</p><div style={actionRow}>{exports.map(([filename, rows])=><button key={filename} type="button" style={v2GhostButton} onClick={()=>downloadCsv(filename, rows)}>{filename}</button>)}</div></div>;
 }
 
 function DataHealthAlerts({ teams, users, assignments, results }) {
@@ -4441,7 +4719,7 @@ function CommissionerCenterSafe({ setActiveTab, loadData }) {
   );
 }
 
-function UserManagerV2({users=[],assignments=[],teams=[],addDiscordUser,renameDiscordUser,setDiscordUserActive}) {
+function UserManagerV2({users=[],assignments=[],teams=[],linkedDiscordUser,addDiscordUser,renameDiscordUser,setDiscordUserActive,setDiscordCommissionerStatus}) {
   const [newName,setNewName]=useState("");
   const [drafts,setDrafts]=useState({});
   const activeTeamFor=(userId)=>{
@@ -4449,11 +4727,13 @@ function UserManagerV2({users=[],assignments=[],teams=[],addDiscordUser,renameDi
     return teams.find((team)=>String(team.id)===String(assignment?.team_id));
   };
   return <main className="cfb-v2-page" style={v2Page}>
-    <div style={v2PageHero}><div><span style={v2Eyebrow}>COMMISSIONER TOOL</span><h1 style={v2PageTitle}>Discord Users</h1><p style={v2PageSub}>Add users, correct usernames, and deactivate former members without deleting league history.</p></div></div>
+    <div style={v2PageHero}><div><span style={v2Eyebrow}>COMMISSIONER TOOL</span><h1 style={v2PageTitle}>Discord Users</h1><p style={v2PageSub}>Add users, correct usernames, assign commissioner access, and deactivate former members without deleting league history.</p></div></div>
+    <section className="elite-commissioner-access"><div><span>COMMISSIONER ACCESS</span><h2>Delegate League Control</h2><p>Commissioners can manage protected Elite Books controls, odds seeds, matchup locks and futures. Only an already linked commissioner can grant or revoke this status, and the final commissioner cannot be removed.</p></div><strong>{users.filter((user)=>user.is_commissioner).length} Commissioner{users.filter((user)=>user.is_commissioner).length===1?"":"s"}</strong></section>
+    {!linkedDiscordUser?.is_commissioner&&<div style={v2Notice}>Sign in with a Discord account that already has commissioner status before changing commissioner access.</div>}
     <section style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>NEW MEMBER</span><h2>Add Discord User</h2></div></div><div style={v2InlineForm}><input style={v2Input} value={newName} onChange={(e)=>setNewName(e.target.value)} placeholder="Discord username" onKeyDown={async(e)=>{if(e.key==="Enter"&&await addDiscordUser(newName))setNewName("");}}/><button style={v2PrimaryButton} onClick={async()=>{if(await addDiscordUser(newName))setNewName("");}}>Add User</button></div></section>
     <section style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>MEMBER DIRECTORY</span><h2>{users.length} Discord Users</h2></div></div><div className="cfb-v2-user-grid" style={v2UserGrid}>{users.map((user)=>{
       const team=activeTeamFor(user.id); const draft=drafts[user.id]??user.discord_username;
-      return <article key={user.id} style={{...v2UserCard,borderColor:`${getTeamSecondary(team)}44`}}><div style={v2UserIdentity}><TeamLogoMark team={team} size={48} plate/><div><b>{user.discord_username}</b><span>{team?.name||"No active team"}</span></div><small style={user.is_active===false?v2InactiveBadge:v2ActiveBadge}>{user.is_active===false?"INACTIVE":"ACTIVE"}</small></div><div style={v2InlineForm}><input style={v2Input} value={draft} onChange={(e)=>setDrafts({...drafts,[user.id]:e.target.value})}/><button style={v2GhostButton} onClick={()=>renameDiscordUser(user.id,draft)}>Save Name</button><button style={user.is_active===false?v2PrimaryButton:v2DangerSoft} onClick={()=>setDiscordUserActive(user.id,user.is_active===false)}>{user.is_active===false?"Reactivate":"Deactivate"}</button></div></article>;
+      return <article key={user.id} style={{...v2UserCard,borderColor:user.is_commissioner?"rgba(167,139,250,.7)":`${getTeamSecondary(team)}44`}}><div style={v2UserIdentity}><TeamLogoMark team={team} size={48} plate/><div><b>{user.discord_username}</b><span>{team?.name||"No active team"}</span></div><div className="elite-user-statuses"><small style={user.is_active===false?v2InactiveBadge:v2ActiveBadge}>{user.is_active===false?"INACTIVE":"ACTIVE"}</small>{user.is_commissioner&&<small className="elite-commissioner-badge">COMMISSIONER</small>}</div></div><div style={v2InlineForm}><input style={v2Input} value={draft} onChange={(e)=>setDrafts({...drafts,[user.id]:e.target.value})}/><button style={v2GhostButton} onClick={()=>renameDiscordUser(user.id,draft)}>Save Name</button><button style={user.is_active===false?v2PrimaryButton:v2DangerSoft} onClick={()=>setDiscordUserActive(user.id,user.is_active===false)}>{user.is_active===false?"Reactivate":"Deactivate"}</button></div><button className={`elite-commissioner-toggle ${user.is_commissioner?"revoke":"grant"}`} disabled={!linkedDiscordUser?.is_commissioner} onClick={()=>setDiscordCommissionerStatus(user.id,!user.is_commissioner)}>{user.is_commissioner?"Revoke Commissioner Status":"Grant Commissioner Status"}</button></article>;
     })}</div></section>
   </main>;
 }
@@ -5583,7 +5863,7 @@ function SortableStatsTable({ title, rows = [], columns = [], emptyText = "No re
 }
 
 
-function CoachProfile({ user, users = [], teams, assignments, results, weeklyMatchups = [], currentYear, currentWeek, rankingSnapshots = [], allAmericans, awards, heismans, nationalChampions, recruiting, seasonPlayerStats = [], teamSeasonStats = [] }) {
+function CoachProfile({ user, users = [], teams, assignments, results, weeklyMatchups = [], currentYear, currentWeek, rankingSnapshots = [], allAmericans, awards, heismans, nationalChampions, recruiting, seasonPlayerStats = [], teamSeasonStats = [], sportsbook = {} }) {
   const safeUser = user || {};
   const coachStats = getCoachStats(usersFallback(safeUser), teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
   const stats = coachStats.find((row)=>row.userId === safeUser.id) || { wins:0, losses:0, nattys:0, confTitles:0, top10Wins:0, top25Wins:0, awards:0, allAmericans:0, heismans:0, prestige:0 };
@@ -5683,6 +5963,10 @@ function CoachProfile({ user, users = [], teams, assignments, results, weeklyMat
     { label:"All-Americans", value:stats?.allAmericans||0, icon:"🇺🇸" },
   ];
   const milestoneRows = coachMilestonesForStats(stats);
+  const coachFuturePicks=(sportsbook.futurePicks||[]).filter((pick)=>String(pick.discord_user_id)===String(safeUser.id));
+  const futureOptionMap=new Map((sportsbook.options||[]).map((option)=>[String(option.id),option]));
+  const futureMarketMap=new Map((sportsbook.markets||[]).map((market)=>[String(market.id),market]));
+  const currentCoachFutures=coachFuturePicks.map((pick)=>({pick,option:futureOptionMap.get(String(pick.option_id)),market:futureMarketMap.get(String(pick.market_id))})).filter((row)=>String(row.market?.season_year)===String(currentYear));
 
 
   return (
@@ -5746,6 +6030,12 @@ function CoachProfile({ user, users = [], teams, assignments, results, weeklyMat
             </div>
           )) : <p style={mutedText}>No recruiting classes recorded yet.</p>}
         </div>
+      </section>
+
+      <section className="coach-elite-books-card">
+        <div className="elite-section-head"><div><span>ELITE BOOKS • {currentYear}</span><h2>Futures Card</h2></div><small>Locked preseason and season-long selections</small></div>
+        <div>{currentCoachFutures.length?currentCoachFutures.map(({pick,option,market})=>{const pickedTeam=teams.find((team)=>String(team.id)===String(option?.team_id));return <article key={pick.id}>{pickedTeam?<TeamLogoMark team={pickedTeam} size={42}/>:<span className="elite-coach-avatar">{String(option?.selection_label||"?").slice(0,1)}</span>}<span><small>{market?.title}</small><strong>{option?.selection_label||"Selection unavailable"}</strong></span><em>{formatAmericanOdds(pick.locked_odds)} • {pick.possible_points} pts</em><b className={`elite-pick-result elite-pick-${pick.status}`}>{String(pick.status).toUpperCase()}</b></article>}):<div style={v2Empty}>No {currentYear} futures have been selected.</div>}</div>
+        <EliteBadgeRail sportsbook={sportsbook} discordUserId={safeUser.id} currentYear={currentYear}/>
       </section>
 
       <CoachTimelineTable timeline={timeline} teams={teams} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions}/>
@@ -6685,6 +6975,197 @@ function GlobalStyle() {
         .cfb-v2-leader-grid { grid-template-columns:1fr !important; }
         .cfb-v2-page { gap:12px !important; }
       }
+
+      /* Elite Books broadcast system */
+      .elite-books-page { --book-green:#35d07f; --book-dark:#07110d; --book-panel:#0b1312; color:#f8fafc; }
+      .elite-books-hero { position:relative; overflow:hidden; display:grid; grid-template-columns:minmax(0,1.5fr) minmax(280px,.55fr); gap:24px; padding:clamp(24px,4vw,48px); border:1px solid rgba(53,208,127,.34); border-radius:26px; background:radial-gradient(circle at 75% 0%,rgba(53,208,127,.19),transparent 34%),linear-gradient(125deg,#07110d,#101917 62%,#07110d); box-shadow:0 28px 70px rgba(0,0,0,.38),inset 0 1px rgba(255,255,255,.07); }
+      .elite-books-hero::after { content:"EB"; position:absolute; right:30%; bottom:-55px; font-size:210px; line-height:1; font-weight:1000; font-style:italic; color:rgba(255,255,255,.025); transform:skew(-8deg); pointer-events:none; }
+      .elite-books-hero > div:first-child { position:relative; z-index:1; }
+      .elite-books-hero > div:first-child > span,.elite-history-hero span,.elite-myteam-login > span,.elite-myteam-hero > div > span { color:var(--book-green,#35d07f); font-size:11px; font-weight:1000; letter-spacing:.18em; }
+      .elite-books-hero h1 { margin:7px 0 4px; font-size:clamp(52px,8vw,98px); line-height:.82; letter-spacing:-.07em; font-weight:1000; font-style:italic; }
+      .elite-books-hero h1 i { color:var(--book-green); }
+      .elite-books-hero p { margin:16px 0; color:#cbd5e1; font-size:clamp(16px,2vw,21px); font-weight:800; }
+      .elite-books-rule-pills { display:flex; flex-wrap:wrap; gap:8px; }
+      .elite-books-rule-pills b { padding:8px 11px; border:1px solid rgba(53,208,127,.2); border-radius:999px; color:#d1fae5; background:rgba(53,208,127,.08); font-size:10px; letter-spacing:.04em; }
+      .elite-auth-card { position:relative; z-index:2; align-self:stretch; display:flex; flex-direction:column; justify-content:center; gap:6px; padding:22px; border:1px solid rgba(255,255,255,.13); border-top:3px solid var(--book-green); border-radius:18px; background:rgba(0,0,0,.34); box-shadow:0 18px 40px rgba(0,0,0,.25); }
+      .elite-auth-card span { color:var(--book-green); font-size:10px; font-weight:1000; letter-spacing:.14em; }
+      .elite-auth-card strong { font-size:21px; }
+      .elite-auth-card small { color:#94a3b8; line-height:1.4; }
+      .elite-auth-card button,.elite-history-hero button,.elite-myteam-login button,.elite-myteam-hero button,.elite-myteam-grid button { margin-top:10px; border:0; border-radius:9px; padding:11px 14px; color:#03100a; background:var(--book-green,#35d07f); font-weight:1000; cursor:pointer; }
+      .elite-ticker { min-width:0; display:grid; grid-template-columns:116px minmax(0,1fr); overflow:hidden; border:1px solid rgba(148,163,184,.18); border-radius:14px; background:#070b12; box-shadow:0 16px 35px rgba(0,0,0,.22); }
+      .elite-ticker-label { display:flex; flex-direction:column; justify-content:center; align-items:flex-start; padding:12px 15px; border:0; color:white; background:linear-gradient(135deg,#b91c1c,#701414); cursor:pointer; }
+      .elite-ticker-label span { font-size:9px; letter-spacing:.18em; font-weight:1000; }
+      .elite-ticker-label b { font-size:17px; }
+      .elite-ticker-label small { opacity:.74; }
+      .elite-ticker-track { display:flex; min-width:0; overflow-x:auto; scrollbar-width:thin; }
+      .elite-ticker-game { flex:0 0 260px; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:8px; padding:10px 15px; border:0; border-right:1px solid rgba(148,163,184,.14); color:#e2e8f0; background:transparent; cursor:pointer; }
+      .elite-ticker-game > span { display:flex; align-items:center; gap:5px; font-size:12px; }
+      .elite-ticker-game > span:nth-of-type(2){justify-content:flex-end;}
+      .elite-ticker-game > strong { color:white; font-size:12px; }
+      .elite-ticker-game > em { grid-column:1/-1; color:#94a3b8; font-size:8px; font-style:normal; font-weight:900; letter-spacing:.12em; }
+      .elite-ticker-empty { padding:22px; color:#94a3b8; }
+      .elite-books-scorebar { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); border:1px solid rgba(53,208,127,.18); border-radius:14px; background:#09100f; overflow:hidden; }
+      .elite-books-scorebar > div { display:flex; flex-direction:column; gap:4px; padding:14px 18px; border-right:1px solid rgba(255,255,255,.08); }
+      .elite-books-scorebar span { color:#64748b; font-size:9px; font-weight:1000; letter-spacing:.15em; }
+      .elite-books-scorebar b { font-size:13px; overflow-wrap:anywhere; }
+      .elite-status { color:#facc15; font-size:10px !important; letter-spacing:.09em; }
+      .elite-status-open { color:#35d07f; } .elite-status-settled { color:#60a5fa; } .elite-status-locked { color:#fb923c; }
+      .elite-books-layout { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:18px; align-items:start; }
+      .elite-books-main,.elite-books-sidebar,.elite-futures,.elite-history-table,.elite-champions,.elite-badge-gallery,.coach-elite-books-card { border:1px solid rgba(148,163,184,.17); border-radius:20px; padding:20px; background:linear-gradient(145deg,rgba(15,23,42,.93),rgba(5,12,12,.96)); box-shadow:0 18px 48px rgba(0,0,0,.25); }
+      .elite-section-head { display:flex; justify-content:space-between; gap:12px; align-items:end; margin-bottom:16px; }
+      .elite-section-head span { color:#35d07f; font-size:9px; font-weight:1000; letter-spacing:.16em; }
+      .elite-section-head h2 { margin:3px 0 0; font-size:22px; letter-spacing:-.03em; }
+      .elite-section-head > small { max-width:390px; color:#64748b; text-align:right; line-height:1.35; }
+      .elite-section-head button { border:0; color:#35d07f; background:transparent; font-size:11px; font-weight:1000; cursor:pointer; }
+      .elite-lines-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+      .elite-line-card { position:relative; overflow:hidden; border:1px solid rgba(148,163,184,.18); border-radius:16px; background:linear-gradient(120deg,color-mix(in srgb,var(--team-one) 25%,#090f16),#090f16 48%,color-mix(in srgb,var(--team-two) 25%,#090f16)); }
+      .elite-line-card::before { content:""; position:absolute; inset:0; background:linear-gradient(110deg,transparent 46%,rgba(255,255,255,.025) 46% 54%,transparent 54%); pointer-events:none; }
+      .elite-line-card > header,.elite-line-card > footer { position:relative; display:flex; align-items:center; justify-content:space-between; padding:10px 13px; border-bottom:1px solid rgba(255,255,255,.08); font-size:9px; font-weight:1000; letter-spacing:.12em; }
+      .elite-line-card > header b { color:#35d07f; }
+      .elite-line-card.betting-closed { border-color:rgba(248,113,113,.5); }
+      .elite-line-card.betting-closed > header b { color:#f87171; }
+      .elite-line-matchup { position:relative; display:grid; grid-template-columns:1fr 38px 1fr; align-items:start; gap:4px; padding:16px 10px; }
+      .elite-line-matchup > div { min-width:0; display:flex; flex-direction:column; align-items:center; gap:4px; text-align:center; }
+      .elite-line-matchup > div > b { color:#94a3b8; font-size:11px; }
+      .elite-line-matchup > div > strong { min-height:32px; font-size:12px; line-height:1.25; }
+      .elite-line-matchup > span { align-self:center; color:#35d07f; font-size:15px; font-weight:1000; font-style:italic; }
+      .elite-final-score { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; text-align:center; padding:8px 15px; background:rgba(0,0,0,.35); }
+      .elite-final-score b { font-size:25px; } .elite-final-score span { color:#35d07f; font-size:9px; font-weight:1000; }
+      .elite-betting-closed { display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 12px;border-block:1px solid rgba(248,113,113,.22);color:#fecaca;background:rgba(127,29,29,.24);font-size:9px; } .elite-betting-closed b { color:#f87171;letter-spacing:.1em; }
+      .elite-market { position:relative; display:grid; grid-template-columns:70px 1fr 1fr; gap:7px; align-items:stretch; padding:7px 10px; }
+      .elite-market > label { align-self:center; color:#64748b; font-size:8px; font-weight:1000; letter-spacing:.12em; }
+      .elite-pick-button { min-width:0; display:grid; grid-template-columns:1fr auto; gap:2px 7px; padding:8px; border:1px solid rgba(148,163,184,.2); border-radius:8px; color:#f8fafc; background:rgba(2,6,23,.72); cursor:pointer; }
+      .elite-pick-button span { min-width:0; overflow:hidden; text-overflow:ellipsis; font-size:9px; font-weight:900; }
+      .elite-pick-button b { font-size:11px; }
+      .elite-pick-button small { grid-column:1/-1; color:#64748b; font-size:7px; font-weight:1000; text-align:right; }
+      .elite-pick-button.selected { border-color:#35d07f; background:rgba(53,208,127,.17); box-shadow:inset 0 0 0 1px rgba(53,208,127,.26); }
+      .elite-pick-button:disabled { cursor:not-allowed; opacity:.62; }
+      .elite-line-card > footer { border-top:1px solid rgba(255,255,255,.08); border-bottom:0; color:#64748b; letter-spacing:0; font-weight:700; }
+      .elite-leaderboard { display:grid; gap:7px; }
+      .elite-leaderboard > div,.elite-history-table > div:not(.elite-section-head) { display:grid; grid-template-columns:32px minmax(0,1fr) auto; gap:9px; align-items:center; padding:10px; border:1px solid rgba(148,163,184,.12); border-radius:10px; background:rgba(2,6,23,.44); }
+      .elite-leaderboard > div.me { border-color:rgba(53,208,127,.5); background:rgba(53,208,127,.09); }
+      .elite-leaderboard > div > b,.elite-history-table > div > b { color:#35d07f; }
+      .elite-leaderboard span,.elite-history-table span { min-width:0; display:flex; flex-direction:column; }
+      .elite-leaderboard strong,.elite-history-table strong { overflow:hidden; text-overflow:ellipsis; }
+      .elite-leaderboard small,.elite-history-table small { color:#64748b; font-size:9px; }
+      .elite-leaderboard em,.elite-history-table em { color:#fff; font-size:11px; font-style:normal; font-weight:1000; }
+      .elite-badge-rail { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; padding-top:15px; border-top:1px solid rgba(148,163,184,.13); }
+      .elite-badge-rail > div { flex-basis:100%; display:flex; justify-content:space-between; }
+      .elite-badge-rail > div span { color:#35d07f; font-size:8px; font-weight:1000; letter-spacing:.12em; }
+      .elite-badge-rail > div b { font-size:11px; }
+      .elite-badge-rail > span { display:flex; align-items:center; gap:5px; padding:6px 8px; border:1px solid rgba(250,204,21,.2); border-radius:999px; background:rgba(250,204,21,.07); }
+      .elite-badge-rail > span i { font-style:normal; } .elite-badge-rail > span strong { font-size:8px; }
+      .elite-badge-rail > small { color:#64748b; line-height:1.4; }
+      .elite-futures-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+      .elite-future-card { overflow:hidden; border:1px solid rgba(148,163,184,.15); border-radius:14px; background:#080e13; }
+      .elite-future-card > header { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:13px; border-bottom:1px solid rgba(148,163,184,.13); background:linear-gradient(90deg,rgba(53,208,127,.1),transparent); }
+      .elite-future-card > header > div { display:flex; align-items:center; gap:9px; }
+      .elite-future-card > header span { display:flex; flex-direction:column; }
+      .elite-future-card > header small { color:#35d07f; font-size:8px; font-weight:1000; text-transform:uppercase; }
+      .elite-future-card > header strong { font-size:13px; }
+      .elite-future-card > header > b { color:#35d07f; font-size:8px; letter-spacing:.1em; }
+      .elite-future-options { max-height:340px; overflow-y:auto; padding:7px; }
+      .elite-future-options button { width:100%; display:grid; grid-template-columns:38px minmax(0,1fr) auto; align-items:center; gap:8px; margin:4px 0; padding:8px; border:1px solid transparent; border-radius:8px; color:#f8fafc; text-align:left; background:rgba(255,255,255,.025); cursor:pointer; }
+      .elite-future-options button:hover { background:rgba(255,255,255,.06); }
+      .elite-future-options button.selected { border-color:#35d07f; background:rgba(53,208,127,.12); }
+      .elite-future-options button:disabled { cursor:not-allowed; }
+      .elite-future-options button > span:nth-child(2) { min-width:0; display:flex; flex-direction:column; }
+      .elite-future-options button strong { overflow:hidden; text-overflow:ellipsis; font-size:10px; }
+      .elite-future-options button small { color:#94a3b8; }
+      .elite-future-options button em { color:#35d07f; font-size:9px; font-style:normal; font-weight:1000; }
+      .elite-coach-avatar { width:32px; height:32px; display:grid; place-items:center; border:1px solid rgba(53,208,127,.4); border-radius:50%; color:#35d07f; background:rgba(53,208,127,.1); font-weight:1000; }
+      .elite-empty,.elite-empty-small { display:flex; flex-direction:column; gap:6px; padding:30px; border:1px dashed rgba(148,163,184,.25); border-radius:12px; color:#64748b; text-align:center; }
+      .elite-empty b { color:#cbd5e1; letter-spacing:.08em; }
+      .elite-books-home { display:grid; grid-template-columns:minmax(260px,1.4fr) repeat(3,minmax(150px,.65fr)); overflow:hidden; border:1px solid rgba(53,208,127,.25); border-radius:18px; background:linear-gradient(125deg,#07110d,#0c1714); box-shadow:0 18px 50px rgba(0,0,0,.27); }
+      .elite-books-home > div { min-width:0; padding:18px; border-right:1px solid rgba(255,255,255,.08); }
+      .elite-books-home-brand { background:radial-gradient(circle at 100% 0%,rgba(53,208,127,.2),transparent 46%); }
+      .elite-books-home-brand > span,.elite-books-home-board span,.elite-books-home-leaders > span,.elite-books-home-me > span { color:#35d07f; font-size:8px; font-weight:1000; letter-spacing:.15em; }
+      .elite-books-home-brand h2 { margin:3px 0; font-size:28px; font-style:italic; letter-spacing:-.05em; } .elite-books-home-brand h2 i { color:#35d07f; }
+      .elite-books-home-brand p { margin:4px 0 10px; color:#94a3b8; font-size:10px; }
+      .elite-books-home button { border:0; padding:0; color:#35d07f; background:transparent; font-size:9px; font-weight:1000; cursor:pointer; }
+      .elite-books-home-board,.elite-books-home-me { display:flex; flex-direction:column; gap:5px; }
+      .elite-books-home-board > div { display:flex; justify-content:space-between; gap:5px; }
+      .elite-books-home-board > strong,.elite-books-home-me > strong { margin-top:auto; font-size:27px; }
+      .elite-books-home-board small,.elite-books-home-me small,.elite-books-home-leaders > small { color:#64748b; font-size:9px; }
+      .elite-books-home-leaders { display:flex; flex-direction:column; gap:6px; }
+      .elite-books-home-leaders > div { display:grid; grid-template-columns:24px 1fr auto; gap:5px; font-size:9px; }
+      .elite-books-home-leaders > div b { color:#35d07f; } .elite-books-home-leaders > div strong { overflow:hidden;text-overflow:ellipsis; } .elite-books-home-leaders > div em { font-style:normal; color:#94a3b8; }
+      .elite-history-hero { display:flex; justify-content:space-between; align-items:end; gap:20px; padding:30px; border-radius:22px; background:linear-gradient(135deg,#07110d,#14251e); border:1px solid rgba(53,208,127,.25); }
+      .elite-history-hero h1 { margin:4px 0; font-size:clamp(40px,6vw,72px); letter-spacing:-.06em; }
+      .elite-history-hero p { color:#94a3b8; }
+      .elite-history-grid { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(260px,.5fr); gap:16px; }
+      .elite-history-table { display:grid; gap:7px; }
+      .elite-champions > div:not(.elite-section-head) { display:grid; gap:4px; padding:12px; border-bottom:1px solid rgba(148,163,184,.13); }
+      .elite-champions > div > b { color:#35d07f; } .elite-champions > div > span,.elite-champions p { color:#64748b; }
+      .elite-badge-gallery > div:last-child { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+      .elite-badge-gallery article { display:flex; flex-direction:column; gap:5px; padding:14px; border:1px solid rgba(148,163,184,.13); border-radius:10px; background:rgba(2,6,23,.4); }
+      .elite-badge-gallery article i { font-size:24px; font-style:normal; } .elite-badge-gallery article small { color:#64748b; line-height:1.35; }
+      .coach-elite-books-card > div:nth-child(2) { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+      .coach-elite-books-card article { display:grid; grid-template-columns:46px minmax(0,1fr) auto; gap:9px; align-items:center; padding:11px; border:1px solid rgba(53,208,127,.18); border-radius:10px; background:rgba(53,208,127,.05); }
+      .coach-elite-books-card article > span { display:flex; flex-direction:column; min-width:0; } .coach-elite-books-card article small { color:#35d07f; font-size:8px; } .coach-elite-books-card article strong { overflow:hidden;text-overflow:ellipsis; }
+      .coach-elite-books-card article em { font-size:9px; font-style:normal; font-weight:900; }
+      .coach-elite-books-card article > b { grid-column:2/-1; color:#94a3b8; font-size:8px; text-align:right; }
+      .elite-pick-won { color:#35d07f !important; } .elite-pick-lost { color:#f87171 !important; }
+      .elite-myteam-login { max-width:760px; margin:40px auto; padding:50px; border:1px solid rgba(53,208,127,.24); border-radius:24px; text-align:center; background:linear-gradient(145deg,#07110d,#111827); }
+      .elite-myteam-login h1 { margin:5px; font-size:60px; } .elite-myteam-login p { color:#94a3b8; }
+      .elite-myteam-hero { display:grid; grid-template-columns:130px minmax(0,1fr) auto; align-items:center; gap:20px; padding:28px; border:1px solid color-mix(in srgb,var(--my-secondary) 50%,transparent); border-radius:22px; background:linear-gradient(125deg,color-mix(in srgb,var(--my-primary) 70%,#020617),#071018); }
+      .elite-myteam-hero h1 { margin:4px 0; font-size:clamp(34px,5vw,66px); letter-spacing:-.06em; } .elite-myteam-hero p { margin:0;color:#cbd5e1; }
+      .elite-myteam-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+      .elite-myteam-grid article { display:flex; flex-direction:column; gap:10px; padding:20px; border:1px solid rgba(148,163,184,.15); border-radius:16px; background:linear-gradient(145deg,rgba(15,23,42,.92),rgba(5,12,12,.96)); }
+      .elite-myteam-grid article > span { color:#35d07f; font-size:9px;font-weight:1000;letter-spacing:.14em; } .elite-myteam-grid article > div { display:flex; align-items:center;gap:10px; } .elite-myteam-grid article > small { color:#64748b; }
+      .elite-myteam-points { font-size:34px; }
+      .elite-manager-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+      .elite-manager-grid article { display:flex; flex-direction:column; gap:8px; padding:22px; border:1px solid rgba(53,208,127,.2); border-radius:16px; background:linear-gradient(145deg,#07110d,#111827); }
+      .elite-manager-grid article > span { color:#35d07f;font-size:9px;font-weight:1000;letter-spacing:.15em; } .elite-manager-grid article h2 { margin:0; } .elite-manager-grid article p,.elite-manager-grid article small { color:#94a3b8; }
+      .elite-manager-grid button,.elite-manager-markets button { border:0;border-radius:8px;padding:10px;color:#03100a;background:#35d07f;font-weight:1000;cursor:pointer; }
+      .elite-manager-markets { display:grid;gap:8px; } .elite-manager-markets > div { display:grid;grid-template-columns:minmax(180px,1fr) minmax(200px,1fr) 90px;gap:10px;align-items:center;padding:10px;border:1px solid rgba(148,163,184,.12);border-radius:10px; } .elite-manager-markets span { display:flex;flex-direction:column; } .elite-manager-markets small { color:#64748b; } .elite-manager-markets select { width:100%;padding:9px;border:1px solid rgba(148,163,184,.2);border-radius:8px;color:#fff;background:#0f172a; }
+      .elite-matchup-locks { display:grid;gap:8px; } .elite-matchup-locks > div { display:grid;grid-template-columns:minmax(100px,1fr) 26px minmax(100px,1fr) minmax(120px,.7fr) 130px;gap:10px;align-items:center;padding:10px 12px;border:1px solid rgba(53,208,127,.18);border-radius:10px;background:rgba(53,208,127,.04); } .elite-matchup-locks > div.locked { border-color:rgba(248,113,113,.34);background:rgba(127,29,29,.13); } .elite-matchup-locks > div > span { display:flex;align-items:center;gap:7px; } .elite-matchup-locks > div > b { color:#64748b;text-align:center;font-size:10px; } .elite-matchup-locks > div > em { color:#35d07f;font-size:9px;font-style:normal;font-weight:1000;letter-spacing:.08em; } .elite-matchup-locks > div.locked > em { color:#f87171; } .elite-matchup-locks button { border:1px solid rgba(248,113,113,.35);border-radius:8px;padding:9px;color:#fecaca;background:rgba(127,29,29,.22);font-size:9px;font-weight:1000;cursor:pointer; } .elite-matchup-locks > div.locked button { border-color:rgba(53,208,127,.35);color:#d1fae5;background:rgba(53,208,127,.12); }
+      .elite-seed-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px; } .elite-seed-grid > article { min-width:0;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px;border:1px solid rgba(148,163,184,.13);border-radius:11px;background:rgba(2,6,23,.42); } .elite-seed-grid > article > div { grid-column:1/-1;min-width:0;display:flex;align-items:center;gap:9px; } .elite-seed-grid > article > div > span { min-width:0;display:flex;flex-direction:column; } .elite-seed-grid > article strong,.elite-seed-grid > article small { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; } .elite-seed-grid > article small { color:#64748b;font-size:8px; } .elite-seed-grid label { display:flex;flex-direction:column;gap:4px;padding:7px;border:1px solid rgba(148,163,184,.1);border-radius:8px;background:rgba(255,255,255,.025); } .elite-seed-grid label span { overflow:hidden;text-overflow:ellipsis;font-size:8px;font-weight:1000;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em; } .elite-seed-grid input { width:100%;padding:8px;border:1px solid rgba(53,208,127,.25);border-radius:7px;color:#fff;background:#07110d;text-align:center;font-weight:1000; } .elite-seed-grid > article > p { grid-column:1/-1;margin:2px 0 0;padding-top:8px;border-top:1px solid rgba(148,163,184,.1);color:#94a3b8;font-size:9px;line-height:1.4; }
+      .elite-discord-drawer { display:flex;align-items:center;justify-content:space-between;gap:10px;margin:12px 0;padding:12px;border:1px solid rgba(88,101,242,.35);border-radius:12px;background:rgba(88,101,242,.1); }
+      .elite-discord-drawer > div { min-width:0;display:flex;flex-direction:column; } .elite-discord-drawer span { color:#a5b4fc;font-size:8px;font-weight:1000;letter-spacing:.12em; } .elite-discord-drawer strong { overflow:hidden;text-overflow:ellipsis; } .elite-discord-drawer button { flex:0 0 auto;border:0;border-radius:7px;padding:8px 10px;color:#fff;background:#5865f2;font-size:9px;font-weight:1000;cursor:pointer; }
+      .elite-commissioner-access { display:flex;justify-content:space-between;align-items:center;gap:18px;padding:20px;border:1px solid rgba(167,139,250,.32);border-radius:16px;background:linear-gradient(135deg,rgba(76,29,149,.22),rgba(15,23,42,.92)); } .elite-commissioner-access span { color:#c4b5fd;font-size:9px;font-weight:1000;letter-spacing:.15em; } .elite-commissioner-access h2 { margin:4px 0;font-size:22px; } .elite-commissioner-access p { max-width:780px;margin:0;color:#94a3b8;line-height:1.45; } .elite-commissioner-access > strong { flex:0 0 auto;padding:10px 13px;border:1px solid rgba(167,139,250,.32);border-radius:999px;color:#ddd6fe;background:rgba(139,92,246,.12);font-size:11px; }
+      .elite-user-statuses { display:flex;flex-direction:column;align-items:flex-end;gap:5px; } .elite-commissioner-badge { padding:5px 7px;border:1px solid rgba(167,139,250,.38);border-radius:999px;color:#ddd6fe;background:rgba(139,92,246,.13);font-size:7px;font-weight:1000;letter-spacing:.08em; }
+      .elite-commissioner-toggle { width:100%;margin-top:10px;padding:9px;border-radius:8px;font-size:9px;font-weight:1000;cursor:pointer; } .elite-commissioner-toggle.grant { border:1px solid rgba(167,139,250,.34);color:#ddd6fe;background:rgba(139,92,246,.12); } .elite-commissioner-toggle.revoke { border:1px solid rgba(248,113,113,.3);color:#fecaca;background:rgba(127,29,29,.16); } .elite-commissioner-toggle:disabled { opacity:.45;cursor:not-allowed; }
+      @media (max-width:1100px) {
+        .elite-books-layout { grid-template-columns:1fr; }
+        .elite-books-sidebar { display:grid;grid-template-columns:1fr 1fr;gap:16px; }
+        .elite-books-sidebar > .elite-section-head { grid-column:1/-1; }
+        .elite-books-home { grid-template-columns:1fr 1fr; } .elite-books-home-brand { grid-column:1/-1; }
+      }
+      @media (max-width:760px) {
+        .elite-books-hero { grid-template-columns:1fr; padding:22px; border-radius:18px; }
+        .elite-books-hero h1 { font-size:clamp(54px,18vw,78px) !important; }
+        .elite-books-scorebar { grid-template-columns:1fr 1fr; }
+        .elite-lines-grid,.elite-futures-grid,.elite-history-grid,.elite-myteam-grid,.elite-manager-grid { grid-template-columns:1fr; }
+        .elite-books-sidebar { display:block; }
+        .elite-lines-grid { gap:10px; }
+        .elite-history-hero { align-items:start;flex-direction:column; }
+        .elite-badge-gallery > div:last-child { grid-template-columns:1fr 1fr; }
+        .coach-elite-books-card > div:nth-child(2) { grid-template-columns:1fr; }
+        .elite-myteam-hero { grid-template-columns:86px minmax(0,1fr);padding:18px; }
+        .elite-myteam-hero > button { grid-column:1/-1; }
+        .elite-manager-markets > div { grid-template-columns:1fr; }
+        .elite-matchup-locks > div { grid-template-columns:1fr 24px 1fr; } .elite-matchup-locks > div > em,.elite-matchup-locks > div > button { grid-column:1/-1; } .elite-matchup-locks > div > em { text-align:center; }
+        .elite-seed-grid { grid-template-columns:1fr 1fr; }
+        .elite-commissioner-access { align-items:flex-start;flex-direction:column; }
+      }
+      @media (max-width:520px) {
+        .elite-ticker { grid-template-columns:82px minmax(0,1fr); }
+        .elite-ticker-label { padding:9px; } .elite-ticker-label b { font-size:13px; }
+        .elite-ticker-game { flex-basis:225px;padding:8px; }
+        .elite-books-home { grid-template-columns:1fr; } .elite-books-home-brand { grid-column:auto; }
+        .elite-books-home > div { border-right:0;border-bottom:1px solid rgba(255,255,255,.08); }
+        .elite-section-head { align-items:start;flex-direction:column; } .elite-section-head > small { text-align:left; }
+        .elite-books-main,.elite-books-sidebar,.elite-futures,.elite-history-table,.elite-champions,.elite-badge-gallery,.coach-elite-books-card { padding:13px;border-radius:14px; }
+        .elite-line-matchup { grid-template-columns:1fr 28px 1fr; }
+        .elite-line-matchup img { max-width:58px!important;max-height:58px!important; }
+        .elite-market { grid-template-columns:58px 1fr 1fr;gap:4px;padding:5px 7px; }
+        .elite-pick-button { padding:7px 5px;grid-template-columns:1fr; } .elite-pick-button b,.elite-pick-button small { text-align:center; }
+        .elite-books-scorebar > div { padding:10px; }
+        .elite-badge-gallery > div:last-child { grid-template-columns:1fr; }
+        .elite-myteam-login { margin:10px;padding:25px 18px; }
+        .elite-seed-grid { grid-template-columns:1fr; }
+      }
 `}</style>
   );
 }
@@ -6703,21 +7184,22 @@ function Header({ loading, reload }) {
     </header>
   );
 }
-function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reorderTabs, adminUnlocked, adminCodeInput, setAdminCodeInput, unlockAdmin, teams = [], assignments = [], currentYear, users: navUsers = []}) {
+function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reorderTabs, adminUnlocked, adminCodeInput, setAdminCodeInput, unlockAdmin, teams = [], assignments = [], currentYear, users: navUsers = [], discordSession, linkedDiscordUser, signInWithDiscord, signOutDiscord}) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const groups = [
-    { title: "League Hub", keys: ["dashboard", "schedule"] },
+    { title: "League Hub", keys: ["dashboard", "schedule", "myTeam"] },
+    { title: "Elite Books", keys: ["eliteBooks", "sportsbookHistory"] },
     { title: "Rankings", keys: ["eloRankings", "powerIndex", "conferencePower", "recruitingRankings"] },
     { title: "Teams", keys: ["allTeamsRatings"] },
     { title: "Dynasty Legacy", keys: ["dynastyTimeline", "dynastyRecords", "rivalries", "h2h"] },
     { title: "League History", keys: ["coachHOF", "playerHOF"] },
     { title: "Recognition", keys: ["allAmericans", "awards", "heismans", "nationalChampions"] },
-    { title: "Commissioner Tools", keys: ["commissionerCenter", "weeklyMatchups", "userManager", "assignments", "leagueDataCenter", "resultsManager", "logoManager"] },
+    { title: "Commissioner Tools", keys: ["commissionerCenter", "sportsbookManager", "weeklyMatchups", "userManager", "assignments", "leagueDataCenter", "resultsManager", "logoManager"] },
   ];
 
   const tabMap = new Map(tabs);
-  const hiddenWhenLocked = new Set(["commissionerCenter", "weeklyMatchups", "userManager", "assignments", "leagueDataCenter", "resultsManager", "logoManager"]);
+  const hiddenWhenLocked = new Set(["commissionerCenter", "sportsbookManager", "weeklyMatchups", "userManager", "assignments", "leagueDataCenter", "resultsManager", "logoManager"]);
   const visibleGroups = groups.map((group) => ({ ...group, keys: group.keys.filter((key) => adminUnlocked || !hiddenWhenLocked.has(key)) })).filter((group) => group.keys.length > 0);
   const usedKeys = new Set(visibleGroups.flatMap((group) => group.keys));
   const coachTabs = tabs
@@ -6744,13 +7226,14 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
     const recognition = ["#141128", "#c4b5fd", "#ffffff"];
     const admin = ["#2a123f", "#f97316", "#ffffff"];
 
-    if (["dashboard", "schedule", "draftRoom"].includes(tabKey)) return main;
+    if (["dashboard", "schedule", "myTeam", "draftRoom"].includes(tabKey)) return main;
+    if (["eliteBooks", "sportsbookHistory"].includes(tabKey)) return ["#07110d", "#35d07f", "#ffffff"];
     if (["logoManager", "allTeamsRatings", "leagueDataCenter", "recruitingRankings", "resultsManager"].includes(tabKey)) return data;
     if (["dynastyTimeline", "dynastyRecords", "rivalries", "h2h"].includes(tabKey)) return legacy;
     if (["powerIndex", "eloRankings", "conferencePower"].includes(tabKey)) return ranking;
     if (["coachHOF", "playerHOF"].includes(tabKey)) return history;
     if (["allAmericans", "awards", "heismans", "nationalChampions"].includes(tabKey)) return recognition;
-    if (["commissionerCenter", "assignments", "weeklyMatchups", "userManager", "leagueDataCenter", "resultsManager", "logoManager"].includes(tabKey)) return admin;
+    if (["commissionerCenter", "sportsbookManager", "assignments", "weeklyMatchups", "userManager", "leagueDataCenter", "resultsManager", "logoManager"].includes(tabKey)) return admin;
     return main;
   }
 
@@ -6841,7 +7324,7 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
       </div>
 
       <nav className="cfb-mobile-nav-v2" style={v2MobileNav} aria-label="Primary mobile navigation">
-        {[["dashboard","Home","⌂"],["schedule","Games","◫"],["conferencePower","Conferences","◆"],["allTeamsRatings","Teams","◉"]].map(([key,label,icon])=><button key={key} type="button" style={activeTab===key?v2MobileNavActive:v2MobileNavButton} onClick={()=>handleSelect(key)}><b>{icon}</b><span>{label}</span></button>)}
+        {[["dashboard","Home","⌂"],["schedule","Games","◫"],["eliteBooks","Books","◆"],["myTeam","My Team","◉"]].map(([key,label,icon])=><button key={key} type="button" style={activeTab===key?v2MobileNavActive:v2MobileNavButton} onClick={()=>handleSelect(key)}><b>{icon}</b><span>{label}</span></button>)}
         <button type="button" style={v2MobileNavButton} onClick={()=>setMenuOpen(true)}><b>☰</b><span>More</span></button>
       </nav>
 
@@ -6854,6 +7337,11 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
                 <div style={drawerSubtitle}>League Navigation</div>
               </div>
               <button type="button" onClick={() => setMenuOpen(false)} style={drawerClose}>×</button>
+            </div>
+
+            <div className="elite-discord-drawer">
+              <div><span>DISCORD IDENTITY</span><strong>{discordSession?(linkedDiscordUser?.discord_username||discordSession.user?.user_metadata?.user_name||"Connected"):"Not connected"}</strong></div>
+              <button type="button" onClick={discordSession?signOutDiscord:signInWithDiscord}>{discordSession?"Sign out":"Connect Discord"}</button>
             </div>
 
             <div style={drawerAdminBox}>
