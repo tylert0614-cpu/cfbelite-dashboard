@@ -17,6 +17,21 @@ const EMPTY_RESULT = { season_year: 2029, week: "Week 1", team_1_id: "", team_2_
 const EMPTY_RECRUITING = { season_year: 2029, rank: "" };
 
 function scoreNumber(value) { const n = Number(value); return Number.isFinite(n) ? n : null; }
+function isoToLocalDateTimeInput(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+function localDateTimeInputToIso(value) {
+  if (!value) return "";
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+  if (!match) return "";
+  const [, year, month, day, hour, minute] = match;
+  const date = new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), 0, 0);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+}
 function recordFromResults(teamId, results, year = null) {
   const filtered = results.filter((r) => (!year || String(r.season_year) === String(year)) && (r.team_1_id === teamId || r.team_2_id === teamId));
   let wins = 0; let losses = 0; let pf = 0; let pa = 0;
@@ -2717,25 +2732,9 @@ function DashboardV2({ teams = [], users = [], assignments = [], results = [], a
   const seasonResults=(allResults||results||[]).filter((row)=>String(row.season_year)===String(currentYear));
   const rankings=computerRankingRows(teams,seasonResults,assignments,users);
   const previousMap=previousRankingMap(rankingSnapshots,currentYear,currentWeek);
-  const rankMap=new Map(rankings.map((row)=>[String(row.team.id),row.rank]));
-  const schedule=(weeklyMatchups||[]).filter((row)=>String(row.season_year)===String(currentYear)).map((row)=>{
-    const team1=row.team_1||teams.find((team)=>String(team.id)===String(row.team_1_id));
-    const team2=row.team_2||teams.find((team)=>String(team.id)===String(row.team_2_id));
-    const result=scheduledResultFor(row,seasonResults,currentYear);
-    return {...row,team1,team2,result,rank1:rankMap.get(String(row.team_1_id)),rank2:rankMap.get(String(row.team_2_id)),user1:assignedCoachName(row.team_1_id,row.team_1_user_id,users,assignments,currentYear),user2:assignedCoachName(row.team_2_id,row.team_2_user_id,users,assignments,currentYear)};
-  });
-  const weekGames=schedule.filter((row)=>String(row.week)===String(currentWeek));
-  const completed=weekGames.filter((row)=>row.result);
-  const remaining=weekGames.filter((row)=>!row.result);
-  const missingVod=completed.filter((row)=>!row.vod_url).length;
-  const featured=weekGames.find((row)=>row.is_game_of_week)||[...weekGames].sort((a,b)=>((a.rank1||99)+(a.rank2||99))-((b.rank1||99)+(b.rank2||99)))[0]||null;
-  const recent=[...seasonResults].filter((row)=>row.team_1_id&&row.team_2_id).sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0)).slice(0,6);
   const topCoach=rankings.find((row)=>assignedCoachName(row.team.id,null,users,assignments,currentYear)!=="User TBD")||rankings[0];
-  const activeAssignments=assignments.filter((row)=>row.status==="Active"&&row.discord_user_id&&row.team_id);
-  const unassignedUsers=users.filter((user)=>user.is_active!==false&&!activeAssignments.some((row)=>String(row.discord_user_id)===String(user.id))).length;
   const prestigeRows=typeof dynastyPrestigeRows==="function"?dynastyPrestigeRows(teams,assignments,allResults,allAmericans,awards,heismans,nationalChampions,recruiting,teamSeasonStats).slice(0,5):[];
   const wire=typeof dynastyWireItems==="function"?dynastyWireItems({rankingDetails:rankings.map((row)=>({...row,record:recordFromResults(row.team.id,seasonResults),user:assignedCoachName(row.team.id,null,users,assignments,currentYear)})),results:allResults,teams,recruiting,prestigeRows,currentYear}):[];
-  const progress=weekGames.length?Math.round((completed.length/weekGames.length)*100):0;
   const visibleRankings=rankings;
   const topUsers=rankings.slice(0,3).map((row)=>({name:assignedCoachName(row.team.id,null,users,assignments,currentYear),detail:`#${row.rank} ${row.teamName}`,value:row.rating.toFixed(1),team:row.team}));
   const conferenceRows=conferencePowerData({teams,users,assignments,results:seasonResults,allResults,allAmericans,awards,heismans,nationalChampions,recruiting});
@@ -2763,37 +2762,12 @@ function DashboardV2({ teams = [], users = [], assignments = [], results = [], a
       <V2LeaderTile label="Top 3 Avg PA" rows={topAvgPa} metric="PA"/>
     </section>
 
-    <section className="cfb-v2-home-grid" style={v2HomeGrid}>
-      <div style={v2Panel}>
-        <div style={v2PanelHeader}><div><span style={v2Eyebrow}>WEEKLY SPOTLIGHT</span><h2>Game of the Week</h2></div><button style={v2TextButton} onClick={()=>setActiveTab?.("schedule")}>Full GameCenter →</button></div>
-        {featured?<div style={{...v2HomeFeatured,background:`linear-gradient(135deg,${getTeamPrimary(featured.team1)}cc,rgba(2,6,23,.97) 52%,${getTeamPrimary(featured.team2)}bb)`}}>
-          <V2MatchupTeam team={featured.team1} rank={featured.rank1} user={featured.user1} compact/>
-          <div style={v2FeaturedScore}>{featured.result?<><b>{scoreForScheduledTeam(featured.result,featured.team_1_id)}–{scoreForScheduledTeam(featured.result,featured.team_2_id)}</b><span>FINAL</span></>:<><b>VS</b><span>{featured.scheduled_at?new Date(featured.scheduled_at).toLocaleString():"TIME TBD"}</span></>}</div>
-          <V2MatchupTeam team={featured.team2} rank={featured.rank2} user={featured.user2} compact/>
-        </div>:<div style={v2Empty}>No user matchup has been scheduled for {currentWeek}.</div>}
-      </div>
-
-      <div style={v2Panel}>
-        <div style={v2PanelHeader}><div><span style={v2Eyebrow}>ACTION CENTER</span><h2>Still to Play</h2></div><span style={v2CountPill}>{remaining.length}</span></div>
-        <div style={v2CompactList}>{remaining.length?remaining.slice(0,8).map((row)=><button key={row.id} style={v2CompactGame} onClick={()=>setActiveTab?.("schedule")}><span style={v2CompactTeam}><span style={v2CompactLogo}><TeamLogoMark team={row.team1} size={26}/></span><span>{getTeamAbbreviation(row.team1)}</span></span><b style={v2CompactVs}>VS</b><span style={{...v2CompactTeam,justifyContent:"flex-end"}}><span>{getTeamAbbreviation(row.team2)}</span><span style={v2CompactLogo}><TeamLogoMark team={row.team2} size={26}/></span></span></button>):<div style={v2SuccessState}>✓ Every scheduled game is complete.</div>}</div>
-      </div>
-    </section>
-
-    <section className="cfb-v2-home-grid" style={v2HomeGrid}>
-      <div style={v2Panel}>
+    <section style={v2Panel}>
         <div style={v2PanelHeader}><div><span style={v2Eyebrow}>LIVE LADDER</span><h2>Automatic Rankings</h2></div><span style={v2CountPill}>{rankings.length} Active Teams</span></div>
         <div style={v2RankingTableScroll}>
           <div className="cfb-v2-ranking-head" style={v2RankingTableHead}><span>Rank</span><span>Team / User</span><span>Move</span><span>Record</span><span>SOR</span><span>Rating</span><span>Avg PA</span><span>Avg PF</span><span>Top 10 Wins</span></div>
           <div style={v2RankingList}>{visibleRankings.map((row)=><button className="cfb-v2-ranking-row" key={row.team.id} style={{...v2RankingRow,borderColor:`${getTeamSecondary(row.team)}44`}} onClick={()=>goToTeam?.(row.team.id)}><b>#{row.rank}</b><span style={v2RankingIdentity}><span style={v2RankingLogo}><TeamLogoMark team={row.team} size={38}/></span><span style={v2RankingTeam}><strong>{row.teamName}</strong><small>{assignedCoachName(row.team.id,null,users,assignments,currentYear)}</small></span></span><RankingMovement currentRank={row.rank} previousRank={previousMap.get(String(row.team.id))}/><span>{row.wins}-{row.losses}</span><span>{row.sor.toFixed(1)}</span><strong>{row.rating.toFixed(1)}</strong><span>{row.avgPa.toFixed(1)}</span><span>{row.avgPf.toFixed(1)}</span><span>{row.top10}</span></button>)}</div>
         </div>
-      </div>
-      <div style={v2Panel}>
-        <div style={v2PanelHeader}><div><span style={v2Eyebrow}>RECENT FINALS</span><h2>Latest Results</h2></div><button style={v2TextButton} onClick={()=>setActiveTab?.("schedule")}>All Games →</button></div>
-        <div style={v2CompactList}>{recent.length?recent.map((row)=>{
-          const team1=row.team_1||teams.find((team)=>String(team.id)===String(row.team_1_id)); const team2=row.team_2||teams.find((team)=>String(team.id)===String(row.team_2_id));
-          return <div key={row.id} style={v2ResultRow}><span><TeamLogoMark team={team1} size={30}/>{getTeamAbbreviation(team1)}</span><b>{row.team_1_score}–{row.team_2_score}</b><span>{getTeamAbbreviation(team2)}<TeamLogoMark team={team2} size={30}/></span><small>{row.week}</small></div>;
-        }):<div style={v2Empty}>No final scores recorded yet.</div>}</div>
-      </div>
     </section>
 
     <section style={v2Panel}>
@@ -4770,7 +4744,7 @@ function ScheduleManagerV2({rows=[],newMatchup,setNewMatchup,teams=[],users=[],a
     <section style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>BULK IMPORT</span><h2>Paste Multiple Weeks</h2></div><button style={v2PrimaryButton} onClick={importWeeklyMatchups}>Import Schedule</button></div><p style={v2PageSub}>Use week headings followed by one matchup per line. Existing games are skipped automatically.</p><textarea style={v2Textarea} value={matchupImportText} onChange={(e)=>setMatchupImportText(e.target.value)} placeholder={"Week 3\nRice Owls vs UAB Blazers\nGeorgia Southern Eagles vs Sacramento State Hornets\n\nWeek 4\nDelaware Blue Hens vs Arkansas State Red Wolves"}/></section>
     <section style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>SCHEDULE DETAILS</span><h2>{seasonRows.length} Matchups</h2></div></div><div style={v2ScheduleList}>{seasonRows.length?seasonRows.map((row)=>{
       const draft=draftFor(row); const team1=row.team_1||teams.find((team)=>String(team.id)===String(row.team_1_id)); const team2=row.team_2||teams.find((team)=>String(team.id)===String(row.team_2_id));
-      return <article key={row.id} style={v2ScheduleEditor}><div style={v2ScheduleEditorHead}><span>{row.week}</span><div><TeamLogoMark team={team1} size={34}/><b>{team1?.name}</b><em>vs</em><TeamLogoMark team={team2} size={34}/><b>{team2?.name}</b></div></div><div className="cfb-v2-form-grid" style={v2FormGrid}><select style={v2Input} value={draft.team_1_user_id||""} onChange={(e)=>setDrafts({...drafts,[row.id]:{...(drafts[row.id]||{}),team_1_user_id:e.target.value}})}><option value="">Auto Away User</option>{activeUsers.map((user)=><option key={user.id} value={user.id}>{user.discord_username}</option>)}</select><select style={v2Input} value={draft.team_2_user_id||""} onChange={(e)=>setDrafts({...drafts,[row.id]:{...(drafts[row.id]||{}),team_2_user_id:e.target.value}})}><option value="">Auto Home User</option>{activeUsers.map((user)=><option key={user.id} value={user.id}>{user.discord_username}</option>)}</select><input type="datetime-local" style={v2Input} value={draft.scheduled_at?String(draft.scheduled_at).slice(0,16):""} onChange={(e)=>setDrafts({...drafts,[row.id]:{...(drafts[row.id]||{}),scheduled_at:e.target.value?new Date(e.target.value).toISOString():""}})}/><select style={v2Input} value={draft.status||"upcoming"} onChange={(e)=>setDrafts({...drafts,[row.id]:{...(drafts[row.id]||{}),status:e.target.value}})}><option value="upcoming">Upcoming</option><option value="scheduled">Scheduled</option><option value="live">Live</option><option value="final">Final</option><option value="postponed">Postponed</option></select><input style={v2Input} value={draft.stream_url||""} onChange={(e)=>setDrafts({...drafts,[row.id]:{...(drafts[row.id]||{}),stream_url:e.target.value}})} placeholder="Live stream URL"/><input style={v2Input} value={draft.vod_url||""} onChange={(e)=>setDrafts({...drafts,[row.id]:{...(drafts[row.id]||{}),vod_url:e.target.value}})} placeholder="VOD URL"/><input style={v2Input} value={draft.notes||""} onChange={(e)=>setDrafts({...drafts,[row.id]:{...(drafts[row.id]||{}),notes:e.target.value}})} placeholder="Game notes"/></div><div style={v2InlineActions}><button style={v2PrimaryButton} onClick={()=>saveScheduleDetails(row)}>Save Details</button><button style={armedDelete===row.id?v2DangerButton:v2DangerSoft} onClick={()=>{if(armedDelete===row.id){deleteRow("weekly_matchups",row.id);setArmedDelete(null);}else{setArmedDelete(row.id);window.setTimeout(()=>setArmedDelete(null),4000);}}}>{armedDelete===row.id?"Confirm Delete":"Delete"}</button></div></article>;
+      return <article key={row.id} style={v2ScheduleEditor}><div style={v2ScheduleEditorHead}><span>{row.week}</span><div><TeamLogoMark team={team1} size={34}/><b>{team1?.name}</b><em>vs</em><TeamLogoMark team={team2} size={34}/><b>{team2?.name}</b></div></div><div className="cfb-v2-form-grid" style={v2FormGrid}><select style={v2Input} value={draft.team_1_user_id||""} onChange={(e)=>setDrafts({...drafts,[row.id]:{...(drafts[row.id]||{}),team_1_user_id:e.target.value}})}><option value="">Auto Away User</option>{activeUsers.map((user)=><option key={user.id} value={user.id}>{user.discord_username}</option>)}</select><select style={v2Input} value={draft.team_2_user_id||""} onChange={(e)=>setDrafts({...drafts,[row.id]:{...(drafts[row.id]||{}),team_2_user_id:e.target.value}})}><option value="">Auto Home User</option>{activeUsers.map((user)=><option key={user.id} value={user.id}>{user.discord_username}</option>)}</select><input type="datetime-local" style={v2Input} value={isoToLocalDateTimeInput(draft.scheduled_at)} onChange={(e)=>setDrafts({...drafts,[row.id]:{...(drafts[row.id]||{}),scheduled_at:localDateTimeInputToIso(e.target.value)}})}/><select style={v2Input} value={draft.status||"upcoming"} onChange={(e)=>setDrafts({...drafts,[row.id]:{...(drafts[row.id]||{}),status:e.target.value}})}><option value="upcoming">Upcoming</option><option value="scheduled">Scheduled</option><option value="live">Live</option><option value="final">Final</option><option value="postponed">Postponed</option></select><input style={v2Input} value={draft.stream_url||""} onChange={(e)=>setDrafts({...drafts,[row.id]:{...(drafts[row.id]||{}),stream_url:e.target.value}})} placeholder="Live stream URL"/><input style={v2Input} value={draft.vod_url||""} onChange={(e)=>setDrafts({...drafts,[row.id]:{...(drafts[row.id]||{}),vod_url:e.target.value}})} placeholder="VOD URL"/><input style={v2Input} value={draft.notes||""} onChange={(e)=>setDrafts({...drafts,[row.id]:{...(drafts[row.id]||{}),notes:e.target.value}})} placeholder="Game notes"/></div><div style={v2InlineActions}><button style={v2PrimaryButton} onClick={()=>saveScheduleDetails(row)}>Save Details</button><button style={armedDelete===row.id?v2DangerButton:v2DangerSoft} onClick={()=>{if(armedDelete===row.id){deleteRow("weekly_matchups",row.id);setArmedDelete(null);}else{setArmedDelete(row.id);window.setTimeout(()=>setArmedDelete(null),4000);}}}>{armedDelete===row.id?"Confirm Delete":"Delete"}</button></div></article>;
     }):<div style={v2Empty}>No matchups found for this filter.</div>}</div></section>
   </main>;
 }
@@ -4786,7 +4760,7 @@ function CommissionerCenterV2({currentYear,currentWeek,advanceAt,setAdvanceAt,se
   const tools=[["weeklyMatchups","Schedule Manager","Games, streams, VODs, and bulk imports"],["userManager","Discord Users","Add, rename, activate, or deactivate users"],["assignments","Team Assignments","Manage current and former team ownership"],["leagueDataCenter","League Data Center","Enter results, recruiting, and season statistics"],["resultsManager","Results Manager","Correct or remove recorded game results"],["logoManager","Team Assets","Team logos, colors, ratings, and conferences"],["allAmericans","Recognition","All-Americans, awards, Heismans, and champions"]];
   return <main className="cfb-v2-page" style={v2Page}>
     <div style={v2PageHero}><div><span style={v2Eyebrow}>PRIVATE ADMIN AREA</span><h1 style={v2PageTitle}>Commissioner Center</h1><p style={v2PageSub}>League operations, data health, schedule control, and season management.</p></div><button style={v2GhostButton} onClick={loadData}>Refresh All Data</button></div>
-    <section className="cfb-v2-admin-grid" style={v2AdminGrid}><div style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>LEAGUE CLOCK</span><h2>{currentYear} • {currentWeek}</h2></div></div><label style={v2FieldLabel}>Next advancement<input type="datetime-local" style={v2Input} value={advanceAt?String(advanceAt).slice(0,16):""} onChange={(e)=>setAdvanceAt(e.target.value?new Date(e.target.value).toISOString():"")}/></label><div style={v2InlineActions}><button style={v2PrimaryButton} onClick={saveLeagueSettings}>Save League Settings</button><button style={v2GhostButton} onClick={saveCurrentRankingSnapshot}>Save Ranking Snapshot</button></div></div><div style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>DATA HEALTH</span><h2>{duplicateUsers.length+duplicateTeams.length+missingAssets.length+unresolved.length?"Attention Needed":"All Clear"}</h2></div></div><div style={v2HealthList}><div><b>{duplicateUsers.length}</b><span>Duplicate usernames</span></div><div><b>{duplicateTeams.length}</b><span>Duplicate active teams</span></div><div><b>{missingAssets.length}</b><span>Teams missing branding</span></div><div><b>{unresolved.length}</b><span>Matchups missing users</span></div><div><b>{seasonResults.length}</b><span>Recorded season results</span></div></div></div></section>
+    <section className="cfb-v2-admin-grid" style={v2AdminGrid}><div style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>LEAGUE CLOCK</span><h2>{currentYear} • {currentWeek}</h2></div></div><label style={v2FieldLabel}>Next advancement<input type="datetime-local" style={v2Input} value={isoToLocalDateTimeInput(advanceAt)} onChange={(e)=>setAdvanceAt(localDateTimeInputToIso(e.target.value))}/></label><div style={v2InlineActions}><button style={v2PrimaryButton} onClick={saveLeagueSettings}>Save League Settings</button><button style={v2GhostButton} onClick={saveCurrentRankingSnapshot}>Save Ranking Snapshot</button></div></div><div style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>DATA HEALTH</span><h2>{duplicateUsers.length+duplicateTeams.length+missingAssets.length+unresolved.length?"Attention Needed":"All Clear"}</h2></div></div><div style={v2HealthList}><div><b>{duplicateUsers.length}</b><span>Duplicate usernames</span></div><div><b>{duplicateTeams.length}</b><span>Duplicate active teams</span></div><div><b>{missingAssets.length}</b><span>Teams missing branding</span></div><div><b>{unresolved.length}</b><span>Matchups missing users</span></div><div><b>{seasonResults.length}</b><span>Recorded season results</span></div></div></div></section>
     <section style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>ADMIN TOOLS</span><h2>League Management</h2></div></div><div className="cfb-v2-tool-grid" style={v2ToolGrid}>{tools.map(([key,title,desc])=><button key={key} style={v2ToolCard} onClick={()=>setActiveTab(key)}><b>{title}</b><span>{desc}</span><em>Open →</em></button>)}</div></section>
     <BackupExportPanel teams={teams} users={users} assignments={assignments} results={results} awards={awards} allAmericans={allAmericans} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>
   </main>;
@@ -7081,19 +7055,19 @@ function GlobalStyle() {
       .elite-coach-avatar { width:32px; height:32px; display:grid; place-items:center; border:1px solid rgba(53,208,127,.4); border-radius:50%; color:#35d07f; background:rgba(53,208,127,.1); font-weight:1000; }
       .elite-empty,.elite-empty-small { display:flex; flex-direction:column; gap:6px; padding:30px; border:1px dashed rgba(148,163,184,.25); border-radius:12px; color:#64748b; text-align:center; }
       .elite-empty b { color:#cbd5e1; letter-spacing:.08em; }
-      .elite-books-home { display:grid; grid-template-columns:minmax(260px,1.4fr) repeat(3,minmax(150px,.65fr)); overflow:hidden; border:1px solid rgba(53,208,127,.25); border-radius:18px; background:linear-gradient(125deg,#07110d,#0c1714); box-shadow:0 18px 50px rgba(0,0,0,.27); }
-      .elite-books-home > div { min-width:0; padding:18px; border-right:1px solid rgba(255,255,255,.08); }
+      .elite-books-home { display:grid; grid-template-columns:minmax(290px,1.35fr) repeat(3,minmax(170px,.65fr)); overflow:hidden; border:1px solid rgba(53,208,127,.25); border-radius:18px; background:linear-gradient(125deg,#07110d,#0c1714); box-shadow:0 18px 50px rgba(0,0,0,.27); }
+      .elite-books-home > div { min-width:0; padding:22px; border-right:1px solid rgba(255,255,255,.08); }
       .elite-books-home-brand { background:radial-gradient(circle at 100% 0%,rgba(53,208,127,.2),transparent 46%); }
-      .elite-books-home-brand > span,.elite-books-home-board span,.elite-books-home-leaders > span,.elite-books-home-me > span { color:#35d07f; font-size:8px; font-weight:1000; letter-spacing:.15em; }
-      .elite-books-home-brand h2 { margin:3px 0; font-size:28px; font-style:italic; letter-spacing:-.05em; } .elite-books-home-brand h2 i { color:#35d07f; }
-      .elite-books-home-brand p { margin:4px 0 10px; color:#94a3b8; font-size:10px; }
-      .elite-books-home button { border:0; padding:0; color:#35d07f; background:transparent; font-size:9px; font-weight:1000; cursor:pointer; }
-      .elite-books-home-board,.elite-books-home-me { display:flex; flex-direction:column; gap:5px; }
+      .elite-books-home-brand > span,.elite-books-home-board span,.elite-books-home-leaders > span,.elite-books-home-me > span { color:#35d07f; font-size:10px; font-weight:1000; letter-spacing:.15em; }
+      .elite-books-home-brand h2 { margin:4px 0; font-size:34px; line-height:1; font-style:italic; letter-spacing:-.05em; } .elite-books-home-brand h2 i { color:#35d07f; }
+      .elite-books-home-brand p { margin:7px 0 13px; color:#a8b3c4; font-size:12px; line-height:1.4; }
+      .elite-books-home button { border:0; padding:0; color:#35d07f; background:transparent; font-size:11px; font-weight:1000; cursor:pointer; }
+      .elite-books-home-board,.elite-books-home-me { display:flex; flex-direction:column; gap:7px; }
       .elite-books-home-board > div { display:flex; justify-content:space-between; gap:5px; }
-      .elite-books-home-board > strong,.elite-books-home-me > strong { margin-top:auto; font-size:27px; }
-      .elite-books-home-board small,.elite-books-home-me small,.elite-books-home-leaders > small { color:#64748b; font-size:9px; }
-      .elite-books-home-leaders { display:flex; flex-direction:column; gap:6px; }
-      .elite-books-home-leaders > div { display:grid; grid-template-columns:24px 1fr auto; gap:5px; font-size:9px; }
+      .elite-books-home-board > strong,.elite-books-home-me > strong { margin-top:auto; font-size:31px; line-height:1; }
+      .elite-books-home-board small,.elite-books-home-me small,.elite-books-home-leaders > small { color:#7f8da3; font-size:11px; line-height:1.35; }
+      .elite-books-home-leaders { display:flex; flex-direction:column; gap:8px; }
+      .elite-books-home-leaders > div { display:grid; grid-template-columns:26px minmax(0,1fr) auto; gap:7px; font-size:11px; align-items:center; }
       .elite-books-home-leaders > div b { color:#35d07f; } .elite-books-home-leaders > div strong { overflow:hidden;text-overflow:ellipsis; } .elite-books-home-leaders > div em { font-style:normal; color:#94a3b8; }
       .elite-history-hero { display:flex; justify-content:space-between; align-items:end; gap:20px; padding:30px; border-radius:22px; background:linear-gradient(135deg,#07110d,#14251e); border:1px solid rgba(53,208,127,.25); }
       .elite-history-hero h1 { margin:4px 0; font-size:clamp(40px,6vw,72px); letter-spacing:-.06em; }
