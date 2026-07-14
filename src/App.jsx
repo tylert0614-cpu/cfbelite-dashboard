@@ -6250,9 +6250,16 @@ function GlobalStyle() {
       :root {
         --cfb-font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
         --cfb-display: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
-        --glass-bg: linear-gradient(145deg, rgba(255,255,255,.16), rgba(255,255,255,.045));
-        --glass-border: rgba(255,255,255,.18);
-        --glass-shadow: 0 28px 90px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.16);
+        --cfb-red: #dc2626;
+        --cfb-red-dark: #7f1d1d;
+        --cfb-gold: #facc15;
+        --cfb-green: #35d07f;
+        --cfb-ink: #05070c;
+        --cfb-panel: #0b1019;
+        --cfb-line: rgba(255,255,255,.12);
+        --glass-bg: linear-gradient(155deg, rgba(15,21,33,.97), rgba(4,7,13,.99));
+        --glass-border: rgba(255,255,255,.12);
+        --glass-shadow: 0 22px 60px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.07);
       }
 
       * {
@@ -6269,11 +6276,20 @@ function GlobalStyle() {
 
       body {
         background:
-          radial-gradient(circle at 10% 0%, rgba(124,58,237,.34), transparent 32%),
-          radial-gradient(circle at 90% 10%, rgba(250,204,21,.12), transparent 28%),
-          radial-gradient(circle at 50% 100%, rgba(59,130,246,.16), transparent 36%),
-          #090615;
+          linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255,255,255,.014) 1px, transparent 1px),
+          radial-gradient(circle at 12% 0%, rgba(220,38,38,.18), transparent 30%),
+          radial-gradient(circle at 88% 8%, rgba(53,208,127,.08), transparent 26%),
+          linear-gradient(180deg,#05070c,#070b12 55%,#020409);
+        background-size: 40px 40px,40px 40px,auto,auto,auto;
+        color:#f8fafc;
       }
+
+      ::selection { background:rgba(220,38,38,.75); color:#fff; }
+      * { scrollbar-color:rgba(220,38,38,.72) rgba(255,255,255,.055); scrollbar-width:thin; }
+      *::-webkit-scrollbar { width:8px; height:8px; }
+      *::-webkit-scrollbar-track { background:rgba(255,255,255,.045); }
+      *::-webkit-scrollbar-thumb { background:linear-gradient(180deg,#dc2626,#7f1d1d); border-radius:999px; }
 
       button, input, select, textarea {
         font-family: var(--cfb-font);
@@ -6296,6 +6312,22 @@ function GlobalStyle() {
         border-collapse: separate;
         border-spacing: 0;
       }
+
+      .cfb-table-scroll { border:1px solid rgba(255,255,255,.10); border-radius:10px; background:rgba(2,6,12,.52); box-shadow:0 14px 36px rgba(0,0,0,.22); }
+      .cfb-table-scroll table thead { position:sticky; top:0; z-index:2; background:#070a10; }
+      .cfb-table-scroll tbody tr { transition:background .16s ease; }
+      .cfb-table-scroll tbody tr:hover { background:rgba(220,38,38,.065); }
+      .cfb-v2-page h1,.cfb-v2-page h2,.cfb-v2-page h3 { font-family:var(--cfb-display); }
+      .cfb-v2-page h2 { letter-spacing:-.035em; }
+      .cfb-v2-page input,.cfb-v2-page select,.cfb-v2-page textarea {
+        background:#070b12 !important;
+        border-color:rgba(148,163,184,.28) !important;
+        box-shadow:inset 0 1px rgba(255,255,255,.035);
+      }
+      .cfb-v2-page input:hover,.cfb-v2-page select:hover,.cfb-v2-page textarea:hover { border-color:rgba(248,113,113,.44) !important; }
+      .cfb-v2-page input:focus,.cfb-v2-page select:focus,.cfb-v2-page textarea:focus { border-color:#ef4444 !important; box-shadow:0 0 0 3px rgba(220,38,38,.12); }
+      .cfb-v2-page > section { transition:border-color .18s ease, box-shadow .18s ease, transform .18s ease; }
+      .cfb-v2-page > section:hover { border-color:rgba(255,255,255,.16) !important; }
 
       @supports not ((backdrop-filter: blur(20px))) {
         .glass-fallback {
@@ -6954,6 +6986,12 @@ function GlobalStyle() {
       @media (max-width: 760px) {
         body { padding-bottom:82px; }
         .cfb-mobile-nav-v2 { display:grid !important; }
+        .cfb-v2-page { gap:12px !important; }
+        .cfb-v2-page > section:not(.elite-ticker) { border-radius:8px !important; }
+        .cfb-table-scroll { margin-top:14px !important; border-radius:7px; }
+        .cfb-table-scroll th { position:sticky; top:0; z-index:2; }
+        .cfb-v2-page button { min-height:42px; }
+        .cfb-v2-page input,.cfb-v2-page select,.cfb-v2-page textarea { min-height:44px; font-size:16px !important; }
         .cfb-v2-dashboard-hero { grid-template-columns:1fr !important; align-items:start !important; }
         .cfb-v2-dashboard-hero > * { min-width:0 !important; width:100% !important; }
         .cfb-v2-filter-inputs { grid-template-columns:1fr !important; }
@@ -8106,45 +8144,46 @@ function DeleteButton({ onClick }) { return <button onClick={onClick} style={del
 const page = {
   minHeight:"100vh",
   width:"100%",
-  background:"#020617",
+  background:"transparent",
   color:"#f8fafc",
   overflowX:"hidden",
   fontFamily:"Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
 };
 const container={width:"100%",maxWidth:"1680px",margin:"0 auto",padding:"clamp(14px, 2vw, 28px)",boxSizing:"border-box"};
-const header={display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,flexWrap:"wrap",gap:20,background:"linear-gradient(135deg, rgba(88,28,135,.55), rgba(15,23,42,.8))",border:"1px solid rgba(250,204,21,.35)",borderRadius:28,padding:"clamp(14px, 2vw, 24px)",boxShadow:"0 24px 80px rgba(0,0,0,.35)"};
+const header={display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:20,background:"radial-gradient(circle at 85% 0%,rgba(220,38,38,.16),transparent 34%),linear-gradient(120deg,#05070c,#111827 66%,#080b12)",border:"1px solid rgba(255,255,255,.13)",borderTop:"4px solid #dc2626",borderRadius:10,padding:"clamp(14px, 2vw, 24px)",boxShadow:"0 22px 60px rgba(0,0,0,.38)"};
 const brandWrap={display:"flex",flexDirection:"column",alignItems:"flex-start",gap:8,minWidth:0};
 const headerLogo={width:"clamp(170px, 28vw, 340px)",height:"auto",display:"block",objectFit:"contain",filter:"drop-shadow(0 16px 32px rgba(0,0,0,.45))"};
-const title={fontSize:"clamp(34px, 5vw, 64px)",fontWeight:950,margin:0,color:"#fff7ed",letterSpacing:"-.04em",textShadow:"0 0 28px rgba(250,204,21,.18)"};
-const subtitle={marginTop:8,color:"#d6d3d1",fontSize:16};
-const statusBox={background:"linear-gradient(135deg,#facc15,#b45309)",border:"1px solid #fde68a",padding:"12px 20px",borderRadius:999,fontWeight:900,color:"#111827",cursor:"pointer",boxShadow:"0 10px 30px rgba(250,204,21,.18)"};
-const tabScroller={overflowX:"auto",background:"rgba(15,16,32,.86)",border:"1px solid rgba(250,204,21,.18)",borderRadius:20,padding:10,marginBottom:24,position:"sticky",top:0,zIndex:10,backdropFilter:"blur(12px)"};
+const title={fontSize:"clamp(34px, 5vw, 64px)",fontWeight:1000,margin:0,color:"#fff",letterSpacing:"-.055em",textShadow:"0 12px 32px rgba(0,0,0,.4)"};
+const subtitle={marginTop:8,color:"#a8b3c4",fontSize:15};
+const statusBox={background:"linear-gradient(135deg,#dc2626,#991b1b)",border:"1px solid rgba(248,113,113,.65)",padding:"11px 17px",borderRadius:7,fontWeight:1000,color:"#fff",cursor:"pointer",boxShadow:"0 12px 28px rgba(220,38,38,.20)",textTransform:"uppercase",letterSpacing:".04em"};
+const tabScroller={overflowX:"auto",background:"rgba(5,7,12,.94)",border:"1px solid rgba(255,255,255,.12)",borderTop:"3px solid #dc2626",borderRadius:9,padding:8,marginBottom:18,position:"sticky",top:0,zIndex:10,backdropFilter:"blur(16px)",boxShadow:"0 12px 34px rgba(0,0,0,.3)"};
 const tabRow={display:"flex",gap:8,width:"max-content"};
-const tabStyle={background:"rgba(30,27,75,.65)",color:"#e5e7eb",border:"1px solid rgba(255,255,255,.1)",borderRadius:14,padding:"10px 14px",fontWeight:800,cursor:"pointer",whiteSpace:"nowrap"};
-const activeTabStyle={...tabStyle,background:"linear-gradient(135deg,#6d28d9,#facc15)",border:"1px solid #fde68a",color:"#111827"};
+const tabStyle={background:"rgba(255,255,255,.035)",color:"#a8b3c4",border:"1px solid rgba(255,255,255,.08)",borderRadius:6,padding:"10px 14px",fontWeight:900,cursor:"pointer",whiteSpace:"nowrap"};
+const activeTabStyle={...tabStyle,background:"linear-gradient(135deg,#dc2626,#991b1b)",border:"1px solid #ef4444",color:"#fff",boxShadow:"0 8px 22px rgba(220,38,38,.18)"};
 const statsGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))",gap:20,marginBottom:32};
-const statCard={background:"linear-gradient(145deg, rgba(15,23,42,.94), rgba(3,7,18,.985))",border:"1px solid rgba(96,165,250,.16)",borderRadius:16,padding:"clamp(16px, 2vw, 22px)",boxShadow:"0 18px 55px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.06)",minHeight:112};
-const statTitle={color:"#c4b5fd",fontSize:12,marginBottom:10,textTransform:"uppercase",letterSpacing:".08em",fontWeight:900};
-const statValue={fontSize:38,fontWeight:950,color:"#fff7ed"};
+const statCard={background:"linear-gradient(155deg,rgba(14,19,30,.985),rgba(4,7,13,.995))",border:"1px solid rgba(255,255,255,.11)",borderTop:"3px solid #dc2626",borderRadius:9,padding:"clamp(16px, 2vw, 22px)",boxShadow:"0 16px 42px rgba(0,0,0,.3),inset 0 1px rgba(255,255,255,.04)",minHeight:112};
+const statTitle={color:"#94a3b8",fontSize:11,marginBottom:10,textTransform:"uppercase",letterSpacing:".11em",fontWeight:1000};
+const statValue={fontSize:38,fontWeight:1000,color:"#fff"};
 const statInput={...statValue,background:"transparent",color:"white",border:"none",outline:"none",width:"100%"};
 const statSelect={background:"#111827",color:"#fff7ed",border:"1px solid rgba(250,204,21,.25)",borderRadius:12,padding:14,fontSize:24,fontWeight:900,width:"100%"};
 const card = {
-  background:"#0f172a",
-  border:"1px solid rgba(255,255,255,.08)",
-  borderRadius:16,
+  background:"linear-gradient(155deg,rgba(14,19,30,.985),rgba(4,7,13,.995))",
+  border:"1px solid rgba(255,255,255,.11)",
+  borderTop:"3px solid #dc2626",
+  borderRadius:10,
   padding:"clamp(16px, 2vw, 24px)",
   marginBottom:22,
   boxShadow:"0 22px 70px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.035)"
 };
 const sectionTop={display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"};
-const sectionTitle={fontSize:"clamp(22px, 2vw, 30px)",fontWeight:950,margin:0,color:"#f8fafc",letterSpacing:"-.035em"};
+const sectionTitle={fontSize:"clamp(22px, 2vw, 30px)",fontWeight:1000,margin:0,color:"#fff",letterSpacing:"-.045em"};
 const formGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))",gap:16,marginTop:20};
 const input = {
-  background: "rgba(2,6,23,.82)",
-  border: "1px solid rgba(100,116,139,.45)",
+  background: "#070b12",
+  border: "1px solid rgba(148,163,184,.28)",
   color: "#fff",
   padding: 12,
-  borderRadius: 12,
+  borderRadius: 8,
   fontSize: 14,
   width: "100%",
   boxSizing: "border-box",
@@ -8154,22 +8193,24 @@ const input = {
 const smallInput={...input,width:"120px",marginRight:8};
 const searchInput={...input,maxWidth:320};
 const button = {
-  background: "linear-gradient(135deg,#2563eb,#1d4ed8)",
+  background: "linear-gradient(135deg,#dc2626,#991b1b)",
   color: "#fff",
-  border: "1px solid rgba(147,197,253,.25)",
-  borderRadius: 12,
+  border: "1px solid rgba(248,113,113,.38)",
+  borderRadius: 7,
   padding: 12,
   fontWeight: 950,
   cursor: "pointer",
-  boxShadow: "0 14px 34px rgba(37,99,235,.22)",
+  boxShadow: "0 12px 28px rgba(220,38,38,.18)",
+  textTransform:"uppercase",
+  letterSpacing:".035em",
 };
-const sortButton={background:"transparent",border:"none",color:"#c4b5fd",fontSize:13,textTransform:"uppercase",fontWeight:900,cursor:"pointer",padding:0};
+const sortButton={background:"transparent",border:"none",color:"#facc15",fontSize:12,textTransform:"uppercase",fontWeight:1000,cursor:"pointer",padding:0};
 const deleteButton={background:"#7f1d1d",color:"white",border:"1px solid #ef4444",borderRadius:10,padding:"8px 10px",cursor:"pointer"};
 const table={width:"100%",borderCollapse:"separate",borderSpacing:0,minWidth:820};
-const th={textAlign:"left",padding:"14px 10px",color:"#c4b5fd",fontSize:12,textTransform:"uppercase",borderBottom:"1px solid rgba(250,204,21,.16)",letterSpacing:".06em"};
+const th={textAlign:"left",padding:"13px 10px",color:"#94a3b8",fontSize:10,textTransform:"uppercase",borderBottom:"2px solid #dc2626",letterSpacing:".09em",fontWeight:1000,background:"#070a10"};
 const trStyle={borderBottom:"1px solid rgba(255,255,255,.08)"};
 const td={padding:"16px 10px",color:"inherit",verticalAlign:"middle"};
-const teamCell={...td,color:"#facc15",fontWeight:800};
+const teamCell={...td,color:"#fff",fontWeight:900};
 const clickableTeamCell={...teamCell,cursor:"pointer",textDecoration:"underline"};
 const mutedText={color:"#d6d3d1",marginTop:8,marginBottom:0};
 
@@ -8178,18 +8219,18 @@ const gameCard={display:"grid",gap:10,border:"1px solid rgba(255,255,255,.1)",bo
 const twoCol={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(320px, 1fr))",gap:20,marginTop:24};
 const twoColWide={display:"grid",gridTemplateColumns:"minmax(0, 3fr) minmax(280px, 1fr)",gap:20,marginTop:20};
 const miniCard = {
-  background:"rgba(7,7,12,.72)",
-  border:"1px solid rgba(250,204,21,.14)",
-  borderRadius:18,
+  background:"linear-gradient(155deg,rgba(14,19,30,.96),rgba(4,7,13,.99))",
+  border:"1px solid rgba(255,255,255,.10)",
+  borderRadius:9,
   padding:18,
   overflowX:"auto",
   WebkitOverflowScrolling:"touch",
   maxWidth:"100%",
 };
 const miniRow={borderBottom:"1px solid rgba(255,255,255,.08)",padding:"10px 0",color:"#e4e4e7"};
-const miniTitle={marginTop:0,color:"#facc15"};
+const miniTitle={marginTop:0,color:"#fff",fontWeight:1000,letterSpacing:"-.03em"};
 const recognitionGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(min(100%, 360px), 1fr))",gap:18,marginTop:22};
-const recognitionCard={background:"linear-gradient(180deg, rgba(30,27,75,.72), rgba(7,7,12,.9))",border:"1px solid rgba(250,204,21,.18)",borderRadius:22,padding:18,boxShadow:"0 14px 40px rgba(0,0,0,.28)",overflow:"hidden"};
+const recognitionCard={background:"linear-gradient(155deg,rgba(14,19,30,.97),rgba(4,7,13,.99))",border:"1px solid rgba(255,255,255,.11)",borderTop:"3px solid #dc2626",borderRadius:10,padding:18,boxShadow:"0 16px 42px rgba(0,0,0,.3)",overflow:"hidden"};
 const recognitionHeader={display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:14,borderBottom:"1px solid rgba(255,255,255,.08)",paddingBottom:14,marginBottom:14,flexWrap:"wrap"};
 const recognitionKicker={color:"#facc15",fontSize:12,fontWeight:950,textTransform:"uppercase",letterSpacing:".08em",marginBottom:6};
 const recognitionPlayer={fontSize:22,fontWeight:950,color:"#fff7ed",lineHeight:1.05};
@@ -8215,11 +8256,11 @@ const movementNeutral={...movementBase,background:"rgba(255,255,255,.08)",color:
 const leaderRow={display:"flex",justifyContent:"space-between",gap:12,borderBottom:"1px solid rgba(255,255,255,.08)",padding:"11px 0",color:"#f5f5f4"};
 const activityList={display:"grid",gap:10,marginTop:18};
 const activityItem={background:"rgba(255,255,255,.045)",border:"1px solid rgba(255,255,255,.08)",borderRadius:14,padding:"12px 14px",color:"#f5f5f4"};
-const profileCard={...card,background:"linear-gradient(135deg, rgba(49,46,129,.88), rgba(7,7,12,.97))"};
+const profileCard={...card,background:"radial-gradient(circle at 90% 0%,rgba(220,38,38,.14),transparent 32%),linear-gradient(135deg,#0d131e,#05070c)"};
 const profileHero={display:"flex",alignItems:"center",justifyContent:"space-between",gap:20,flexWrap:"wrap",marginBottom:20};
 const eyebrow={color:"#facc15",textTransform:"uppercase",letterSpacing:".12em",fontSize:12,fontWeight:950};
 const profileName={fontSize:"clamp(36px, 5vw, 64px)",margin:"6px 0",fontWeight:950,letterSpacing:"-.05em"};
-const hofCard={background:"linear-gradient(160deg, rgba(88,28,135,.72), rgba(15,23,42,.95) 45%, rgba(69,10,10,.85))",border:"1px solid rgba(250,204,21,.28)",borderRadius:26,padding:24,boxShadow:"0 24px 70px rgba(0,0,0,.38)",minHeight:260,overflow:"hidden"};
+const hofCard={background:"radial-gradient(circle at 90% 0%,rgba(250,204,21,.11),transparent 30%),linear-gradient(145deg,#111827,#05070c 68%,#160809)",border:"1px solid rgba(250,204,21,.26)",borderTop:"3px solid #facc15",borderRadius:12,padding:24,boxShadow:"0 22px 60px rgba(0,0,0,.38)",minHeight:260,overflow:"hidden"};
 const hofTop={display:"grid",gridTemplateColumns:"86px minmax(0,1fr) 120px",gap:16,alignItems:"center"};
 const hofTopClean={display:"grid",gridTemplateColumns:"86px minmax(0,1fr)",gap:18,alignItems:"center"};
 const hofIconWrap={width:76,height:76,borderRadius:20,display:"grid",placeItems:"center",background:"rgba(0,0,0,.34)",border:"1px solid rgba(255,255,255,.14)",position:"relative"};
@@ -8933,13 +8974,14 @@ const teamBadgeBubble = {
 
 
 const liquidGlassPanel = {
-  background: "linear-gradient(145deg, rgba(255,255,255,.155), rgba(255,255,255,.045))",
-  backdropFilter: "blur(26px) saturate(160%)",
-  WebkitBackdropFilter: "blur(26px) saturate(160%)",
-  border: "1px solid rgba(255,255,255,.17)",
-  borderRadius: 30,
+  background: "linear-gradient(155deg,rgba(14,19,30,.97),rgba(4,7,13,.99))",
+  backdropFilter: "blur(20px) saturate(135%)",
+  WebkitBackdropFilter: "blur(20px) saturate(135%)",
+  border: "1px solid rgba(255,255,255,.11)",
+  borderTop: "3px solid #dc2626",
+  borderRadius: 10,
   padding: 24,
-  boxShadow: "0 30px 90px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.18)",
+  boxShadow: "0 20px 56px rgba(0,0,0,.36),inset 0 1px rgba(255,255,255,.045)",
   marginBottom: 20,
 };
 
@@ -9750,29 +9792,32 @@ const navShell = {
   gap: 12,
   marginBottom: 20,
   padding: "12px 14px",
-  border: "1px solid rgba(148,163,184,.18)",
-  borderRadius: 18,
-  background: "linear-gradient(90deg, rgba(5,8,25,.92), rgba(13,18,45,.82))",
+  border: "1px solid rgba(255,255,255,.12)",
+  borderTop: "3px solid #dc2626",
+  borderRadius: 9,
+  background: "linear-gradient(90deg,rgba(5,7,12,.97),rgba(15,21,33,.94))",
   backdropFilter: "blur(16px)",
   boxShadow: "0 18px 60px rgba(0,0,0,.30)",
 };
 
 const hamburgerButton = {
-  border: "1px solid rgba(167,139,250,.45)",
-  background: "linear-gradient(135deg, rgba(88,28,135,.95), rgba(15,23,42,.96))",
+  border: "1px solid rgba(248,113,113,.46)",
+  background: "linear-gradient(135deg,#dc2626,#991b1b)",
   color: "#fff",
-  borderRadius: 14,
+  borderRadius: 7,
   padding: "12px 16px",
   fontWeight: 1000,
   cursor: "pointer",
-  boxShadow: "0 14px 34px rgba(124,58,237,.25)",
+  boxShadow: "0 12px 28px rgba(220,38,38,.22)",
+  textTransform:"uppercase",
+  letterSpacing:".04em",
 };
 
 const activePagePill = {
   border: "1px solid rgba(148,163,184,.24)",
-  background: "rgba(15,23,42,.72)",
+  background: "rgba(5,7,12,.82)",
   color: "#e5e7eb",
-  borderRadius: 999,
+  borderRadius: 7,
   padding: "10px 14px",
   fontWeight: 900,
   fontSize: 13,
@@ -9781,8 +9826,9 @@ const activePagePill = {
 const drawerPanel = {
   width: "min(420px, 92vw)",
   height: "100%",
-  background: "linear-gradient(180deg, rgba(5,8,25,.98), rgba(16,12,42,.98))",
-  borderRight: "1px solid rgba(148,163,184,.20)",
+  background: "radial-gradient(circle at 0 0,rgba(220,38,38,.17),transparent 27%),linear-gradient(180deg,#080b12,#030509)",
+  borderRight: "1px solid rgba(248,113,113,.26)",
+  borderTop: "4px solid #dc2626",
   padding: 18,
   overflowY: "auto",
   boxShadow: "30px 0 90px rgba(0,0,0,.55)",
@@ -11083,27 +11129,29 @@ const v29ConferenceLogo = {
 };
 
 const liquidGlassTile = {
-  background: "linear-gradient(145deg, rgba(15,23,42,.86), rgba(3,7,18,.96))",
-  border: "1px solid rgba(148,163,184,.16)",
-  borderRadius: 14,
+  background: "linear-gradient(155deg,rgba(15,21,33,.94),rgba(4,7,13,.98))",
+  border: "1px solid rgba(255,255,255,.10)",
+  borderRadius: 9,
   padding: 13,
   boxShadow: "0 16px 44px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.05)",
 };
 
 const broadcastCard = {
-  background:"#0f172a",
-  border:"1px solid rgba(255,255,255,.08)",
-  borderRadius:18,
+  background:"linear-gradient(155deg,rgba(14,19,30,.97),rgba(4,7,13,.99))",
+  border:"1px solid rgba(255,255,255,.11)",
+  borderTop:"3px solid #dc2626",
+  borderRadius:10,
   padding:"clamp(16px, 2vw, 24px)",
   boxShadow:"0 22px 70px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.035)"
 };
 
 const broadcastPageCard = {
   ...card,
-  borderRadius: 18,
-  background: "linear-gradient(145deg, rgba(8,13,31,.96), rgba(3,7,18,.99))",
-  border: "1px solid rgba(148,163,184,.18)",
-  boxShadow: "0 24px 80px rgba(0,0,0,.40), inset 0 1px 0 rgba(255,255,255,.055)",
+  borderRadius: 10,
+  background: "linear-gradient(155deg,rgba(14,19,30,.98),rgba(4,7,13,.995))",
+  border: "1px solid rgba(255,255,255,.11)",
+  borderTop: "3px solid #dc2626",
+  boxShadow: "0 20px 58px rgba(0,0,0,.38),inset 0 1px rgba(255,255,255,.045)",
 };
 
 
