@@ -1321,19 +1321,26 @@ export default function App() {
   async function submitSportsbookPick(lineId, pickType, teamId) {
     if (!discordSession?.user) { setError("Sign in with Discord before making an Elite Books pick."); return false; }
     setSportsbookBusy(true);
-    const { error: pickError } = await supabase.rpc("submit_elite_books_pick", { p_line_id: lineId, p_pick_type: pickType, p_team_id: String(teamId) });
+    const { data, error: pickError } = await supabase.rpc("submit_elite_books_pick", { p_line_id: lineId, p_pick_type: pickType, p_team_id: String(teamId) });
     setSportsbookBusy(false);
     if (pickError) { setError(`Pick not saved: ${pickError.message}`); return false; }
-    setError("Elite Books pick locked in."); await loadEliteBooksData(); return true;
+    const saved=Array.isArray(data)?data[0]:data;
+    if (saved) setSportsbook((previous)=>({...previous,
+      picks:[...(previous.picks||[]).filter((pick)=>!(String(pick.auth_user_id)===String(saved.auth_user_id)&&String(pick.line_id)===String(saved.line_id)&&pick.pick_type===saved.pick_type)),saved],
+      lines:(previous.lines||[]).map((line)=>String(line.id)===String(lineId)?{...line,is_frozen:true}:line),
+    })); else await loadEliteBooksData();
+    setError("Elite Books pick saved to your Discord profile."); return true;
   }
 
   async function submitFuturePick(optionId) {
     if (!discordSession?.user) { setError("Sign in with Discord before making a futures pick."); return false; }
     setSportsbookBusy(true);
-    const { error: pickError } = await supabase.rpc("submit_elite_books_future", { p_option_id: optionId });
+    const { data, error: pickError } = await supabase.rpc("submit_elite_books_future", { p_option_id: optionId });
     setSportsbookBusy(false);
     if (pickError) { setError(`Future pick not saved: ${pickError.message}`); return false; }
-    setError("Futures selection locked in."); await loadEliteBooksData(); return true;
+    const saved=Array.isArray(data)?data[0]:data;
+    if (saved) setSportsbook((previous)=>({...previous,futurePicks:[...(previous.futurePicks||[]).filter((pick)=>!(String(pick.auth_user_id)===String(saved.auth_user_id)&&String(pick.market_id)===String(saved.market_id))),saved]})); else await loadEliteBooksData();
+    setError("Futures selection saved to your Discord profile."); return true;
   }
 
   async function generateSportsbookBoard() {
@@ -2618,14 +2625,16 @@ function CurrentWeekTicker({teams=[],weeklyMatchups=[],results=[],currentYear,cu
     const result=scheduledResultFor(row,results,currentYear);
     return {...row,team1,team2,result};
   });
+  const tickerDuration=`${Math.max(28,rows.length*7)}s`;
+  const renderTickerGame=(row,key,duplicate=false)=><button type="button" key={key} className="elite-ticker-game" aria-hidden={duplicate||undefined} tabIndex={duplicate?-1:0} onClick={()=>setActiveTab?.("schedule")}>
+    <span><TeamLogoMark team={row.team1} size={26}/><b>{getTeamAbbreviation(row.team1)}</b></span>
+    {row.result?<strong>{scoreForScheduledTeam(row.result,row.team_1_id)}–{scoreForScheduledTeam(row.result,row.team_2_id)}</strong>:<strong>VS</strong>}
+    <span><b>{getTeamAbbreviation(row.team2)}</b><TeamLogoMark team={row.team2} size={26}/></span>
+    <em>{row.result?"FINAL":row.scheduled_at?new Date(row.scheduled_at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}):"TBD"}</em>
+  </button>;
   return <section className="elite-ticker" aria-label={`${currentWeek} GameCenter ticker`}>
     <button type="button" className="elite-ticker-label" onClick={()=>setActiveTab?.("schedule")}><span>LIVE</span><b>{currentWeek}</b><small>GameCenter</small></button>
-    <div className="elite-ticker-track">{rows.length?rows.map((row)=><button type="button" key={row.id} className="elite-ticker-game" onClick={()=>setActiveTab?.("schedule")}>
-      <span><TeamLogoMark team={row.team1} size={26}/><b>{getTeamAbbreviation(row.team1)}</b></span>
-      {row.result?<strong>{scoreForScheduledTeam(row.result,row.team_1_id)}–{scoreForScheduledTeam(row.result,row.team_2_id)}</strong>:<strong>VS</strong>}
-      <span><b>{getTeamAbbreviation(row.team2)}</b><TeamLogoMark team={row.team2} size={26}/></span>
-      <em>{row.result?"FINAL":row.scheduled_at?new Date(row.scheduled_at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}):"TBD"}</em>
-    </button>):<div className="elite-ticker-empty">No games are listed for {currentWeek}.</div>}</div>
+    <div className="elite-ticker-viewport">{rows.length?<div className="elite-ticker-track" style={{"--elite-ticker-duration":tickerDuration}}><div className="elite-ticker-group">{rows.map((row)=>renderTickerGame(row,`primary-${row.id}`))}</div><div className="elite-ticker-group" aria-hidden="true">{rows.map((row)=>renderTickerGame(row,`duplicate-${row.id}`,true))}</div></div>:<div className="elite-ticker-empty">No games are listed for {currentWeek}.</div>}</div>
   </section>;
 }
 
@@ -2645,14 +2654,20 @@ function EliteBooksHomePanel({sportsbook={},linkedDiscordUser,currentYear,curren
 
 function EliteBooks({sportsbook={},teams=[],users=[],assignments=[],results=[],weeklyMatchups=[],conferenceAssets=[],currentYear,currentWeek,advanceAt,discordSession,linkedDiscordUser,busy,signInWithDiscord,signOutDiscord,submitPick,submitFuture,setActiveTab}) {
   const board=currentSportsbookBoard(sportsbook,currentYear,currentWeek);
-  const lines=(sportsbook.lines||[]).filter((line)=>String(line.board_id)===String(board?.id));
+  const matchupMap=new Map((weeklyMatchups||[]).map((row)=>[String(row.id),row]));
+  const lines=(sportsbook.lines||[]).filter((line)=>String(line.board_id)===String(board?.id)).sort((a,b)=>{
+    const matchupA=matchupMap.get(String(a.matchup_id)); const matchupB=matchupMap.get(String(b.matchup_id));
+    const timeA=matchupA?.scheduled_at?new Date(matchupA.scheduled_at).getTime():Number.MAX_SAFE_INTEGER;
+    const timeB=matchupB?.scheduled_at?new Date(matchupB.scheduled_at).getTime():Number.MAX_SAFE_INTEGER;
+    return timeA-timeB||String(matchupA?.team_1?.name||a.team_1_id).localeCompare(String(matchupB?.team_1?.name||b.team_1_id))||String(a.id).localeCompare(String(b.id));
+  });
   const myId=sportsbookUserId(linkedDiscordUser);
   const myPicks=(sportsbook.picks||[]).filter((pick)=>String(pick.discord_user_id)===myId);
   const standings=(sportsbook.seasonStandings||[]).filter((row)=>String(row.season_year)===String(currentYear)).sort((a,b)=>Number(b.total_points)-Number(a.total_points));
-  const markets=(sportsbook.markets||[]).filter((row)=>String(row.season_year)===String(currentYear));
+  const marketOrder={national_champion:0,conference_champion:1,heath_hurley_coty:2,most_improved_team:3};
+  const markets=(sportsbook.markets||[]).filter((row)=>String(row.season_year)===String(currentYear)).sort((a,b)=>(marketOrder[a.market_type]??99)-(marketOrder[b.market_type]??99)||String(a.conference_name||a.title||"").localeCompare(String(b.conference_name||b.title||""))||String(a.id).localeCompare(String(b.id)));
   const rankings=computerRankingRows(teams,results.filter((row)=>String(row.season_year)===String(currentYear)),assignments,users);
   const rankMap=new Map(rankings.map((row)=>[String(row.team.id),row.rank]));
-  const matchupMap=new Map((weeklyMatchups||[]).map((row)=>[String(row.id),row]));
   const now=Date.now();
   const locked=!board||board.status!=="open"||(board.locks_at&&new Date(board.locks_at).getTime()<=now);
   const marketLabel={national_champion:"National Champion",conference_champion:"Conference Champion",heath_hurley_coty:"Heath Hurley COTY",most_improved_team:"Most Improved Team"};
@@ -2674,7 +2689,7 @@ function EliteBooks({sportsbook={},teams=[],users=[],assignments=[],results=[],w
       </div>
       <aside className="elite-books-sidebar"><div className="elite-section-head"><div><span>LEADERBOARD</span><h2>{currentYear} Standings</h2></div><button onClick={()=>setActiveTab?.("sportsbookHistory")}>All-Time →</button></div><div className="elite-leaderboard">{standings.length?standings.map((row,index)=><div key={row.discord_user_id} className={String(row.discord_user_id)===myId?"me":""}><b>#{index+1}</b><span><strong>{row.discord_username}</strong><small>{row.correct_picks}/{row.graded_picks} correct</small></span><em>{row.total_points} pts</em></div>):<div className="elite-empty-small">No graded cards yet.</div>}</div><EliteBadgeRail sportsbook={sportsbook} discordUserId={myId} currentYear={currentYear}/></aside>
     </section>
-    <section className="elite-futures"><div className="elite-section-head"><div><span>SEASON FUTURES</span><h2>Call Your Shot</h2></div><small>Longer odds pay more bonus points • payouts lock when selected</small></div>{markets.length?<div className="elite-futures-grid">{markets.map((market)=>{const options=(sportsbook.options||[]).filter((option)=>String(option.market_id)===String(market.id)).sort((a,b)=>Number(a.american_odds)-Number(b.american_odds)); const existing=(sportsbook.futurePicks||[]).find((pick)=>String(pick.discord_user_id)===myId&&String(pick.market_id)===String(market.id)); return <article className="elite-future-card" key={market.id}><header><div>{market.market_type==="conference_champion"&&<ConferenceLogoMark conference={market.conference_name} conferenceAssets={conferenceAssets} size={38}/>}<span><small>{market.conference_name||"CFBELITE 27"}</small><strong>{market.title||marketLabel[market.market_type]}</strong></span></div><b>{market.status.toUpperCase()}</b></header><div className="elite-future-options">{options.map((option)=>{const team=option.team_id?teamFor(option.team_id):option.discord_user_id?teamForCoach(option.discord_user_id):null; const selected=String(existing?.option_id)===String(option.id); return <button className={selected?"selected":""} disabled={busy||market.status!=="open"||!discordSession} key={option.id} onClick={()=>submitFuture(option.id)}>{team?<TeamLogoMark team={team} size={38}/>:<span className="elite-coach-avatar">{option.selection_label.slice(0,1).toUpperCase()}</span>}<span><strong>{option.selection_label}</strong><small>{formatAmericanOdds(option.american_odds)}</small></span><em>{option.bonus_points} pts</em></button>})}</div></article>})}</div>:<div className="elite-empty"><b>FUTURES OPENING SOON</b><span>National Champion, Conference Champions and Heath Hurley COTY begin in Season 1. Most Improved Team automatically joins in Season 2.</span></div>}</section>
+    <section className="elite-futures"><div className="elite-section-head"><div><span>SEASON FUTURES</span><h2>Call Your Shot</h2></div><small>Selections save instantly to your Discord profile • longer odds pay more bonus points</small></div>{markets.length?<div className="elite-futures-grid">{markets.map((market)=>{const options=(sportsbook.options||[]).filter((option)=>String(option.market_id)===String(market.id)).sort((a,b)=>Number(a.american_odds)-Number(b.american_odds)||String(a.selection_label).localeCompare(String(b.selection_label))||String(a.id).localeCompare(String(b.id))); const existing=(sportsbook.futurePicks||[]).find((pick)=>String(pick.discord_user_id)===myId&&String(pick.market_id)===String(market.id)); return <article className="elite-future-card" key={market.id}><header><div>{market.market_type==="conference_champion"&&<ConferenceLogoMark conference={market.conference_name} conferenceAssets={conferenceAssets} size={38}/>}<span><small>{market.conference_name||"CFBELITE 27"}</small><strong>{market.title||marketLabel[market.market_type]}</strong></span></div><b>{market.status.toUpperCase()}</b></header><div className="elite-future-options">{options.map((option)=>{const team=option.team_id?teamFor(option.team_id):option.discord_user_id?teamForCoach(option.discord_user_id):null; const selected=String(existing?.option_id)===String(option.id); return <button className={selected?"selected":""} disabled={busy||market.status!=="open"||!discordSession} key={option.id} onClick={()=>submitFuture(option.id)}>{team?<TeamLogoMark team={team} size={38}/>:<span className="elite-coach-avatar">{option.selection_label.slice(0,1).toUpperCase()}</span>}<span><strong>{option.selection_label}</strong><small>{formatAmericanOdds(option.american_odds)}</small></span><em>{option.bonus_points} pts</em></button>})}</div></article>})}</div>:<div className="elite-empty"><b>FUTURES OPENING SOON</b><span>National Champion, Conference Champions and Heath Hurley COTY begin in Season 1. Most Improved Team automatically joins in Season 2.</span></div>}</section>
   </main>;
 }
 
@@ -6975,13 +6990,19 @@ function GlobalStyle() {
       .elite-ticker-label span { font-size:9px; letter-spacing:.18em; font-weight:1000; }
       .elite-ticker-label b { font-size:17px; }
       .elite-ticker-label small { opacity:.74; }
-      .elite-ticker-track { display:flex; min-width:0; overflow-x:auto; scrollbar-width:thin; }
+      .elite-ticker-viewport { min-width:0; overflow:hidden; position:relative; }
+      .elite-ticker-viewport::after { content:""; position:absolute; inset:0 0 0 auto; width:34px; pointer-events:none; background:linear-gradient(90deg,transparent,#070b12); }
+      .elite-ticker-track { display:flex; width:max-content; min-width:100%; will-change:transform; animation:eliteTickerLoop var(--elite-ticker-duration,42s) linear infinite; }
+      .elite-ticker-group { display:flex; flex:0 0 auto; min-width:max-content; }
+      .elite-ticker-viewport:hover .elite-ticker-track,.elite-ticker-viewport:focus-within .elite-ticker-track { animation-play-state:paused; }
+      @keyframes eliteTickerLoop { from { transform:translate3d(0,0,0); } to { transform:translate3d(-50%,0,0); } }
       .elite-ticker-game { flex:0 0 260px; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:8px; padding:10px 15px; border:0; border-right:1px solid rgba(148,163,184,.14); color:#e2e8f0; background:transparent; cursor:pointer; }
       .elite-ticker-game > span { display:flex; align-items:center; gap:5px; font-size:12px; }
       .elite-ticker-game > span:nth-of-type(2){justify-content:flex-end;}
       .elite-ticker-game > strong { color:white; font-size:12px; }
       .elite-ticker-game > em { grid-column:1/-1; color:#94a3b8; font-size:8px; font-style:normal; font-weight:900; letter-spacing:.12em; }
       .elite-ticker-empty { padding:22px; color:#94a3b8; }
+      @media (prefers-reduced-motion:reduce) { .elite-ticker-viewport { overflow-x:auto; scrollbar-width:none; } .elite-ticker-viewport::-webkit-scrollbar { display:none; } .elite-ticker-track { animation:none; } .elite-ticker-group[aria-hidden="true"] { display:none; } }
       .elite-books-scorebar { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); border:1px solid rgba(53,208,127,.18); border-radius:14px; background:#09100f; overflow:hidden; }
       .elite-books-scorebar > div { display:flex; flex-direction:column; gap:4px; padding:14px 18px; border-right:1px solid rgba(255,255,255,.08); }
       .elite-books-scorebar span { color:#64748b; font-size:9px; font-weight:1000; letter-spacing:.15em; }
