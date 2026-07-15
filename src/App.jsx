@@ -69,7 +69,9 @@ function clampSor(value) {
 
 function pollRankDifficulty(rank) {
   const number = Number(rank);
-  if (!number || number < 1 || number > 25) return 0.1;
+  // An unranked opponent is neutral rather than nearly worthless. Ranked wins
+  // still scale from elite (#1) to strong (#25) competition.
+  if (!number || number < 1 || number > 25) return 4.5;
   return 10 - ((number - 1) / 24) * 4;
 }
 
@@ -99,20 +101,25 @@ function recordDifficulty(teamId, results) {
 }
 
 function strengthOfResult(teamId, teams, results) {
-  const games = results.filter((result) => result.team_1_id === teamId || result.team_2_id === teamId);
+  const games = results.filter((result) => String(result.team_1_id) === String(teamId) || String(result.team_2_id) === String(teamId));
   if (!games.length) return "—";
 
   const total = games.reduce((sum, result) => {
-    const isTeam1 = result.team_1_id === teamId;
+    const isTeam1 = String(result.team_1_id) === String(teamId);
     const opponentId = isTeam1 ? result.team_2_id : result.team_1_id;
     const opponentRank = isTeam1 ? result.team_2_rank : result.team_1_rank;
+    const pointsFor = Number(isTeam1 ? result.team_1_score : result.team_2_score) || 0;
+    const pointsAgainst = Number(isTeam1 ? result.team_2_score : result.team_1_score) || 0;
+    const resultMargin = pointsFor - pointsAgainst;
 
     const standingsScore = standingRankDifficulty(opponentId, teams, results);
     const recordScore = recordDifficulty(opponentId, results);
     const rankedScore = pollRankDifficulty(opponentRank);
 
-    const gameDifficulty = (standingsScore * 0.45) + (recordScore * 0.35) + (rankedScore * 0.20);
-    return sum + clampSor(gameDifficulty);
+    const opponentDifficulty = (standingsScore * 0.50) + (recordScore * 0.32) + (rankedScore * 0.18);
+    const outcomeAdjustment = resultMargin > 0 ? 1.05 : resultMargin < 0 ? -1.05 : 0;
+    const competitivenessAdjustment = Math.max(-1.25, Math.min(1.25, resultMargin / 21));
+    return sum + clampSor(opponentDifficulty + outcomeAdjustment + competitivenessAdjustment);
   }, 0);
 
   return clampSor(total / games.length).toFixed(1);
@@ -2553,7 +2560,7 @@ function GameCenterV2({ teams = [], users = [], assignments = [], weeklyMatchups
 }
 
 function V2MatchupTeam({team,rank,user,compact=false,side}) {
-  return <div style={compact?v2MatchupTeamCompact:v2MatchupTeam}>
+  return <div className="cfb-v2-matchup-team" style={compact?v2MatchupTeamCompact:v2MatchupTeam}>
     {side&&<small style={v2SideLabel}>{side}</small>}
     <div style={v2LogoRank}><TeamLogoMark team={team} size={compact?52:94} plate/>{rank&&<b>#{rank}</b>}</div>
     <strong>{team?.name||"Team TBD"}</strong><span>{user||"User TBD"}</span>
@@ -2566,44 +2573,46 @@ function conferencePowerData({ teams = [], users = [], assignments = [], results
   const activeTeams = teams.filter((team)=>activeTeamIds.has(String(team.id)));
   const rankingRows = computerRankingRows(activeTeams, results, assignments, users);
   const eloRows = userEloRows(users, assignments, allResults.length ? allResults : results);
-  const eloMap = new Map(eloRows.map((row)=>[row.user.id,row.adjustedElo || row.elo]));
-  const rankingMap = new Map(rankingRows.map((row)=>[row.team.id,row]));
+  const eloMap = new Map(eloRows.map((row)=>[String(row.user.id),row.adjustedElo || row.elo]));
+  const rankingMap = new Map(rankingRows.map((row)=>[String(row.team.id),row]));
   const conferenceMap = new Map();
 
   activeTeams.forEach((team)=>{
     const conference = normalizeDraftConference(team.conference) || "Unassigned";
     if (!conferenceMap.has(conference)) conferenceMap.set(conference,{conference,teams:0,recordWins:0,recordLosses:0,teamScore:0,eloScore:0,nattys:0,confTitles:0,recruitingScore:0,recruitingCount:0,allAmericans:0,awards:0,heismans:0,top25:0});
     const row = conferenceMap.get(conference);
-    const ranking = rankingMap.get(team.id);
+    const ranking = rankingMap.get(String(team.id));
     const rec = recordFromResults(team.id,results);
-    const activeAssignment = activeAssignments.find((assignment)=>assignment.team_id===team.id);
-    const userElo = eloMap.get(activeAssignment?.discord_user_id) || 1500;
+    const activeAssignment = activeAssignments.find((assignment)=>String(assignment.team_id)===String(team.id));
+    const userElo = eloMap.get(String(activeAssignment?.discord_user_id)) || 1500;
     const fullResults = allResults.length ? allResults : results;
-    const bestRecruit = recruiting.filter((item)=>item.team_id===team.id && Number(item.rank)>0).sort((a,b)=>Number(a.rank)-Number(b.rank))[0];
+    const latestRecruit = recruiting.filter((item)=>String(item.team_id)===String(team.id) && Number(item.rank)>0).sort((a,b)=>Number(b.season_year)-Number(a.season_year)||Number(a.rank)-Number(b.rank))[0];
     row.teams += 1;
     row.recordWins += rec.wins;
     row.recordLosses += rec.losses;
     row.teamScore += ranking?.score || 0;
     row.eloScore += Math.max(0,Math.min(100,(userElo-1300)/4));
-    row.nattys += nationalChampions.filter((item)=>item.team_id===team.id).length + titleCount(team.id,fullResults,"National Championship Week");
+    row.nattys += Math.max(nationalChampions.filter((item)=>String(item.team_id)===String(team.id)).length,titleCount(team.id,fullResults,"National Championship Week"));
     row.confTitles += titleCount(team.id,fullResults,"Conference Championship Week");
-    row.allAmericans += allAmericans.filter((item)=>item.team_id===team.id).length;
-    row.awards += awards.filter((item)=>item.team_id===team.id).length;
-    row.heismans += heismans.filter((item)=>item.team_id===team.id).length;
+    row.allAmericans += allAmericans.filter((item)=>String(item.team_id)===String(team.id)).length;
+    row.awards += awards.filter((item)=>String(item.team_id)===String(team.id)).length;
+    row.heismans += heismans.filter((item)=>String(item.team_id)===String(team.id)).length;
     if (ranking?.rank<=25) row.top25 += 1;
-    if (bestRecruit) { row.recruitingScore += Math.max(0,101-Number(bestRecruit.rank)); row.recruitingCount += 1; }
+    if (latestRecruit) { row.recruitingScore += Math.max(0,101-Number(latestRecruit.rank)); row.recruitingCount += 1; }
   });
 
   return [...conferenceMap.values()].map((row)=>{
     const games=row.recordWins+row.recordLosses;
-    const performance=row.teams?row.teamScore/row.teams:0;
+    const performance=row.teams?Math.max(0,Math.min(100,row.teamScore/row.teams)):50;
     const userStrength=row.teams?row.eloScore/row.teams:0;
     const winPct=games?row.recordWins/games:0;
-    const championshipScore=Math.min(100,(row.nattys*28)+(row.confTitles*10));
+    const recordScore=games?winPct*100:50;
+    const rankedDepth=row.teams?(row.top25/row.teams)*100:0;
+    const championshipScore=row.teams?Math.min(100,((row.nattys*30)+(row.confTitles*10))/row.teams):0;
     const recruitingAvg=row.recruitingCount?row.recruitingScore/row.recruitingCount:45;
-    const recognitionScore=Math.min(100,(row.allAmericans*2.2)+(row.awards*4)+(row.heismans*10));
-    const currentPerformanceScore=(performance*.75)+(winPct*25)+(row.top25*1.2);
-    const power=(currentPerformanceScore*.40)+(userStrength*.25)+(championshipScore*.15)+(recruitingAvg*.10)+(recognitionScore*.10);
+    const recognitionScore=row.teams?Math.min(100,((row.allAmericans*2)+(row.awards*4)+(row.heismans*12))/row.teams):0;
+    const currentPerformanceScore=(performance*.70)+(recordScore*.20)+(rankedDepth*.10);
+    const power=(currentPerformanceScore*.50)+(userStrength*.20)+(championshipScore*.12)+(recruitingAvg*.10)+(recognitionScore*.08);
     return {...row,games,winPct,performance,userStrength,championshipScore,recruitingAvg,recognitionScore,currentPerformanceScore,power:Number(power.toFixed(1))};
   }).sort((a,b)=>b.power-a.power);
 }
@@ -2778,7 +2787,7 @@ function EliteBooksManager({sportsbook={},users=[],teams=[],assignments=[],curre
   const markets=(sportsbook.markets||[]).filter((row)=>String(row.season_year)===String(currentYear));
   const teamFor=(id)=>teams.find((team)=>String(team.id)===String(id));
   const teamForUser=(userId)=>{const assignment=assignments.find((row)=>String(row.discord_user_id)===String(userId)&&assignmentActiveForYear(row,currentYear));return teamFor(assignment?.team_id);};
-  return <main className="cfb-v2-page">
+  return <main className="cfb-v2-page elite-books-manager-page">
     <div style={v2PageHero}><div><span style={v2Eyebrow}>COMMISSIONER OPERATIONS</span><h1 style={v2PageTitle}>Elite Books Manager</h1><p style={v2PageSub}>Generate the current board, manually close betting as games begin, open futures and settle season awards.</p></div><button style={v2GhostButton} onClick={loadData}>Refresh</button></div>
     {!linkedDiscordUser?.is_commissioner&&<div style={v2Notice}>For protected sportsbook writes, sign in with Discord and mark that linked user as <b>is_commissioner = true</b> in Supabase. The commissioner code remains an emergency UI lock.</div>}
     <section className="elite-manager-grid"><article><span>CURRENT BOARD</span><h2>{currentYear} • {currentWeek}</h2><p>{board?`${board.status.toUpperCase()} • ${currentLines.length} generated lines`:"No board generated yet"}</p><small>Lock deadline: {board?.locks_at||advanceAt?new Date(board?.locks_at||advanceAt).toLocaleString():"Not set"}</small><button disabled={busy} onClick={generateBoard}>{busy?"Working…":"Generate / Refresh Lines"}</button></article><article><span>SEASON FUTURES</span><h2>Four market system</h2><p>National Champion, conference champions, Heath Hurley COTY and—beginning in Season 2—Most Improved Team.</p><button disabled={busy} onClick={seedFutures}>{busy?"Working…":"Create / Refresh Futures"}</button></article></section>
@@ -2825,7 +2834,7 @@ function DashboardV2({ teams = [], users = [], assignments = [], results = [], a
     </section>
 
     <section style={v2Panel}>
-        <div style={v2PanelHeader}><div><span style={v2Eyebrow}>LIVE LADDER</span><h2>Automatic Rankings</h2></div><span style={v2CountPill}>{rankings.length} Active Teams</span></div>
+        <div className="cfb-v2-table-panel-head" style={v2PanelHeader}><div><span style={v2Eyebrow}>LIVE LADDER</span><h2>Automatic Rankings</h2></div><span className="cfb-v2-active-count" style={v2CountPill}>{rankings.length} Active Teams</span></div>
         <div style={v2RankingTableScroll}>
           <div className="cfb-v2-ranking-head" style={v2RankingTableHead}><span>Rank</span><span>Team / User</span><span>Move</span><span>Record</span><span>SOR</span><span>Rating</span><span>Avg PA</span><span>Avg PF</span><span>Top 10 Wins</span></div>
           <div style={v2RankingList}>{visibleRankings.map((row)=><button className="cfb-v2-ranking-row" key={row.team.id} style={{...v2RankingRow,borderColor:`${getTeamSecondary(row.team)}44`}} onClick={()=>goToTeam?.(row.team.id)}><b>#{row.rank}</b><span style={v2RankingIdentity}><span style={v2RankingLogo}><TeamLogoMark team={row.team} size={38}/></span><span style={v2RankingTeam}><strong>{row.teamName}</strong><small>{assignedCoachName(row.team.id,null,users,assignments,currentYear)}</small></span></span><RankingMovement currentRank={row.rank} previousRank={previousMap.get(String(row.team.id))}/><span>{row.wins}-{row.losses}</span><span>{row.sor.toFixed(1)}</span><strong>{row.rating.toFixed(1)}</strong><span>{row.avgPa.toFixed(1)}</span><span>{row.avgPf.toFixed(1)}</span><span>{row.top10}</span></button>)}</div>
@@ -2833,10 +2842,10 @@ function DashboardV2({ teams = [], users = [], assignments = [], results = [], a
     </section>
 
     <section style={v2Panel}>
-      <div style={v2PanelHeader}><div><span style={v2Eyebrow}>CONFERENCE REPORT</span><h2>Conference Power Rankings</h2></div><button style={v2TextButton} onClick={()=>setActiveTab?.("conferencePower")}>Full Conference Page →</button></div>
+      <div className="cfb-v2-table-panel-head" style={v2PanelHeader}><div><span style={v2Eyebrow}>CONFERENCE REPORT</span><h2>Conference Power Rankings</h2></div><button style={v2TextButton} onClick={()=>setActiveTab?.("conferencePower")}>Full Conference Page →</button></div>
       <div className="cfb-v2-conference-scroll" style={v2ConferenceTableScroll}>
-        <div style={v2ConferenceTableHead}><span>#</span><span>Conference</span><span>Power</span><span>Performance</span><span>User ELO</span><span>Titles</span><span>Recruiting</span><span>Recognition</span><span>Record</span><span>Users</span></div>
-        {conferenceRows.map((row,index)=><div key={row.conference} style={v2ConferenceTableRow}><b>#{index+1}</b><span style={v2ConferenceIdentity}><ConferenceLogoMark conference={row.conference} conferenceAssets={conferenceAssets} size={34}/><strong>{row.conference}</strong></span><strong>{row.power.toFixed(1)}</strong><span>{row.currentPerformanceScore.toFixed(1)}</span><span>{row.userStrength.toFixed(1)}</span><span>{row.championshipScore.toFixed(1)}</span><span>{row.recruitingAvg.toFixed(1)}</span><span>{row.recognitionScore.toFixed(1)}</span><span>{row.recordWins}-{row.recordLosses}</span><span>{row.teams}</span></div>)}
+        <div className="cfb-v2-conference-head" style={v2ConferenceTableHead}><span>#</span><span>Conference</span><span>Power</span><span>Performance</span><span>User ELO</span><span>Titles</span><span>Recruiting</span><span>Recognition</span><span>Record</span><span>Users</span></div>
+        {conferenceRows.map((row,index)=><div className="cfb-v2-conference-row" key={row.conference} style={v2ConferenceTableRow}><b>#{index+1}</b><span style={v2ConferenceIdentity}><ConferenceLogoMark conference={row.conference} conferenceAssets={conferenceAssets} size={34}/><strong>{row.conference}</strong></span><strong>{row.power.toFixed(1)}</strong><span>{row.currentPerformanceScore.toFixed(1)}</span><span>{row.userStrength.toFixed(1)}</span><span>{row.championshipScore.toFixed(1)}</span><span>{row.recruitingAvg.toFixed(1)}</span><span>{row.recognitionScore.toFixed(1)}</span><span>{row.recordWins}-{row.recordLosses}</span><span>{row.teams}</span></div>)}
       </div>
     </section>
 
@@ -5535,37 +5544,20 @@ function computerRankingRows(teams, results, assignments = [], users = []) {
     const sor = Number(strengthOfResult(team.id, teams, safeResults)) || 0;
     const top10 = top10Wins(team.id, safeResults);
     const top25 = top25Wins(team.id, safeResults);
-    const qw = qualityWins(team.id, safeResults);
     const margin = avgPf - avgPa;
-    const offenseScore = Math.max(0, Math.min(18, avgPf * 0.22));
-    const defenseScore = Math.max(0, Math.min(18, (38 - avgPa) * 0.28));
-    const marginScore = Math.max(-8, Math.min(14, margin * 0.32));
-    const userTierScore = opponentUserTierScore(team.id, safeResults, assignments, users);
-    const lossPenalty = rec.losses * 4.2;
-    const winsScore = rec.wins * 2.1;
-    const winPctScore = winPct * 34;
-    const sorScore = sor * 3.15;
-    const top10Score = top10 * 8.5;
-    const top25Score = Math.max(0, top25 - top10) * 4.25;
-    const qualityWinScore = qw * 3.75;
-    const userDifficultyScore = userTierScore * 0.28;
-    const gameVolumeBonus = Math.min(6, games * 0.55);
+    const qw = qualityWins(team.id, safeResults);
 
-    const raw =
-      winPctScore +
-      winsScore +
-      sorScore +
-      top10Score +
-      top25Score +
-      qualityWinScore +
-      offenseScore +
-      defenseScore +
-      marginScore +
-      userDifficultyScore +
-      gameVolumeBonus -
-      lossPenalty;
-
-    const rating = Number(Math.max(0, raw).toFixed(1));
+    // Stable 0-100 model: results drive 78% of the grade, scoring efficiency
+    // contributes 14%, and ranked-win quality contributes up to 8%.
+    const winPctScore = winPct * 36;
+    const sorScore = (sor / 10) * 24;
+    const marginScore = Math.max(0, Math.min(18, ((margin + 28) / 56) * 18));
+    const offenseScore = Math.max(0, Math.min(7, (avgPf / 45) * 7));
+    const defenseScore = Math.max(0, Math.min(7, ((45 - avgPa) / 45) * 7));
+    const qualityWinScore = Math.min(8,(top10 * 3.5) + (Math.max(0,top25-top10) * 1.75));
+    const performance = Math.max(0,Math.min(100,winPctScore+sorScore+marginScore+offenseScore+defenseScore+qualityWinScore));
+    const confidence = games ? Math.min(1,.62+(games*.08)) : 0;
+    const rating = Number((games ? 50+((performance-50)*confidence) : 50).toFixed(1));
 
     return {
       team,
@@ -5580,22 +5572,22 @@ function computerRankingRows(teams, results, assignments = [], users = []) {
       qw,
       sor,
       winPct: Number((winPct * 100).toFixed(1)),
-      userTierScore: Number(userTierScore.toFixed(1)),
+      userTierScore: Number(opponentUserTierScore(team.id, safeResults, assignments, users).toFixed(1)),
       rating,
       score: rating,
       formulaParts: {
         winPctScore: Number(winPctScore.toFixed(1)),
         sorScore: Number(sorScore.toFixed(1)),
-        top10Score: Number(top10Score.toFixed(1)),
-        top25Score: Number(top25Score.toFixed(1)),
+        marginScore: Number(marginScore.toFixed(1)),
+        qualityWinScore: Number(qualityWinScore.toFixed(1)),
         offenseScore: Number(offenseScore.toFixed(1)),
         defenseScore: Number(defenseScore.toFixed(1)),
-        lossPenalty: Number(lossPenalty.toFixed(1)),
+        confidence: Number(confidence.toFixed(2)),
       },
     };
   });
   return base
-    .sort((a,b)=>b.rating-a.rating || b.wins-a.wins || a.losses-b.losses || b.sor-a.sor || a.teamName.localeCompare(b.teamName))
+    .sort((a,b)=>b.rating-a.rating || b.wins-a.wins || a.losses-b.losses || b.sor-a.sor || (b.avgPf-b.avgPa)-(a.avgPf-a.avgPa) || a.teamName.localeCompare(b.teamName))
     .map((row,index)=>({...row, rank:index+1}));
 }
 
@@ -7046,12 +7038,122 @@ function GlobalStyle() {
         .cfb-v2-game-grid, .cfb-v2-media-grid, .cfb-v2-user-grid, .cfb-v2-bye-grid, .cfb-v2-playoff-grid, .cfb-v2-form-grid { grid-template-columns:1fr !important; }
         .cfb-v2-coach-strip { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
         .cfb-v2-page h1 { font-size:clamp(34px,10vw,50px) !important; }
-        .cfb-v2-ranking-head, .cfb-v2-ranking-row { min-width:850px !important; }
+        .cfb-v2-table-panel-head { min-width:0; flex-wrap:nowrap !important; }
+        .cfb-v2-table-panel-head > div { min-width:0; }
+        .cfb-v2-table-panel-head h2 { overflow-wrap:anywhere; }
+        .cfb-v2-active-count { flex:0 1 auto; max-width:46%; min-width:0 !important; height:auto !important; min-height:30px; padding:6px 11px; line-height:1.15; text-align:center; white-space:normal; overflow-wrap:anywhere; }
+        .cfb-v2-ranking-head, .cfb-v2-ranking-row {
+          grid-template-columns:44px 155px 52px 62px 60px 68px 66px 66px 82px !important;
+          min-width:735px !important;
+          gap:6px !important;
+          padding-left:8px !important;
+          padding-right:8px !important;
+        }
+        .cfb-v2-ranking-head > :nth-child(1),
+        .cfb-v2-ranking-row > :nth-child(1) {
+          position:sticky; left:0; z-index:4;
+          align-self:stretch; display:flex; align-items:center;
+          background:#11151e;
+        }
+        .cfb-v2-ranking-head > :nth-child(2),
+        .cfb-v2-ranking-row > :nth-child(2) {
+          position:sticky; left:50px; z-index:4;
+          align-self:stretch;
+          background:#11151e;
+          box-shadow:12px 0 14px -12px rgba(0,0,0,.95);
+        }
+        .cfb-v2-ranking-head > :nth-child(1),
+        .cfb-v2-ranking-head > :nth-child(2) { z-index:6; background:#05070c; }
+        .cfb-v2-ranking-row > :nth-child(2) { display:grid; }
+        .cfb-v2-ranking-row > :nth-child(2) strong,
+        .cfb-v2-ranking-row > :nth-child(2) small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .cfb-v2-conference-head, .cfb-v2-conference-row {
+          grid-template-columns:42px 150px 64px 82px 70px 64px 76px 82px 70px 52px !important;
+          min-width:790px !important;
+          gap:6px !important;
+          padding-left:8px !important;
+          padding-right:8px !important;
+        }
+        .cfb-v2-conference-head > :nth-child(1),
+        .cfb-v2-conference-row > :nth-child(1) {
+          position:sticky; left:0; z-index:4;
+          align-self:stretch; display:flex; align-items:center;
+          background:#11151e;
+        }
+        .cfb-v2-conference-head > :nth-child(2),
+        .cfb-v2-conference-row > :nth-child(2) {
+          position:sticky; left:48px; z-index:4;
+          align-self:stretch;
+          overflow:hidden;
+          background:#11151e;
+          box-shadow:12px 0 14px -12px rgba(0,0,0,.95);
+        }
+        .cfb-v2-conference-head > :nth-child(1),
+        .cfb-v2-conference-head > :nth-child(2) { z-index:6; background:#05070c; }
+        .cfb-v2-conference-row > :nth-child(2) strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       }
       @media (max-width: 520px) {
         .cfb-v2-kpi-grid, .cfb-v2-coach-strip { grid-template-columns:1fr !important; }
         .cfb-v2-leader-grid { grid-template-columns:1fr !important; }
         .cfb-v2-page { gap:12px !important; }
+      }
+
+      /* v21 non-sportsbook presentation polish */
+      .cfb-v2-page:not(.elite-books-page):not(.elite-books-manager-page) h1,
+      .cfb-v2-page:not(.elite-books-page):not(.elite-books-manager-page) h2 { text-wrap:balance; }
+      .cfb-v2-page:not(.elite-books-page):not(.elite-books-manager-page) > section:not([class*="elite-"]) {
+        position:relative;
+        isolation:isolate;
+      }
+      .cfb-v2-page:not(.elite-books-page):not(.elite-books-manager-page) > section:not([class*="elite-"])::before {
+        content:"";
+        position:absolute;
+        z-index:-1;
+        inset:0 0 auto;
+        height:1px;
+        background:linear-gradient(90deg,rgba(239,68,68,.65),rgba(250,204,21,.22),transparent 72%);
+        pointer-events:none;
+      }
+      .cfb-v2-game-grid > article,
+      .cfb-v2-user-grid > article,
+      .cfb-v2-media-grid > article,
+      .cfb-v2-bye-grid > div,
+      .cfb-v2-playoff-grid > div {
+        min-width:0;
+        overflow:hidden;
+        transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;
+      }
+      .cfb-v2-matchup-team { min-width:0; overflow:hidden; }
+      .cfb-v2-matchup-team > strong,
+      .cfb-v2-matchup-team > span { max-width:100%; overflow-wrap:anywhere; }
+      .cfb-v2-ranking-table-scroll,
+      .cfb-v2-conference-scroll,
+      .cfb-table-scroll {
+        overscroll-behavior-inline:contain;
+        scroll-snap-type:x proximity;
+      }
+      @media (hover:hover) and (pointer:fine) {
+        .cfb-v2-game-grid > article:hover,
+        .cfb-v2-user-grid > article:hover,
+        .cfb-v2-media-grid > article:hover,
+        .cfb-v2-bye-grid > div:hover,
+        .cfb-v2-playoff-grid > div:hover {
+          transform:translateY(-2px);
+          border-color:rgba(248,113,113,.40) !important;
+          box-shadow:0 20px 48px rgba(0,0,0,.34) !important;
+        }
+      }
+      @media (max-width:760px) {
+        .cfb-v2-page:not(.elite-books-page):not(.elite-books-manager-page) > section:not([class*="elite-"]) { padding:14px !important; }
+        .cfb-v2-page:not(.elite-books-page):not(.elite-books-manager-page) h2 {
+          font-size:clamp(24px,7vw,34px) !important;
+          line-height:1.04;
+        }
+        .cfb-v2-matchup-team > strong { font-size:13px !important; line-height:1.15; }
+        .cfb-v2-matchup-team > span { font-size:11px !important; }
+        .cfb-v2-ranking-table-scroll,
+        .cfb-v2-conference-scroll,
+        .cfb-table-scroll { -webkit-overflow-scrolling:touch; }
       }
 
       /* Elite Books broadcast system */
@@ -7077,12 +7179,14 @@ function GlobalStyle() {
       .elite-ticker-label small { opacity:.74; }
       .elite-ticker-viewport { min-width:0; overflow:hidden; position:relative; }
       .elite-ticker-viewport::after { content:""; position:absolute; inset:0 0 0 auto; width:34px; pointer-events:none; background:linear-gradient(90deg,transparent,#070b12); }
-      .elite-ticker-track { display:flex; width:max-content; min-width:100%; will-change:transform; animation:eliteTickerLoop var(--elite-ticker-duration,42s) linear infinite; }
-      .elite-ticker-group { display:flex; flex:0 0 auto; min-width:max-content; }
+      .elite-ticker-track { display:flex; width:max-content; min-width:100%; gap:0; will-change:transform; backface-visibility:hidden; animation:eliteTickerLoop var(--elite-ticker-duration,42s) linear infinite; }
+      .elite-ticker-group { display:flex; flex:0 0 auto; gap:0; min-width:0; }
       .elite-ticker-viewport:hover .elite-ticker-track,.elite-ticker-viewport:focus-within .elite-ticker-track { animation-play-state:paused; }
       @keyframes eliteTickerLoop { from { transform:translate3d(0,0,0); } to { transform:translate3d(-50%,0,0); } }
-      .elite-ticker-game { flex:0 0 260px; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:8px; padding:10px 15px; border:0; border-right:1px solid rgba(148,163,184,.14); color:#e2e8f0; background:transparent; cursor:pointer; }
-      .elite-ticker-game > span { display:flex; align-items:center; gap:5px; font-size:12px; }
+      .elite-ticker-game { flex:0 0 260px; width:260px; min-width:260px; max-width:260px; display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center; gap:8px; padding:10px 15px; overflow:hidden; contain:layout paint; border:0; border-right:1px solid rgba(148,163,184,.14); color:#e2e8f0; background:#070b12; cursor:pointer; }
+      .elite-ticker-game > span { min-width:0; overflow:hidden; display:flex; align-items:center; gap:5px; font-size:12px; }
+      .elite-ticker-game > span > * { flex:0 0 auto; }
+      .elite-ticker-game > span > b { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       .elite-ticker-game > span:nth-of-type(2){justify-content:flex-end;}
       .elite-ticker-game > strong { color:white; font-size:12px; }
       .elite-ticker-game > em { grid-column:1/-1; color:#94a3b8; font-size:8px; font-style:normal; font-weight:900; letter-spacing:.12em; }
@@ -7245,7 +7349,7 @@ function GlobalStyle() {
       @media (max-width:520px) {
         .elite-ticker { grid-template-columns:82px minmax(0,1fr); }
         .elite-ticker-label { padding:9px; } .elite-ticker-label b { font-size:13px; }
-        .elite-ticker-game { flex-basis:225px;padding:8px; }
+        .elite-ticker-game { flex-basis:210px;width:210px;min-width:210px;max-width:210px;padding:8px 9px;gap:5px; }
         .elite-books-home { grid-template-columns:1fr; } .elite-books-home-brand { grid-column:auto; }
         .elite-books-home > div { border-right:0;border-bottom:1px solid rgba(255,255,255,.08); }
         .elite-section-head { align-items:start;flex-direction:column; } .elite-section-head > small { text-align:left; }
