@@ -1326,10 +1326,10 @@ export default function App() {
     if (pickError) { setError(`Pick not saved: ${pickError.message}`); return false; }
     const saved=Array.isArray(data)?data[0]:data;
     if (saved) setSportsbook((previous)=>({...previous,
-      picks:[...(previous.picks||[]).filter((pick)=>!(String(pick.auth_user_id)===String(saved.auth_user_id)&&String(pick.line_id)===String(saved.line_id)&&pick.pick_type===saved.pick_type)),saved],
+      picks:[...(previous.picks||[]).filter((pick)=>!(String(pick.auth_user_id)===String(saved.auth_user_id)&&String(pick.line_id)===String(saved.line_id)&&String(pick.pick_slot||pick.pick_type)===String(saved.pick_slot||saved.pick_type))),saved],
       lines:(previous.lines||[]).map((line)=>String(line.id)===String(lineId)?{...line,is_frozen:true}:line),
     })); else await loadEliteBooksData();
-    setError("Elite Books pick saved to your Discord profile."); return true;
+    setError("Ticket locked in. You can change it until the commissioner closes that matchup."); return true;
   }
 
   async function submitFuturePick(optionId) {
@@ -2653,6 +2653,7 @@ function EliteBooksHomePanel({sportsbook={},linkedDiscordUser,currentYear,curren
 }
 
 function EliteBooks({sportsbook={},teams=[],users=[],assignments=[],results=[],weeklyMatchups=[],conferenceAssets=[],currentYear,currentWeek,advanceAt,discordSession,linkedDiscordUser,busy,signInWithDiscord,signOutDiscord,submitPick,submitFuture,setActiveTab}) {
+  const [ticketDrafts,setTicketDrafts]=useState({});
   const board=currentSportsbookBoard(sportsbook,currentYear,currentWeek);
   const matchupMap=new Map((weeklyMatchups||[]).map((row)=>[String(row.id),row]));
   const lines=(sportsbook.lines||[]).filter((line)=>String(line.board_id)===String(board?.id)).sort((a,b)=>{
@@ -2668,24 +2669,70 @@ function EliteBooks({sportsbook={},teams=[],users=[],assignments=[],results=[],w
   const markets=(sportsbook.markets||[]).filter((row)=>String(row.season_year)===String(currentYear)).sort((a,b)=>(marketOrder[a.market_type]??99)-(marketOrder[b.market_type]??99)||String(a.conference_name||a.title||"").localeCompare(String(b.conference_name||b.title||""))||String(a.id).localeCompare(String(b.id)));
   const rankings=computerRankingRows(teams,results.filter((row)=>String(row.season_year)===String(currentYear)),assignments,users);
   const rankMap=new Map(rankings.map((row)=>[String(row.team.id),row.rank]));
-  const now=Date.now();
-  const locked=!board||board.status!=="open"||(board.locks_at&&new Date(board.locks_at).getTime()<=now);
+  const locked=!board||board.status!=="open";
+  const newTicketRules=Number(board?.week_index??weekIndex(currentWeek))>=3;
   const marketLabel={national_champion:"National Champion",conference_champion:"Conference Champion",heath_hurley_coty:"Heath Hurley COTY",most_improved_team:"Most Improved Team"};
   function teamFor(id){return teams.find((team)=>String(team.id)===String(id));}
   function teamForCoach(id){const assignment=assignments.find((row)=>String(row.discord_user_id)===String(id)&&assignmentActiveForYear(row,currentYear));return teamFor(assignment?.team_id);}
-  function linePick(line,type){return myPicks.find((pick)=>String(pick.line_id)===String(line.id)&&pick.pick_type===type);}
-  function pickButton(line,type,team,oddsOrSpread){
-    const picked=linePick(line,type); const active=String(picked?.selected_team_id)===String(team?.id);
-    const points=type==="moneyline"?moneylinePointPreview(oddsOrSpread):spreadPointPreview(oddsOrSpread);
-    return <button disabled={busy||locked||line.is_betting_locked||!discordSession} className={`elite-pick-button ${active?"selected":""}`} onClick={()=>submitPick(line.id,type,team.id)}><span>{getTeamAbbreviation(team)}</span><b>{type==="moneyline"?formatAmericanOdds(oddsOrSpread):formatSpread(oddsOrSpread)}</b><small>{points} PT{points===1?"":"S"}</small></button>;
+  function pickSlot(pick){return pick?.pick_slot||(pick?.pick_type==="total"?"total":"side");}
+  function savedLinePick(line,slot){return myPicks.find((pick)=>String(pick.line_id)===String(line.id)&&pickSlot(pick)===slot);}
+  function normalizedSavedChoice(pick){return pick?{type:pick.pick_type,selection:pick.pick_type==="total"?pick.selected_total_side:String(pick.selected_team_id)}:null;}
+  function draftKey(line,slot){return `${String(line.id)}:${slot}`;}
+  function currentChoice(line,slot){return ticketDrafts[draftKey(line,slot)]||normalizedSavedChoice(savedLinePick(line,slot));}
+  function choosePick(line,type,selection){
+    if(busy||locked||line.is_betting_locked||!discordSession)return;
+    if(!newTicketRules){submitPick(line.id,type,String(selection));return;}
+    const slot=type==="total"?"total":"side";
+    setTicketDrafts((drafts)=>({...drafts,[draftKey(line,slot)]:{type,selection:String(selection)}}));
+  }
+  async function lockInPick(line){
+    const pending=["side","total"].map((slot)=>[slot,ticketDrafts[draftKey(line,slot)]]).filter(([,draft])=>draft);
+    if(!pending.length)return;
+    const completed=[];
+    for(const [slot,draft] of pending){
+      const saved=await submitPick(line.id,draft.type,draft.selection);
+      if(saved)completed.push(slot);
+    }
+    if(completed.length)setTicketDrafts((drafts)=>{const next={...drafts};completed.forEach((slot)=>delete next[draftKey(line,slot)]);return next;});
+  }
+  function pickButton(line,type,selection,label,display,points,subline=""){
+    const slot=newTicketRules?(type==="total"?"total":"side"):type;
+    const choice=currentChoice(line,slot);
+    const active=choice?.type===type&&String(choice.selection)===String(selection);
+    return <button type="button" disabled={busy||locked||line.is_betting_locked||!discordSession} className={`elite-pick-button ${active?"selected":""}`} onClick={()=>choosePick(line,type,selection)}><span>{label}</span><b>{display}</b>{subline&&<em>{subline}</em>}<small>{points} PT{points===1?"":"S"}</small></button>;
   }
   return <main className="cfb-v2-page elite-books-page">
-    <div className="elite-books-hero"><div><span>CFBELITE 27 PRESENTS</span><h1>ELITE <i>BOOKS</i></h1><p>Beat the line. Build your card. Own the season.</p><div className="elite-books-rule-pills"><b>✓ Current week only</b><b>✓ Odds lock with your pick</b><b>✓ Underdogs earn more</b></div></div><div className="elite-auth-card">{discordSession?<><span>BETTING AS</span><strong>{linkedDiscordUser?.discord_username||discordSession.user?.user_metadata?.user_name||"Discord Member"}</strong><small>Scores stay tied to your Discord identity.</small><button type="button" onClick={signOutDiscord}>Sign out</button></>:<><span>YOUR CARD STARTS HERE</span><strong>Sign in with Discord</strong><small>Your picks, points, futures and badges follow your account.</small><button type="button" onClick={signInWithDiscord}>Continue with Discord</button></>}</div></div>
+    <div className="elite-books-hero"><div><span>CFBELITE 27 PRESENTS</span><h1>ELITE <i>BOOKS</i></h1><p>Beat the line. Build your card. Own the season.</p><div className="elite-books-rule-pills">{newTicketRules?<><b>✓ One ML or spread pick</b><b>✓ Plus one over/under</b><b>✓ Editable until manual lock</b></>:<><b>✓ Week 2 legacy board</b><b>✓ Moneyline and spread remain separate</b><b>✓ New format begins Week 3</b></>}</div></div><div className="elite-auth-card">{discordSession?<><span>BETTING AS</span><strong>{linkedDiscordUser?.discord_username||discordSession.user?.user_metadata?.user_name||"Discord Member"}</strong><small>Scores stay tied to your Discord identity.</small><button type="button" onClick={signOutDiscord}>Sign out</button></>:<><span>YOUR CARD STARTS HERE</span><strong>Sign in with Discord</strong><small>Your picks, points, futures and badges follow your account.</small><button type="button" onClick={signInWithDiscord}>Continue with Discord</button></>}</div></div>
     <CurrentWeekTicker teams={teams} weeklyMatchups={weeklyMatchups} results={results} currentYear={currentYear} currentWeek={currentWeek} setActiveTab={setActiveTab}/>
-    <div className="elite-books-scorebar"><div><span>BOARD</span><b>{currentWeek}</b></div><div><span>STATUS</span><b className={`elite-status elite-status-${board?.status||"draft"}`}>{String(board?.status||"NOT PUBLISHED").toUpperCase()}</b></div><div><span>LOCK</span><b>{board?.locks_at?new Date(board.locks_at).toLocaleString():advanceAt?new Date(advanceAt).toLocaleString():"Commissioner deadline"}</b></div><div><span>MY PICKS</span><b>{myPicks.filter((pick)=>String(pick.board_id)===String(board?.id)).length}</b></div></div>
+    <div className="elite-books-scorebar"><div><span>BOARD</span><b>{currentWeek}</b></div><div><span>STATUS</span><b className={`elite-status elite-status-${board?.status||"draft"}`}>{String(board?.status||"NOT PUBLISHED").toUpperCase()}</b></div><div><span>LOCK</span><b>Manual by matchup</b></div><div><span>MY PICKS</span><b>{myPicks.filter((pick)=>String(pick.board_id)===String(board?.id)).length}</b></div></div>
     <section className="elite-books-layout">
-      <div className="elite-books-main"><div className="elite-section-head"><div><span>WEEKLY BOARD</span><h2>Moneyline & Spread</h2></div><small>Home team is listed second • every correct pick earns at least +1</small></div>
-        {lines.length?<div className="elite-lines-grid">{lines.map((line)=>{const m=matchupMap.get(String(line.matchup_id)); const t1=teamFor(line.team_1_id)||m?.team_1; const t2=teamFor(line.team_2_id)||m?.team_2; return <article className={`elite-line-card ${line.is_betting_locked?"betting-closed":""}`} key={line.id} style={{"--team-one":getTeamPrimary(t1),"--team-two":getTeamPrimary(t2)}}><header><span>{currentWeek}</span>{line.settled_at?<b>FINAL</b>:line.is_betting_locked?<b>BETTING CLOSED</b>:line.is_frozen?<b>LINE LOCKED</b>:<b>OPEN</b>}</header><div className="elite-line-matchup"><div><TeamLogoMark team={t1} size={70}/><b>#{line.team_1_rank||rankMap.get(String(t1?.id))||"—"}</b><strong>{t1?.name}</strong></div><span>VS</span><div><TeamLogoMark team={t2} size={70}/><b>#{line.team_2_rank||rankMap.get(String(t2?.id))||"—"}</b><strong>{t2?.name}</strong></div></div>{line.settled_at&&<div className="elite-final-score"><b>{line.team_1_score}</b><span>FINAL</span><b>{line.team_2_score}</b></div>}{line.is_betting_locked&&<div className="elite-betting-closed"><b>BETTING LOCKED</b><span>{line.betting_lock_reason||"Game started"}</span></div>}<div className="elite-market"><label>MONEYLINE</label>{pickButton(line,"moneyline",t1,line.team_1_moneyline)}{pickButton(line,"moneyline",t2,line.team_2_moneyline)}</div><div className="elite-market"><label>SPREAD</label>{pickButton(line,"spread",t1,line.team_1_spread)}{pickButton(line,"spread",t2,line.team_2_spread)}</div><footer><span>Model edge: {Math.abs(Number(line.projected_margin||0)).toFixed(1)} pts</span><span>{line.is_betting_locked?"Matchup closed":line.is_frozen?"Opening line frozen":"Live model line"}</span></footer></article>})}</div>:<div className="elite-empty"><b>THE BOARD IS BEING BUILT</b><span>The commissioner can generate {currentWeek} lines after the Elite Books migration is installed.</span></div>}
+      <div className="elite-books-main"><div className="elite-section-head"><div><span>WEEKLY BOARD</span><h2>{newTicketRules?"Moneyline, Spread & Totals":"Moneyline & Spread"}</h2></div><small>{newTicketRules?"Choose one side (moneyline or spread) and one total (over or under), then press Lock It In":"Week 2 keeps the original board and all existing selections; the new ticket format begins Week 3"}</small></div>
+        {lines.length?<div className="elite-lines-grid">{lines.map((line)=>{
+          const m=matchupMap.get(String(line.matchup_id));
+          const t1=teamFor(line.team_1_id)||m?.team_1;
+          const t2=teamFor(line.team_2_id)||m?.team_2;
+          const savedSide=savedLinePick(line,"side");
+          const savedTotal=savedLinePick(line,"total");
+          const sideDraft=ticketDrafts[draftKey(line,"side")];
+          const totalDraft=ticketDrafts[draftKey(line,"total")];
+          const hasDraft=Boolean(sideDraft||totalDraft);
+          const total=Number(line.total_line||49.5);
+          const totalOddsOver=Number(line.over_moneyline||-110);
+          const totalOddsUnder=Number(line.under_moneyline||-110);
+          const sideLabel=savedSide?`${getTeamAbbreviation(teamFor(savedSide.selected_team_id))} ${savedSide.pick_type}`.toUpperCase():"NOT SELECTED";
+          const totalLabel=savedTotal?`${String(savedTotal.selected_total_side||"").toUpperCase()} ${Number(savedTotal.locked_total||total).toFixed(1)}`:"NOT SELECTED";
+          return <article className={`elite-line-card ${line.is_betting_locked?"betting-closed":""}`} key={line.id} style={{"--team-one":getTeamPrimary(t1),"--team-two":getTeamPrimary(t2)}}>
+            <header><span>{currentWeek}</span>{line.settled_at?<b>FINAL</b>:line.is_betting_locked?<b>BETTING CLOSED</b>:<b>PICKS OPEN</b>}</header>
+            <div className="elite-line-matchup"><div><TeamLogoMark team={t1} size={70}/><b>#{line.team_1_rank||rankMap.get(String(t1?.id))||"—"}</b><strong>{t1?.name}</strong></div><span>VS</span><div><TeamLogoMark team={t2} size={70}/><b>#{line.team_2_rank||rankMap.get(String(t2?.id))||"—"}</b><strong>{t2?.name}</strong></div></div>
+            {line.settled_at&&<div className="elite-final-score"><b>{line.team_1_score}</b><span>FINAL</span><b>{line.team_2_score}</b></div>}
+            {line.is_betting_locked&&<div className="elite-betting-closed"><b>BETTING LOCKED</b><span>{line.betting_lock_reason||"Game started"}</span></div>}
+            <div className="elite-market"><label>MONEYLINE</label>{pickButton(line,"moneyline",t1?.id,getTeamAbbreviation(t1),formatAmericanOdds(line.team_1_moneyline),moneylinePointPreview(line.team_1_moneyline))}{pickButton(line,"moneyline",t2?.id,getTeamAbbreviation(t2),formatAmericanOdds(line.team_2_moneyline),moneylinePointPreview(line.team_2_moneyline))}</div>
+            <div className="elite-market"><label>SPREAD</label>{pickButton(line,"spread",t1?.id,getTeamAbbreviation(t1),formatSpread(line.team_1_spread),spreadPointPreview(line.team_1_spread))}{pickButton(line,"spread",t2?.id,getTeamAbbreviation(t2),formatSpread(line.team_2_spread),spreadPointPreview(line.team_2_spread))}</div>
+            {newTicketRules&&<div className="elite-market elite-total-market"><label>TOTAL {total.toFixed(1)}</label>{pickButton(line,"total","over","OVER",`O ${total.toFixed(1)}`,moneylinePointPreview(totalOddsOver),formatAmericanOdds(totalOddsOver))}{pickButton(line,"total","under","UNDER",`U ${total.toFixed(1)}`,moneylinePointPreview(totalOddsUnder),formatAmericanOdds(totalOddsUnder))}</div>}
+            {newTicketRules?<div className={`elite-ticket-submit ${hasDraft?"has-draft":""}`}><span>{hasDraft?"Changes ready—Lock It In to update your Discord ticket.":`SIDE: ${sideLabel} • TOTAL: ${totalLabel} • Editable until betting closes.`}</span><button type="button" disabled={busy||locked||line.is_betting_locked||!discordSession||!hasDraft} onClick={()=>lockInPick(line)}>{busy?"SAVING…":"LOCK IT IN"}</button></div>:<div className="elite-ticket-submit elite-legacy-ticket"><span>WEEK 2: Moneyline and spread selections remain separate and save immediately. Existing picks are unchanged.</span></div>}
+            <footer><span>Model edge: {Math.abs(Number(line.projected_margin||0)).toFixed(1)} pts{newTicketRules?` • projected total ${total.toFixed(1)}`:""}</span><span>{line.is_betting_locked?"Matchup closed":line.is_frozen?"Odds frozen after first ticket":"Live model line"}</span></footer>
+          </article>;
+        })}</div>:<div className="elite-empty"><b>THE BOARD IS BEING BUILT</b><span>The commissioner can generate {currentWeek} lines after the Elite Books migration is installed.</span></div>}
       </div>
       <aside className="elite-books-sidebar"><div className="elite-section-head"><div><span>LEADERBOARD</span><h2>{currentYear} Standings</h2></div><button onClick={()=>setActiveTab?.("sportsbookHistory")}>All-Time →</button></div><div className="elite-leaderboard">{standings.length?standings.map((row,index)=><div key={row.discord_user_id} className={String(row.discord_user_id)===myId?"me":""}><b>#{index+1}</b><span><strong>{row.discord_username}</strong><small>{row.correct_picks}/{row.graded_picks} correct</small></span><em>{row.total_points} pts</em></div>):<div className="elite-empty-small">No graded cards yet.</div>}</div><EliteBadgeRail sportsbook={sportsbook} discordUserId={myId} currentYear={currentYear}/></aside>
     </section>
@@ -7074,9 +7121,17 @@ function GlobalStyle() {
       .elite-pick-button { min-width:0; display:grid; grid-template-columns:1fr auto; gap:2px 7px; padding:8px; border:1px solid rgba(148,163,184,.2); border-radius:8px; color:#f8fafc; background:rgba(2,6,23,.72); cursor:pointer; }
       .elite-pick-button span { min-width:0; overflow:hidden; text-overflow:ellipsis; font-size:10px; font-weight:1000; }
       .elite-pick-button b { color:#fff; font-size:16px; line-height:1; font-weight:1000; letter-spacing:-.02em; }
+      .elite-pick-button em { grid-column:1/-1; color:#94a3b8; font-size:9px; line-height:1; font-style:normal; font-weight:900; text-align:right; }
       .elite-pick-button small { grid-column:1/-1; color:#35d07f; font-size:9px; line-height:1; font-weight:1000; text-align:right; letter-spacing:.06em; }
       .elite-pick-button.selected { border-color:#35d07f; background:rgba(53,208,127,.17); box-shadow:inset 0 0 0 1px rgba(53,208,127,.26); }
       .elite-pick-button:disabled { cursor:not-allowed; opacity:.62; }
+      .elite-total-market { margin-top:2px; padding-top:9px; border-top:1px dashed rgba(148,163,184,.16); }
+      .elite-ticket-submit { position:relative; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:center; margin:7px 10px 10px; padding:10px 11px; border:1px solid rgba(148,163,184,.16); border-radius:10px; background:rgba(2,6,23,.68); }
+      .elite-ticket-submit.has-draft { border-color:rgba(53,208,127,.55); background:rgba(53,208,127,.08); }
+      .elite-ticket-submit span { color:#94a3b8; font-size:10px; line-height:1.35; font-weight:800; }
+      .elite-ticket-submit.has-draft span { color:#d1fae5; }
+      .elite-ticket-submit button { min-width:112px; padding:10px 13px; border:1px solid #35d07f; border-radius:8px; color:#02130b; background:#35d07f; font-size:10px; font-weight:1000; letter-spacing:.08em; cursor:pointer; }
+      .elite-ticket-submit button:disabled { border-color:rgba(148,163,184,.18); color:#64748b; background:rgba(15,23,42,.75); cursor:not-allowed; }
       .elite-line-card > footer { border-top:1px solid rgba(255,255,255,.08); border-bottom:0; color:#64748b; letter-spacing:0; font-weight:700; }
       .elite-leaderboard { display:grid; gap:7px; }
       .elite-leaderboard > div,.elite-history-table > div:not(.elite-section-head) { display:grid; grid-template-columns:32px minmax(0,1fr) auto; gap:9px; align-items:center; padding:10px; border:1px solid rgba(148,163,184,.12); border-radius:10px; background:rgba(2,6,23,.44); }
@@ -7198,7 +7253,9 @@ function GlobalStyle() {
         .elite-line-matchup { grid-template-columns:1fr 28px 1fr; }
         .elite-line-matchup img { max-width:58px!important;max-height:58px!important; }
         .elite-market { grid-template-columns:58px 1fr 1fr;gap:4px;padding:5px 7px; }
-        .elite-pick-button { padding:7px 5px;grid-template-columns:1fr; } .elite-pick-button b,.elite-pick-button small { text-align:center; }
+        .elite-pick-button { padding:7px 5px;grid-template-columns:1fr; } .elite-pick-button b,.elite-pick-button em,.elite-pick-button small { text-align:center; }
+        .elite-ticket-submit { grid-template-columns:1fr; margin:6px 7px 9px; }
+        .elite-ticket-submit button { width:100%; min-height:44px; }
         .elite-books-scorebar > div { padding:10px; }
         .elite-badge-gallery > div:last-child { grid-template-columns:1fr; }
         .elite-myteam-login { margin:10px;padding:25px 18px; }
