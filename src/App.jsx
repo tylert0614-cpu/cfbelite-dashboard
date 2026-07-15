@@ -2766,7 +2766,9 @@ function EliteBooksHistory({sportsbook={},users=[],currentYear,setActiveTab}) {
   const rows=[...(sportsbook.allTimeStandings||[])].sort((a,b)=>Number(b.total_points)-Number(a.total_points));
   const champions=[...(sportsbook.champions||[])].sort((a,b)=>Number(b.season_year)-Number(a.season_year));
   const defs=new Map((sportsbook.badges||[]).map((badge)=>[badge.code,badge]));
-  return <main className="cfb-v2-page elite-books-page"><div className="elite-history-hero"><div><span>THE LEDGER</span><h1>All-Time Sportsbook</h1><p>Every completed season preserved. New-year standings reset; legacy never does.</p></div><button onClick={()=>setActiveTab?.("eliteBooks")}>Back to Elite Books</button></div><section className="elite-history-grid"><div className="elite-history-table"><div className="elite-section-head"><div><span>CAREER BOARD</span><h2>All-Time Points</h2></div></div>{rows.length?rows.map((row,index)=><div key={row.discord_user_id}><b>#{index+1}</b><span><strong>{row.discord_username}</strong><small>{row.correct_picks}/{row.graded_picks} correct • {row.seasons} season{Number(row.seasons)===1?"":"s"}</small></span><em>{row.total_points} pts</em></div>):<div className="elite-empty-small">Career standings begin after the first graded season.</div>}</div><aside className="elite-champions"><div className="elite-section-head"><div><span>CHAMPIONS</span><h2>Season Winners</h2></div></div>{champions.length?champions.map((row)=><div key={row.season_year}><b>{row.season_year}</b><strong>{row.discord_username||users.find((user)=>String(user.id)===String(row.discord_user_id))?.discord_username||row.discord_user_id}</strong><span>{row.total_points} points</span></div>):<p>The first Elite Books champion will be crowned after {currentYear}.</p>}</aside></section><section className="elite-badge-gallery"><div className="elite-section-head"><div><span>TROPHY CASE</span><h2>Recognition System</h2></div></div><div>{[...defs.values()].map((badge)=><article key={badge.code}><EliteBadgeMark code={badge.code}/><strong>{badge.title}</strong><small>{badge.description}</small></article>)}</div></section></main>;
+  const record=(row)=>`${Number(row.correct_picks||0)}-${Number(row.lost_picks||0)}-${Number(row.pushes||0)}`;
+  const marketRecord=(row,prefix)=>`${Number(row[`${prefix}_wins`]||0)}-${Number(row[`${prefix}_losses`]||0)}`;
+  return <main className="cfb-v2-page elite-books-page"><div className="elite-history-hero"><div><span>THE LEDGER</span><h1>All-Time Sportsbook</h1><p>Every completed season preserved. New-year standings reset; legacy never does.</p></div><button onClick={()=>setActiveTab?.("eliteBooks")}>Back to Elite Books</button></div><section className="elite-history-grid"><div className="elite-history-table elite-history-ledger"><div className="elite-section-head"><div><span>CAREER BOARD</span><h2>All-Time Betting Ledger</h2></div><small>Records display wins-losses; overall record also includes pushes.</small></div>{rows.length?<div className="elite-history-ledger-scroll"><div className="elite-history-ledger-head"><span>Rank</span><span>Bettor</span><span>Record</span><span>Win %</span><span>Moneyline</span><span>Spread</span><span>O/U</span><span>Dog Wins</span><span>Points</span></div>{rows.map((row,index)=><div className="elite-history-ledger-row" key={row.discord_user_id}><b>#{index+1}</b><span><strong>{row.discord_username}</strong><small>{row.graded_picks} graded pick{Number(row.graded_picks)===1?"":"s"} • {row.seasons} season{Number(row.seasons)===1?"":"s"}</small></span><strong>{record(row)}</strong><span>{Number(row.win_percentage||0).toFixed(1)}%</span><span>{marketRecord(row,"moneyline")}</span><span>{marketRecord(row,"spread")}</span><span>{marketRecord(row,"total")}</span><span>{Number(row.underdog_wins||0)}</span><em>{row.total_points} pts</em></div>)}</div>:<div className="elite-empty-small">Career standings begin after the first graded season.</div>}</div><aside className="elite-champions"><div className="elite-section-head"><div><span>CHAMPIONS</span><h2>Season Winners</h2></div></div>{champions.length?champions.map((row)=><div key={row.season_year}><b>{row.season_year}</b><strong>{row.discord_username||users.find((user)=>String(user.id)===String(row.discord_user_id))?.discord_username||row.discord_user_id}</strong><span>{row.total_points} points</span></div>):<p>The first Elite Books champion will be crowned after {currentYear}.</p>}</aside></section><section className="elite-badge-gallery"><div className="elite-section-head"><div><span>TROPHY CASE</span><h2>Recognition System</h2></div></div><div>{[...defs.values()].map((badge)=><article key={badge.code}><EliteBadgeMark code={badge.code}/><strong>{badge.title}</strong><small>{badge.description}</small></article>)}</div></section></main>;
 }
 
 function MyTeamHub({linkedDiscordUser,discordSession,teams=[],users=[],assignments=[],results=[],weeklyMatchups=[],sportsbook={},currentYear,currentWeek,signInWithDiscord,setActiveTab}) {
@@ -6308,8 +6310,8 @@ function GlobalStyle() {
       html, body, #root {
         min-height: 100%;
         font-family: var(--cfb-font);
-        text-rendering: geometricPrecision;
-        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: auto;
         -moz-osx-font-smoothing: grayscale;
       }
 
@@ -7238,7 +7240,7 @@ function GlobalStyle() {
       .elite-ticket-submit button:disabled { border-color:rgba(148,163,184,.18); color:#64748b; background:rgba(15,23,42,.75); cursor:not-allowed; }
       .elite-line-card > footer { border-top:1px solid rgba(255,255,255,.08); border-bottom:0; color:#64748b; letter-spacing:0; font-weight:700; }
       .elite-leaderboard { display:grid; gap:7px; }
-      .elite-leaderboard > div,.elite-history-table > div:not(.elite-section-head) { display:grid; grid-template-columns:32px minmax(0,1fr) auto; gap:9px; align-items:center; padding:10px; border:1px solid rgba(148,163,184,.12); border-radius:10px; background:rgba(2,6,23,.44); }
+      .elite-leaderboard > div,.elite-history-table > div:not(.elite-section-head):not(.elite-history-ledger-scroll):not(.elite-empty-small) { display:grid; grid-template-columns:32px minmax(0,1fr) auto; gap:9px; align-items:center; padding:10px; border:1px solid rgba(148,163,184,.12); border-radius:10px; background:rgba(2,6,23,.44); }
       .elite-leaderboard > div.me { border-color:rgba(53,208,127,.5); background:rgba(53,208,127,.09); }
       .elite-leaderboard > div > b,.elite-history-table > div > b { color:#35d07f; }
       .elite-leaderboard span,.elite-history-table span { min-width:0; display:flex; flex-direction:column; }
@@ -7292,6 +7294,23 @@ function GlobalStyle() {
       .elite-history-hero p { color:#94a3b8; }
       .elite-history-grid { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(260px,.5fr); gap:16px; }
       .elite-history-table { display:grid; gap:7px; }
+      .elite-history-ledger { min-width:0; }
+      .elite-history-ledger-scroll { min-width:0; overflow-x:auto; border:1px solid rgba(148,163,184,.16); border-radius:11px; background:rgba(2,6,23,.38); }
+      .elite-history-ledger-head,.elite-history-ledger-row { display:grid; grid-template-columns:48px minmax(180px,1.5fr) 88px 72px 90px 82px 76px 72px 78px; gap:10px; align-items:center; min-width:860px; padding:11px 13px; }
+      .elite-history-ledger-head { position:sticky; top:0; z-index:5; border-bottom:2px solid #35d07f; color:#94a3b8; background:#070b12; font-size:10px; font-weight:1000; letter-spacing:.08em; text-transform:uppercase; }
+      .elite-history-ledger-row { min-height:62px; border-bottom:1px solid rgba(148,163,184,.12); color:#e5e7eb; background:rgba(15,23,42,.38); font-size:13px; font-weight:750; }
+      .elite-history-ledger-row:last-child { border-bottom:0; }
+      .elite-history-ledger-row > b { color:#35d07f; font-size:14px; }
+      .elite-history-ledger-row > span:nth-child(2) { min-width:0; display:grid; gap:3px; }
+      .elite-history-ledger-row > span:nth-child(2) strong { overflow:hidden; color:#fff; font-size:14px; line-height:1.15; text-overflow:ellipsis; white-space:nowrap; }
+      .elite-history-ledger-row > span:nth-child(2) small { color:#94a3b8; font-size:10px; font-weight:650; }
+      .elite-history-ledger-row > em { color:#fff; font-size:14px; font-style:normal; font-weight:1000; text-align:right; }
+      @media (max-width:760px) {
+        .elite-history-ledger-head,.elite-history-ledger-row { grid-template-columns:44px 150px 78px 66px 82px 76px 70px 66px 72px; min-width:750px; gap:6px; padding-inline:8px; }
+        .elite-history-ledger-head > :nth-child(1),.elite-history-ledger-row > :nth-child(1) { position:sticky; left:0; z-index:6; align-self:stretch; display:flex; align-items:center; background:#0d1522; }
+        .elite-history-ledger-head > :nth-child(2),.elite-history-ledger-row > :nth-child(2) { position:sticky; left:50px; z-index:6; align-self:stretch; background:#0d1522; box-shadow:12px 0 14px -12px rgba(0,0,0,.95); }
+        .elite-history-ledger-head > :nth-child(1),.elite-history-ledger-head > :nth-child(2) { z-index:8; background:#070b12; }
+      }
       .elite-champions > div:not(.elite-section-head) { display:grid; gap:4px; padding:12px; border-bottom:1px solid rgba(148,163,184,.13); }
       .elite-champions > div > b { color:#35d07f; } .elite-champions > div > span,.elite-champions p { color:#64748b; }
       .elite-badge-gallery > div:last-child { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
