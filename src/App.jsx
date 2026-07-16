@@ -1,10 +1,38 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
   import.meta.env.VITE_SUPABASE_ANON_KEY
 );
+
+const NETWORK_REFRESH_MS = 15000;
+function playEliteSound(kind="notification",enabled=true) {
+  if(!enabled||typeof window==="undefined") return;
+  const AudioContextClass=window.AudioContext||window.webkitAudioContext;
+  if(!AudioContextClass) return;
+  const context=new AudioContextClass();
+  const now=context.currentTime;
+  const master=context.createGain();
+  master.gain.setValueAtTime(.0001,now);
+  master.gain.exponentialRampToValueAtTime(kind==="notification"?.12:.045,now+.012);
+  master.gain.exponentialRampToValueAtTime(.0001,now+(kind==="notification"?.48:.12));
+  master.connect(context.destination);
+  const notes=kind==="notification"?[587.33,880,1174.66]:kind==="team"?[196,293.66,392]:[740];
+  notes.forEach((frequency,index)=>{
+    const oscillator=context.createOscillator();
+    const gain=context.createGain();
+    const start=now+index*(kind==="notification"?.085:.035);
+    oscillator.type=kind==="notification"?"sine":"triangle";
+    oscillator.frequency.setValueAtTime(frequency,start);
+    if(kind==="notification") oscillator.frequency.exponentialRampToValueAtTime(frequency*1.012,start+.12);
+    gain.gain.setValueAtTime(.0001,start);
+    gain.gain.exponentialRampToValueAtTime(1,start+.012);
+    gain.gain.exponentialRampToValueAtTime(.0001,start+(kind==="notification"?.3:.09));
+    oscillator.connect(gain); gain.connect(master); oscillator.start(start); oscillator.stop(start+(kind==="notification"?.32:.1));
+  });
+  window.setTimeout(()=>context.close?.(),700);
+}
 
 const WEEKS = ["Week 0","Week 1","Week 2","Week 3","Week 4","Week 5","Week 6","Week 7","Week 8","Week 9","Week 10","Week 11","Week 12","Week 13","Week 14","Conference Championship Week","Bowl Week 1","Bowl Week 2","Bowl Week 3","National Championship Week"];
 function weekIndex(week) { const index = WEEKS.indexOf(week); return index === -1 ? 999 : index; }
@@ -737,6 +765,10 @@ function isErrorMessage(message) {
     value.includes("could not");
 }
 
+function LeagueLoginGate({ready,session,linkedUser,signIn,signOut,retry,error}) {
+  return <><GlobalStyle/><main className="league-login-shell"><section className="league-login-card"><div className="league-login-mark"><span>CFB</span><strong>ELITE</strong><b>27</b></div><div><span className="league-login-kicker">THE PRIVATE HOME OF THE DYNASTY</span><h1>{!ready?"Opening the stadium…":session&&!linkedUser?"Linking your league identity…":"Your league. Your network. Your legacy."}</h1><p>{!ready?"Checking your secure session.":session&&!linkedUser?"Your Discord login is valid. We are matching it to your active CFB Elite membership.":"Sign in with your league Discord account to enter the secured CFB Elite 27 network."}</p></div>{error&&<div className="league-login-error">{error}</div>}<div className="league-login-actions">{!ready?<span className="league-login-loader">LIVE DATABASE</span>:!session?<button onClick={signIn}>Continue with Discord</button>:<><button onClick={retry}>Retry League Link</button><button className="secondary" onClick={signOut}>Sign Out</button></>}</div><footer><span>SECURE LEAGUE ACCESS</span><span>ELITE BOOKS • GAMECENTER • REDZONE • LEAGUE HUB</span></footer></section></main></>;
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [currentYear, setCurrentYear] = useState("2029");
@@ -796,11 +828,13 @@ export default function App() {
   const [matchupImportText, setMatchupImportText] = useState("");
   const [discordSession, setDiscordSession] = useState(null);
   const [linkedDiscordUser, setLinkedDiscordUser] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
   const [sportsbook, setSportsbook] = useState({
     boards: [], lines: [], picks: [], markets: [], options: [], futurePicks: [],
     badges: [], badgeAwards: [], seasonStandings: [], allTimeStandings: [], champions: [],
   });
   const [sportsbookBusy, setSportsbookBusy] = useState(false);
+  const [soundPreferences,setSoundPreferences]=useState(()=>{try{return JSON.parse(localStorage.getItem("cfb-network-preferences")||"{}");}catch{return {};}});
 
   const teamOptions = useMemo(() => [...teams].sort((a, b) => a.name.localeCompare(b.name)), [teams]);
   const userOptions = useMemo(() => [...users].sort((a, b) => a.discord_username.localeCompare(b.discord_username)), [users]);
@@ -920,7 +954,7 @@ export default function App() {
     await saveCommissionerRankings(next);
   }
 
-  const baseTabs = [["dashboard","Home"],["schedule","GameCenter"],["eliteBooks","Elite Books"],["sportsbookHistory","All-Time Sportsbook"],["myTeam","My Team"],["allTeamsRatings","Teams"],["eloRankings","User ELO"],["powerIndex","All-Time Coach Rankings"],["conferencePower","Conference Power"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["h2h","User vs User H2H"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],["commissionerCenter","Commissioner Center"],["sportsbookManager","Elite Books Manager"],["weeklyMatchups","Schedule Manager"],["userManager","Discord Users"],["assignments","Team Assignments"],["leagueDataCenter","League Data Center"],["resultsManager","Results Manager"],["logoManager","Team Assets"],["draftRoom","CFBElite 27 Draft Room"],...coachProfileUsers.map((user) => [`coach-${user.id}`, user.activeTeamName || user.discord_username])];
+  const baseTabs = [["dashboard","Home"],["leagueHub","League Hub"],["schedule","GameCenter"],["eliteBooks","Elite Books"],["redZone","RedZone"],["sportsbookHistory","All-Time Sportsbook"],["myTeam","My Team"],["allTeamsRatings","Teams"],["eloRankings","User ELO"],["powerIndex","All-Time Coach Rankings"],["conferencePower","Conference Power"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["h2h","User vs User H2H"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],["commissionerCenter","Commissioner Center"],["sportsbookManager","Elite Books Manager"],["weeklyMatchups","Schedule Manager"],["userManager","League Members"],["assignments","Team Assignments"],["leagueDataCenter","League Data Center"],["resultsManager","Results Manager"],["logoManager","Team Assets"],["draftRoom","CFBElite 27 Draft Room"],...coachProfileUsers.map((user) => [`coach-${user.id}`, user.activeTeamName || user.discord_username])];
   const tabs = useMemo(() => {
     const tabMap = new Map(baseTabs);
     const ordered = tabOrder
@@ -960,7 +994,7 @@ export default function App() {
       supabase.from("teams").select("*").order("name"),
       supabase.from("league_settings").select("*").eq("id", 1).single(),
       supabase.from("dashboard_tab_order").select("*").eq("id", 1).single(),
-      supabase.from("discord_users").select("*").order("discord_username"),
+      supabase.from("discord_users").select("id,discord_username,is_active,is_commissioner,discord_avatar_url,sportsbook_seed,sportsbook_notes").order("discord_username"),
       supabase.from("team_assignments").select("*, teams(name), discord_users(discord_username)").order("created_at"),
       supabase.from("team_standings").select("*").order("team_name"),
       supabase.from("commissioner_rankings").select("*").order("rank"),
@@ -1034,7 +1068,6 @@ export default function App() {
     }
     setLoading(false);
   }
-  useEffect(() => { loadData(); loadEliteBooksData(); }, []);
   useEffect(() => {
     if (!supabase.auth?.getSession) return undefined;
     let active = true;
@@ -1042,15 +1075,25 @@ export default function App() {
       if (!active) return;
       const nextSession = data?.session || null;
       setDiscordSession(nextSession);
+      setAuthReady(true);
       if (nextSession) linkDiscordIdentity(nextSession);
     });
     const authListener = supabase.auth.onAuthStateChange?.((_event, nextSession)=>{
       setDiscordSession(nextSession || null);
+      setAuthReady(true);
       if (nextSession) linkDiscordIdentity(nextSession);
       else setLinkedDiscordUser(null);
     });
     return ()=>{ active=false; authListener?.data?.subscription?.unsubscribe?.(); };
   }, []);
+  useEffect(()=>{
+    if(!discordSession?.user) return;
+    loadData(); loadEliteBooksData();
+  },[discordSession?.user?.id]);
+  useEffect(()=>setAdminUnlocked(Boolean(linkedDiscordUser?.is_commissioner)),[linkedDiscordUser?.is_commissioner]);
+  useEffect(()=>{const sync=()=>{try{setSoundPreferences(JSON.parse(localStorage.getItem("cfb-network-preferences")||"{}"));}catch{}};window.addEventListener("cfb-preferences",sync);return()=>window.removeEventListener("cfb-preferences",sync);},[]);
+  useEffect(()=>{if(!discordSession?.user?.id)return;const channel=supabase.channel?.(`app-alerts-${discordSession.user.id}`).on("postgres_changes",{event:"INSERT",schema:"public",table:"app_notifications",filter:`auth_user_id=eq.${discordSession.user.id}`},(payload)=>{if(soundPreferences.sound_enabled!==false)playEliteSound("notification",true);setError(payload?.new?.title||"New league notification");}).subscribe();return()=>{if(channel)supabase.removeChannel?.(channel);};},[discordSession?.user?.id,soundPreferences.sound_enabled]);
+  useEffect(()=>{if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});},[]);
   async function refreshDraftRoomState() {
     const [picksRes, settingsRes] = await Promise.all([
       supabase.from("cfb27_draft_picks").select("*, teams(*), discord_users(discord_username)").order("pick_number"),
@@ -1283,7 +1326,7 @@ export default function App() {
   }
 
   async function loadEliteBooksData() {
-    const names = ["sportsbook_boards","sportsbook_lines","sportsbook_picks","sportsbook_future_markets","sportsbook_future_options","sportsbook_future_picks","sportsbook_badges","sportsbook_badge_awards","elite_books_standings","elite_books_all_time_standings","sportsbook_season_champions"];
+    const names = ["sportsbook_boards","sportsbook_lines","sportsbook_pick_directory","sportsbook_future_markets","sportsbook_future_options","sportsbook_future_pick_directory","sportsbook_badges","sportsbook_badge_awards","elite_books_standings","elite_books_all_time_standings","sportsbook_season_champions"];
     try {
       const responses = await Promise.all(names.map((name)=>supabase.from(name).select("*")));
       setSportsbook({
@@ -1322,7 +1365,7 @@ export default function App() {
 
   async function signOutDiscord() {
     if (supabase.auth?.signOut) await supabase.auth.signOut();
-    setDiscordSession(null); setLinkedDiscordUser(null); await loadEliteBooksData();
+    setDiscordSession(null); setLinkedDiscordUser(null);
   }
 
   async function submitSportsbookPick(lineId, pickType, teamId) {
@@ -1378,6 +1421,18 @@ export default function App() {
     setSportsbookBusy(false);
     if(lockError){setError(`Matchup lock failed: ${lockError.message}`);return false;}
     setError(locked?"Betting locked for that matchup.":"Betting reopened for that matchup.");
+    await loadEliteBooksData(); return true;
+  }
+
+  async function voidSportsbookMatchup(lineId) {
+    const reason=window.prompt("Why is this matchup being voided?","Game was not played");
+    if(!reason?.trim()) return false;
+    if(!window.confirm("Void every wager on this matchup for zero points? This cannot be reopened from the dashboard.")) return false;
+    setSportsbookBusy(true);
+    const { error: voidError }=await supabase.rpc("void_elite_books_matchup",{p_line_id:lineId,p_reason:reason.trim()});
+    setSportsbookBusy(false);
+    if(voidError){setError(`Matchup void failed: ${voidError.message}`);return false;}
+    setError("Matchup voided. All wagers were closed with zero points.");
     await loadEliteBooksData(); return true;
   }
 
@@ -1645,19 +1700,16 @@ export default function App() {
   }
 
   function unlockAdmin() {
-    const expected = import.meta.env.VITE_ADMIN_CODE || "cfbelite";
-    if (adminCodeInput === expected) {
-      setAdminUnlocked(true);
-      setAdminCodeInput("");
-      setError("");
-    } else {
-      setError("Incorrect commissioner code.");
-    }
+    setError("Commissioner access now requires a signed-in Discord account with commissioner status.");
   }
 
-  return <><GlobalStyle/><div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={isErrorMessage(error) ? errorBox : successBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} draggedTab={draggedTab} setDraggedTab={setDraggedTab} reorderTabs={reorderTabs} adminUnlocked={adminUnlocked} adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin} teams={teamOptions} assignments={assignments} currentYear={currentYear} users={userOptions} discordSession={discordSession} linkedDiscordUser={linkedDiscordUser} signInWithDiscord={signInWithDiscord} signOutDiscord={signOutDiscord}/>
+  if(!authReady||!discordSession||!linkedDiscordUser) return <LeagueLoginGate ready={authReady} session={discordSession} linkedUser={linkedDiscordUser} signIn={signInWithDiscord} signOut={signOutDiscord} retry={()=>linkDiscordIdentity(discordSession)} error={error}/>;
+
+  return <><GlobalStyle/><div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={isErrorMessage(error) ? errorBox : successBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} draggedTab={draggedTab} setDraggedTab={setDraggedTab} reorderTabs={reorderTabs} adminUnlocked={adminUnlocked} adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin} teams={teamOptions} assignments={assignments} currentYear={currentYear} users={userOptions} discordSession={discordSession} linkedDiscordUser={linkedDiscordUser} signInWithDiscord={signInWithDiscord} signOutDiscord={signOutDiscord} soundPreferences={soundPreferences}/>
     {activeTab === "draftRoom" && <DraftRoom teams={teamOptions} users={userOptions} picks={draftPicks27} settings={draftSettings27} conferenceAssets={conferenceAssets} startClock={startDraftClock} pauseClock={pauseDraftClock} resumeClock={resumeDraftClock} announcePick={announceDraftPick} revealPick={revealDraftPick} undoPick={undoDraftPick}/>}     
     {activeTab === "dashboard" && <DashboardV2 teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} weeklyMatchups={weeklyMatchups} conferenceAssets={conferenceAssets} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} teamSeasonStats={teamSeasonStats} currentYear={currentYear} currentWeek={currentWeek} advanceAt={advanceAt} rankingSnapshots={rankingSnapshots} adminUnlocked={adminUnlocked} sportsbook={sportsbook} linkedDiscordUser={linkedDiscordUser} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)})); setNewWeeklyMatchup((prev)=>({...prev,season_year:Number(value)}));}} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value})); setNewWeeklyMatchup((prev)=>({...prev,week:value}));}} saveSettings={saveLeagueSettings} goToTeam={goToTeam} setActiveTab={setActiveTab}/>} 
+    {activeTab === "leagueHub" && <LeagueHub discordSession={discordSession} linkedDiscordUser={linkedDiscordUser} users={userOptions} teams={activeTeamOptions} assignments={assignments} currentYear={currentYear} setActiveTab={setActiveTab} setError={setError}/>} 
+    {activeTab === "redZone" && <RedZoneCenter discordSession={discordSession} linkedDiscordUser={linkedDiscordUser} users={userOptions} teams={activeTeamOptions} assignments={assignments} currentYear={currentYear} setError={setError}/>} 
     {activeTab === "eliteBooks" && <EliteBooks sportsbook={sportsbook} teams={activeTeamOptions} users={userOptions} assignments={assignments} results={results} weeklyMatchups={weeklyMatchups} conferenceAssets={conferenceAssets} currentYear={currentYear} currentWeek={currentWeek} advanceAt={advanceAt} discordSession={discordSession} linkedDiscordUser={linkedDiscordUser} busy={sportsbookBusy} signInWithDiscord={signInWithDiscord} signOutDiscord={signOutDiscord} submitPick={submitSportsbookPick} submitFuture={submitFuturePick} setActiveTab={setActiveTab}/>} 
     {activeTab === "sportsbookHistory" && <EliteBooksHistory sportsbook={sportsbook} users={userOptions} currentYear={currentYear} setActiveTab={setActiveTab}/>} 
     {activeTab === "myTeam" && <MyTeamHub linkedDiscordUser={linkedDiscordUser} discordSession={discordSession} teams={activeTeamOptions} users={userOptions} assignments={assignments} results={results} weeklyMatchups={weeklyMatchups} sportsbook={sportsbook} currentYear={currentYear} currentWeek={currentWeek} signInWithDiscord={signInWithDiscord} setActiveTab={setActiveTab}/>} 
@@ -1667,7 +1719,7 @@ export default function App() {
 {activeTab === "rivalries" && <Rivalries users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
     {activeTab === "powerIndex" && <DynastyPowerIndex users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}
     {activeTab === "commissionerCenter" && (adminUnlocked ? <CommissionerCenterV2 currentYear={currentYear} currentWeek={currentWeek} advanceAt={advanceAt} setAdvanceAt={setAdvanceAt} setActiveTab={setActiveTab} saveLeagueSettings={saveLeagueSettings} saveCurrentRankingSnapshot={saveCurrentRankingSnapshot} loadData={loadData} teams={teamOptions} users={userOptions} assignments={assignments} results={results} weeklyMatchups={weeklyMatchups} awards={awards} allAmericans={allAmericans} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>) }    
-    {activeTab === "sportsbookManager" && (adminUnlocked ? <EliteBooksManager sportsbook={sportsbook} users={userOptions} teams={activeTeamOptions} assignments={assignments} currentYear={currentYear} currentWeek={currentWeek} advanceAt={advanceAt} busy={sportsbookBusy} linkedDiscordUser={linkedDiscordUser} generateBoard={generateSportsbookBoard} seedFutures={seedSportsbookFutures} settleFuture={settleFutureMarket} setMatchupLock={setMatchupBettingLock} updateSeed={updateSportsbookSeed} updateTeamSeed={updateSportsbookTeamSeed} loadData={loadEliteBooksData}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>)}
+    {activeTab === "sportsbookManager" && (adminUnlocked ? <EliteBooksManager sportsbook={sportsbook} users={userOptions} teams={activeTeamOptions} assignments={assignments} currentYear={currentYear} currentWeek={currentWeek} advanceAt={advanceAt} busy={sportsbookBusy} linkedDiscordUser={linkedDiscordUser} generateBoard={generateSportsbookBoard} seedFutures={seedSportsbookFutures} settleFuture={settleFutureMarket} setMatchupLock={setMatchupBettingLock} voidMatchup={voidSportsbookMatchup} updateSeed={updateSportsbookSeed} updateTeamSeed={updateSportsbookTeamSeed} loadData={loadEliteBooksData}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>)}
     {activeTab === "logoManager" && <LogoManager teams={teamOptions} updateRow={updateRow} conferenceAssets={conferenceAssets} saveConferenceAsset={saveConferenceAsset}/>}    
     {activeTab === "allTeamsRatings" && <AllTeamsRatings teams={teamOptions}/>}    
     {activeTab === "leagueDataCenter" && <LeagueDataCenter teams={teamOptions} users={userOptions} assignments={assignments} results={results} currentYear={currentYear} currentWeek={currentWeek} setError={setError} loadData={loadData}/>}
@@ -2661,6 +2713,130 @@ function EliteBooksHomePanel({sportsbook={},linkedDiscordUser,currentYear,curren
   </section>;
 }
 
+function networkTeamForUser(userId,teams,assignments,currentYear) {
+  const assignment=assignments.find((row)=>String(row.discord_user_id)===String(userId)&&assignmentActiveForYear(row,currentYear))||assignments.find((row)=>String(row.discord_user_id)===String(userId)&&row.status==="Active");
+  return teams.find((team)=>String(team.id)===String(assignment?.team_id));
+}
+
+function NetworkIdentity({userId,users,teams,assignments,currentYear,compact=false}) {
+  const user=users.find((row)=>String(row.id)===String(userId));
+  const team=networkTeamForUser(userId,teams,assignments,currentYear);
+  return <span className={`network-identity ${compact?"compact":""}`}><TeamLogoMark team={team} size={compact?28:38}/><span><strong>{user?.discord_username||"League Member"}</strong>{!compact&&<small>{team?.name||"CFB Elite"}</small>}</span></span>;
+}
+
+function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignments=[],currentYear,setActiveTab,setError}) {
+  const [mode,setMode]=useState("channels");
+  const [channels,setChannels]=useState([]);
+  const [selectedChannel,setSelectedChannel]=useState(null);
+  const [messages,setMessages]=useState([]);
+  const [reactions,setReactions]=useState([]);
+  const [conversations,setConversations]=useState([]);
+  const [conversationMembers,setConversationMembers]=useState([]);
+  const [selectedConversation,setSelectedConversation]=useState(null);
+  const [directMessages,setDirectMessages]=useState([]);
+  const [notifications,setNotifications]=useState([]);
+  const [preferences,setPreferences]=useState(null);
+  const [draft,setDraft]=useState("");
+  const [busy,setBusy]=useState(false);
+  const [memberSearch,setMemberSearch]=useState("");
+  const lastNotificationRef=useRef(null);
+
+  async function loadNetworkShell() {
+    if(!discordSession?.user) return;
+    await supabase.rpc("ensure_league_network_profile");
+    const [channelRes,conversationRes,memberRes,notificationRes,prefRes]=await Promise.all([
+      supabase.from("league_channels").select("*").eq("is_archived",false).order("sort_order"),
+      supabase.from("direct_conversations").select("*").order("last_message_at",{ascending:false}),
+      supabase.from("direct_conversation_members").select("*"),
+      supabase.from("app_notifications").select("*").order("created_at",{ascending:false}).limit(80),
+      supabase.from("notification_preferences").select("*").eq("auth_user_id",discordSession.user.id).maybeSingle(),
+    ]);
+    const nextChannels=channelRes.data||[];
+    setChannels(nextChannels); setSelectedChannel((current)=>current||nextChannels[0]?.id||null);
+    setConversations(conversationRes.data||[]); setConversationMembers(memberRes.data||[]);
+    const nextNotifications=notificationRes.data||[];
+    if(lastNotificationRef.current&&nextNotifications[0]?.id&&nextNotifications[0].id!==lastNotificationRef.current&&prefRes.data?.sound_enabled!==false) playEliteSound("notification",true);
+    lastNotificationRef.current=nextNotifications[0]?.id||lastNotificationRef.current;
+    const nextPreferences=prefRes.data||null;setNotifications(nextNotifications); setPreferences(nextPreferences);
+    if(nextPreferences){localStorage.setItem("cfb-network-preferences",JSON.stringify(nextPreferences));window.dispatchEvent(new Event("cfb-preferences"));}
+  }
+  async function loadChannelMessages() {
+    if(!selectedChannel) return;
+    const [messageRes,reactionRes]=await Promise.all([supabase.from("league_channel_messages").select("*").eq("channel_id",selectedChannel).is("deleted_at",null).order("created_at",{ascending:true}).limit(250),supabase.from("league_message_reactions").select("*")]);
+    if(messageRes.error)setError?.(messageRes.error.message); else setMessages(messageRes.data||[]);setReactions(reactionRes.data||[]);
+  }
+  async function loadDirectMessages() {
+    if(!selectedConversation) return;
+    const {data,error}=await supabase.from("direct_messages").select("*").eq("conversation_id",selectedConversation).is("deleted_at",null).order("created_at",{ascending:true}).limit(250);
+    if(error)setError?.(error.message); else {setDirectMessages(data||[]);await supabase.rpc("mark_direct_conversation_read",{p_conversation_id:selectedConversation});}
+  }
+  useEffect(()=>{loadNetworkShell();const timer=window.setInterval(loadNetworkShell,NETWORK_REFRESH_MS);const channel=supabase.channel?.("league-network-ui").on("postgres_changes",{event:"INSERT",schema:"public",table:"league_channel_messages"},()=>loadChannelMessages()).on("postgres_changes",{event:"INSERT",schema:"public",table:"direct_messages"},()=>loadDirectMessages()).on("postgres_changes",{event:"INSERT",schema:"public",table:"app_notifications"},()=>loadNetworkShell()).subscribe();return()=>{window.clearInterval(timer);if(channel)supabase.removeChannel?.(channel);};},[discordSession?.user?.id,selectedChannel,selectedConversation]);
+  useEffect(()=>{loadChannelMessages();},[selectedChannel]);
+  useEffect(()=>{loadDirectMessages();},[selectedConversation]);
+
+  async function sendMessage() {
+    if(!draft.trim()||busy)return; setBusy(true);
+    const rpc=mode==="direct"?supabase.rpc("send_direct_message",{p_conversation_id:selectedConversation,p_body:draft.trim()}):supabase.rpc("send_league_channel_message",{p_channel_id:selectedChannel,p_body:draft.trim()});
+    const {error}=await rpc; setBusy(false);
+    if(error){setError?.(`Message not sent: ${error.message}`);return;}
+    setDraft(""); if(mode==="direct")await loadDirectMessages();else await loadChannelMessages();
+  }
+  async function startConversation(userId) {
+    setBusy(true);const {data,error}=await supabase.rpc("start_direct_conversation",{p_other_discord_user_id:String(userId)});setBusy(false);
+    if(error){setError?.(`Conversation could not start: ${error.message}`);return;}
+    await loadNetworkShell();setSelectedConversation(data);setMode("direct");setMemberSearch("");
+  }
+  async function savePreference(field,value) {
+    const next={...(preferences||{}),auth_user_id:discordSession.user.id,discord_user_id:String(linkedDiscordUser.id),[field]:value,updated_at:new Date().toISOString()};
+    setPreferences(next);localStorage.setItem("cfb-network-preferences",JSON.stringify(next));window.dispatchEvent(new Event("cfb-preferences"));const {error}=await supabase.from("notification_preferences").upsert(next,{onConflict:"auth_user_id"});if(error)setError?.(`Preference not saved: ${error.message}`);
+  }
+  async function enablePush() {
+    try{
+      if(!("serviceWorker" in navigator)||!("PushManager" in window))throw new Error("Push notifications are not supported in this browser.");
+      const permission=await Notification.requestPermission();if(permission!=="granted")throw new Error("Notification permission was not granted.");
+      const vapid=import.meta.env.VITE_VAPID_PUBLIC_KEY;if(!vapid)throw new Error("Push delivery will activate after the commissioner installs the VAPID public key.");
+      const registration=await navigator.serviceWorker.register("/sw.js");
+      const bytes=Uint8Array.from(atob(vapid.replace(/-/g,"+").replace(/_/g,"/")),(char)=>char.charCodeAt(0));
+      const subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:bytes});const json=subscription.toJSON();
+      const {error}=await supabase.from("push_subscriptions").upsert({auth_user_id:discordSession.user.id,endpoint:json.endpoint,p256dh:json.keys.p256dh,auth_secret:json.keys.auth,user_agent:navigator.userAgent,last_used_at:new Date().toISOString()},{onConflict:"endpoint"});
+      if(error)throw error;await savePreference("push_enabled",true);setError?.("Push notifications enabled on this device.");
+    }catch(error){setError?.(error.message);}
+  }
+  async function markNotificationsRead() {await supabase.rpc("mark_app_notification_read",{});await loadNetworkShell();}
+  const selectedChannelRow=channels.find((row)=>String(row.id)===String(selectedChannel));
+  const unread=notifications.filter((row)=>!row.read_at).length;
+  const conversationOther=(conversationId)=>{const member=conversationMembers.find((row)=>String(row.conversation_id)===String(conversationId)&&String(row.discord_user_id)!==String(linkedDiscordUser.id));return users.find((row)=>String(row.id)===String(member?.discord_user_id));};
+  const filteredMembers=users.filter((user)=>user.is_active!==false&&String(user.id)!==String(linkedDiscordUser.id)&&String(user.discord_username).toLowerCase().includes(memberSearch.toLowerCase())).slice(0,12);
+  const displayedMessages=mode==="direct"?directMessages:messages;
+  return <main className="cfb-v2-page network-page"><section className="network-hero"><div><span>CFB ELITE NETWORK</span><h1>League Hub</h1><p>Every announcement, conversation and rivalry—inside the dynasty.</p></div><div className="network-live-presence"><i/><strong>{users.filter((row)=>row.is_active!==false).length}</strong><span>League Members</span></div></section><div className="network-layout"><aside className="network-sidebar"><nav><button className={mode==="channels"?"active":""} onClick={()=>setMode("channels")}>Channels</button><button className={mode==="direct"?"active":""} onClick={()=>setMode("direct")}>Messages</button><button className={mode==="notifications"?"active":""} onClick={()=>setMode("notifications")}>Alerts {unread>0&&<b>{unread}</b>}</button><button className={mode==="settings"?"active":""} onClick={()=>setMode("settings")}>Settings</button></nav>{mode==="channels"&&<div className="network-channel-list">{channels.map((channel)=><button key={channel.id} className={String(selectedChannel)===String(channel.id)?"active":""} onClick={()=>setSelectedChannel(channel.id)}><b>{channel.icon}</b><span><strong>{channel.name}</strong><small>{channel.description}</small></span></button>)}</div>}{mode==="direct"&&<><label className="network-member-search"><span>NEW MESSAGE</span><input value={memberSearch} onChange={(event)=>setMemberSearch(event.target.value)} placeholder="Find a league member"/></label>{memberSearch&&<div className="network-member-results">{filteredMembers.map((user)=><button key={user.id} onClick={()=>startConversation(user.id)}><NetworkIdentity userId={user.id} users={users} teams={teams} assignments={assignments} currentYear={currentYear} compact/></button>)}</div>}<div className="network-conversation-list">{conversations.map((conversation)=>{const other=conversationOther(conversation.id);return <button key={conversation.id} className={String(selectedConversation)===String(conversation.id)?"active":""} onClick={()=>setSelectedConversation(conversation.id)}><NetworkIdentity userId={other?.id} users={users} teams={teams} assignments={assignments} currentYear={currentYear} compact/><small>{new Date(conversation.last_message_at).toLocaleDateString()}</small></button>})}</div></>}</aside><section className="network-stage">{mode==="notifications"?<div className="network-notifications"><header><div><span>INBOX</span><h2>Notifications</h2></div><button onClick={markNotificationsRead}>Mark all read</button></header>{notifications.map((notification)=><button key={notification.id} className={notification.read_at?"":"unread"} onClick={()=>{if(notification.target_tab)setActiveTab?.(notification.target_tab);}}><i/><span><strong>{notification.title}</strong><p>{notification.body}</p><small>{new Date(notification.created_at).toLocaleString()}</small></span></button>)}</div>:mode==="settings"?<NotificationSettings preferences={preferences} savePreference={savePreference} enablePush={enablePush}/>:<><header className="network-stage-header"><div><span>{mode==="direct"?"PRIVATE CONVERSATION":selectedChannelRow?.channel_type?.toUpperCase()}</span><h2>{mode==="direct"?(conversationOther(selectedConversation)?.discord_username||"Select a conversation"):(selectedChannelRow?.name||"League Channel")}</h2><p>{mode==="direct"?"Only members of this conversation can read these messages.":selectedChannelRow?.description}</p></div>{mode==="channels"&&selectedChannelRow?.slug==="streams"&&<button onClick={()=>setActiveTab?.("redZone")}>Open RedZone</button>}</header><div className="network-message-feed">{displayedMessages.map((message)=><article key={message.id} className={String(message.author_discord_user_id)===String(linkedDiscordUser.id)?"mine":""}><NetworkIdentity userId={message.author_discord_user_id} users={users} teams={teams} assignments={assignments} currentYear={currentYear}/><p>{message.body}</p><time>{new Date(message.created_at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}</time></article>)}{!displayedMessages.length&&<div className="network-empty"><b>Start the conversation.</b><span>This space is ready for the league.</span></div>}</div><div className="network-composer"><textarea value={draft} onChange={(event)=>setDraft(event.target.value)} onKeyDown={(event)=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();sendMessage();}}} placeholder={mode==="direct"?"Message privately…":`Message #${selectedChannelRow?.slug||"channel"}…`} disabled={mode==="direct"&&!selectedConversation}/><button disabled={busy||!draft.trim()||(mode==="direct"&&!selectedConversation)} onClick={sendMessage}>{busy?"Sending…":"Send"}</button><small>Enter to send • Shift + Enter for a new line</small></div></>}</section></div></main>;
+}
+
+function NotificationSettings({preferences,savePreference,enablePush}) {
+  const options=[["announcements","Commissioner announcements","Official league updates and deadlines"],["direct_messages","Direct messages","Private messages from league members"],["mentions","Mentions and replies","When someone specifically tags you"],["streams_live","Streams going live","RedZone alerts for active league streams"],["game_results","Final scores","GameCenter results and sportsbook grading"],["advancement","Week advancement","New week and advancement deadline alerts"],["elite_books","Elite Books","New lines, locks and settled tickets"]];
+  return <div className="network-settings"><header><span>CONTROL ROOM</span><h2>Notification & Sound Settings</h2><p>You decide what gets your attention and how the app feels.</p></header><section><div><strong>Push Notifications</strong><small>Receive alerts when the installed app is closed.</small></div><button onClick={enablePush}>{preferences?.push_enabled?"Enabled on a device":"Enable Push"}</button></section><section><div><strong>Elite Pulse</strong><small>The original three-note CFB Elite notification signature.</small></div><span className="network-setting-actions"><button onClick={()=>playEliteSound("notification",true)}>Preview</button><input type="checkbox" checked={preferences?.sound_enabled!==false} onChange={(event)=>savePreference("sound_enabled",event.target.checked)}/></span></section><section><div><strong>Menu Sounds</strong><small>Subtle navigation feedback.</small></div><span className="network-setting-actions"><button onClick={()=>playEliteSound("menu",true)}>Preview</button><input type="checkbox" checked={Boolean(preferences?.menu_sounds)} onChange={(event)=>savePreference("menu_sounds",event.target.checked)}/></span></section><section><div><strong>Team Page Sounds</strong><small>A short broadcast swell when entering a team profile.</small></div><span className="network-setting-actions"><button onClick={()=>playEliteSound("team",true)}>Preview</button><input type="checkbox" checked={Boolean(preferences?.team_sounds)} onChange={(event)=>savePreference("team_sounds",event.target.checked)}/></span></section><div className="network-setting-grid">{options.map(([key,title,description])=><label key={key}><span><strong>{title}</strong><small>{description}</small></span><input type="checkbox" checked={preferences?.[key]!==false} onChange={(event)=>savePreference(key,event.target.checked)}/></label>)}</div></div>;
+}
+
+function streamPlayerUrl(profile,status) {
+  if(profile.embed_url)return profile.embed_url;
+  if(profile.platform==="twitch")return `https://player.twitch.tv/?channel=${encodeURIComponent(profile.channel_key)}&parent=${encodeURIComponent(window.location.hostname)}&autoplay=false&muted=true`;
+  if(profile.platform==="youtube"&&status?.live_video_id)return `https://www.youtube.com/embed/${encodeURIComponent(status.live_video_id)}?autoplay=0&playsinline=1`;
+  if(profile.platform==="kick")return `https://player.kick.com/${encodeURIComponent(profile.channel_key)}`;
+  return "";
+}
+
+function RedZoneCenter({discordSession,linkedDiscordUser,users=[],teams=[],assignments=[],currentYear,setError}) {
+  const [profiles,setProfiles]=useState([]);const [statuses,setStatuses]=useState([]);const [selected,setSelected]=useState([]);const [editing,setEditing]=useState(false);const [form,setForm]=useState({platform:"twitch",channel_key:"",channel_url:"",display_name:""});const [busy,setBusy]=useState(false);
+  async function loadStreams(){const [profileRes,statusRes]=await Promise.all([supabase.from("stream_profiles").select("*").eq("enabled",true).order("updated_at",{ascending:false}),supabase.from("live_stream_status").select("*")]);if(profileRes.error)setError?.(profileRes.error.message);else setProfiles(profileRes.data||[]);setStatuses(statusRes.data||[]);}
+  useEffect(()=>{loadStreams();const timer=window.setInterval(loadStreams,30000);const channel=supabase.channel?.("redzone-live-status").on("postgres_changes",{event:"*",schema:"public",table:"live_stream_status"},loadStreams).subscribe();return()=>{window.clearInterval(timer);if(channel)supabase.removeChannel?.(channel);};},[]);
+  const statusFor=(id)=>statuses.find((row)=>String(row.profile_id)===String(id));
+  const ordered=[...profiles].sort((a,b)=>Number(Boolean(statusFor(b.id)?.is_live))-Number(Boolean(statusFor(a.id)?.is_live))||String(a.display_name).localeCompare(String(b.display_name)));
+  function toggleWatch(profile){const exists=selected.includes(profile.id);if(exists){setSelected(selected.filter((id)=>id!==profile.id));return;}if(selected.length>=4){setError?.("RedZone multiview supports up to four streams at once.");return;}setSelected([...selected,profile.id]);}
+  async function saveProfile(){if(!form.channel_key.trim()||!form.channel_url.trim()){setError?.("Enter the platform channel ID/slug and public channel URL.");return;}setBusy(true);const payload={discord_user_id:String(linkedDiscordUser.id),platform:form.platform,channel_key:form.channel_key.trim(),channel_url:form.channel_url.trim(),display_name:form.display_name.trim()||linkedDiscordUser.discord_username,enabled:true,updated_at:new Date().toISOString()};const{error}=await supabase.from("stream_profiles").upsert(payload,{onConflict:"discord_user_id,platform"});setBusy(false);if(error)setError?.(`Stream profile not saved: ${error.message}`);else{setEditing(false);setForm({...form,channel_key:"",channel_url:"",display_name:""});await loadStreams();}}
+  const selectedProfiles=selected.map((id)=>profiles.find((row)=>String(row.id)===String(id))).filter(Boolean);
+  const liveCount=ordered.filter((profile)=>statusFor(profile.id)?.is_live).length;
+  return <main className="cfb-v2-page redzone-page"><section className="redzone-hero"><div><span>CFB ELITE LIVE</span><h1>RedZone</h1><p>Every league stream. One control room. Up to four games at once.</p></div><div><i/><strong>{liveCount}</strong><span>LIVE NOW</span></div></section>{selectedProfiles.length>0&&<section className={`redzone-multiview streams-${selectedProfiles.length}`}>{selectedProfiles.map((profile)=>{const status=statusFor(profile.id);const url=streamPlayerUrl(profile,status);return <article key={profile.id}><header><NetworkIdentity userId={profile.discord_user_id} users={users} teams={teams} assignments={assignments} currentYear={currentYear} compact/><button onClick={()=>toggleWatch(profile)}>×</button></header>{url?<iframe src={url} title={`${profile.display_name} stream`} allow="autoplay; fullscreen; picture-in-picture" allowFullScreen/>:<div className="redzone-player-fallback"><b>Live player is waiting for this platform’s video ID.</b><a href={profile.channel_url} target="_blank" rel="noreferrer">Open Stream</a></div>}</article>})}</section>}<section className="redzone-directory"><header><div><span>LIVE DIRECTORY</span><h2>{liveCount?"The league is on the air":"Stream control room"}</h2></div><button onClick={()=>setEditing(!editing)}>{editing?"Close":"Manage My Streams"}</button></header>{editing&&<div className="redzone-profile-form"><select value={form.platform} onChange={(event)=>setForm({...form,platform:event.target.value})}><option value="twitch">Twitch</option><option value="youtube">YouTube</option><option value="kick">Kick</option></select><input value={form.channel_key} onChange={(event)=>setForm({...form,channel_key:event.target.value})} placeholder={form.platform==="youtube"?"YouTube channel ID":"Channel name / slug"}/><input value={form.channel_url} onChange={(event)=>setForm({...form,channel_url:event.target.value})} placeholder="Public channel URL"/><input value={form.display_name} onChange={(event)=>setForm({...form,display_name:event.target.value})} placeholder="Display name (optional)"/><button disabled={busy} onClick={saveProfile}>{busy?"Saving…":"Save Stream"}</button><small>Automatic live detection activates after the platform credentials are installed securely on the server.</small></div>}<div className="redzone-stream-grid">{ordered.map((profile)=>{const status=statusFor(profile.id);const user=users.find((row)=>String(row.id)===String(profile.discord_user_id));const team=networkTeamForUser(profile.discord_user_id,teams,assignments,currentYear);return <article key={profile.id} className={status?.is_live?"live":"offline"} style={{"--stream-team":getTeamPrimary(team)}}><div className="redzone-thumb">{status?.thumbnail_url?<img src={status.thumbnail_url} alt=""/>:<TeamLogoMark team={team} size={92}/>}<b>{status?.is_live?"LIVE":"OFFLINE"}</b><span>{profile.platform.toUpperCase()}</span></div><div><NetworkIdentity userId={user?.id} users={users} teams={teams} assignments={assignments} currentYear={currentYear}/><h3>{status?.stream_title||`${profile.display_name||user?.discord_username} stream`}</h3><p>{status?.is_live?`${status.viewer_count||0} watching${status.category_name?` • ${status.category_name}`:""}`:"We’ll light this tile up automatically when they go live."}</p></div><footer><button disabled={!status?.is_live} className={selected.includes(profile.id)?"selected":""} onClick={()=>toggleWatch(profile)}>{selected.includes(profile.id)?"Remove from Multiview":selected.length?"Add to Multiview":"Watch in RedZone"}</button><a href={profile.channel_url} target="_blank" rel="noreferrer">Open Platform</a></footer></article>})}{!ordered.length&&<div className="redzone-empty"><b>No streams linked yet.</b><span>Each member can add Twitch, YouTube or Kick from Manage My Streams.</span></div>}</div></section></main>;
+}
+
 function EliteBooks({sportsbook={},teams=[],users=[],assignments=[],results=[],weeklyMatchups=[],conferenceAssets=[],currentYear,currentWeek,advanceAt,discordSession,linkedDiscordUser,busy,signInWithDiscord,signOutDiscord,submitPick,submitFuture,setActiveTab}) {
   const [ticketDrafts,setTicketDrafts]=useState({});
   const board=currentSportsbookBoard(sportsbook,currentYear,currentWeek);
@@ -2730,11 +2906,11 @@ function EliteBooks({sportsbook={},teams=[],users=[],assignments=[],results=[],w
           const totalOddsUnder=Number(line.under_moneyline||-110);
           const sideLabel=savedSide?`${getTeamAbbreviation(teamFor(savedSide.selected_team_id))} ${savedSide.pick_type}`.toUpperCase():"NOT SELECTED";
           const totalLabel=savedTotal?`${String(savedTotal.selected_total_side||"").toUpperCase()} ${Number(savedTotal.locked_total||total).toFixed(1)}`:"NOT SELECTED";
-          return <article className={`elite-line-card ${line.is_betting_locked?"betting-closed":""}`} key={line.id} style={{"--team-one":getTeamPrimary(t1),"--team-two":getTeamPrimary(t2)}}>
-            <header><span>{currentWeek}</span>{line.settled_at?<b>FINAL</b>:line.is_betting_locked?<b>BETTING CLOSED</b>:<b>PICKS OPEN</b>}</header>
+          return <article className={`elite-line-card ${line.is_betting_locked?"betting-closed":""} ${line.voided_at?"matchup-voided":""}`} key={line.id} style={{"--team-one":getTeamPrimary(t1),"--team-two":getTeamPrimary(t2)}}>
+            <header><span>{currentWeek}</span>{line.voided_at?<b>VOID</b>:line.settled_at?<b>FINAL</b>:line.is_betting_locked?<b>BETTING CLOSED</b>:<b>PICKS OPEN</b>}</header>
             <div className="elite-line-matchup"><div><TeamLogoMark team={t1} size={70}/><b>#{line.team_1_rank||rankMap.get(String(t1?.id))||"—"}</b><strong>{t1?.name}</strong></div><span>VS</span><div><TeamLogoMark team={t2} size={70}/><b>#{line.team_2_rank||rankMap.get(String(t2?.id))||"—"}</b><strong>{t2?.name}</strong></div></div>
-            {line.settled_at&&<div className="elite-final-score"><b>{line.team_1_score}</b><span>FINAL</span><b>{line.team_2_score}</b></div>}
-            {line.is_betting_locked&&<div className="elite-betting-closed"><b>BETTING LOCKED</b><span>{line.betting_lock_reason||"Game started"}</span></div>}
+            {line.settled_at&&!line.voided_at&&<div className="elite-final-score"><b>{line.team_1_score}</b><span>FINAL</span><b>{line.team_2_score}</b></div>}
+            {line.voided_at?<div className="elite-betting-closed elite-betting-voided"><b>MATCHUP VOIDED</b><span>{line.void_reason||"Game was not played"}</span></div>:line.is_betting_locked&&<div className="elite-betting-closed"><b>BETTING LOCKED</b><span>{line.betting_lock_reason||"Game started"}</span></div>}
             <div className="elite-market"><label>MONEYLINE</label>{pickButton(line,"moneyline",t1?.id,getTeamAbbreviation(t1),formatAmericanOdds(line.team_1_moneyline),moneylinePointPreview(line.team_1_moneyline))}{pickButton(line,"moneyline",t2?.id,getTeamAbbreviation(t2),formatAmericanOdds(line.team_2_moneyline),moneylinePointPreview(line.team_2_moneyline))}</div>
             <div className="elite-market"><label>SPREAD</label>{pickButton(line,"spread",t1?.id,getTeamAbbreviation(t1),formatSpread(line.team_1_spread),spreadPointPreview(line.team_1_spread))}{pickButton(line,"spread",t2?.id,getTeamAbbreviation(t2),formatSpread(line.team_2_spread),spreadPointPreview(line.team_2_spread))}</div>
             {newTicketRules&&<div className="elite-market elite-total-market"><label>TOTAL {total.toFixed(1)}</label>{pickButton(line,"total","over","OVER",`O ${total.toFixed(1)}`,moneylinePointPreview(totalOddsOver),formatAmericanOdds(totalOddsOver))}{pickButton(line,"total","under","UNDER",`U ${total.toFixed(1)}`,moneylinePointPreview(totalOddsUnder),formatAmericanOdds(totalOddsUnder))}</div>}
@@ -2782,7 +2958,7 @@ function MyTeamHub({linkedDiscordUser,discordSession,teams=[],users=[],assignmen
   return <main className="cfb-v2-page"><section className="elite-myteam-hero" style={{"--my-primary":getTeamPrimary(team),"--my-secondary":getTeamSecondary(team)}}><TeamLogoMark team={team} size={120}/><div><span>{currentYear} PERSONAL HQ</span><h1>{team?.name||"Team assignment pending"}</h1><p>{linkedDiscordUser.discord_username}</p></div><button onClick={()=>setActiveTab?.(`coach-${linkedDiscordUser.id}`)}>Full Coach Profile →</button></section><section className="elite-myteam-grid"><article><span>NEXT UP • {currentWeek}</span>{next?<><div><TeamLogoMark team={opponent} size={74}/><strong>{opponent?.name}</strong></div><small>{next.scheduled_at?new Date(next.scheduled_at).toLocaleString():"Time TBD"}</small></>:<p>No current-week matchup listed.</p>}<button onClick={()=>setActiveTab?.("schedule")}>Open GameCenter</button></article><article><span>ELITE BOOKS</span><strong className="elite-myteam-points">{season?.total_points||0} PTS</strong><small>{season?.correct_picks||0} correct picks</small><button onClick={()=>setActiveTab?.("eliteBooks")}>Build My Card</button></article><article><span>MY FUTURES</span>{futurePicks.length?<b>{futurePicks.length} selection{futurePicks.length===1?"":"s"} locked</b>:<b>No futures selected</b>}<small>All current-year futures are also shown on your coach profile.</small><button onClick={()=>setActiveTab?.("eliteBooks")}>View Futures</button></article></section><EliteBadgeRail sportsbook={sportsbook} discordUserId={linkedDiscordUser.id} currentYear={currentYear}/></main>;
 }
 
-function EliteBooksManager({sportsbook={},users=[],teams=[],assignments=[],currentYear,currentWeek,advanceAt,busy,linkedDiscordUser,generateBoard,seedFutures,settleFuture,setMatchupLock,updateSeed,updateTeamSeed,loadData}) {
+function EliteBooksManager({sportsbook={},users=[],teams=[],assignments=[],currentYear,currentWeek,advanceAt,busy,linkedDiscordUser,generateBoard,seedFutures,settleFuture,setMatchupLock,voidMatchup,updateSeed,updateTeamSeed,loadData}) {
   const [settlements,setSettlements]=useState({});
   const board=currentSportsbookBoard(sportsbook,currentYear,currentWeek);
   const currentLines=(sportsbook.lines||[]).filter((line)=>String(line.board_id)===String(board?.id));
@@ -2793,10 +2969,16 @@ function EliteBooksManager({sportsbook={},users=[],teams=[],assignments=[],curre
     <div style={v2PageHero}><div><span style={v2Eyebrow}>COMMISSIONER OPERATIONS</span><h1 style={v2PageTitle}>Elite Books Manager</h1><p style={v2PageSub}>Generate the current board, manually close betting as games begin, open futures and settle season awards.</p></div><button style={v2GhostButton} onClick={loadData}>Refresh</button></div>
     {!linkedDiscordUser?.is_commissioner&&<div style={v2Notice}>For protected sportsbook writes, sign in with Discord and mark that linked user as <b>is_commissioner = true</b> in Supabase. The commissioner code remains an emergency UI lock.</div>}
     <section className="elite-manager-grid"><article><span>CURRENT BOARD</span><h2>{currentYear} • {currentWeek}</h2><p>{board?`${board.status.toUpperCase()} • ${currentLines.length} generated lines`:"No board generated yet"}</p><small>Lock deadline: {board?.locks_at||advanceAt?new Date(board?.locks_at||advanceAt).toLocaleString():"Not set"}</small><button disabled={busy} onClick={generateBoard}>{busy?"Working…":"Generate / Refresh Lines"}</button></article><article><span>SEASON FUTURES</span><h2>Four market system</h2><p>National Champion, conference champions, Heath Hurley COTY and—beginning in Season 2—Most Improved Team.</p><button disabled={busy} onClick={seedFutures}>{busy?"Working…":"Create / Refresh Futures"}</button></article></section>
-    <section style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>LIVE BETTING CONTROL</span><h2>Matchup Locks</h2></div><small style={mutedText}>Select Lock Betting as soon as a game starts. Existing picks remain recorded, but no new or changed picks are accepted.</small></div><div className="elite-matchup-locks">{currentLines.length?currentLines.map((line)=>{const t1=teamFor(line.team_1_id);const t2=teamFor(line.team_2_id);return <div key={line.id} className={line.is_betting_locked?"locked":""}><span><TeamLogoMark team={t1} size={34}/><strong>{getTeamAbbreviation(t1)}</strong></span><b>VS</b><span><TeamLogoMark team={t2} size={34}/><strong>{getTeamAbbreviation(t2)}</strong></span><em>{line.is_betting_locked?`LOCKED${line.betting_locked_at?` • ${new Date(line.betting_locked_at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}`:""}`:"BETTING OPEN"}</em><button disabled={busy||Boolean(line.settled_at)} onClick={()=>setMatchupLock(line.id,!line.is_betting_locked)}>{line.is_betting_locked?"Reopen Betting":"Lock Betting"}</button></div>}):<div style={v2Empty}>Generate the current board to manage matchup locks.</div>}</div></section>
+    <section style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>LIVE BETTING CONTROL</span><h2>Matchup Locks</h2></div><small style={mutedText}>Lock betting when a game starts. If a game is never played, Void Matchup closes every wager for zero points.</small></div><div className="elite-matchup-locks">{currentLines.length?currentLines.map((line)=>{const t1=teamFor(line.team_1_id);const t2=teamFor(line.team_2_id);return <div key={line.id} className={`${line.is_betting_locked?"locked":""} ${line.voided_at?"voided":""}`}><span><TeamLogoMark team={t1} size={34}/><strong>{getTeamAbbreviation(t1)}</strong></span><b>VS</b><span><TeamLogoMark team={t2} size={34}/><strong>{getTeamAbbreviation(t2)}</strong></span><em>{line.voided_at?"VOIDED":line.is_betting_locked?`LOCKED${line.betting_locked_at?` • ${new Date(line.betting_locked_at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}`:""}`:"BETTING OPEN"}</em><div className="elite-matchup-actions"><button disabled={busy||Boolean(line.settled_at)} onClick={()=>setMatchupLock(line.id,!line.is_betting_locked)}>{line.is_betting_locked?"Reopen Betting":"Lock Betting"}</button><button className="void-matchup" disabled={busy||Boolean(line.settled_at)} onClick={()=>voidMatchup(line.id)}>Void Matchup</button></div></div>}):<div style={v2Empty}>Generate the current board to manage matchup locks.</div>}</div></section>
     <section style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>PRESEASON MODEL</span><h2>Coach & Team Foundation</h2></div><small style={mutedText}>Your imported user skill and team overall ratings drive the opening lines. Their influence automatically declines as actual results accumulate.</small></div><div className="elite-seed-grid">{users.filter((user)=>user.is_active!==false).map((user)=>{const team=teamForUser(user.id);return <article key={user.id}><div><TeamLogoMark team={team} size={40}/><span><strong>{user.discord_username}</strong><small>{team?.name||"No active team"}</small></span></div><label><span>User Skill</span><input type="number" min="1" max="99" defaultValue={user.sportsbook_seed||50} onBlur={(event)=>updateSeed(user.id,event.target.value)}/></label><label><span>Team OVR</span><input type="number" min="1" max="99" disabled={!team} defaultValue={team?.sportsbook_team_seed||70} onBlur={(event)=>team&&updateTeamSeed(team.id,event.target.value)}/></label>{user.sportsbook_notes&&<p>{user.sportsbook_notes}</p>}</article>})}</div></section>
     <section style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>FUTURES SETTLEMENT</span><h2>Declare Winners</h2></div></div><div className="elite-manager-markets">{markets.map((market)=>{const options=(sportsbook.options||[]).filter((row)=>String(row.market_id)===String(market.id));return <div key={market.id}><span><strong>{market.title}</strong><small>{market.status}</small></span><select value={settlements[market.id]||""} onChange={(event)=>setSettlements({...settlements,[market.id]:event.target.value})}><option value="">Select winner…</option>{options.map((option)=><option key={option.id} value={option.id}>{option.selection_label}</option>)}</select><button disabled={!settlements[market.id]||market.status==="settled"} onClick={()=>settleFuture(market.id,settlements[market.id])}>Settle</button></div>})}{!markets.length&&<div style={v2Empty}>Create the season futures first.</div>}</div></section>
   </main>;
+}
+
+function NetworkHomePanel({linkedDiscordUser,setActiveTab}) {
+  const [pulse,setPulse]=useState({live:0,unread:0,announcement:null});
+  useEffect(()=>{let active=true;async function load(){const [statusRes,notificationRes,channelRes]=await Promise.all([supabase.from("live_stream_status").select("profile_id").eq("is_live",true),supabase.from("app_notifications").select("id").is("read_at",null),supabase.from("league_channels").select("id").eq("slug","announcements").maybeSingle()]);let announcement=null;if(channelRes.data?.id){const messageRes=await supabase.from("league_channel_messages").select("body,created_at").eq("channel_id",channelRes.data.id).is("deleted_at",null).order("created_at",{ascending:false}).limit(1);announcement=messageRes.data?.[0]||null;}if(active)setPulse({live:statusRes.data?.length||0,unread:notificationRes.data?.length||0,announcement});}load();const timer=window.setInterval(load,NETWORK_REFRESH_MS);return()=>{active=false;window.clearInterval(timer);};},[linkedDiscordUser?.id]);
+  return <section className="network-home-panel"><button onClick={()=>setActiveTab?.("leagueHub")}><span>LEAGUE HUB</span><h2>{pulse.announcement?.body||"The league conversation lives here."}</h2><small>{pulse.announcement?`Latest announcement • ${new Date(pulse.announcement.created_at).toLocaleDateString()}`:"Channels, private messages, announcements and alerts"}</small><b>Enter the Hub →</b></button><button onClick={()=>setActiveTab?.("leagueHub")}><span>MY INBOX</span><strong>{pulse.unread}</strong><small>Unread notification{pulse.unread===1?"":"s"}</small></button><button className={pulse.live?"live":""} onClick={()=>setActiveTab?.("redZone")}><span>REDZONE</span><strong>{pulse.live}</strong><small>{pulse.live?"League streams live now":"Streams currently live"}</small><b>{pulse.live?"Watch Now →":"Open Control Room →"}</b></button></section>;
 }
 
 function DashboardV2({ teams = [], users = [], assignments = [], results = [], allResults = [], weeklyMatchups = [], conferenceAssets = [], allAmericans = [], awards = [], heismans = [], nationalChampions = [], recruiting = [], teamSeasonStats = [], currentYear, currentWeek, advanceAt, setCurrentYear, setCurrentWeek, saveSettings, goToTeam, setActiveTab, rankingSnapshots = [], adminUnlocked = false, sportsbook = {}, linkedDiscordUser = null }) {
@@ -2824,6 +3006,8 @@ function DashboardV2({ teams = [], users = [], assignments = [], results = [], a
     </section>
 
     <CurrentWeekTicker teams={teams} weeklyMatchups={weeklyMatchups} results={allResults} currentYear={currentYear} currentWeek={currentWeek} setActiveTab={setActiveTab}/>
+
+    <NetworkHomePanel linkedDiscordUser={linkedDiscordUser} setActiveTab={setActiveTab}/>
 
     <EliteBooksHomePanel sportsbook={sportsbook} linkedDiscordUser={linkedDiscordUser} currentYear={currentYear} currentWeek={currentWeek} setActiveTab={setActiveTab}/>
 
@@ -7335,18 +7519,37 @@ function GlobalStyle() {
       .elite-manager-grid article > span { color:#35d07f;font-size:9px;font-weight:1000;letter-spacing:.15em; } .elite-manager-grid article h2 { margin:0; } .elite-manager-grid article p,.elite-manager-grid article small { color:#94a3b8; }
       .elite-manager-grid button,.elite-manager-markets button { border:0;border-radius:8px;padding:10px;color:#03100a;background:#35d07f;font-weight:1000;cursor:pointer; }
       .elite-manager-markets { display:grid;gap:8px; } .elite-manager-markets > div { display:grid;grid-template-columns:minmax(180px,1fr) minmax(200px,1fr) 90px;gap:10px;align-items:center;padding:10px;border:1px solid rgba(148,163,184,.12);border-radius:10px; } .elite-manager-markets span { display:flex;flex-direction:column; } .elite-manager-markets small { color:#64748b; } .elite-manager-markets select { width:100%;padding:9px;border:1px solid rgba(148,163,184,.2);border-radius:8px;color:#fff;background:#0f172a; }
-      .elite-matchup-locks { display:grid;gap:8px; } .elite-matchup-locks > div { display:grid;grid-template-columns:minmax(100px,1fr) 26px minmax(100px,1fr) minmax(120px,.7fr) 130px;gap:10px;align-items:center;padding:10px 12px;border:1px solid rgba(53,208,127,.18);border-radius:10px;background:rgba(53,208,127,.04); } .elite-matchup-locks > div.locked { border-color:rgba(248,113,113,.34);background:rgba(127,29,29,.13); } .elite-matchup-locks > div > span { display:flex;align-items:center;gap:7px; } .elite-matchup-locks > div > b { color:#64748b;text-align:center;font-size:10px; } .elite-matchup-locks > div > em { color:#35d07f;font-size:9px;font-style:normal;font-weight:1000;letter-spacing:.08em; } .elite-matchup-locks > div.locked > em { color:#f87171; } .elite-matchup-locks button { border:1px solid rgba(248,113,113,.35);border-radius:8px;padding:9px;color:#fecaca;background:rgba(127,29,29,.22);font-size:9px;font-weight:1000;cursor:pointer; } .elite-matchup-locks > div.locked button { border-color:rgba(53,208,127,.35);color:#d1fae5;background:rgba(53,208,127,.12); }
+      .elite-matchup-locks { display:grid;gap:8px; } .elite-matchup-locks > div { display:grid;grid-template-columns:minmax(100px,1fr) 26px minmax(100px,1fr) minmax(120px,.7fr) minmax(220px,.9fr);gap:10px;align-items:center;padding:10px 12px;border:1px solid rgba(53,208,127,.18);border-radius:10px;background:rgba(53,208,127,.04); } .elite-matchup-locks > div.locked { border-color:rgba(248,113,113,.34);background:rgba(127,29,29,.13); } .elite-matchup-locks > div.voided { border-color:rgba(148,163,184,.28);background:rgba(71,85,105,.13); } .elite-matchup-locks > div > span { display:flex;align-items:center;gap:7px; } .elite-matchup-locks > div > b { color:#64748b;text-align:center;font-size:10px; } .elite-matchup-locks > div > em { color:#35d07f;font-size:9px;font-style:normal;font-weight:1000;letter-spacing:.08em; } .elite-matchup-locks > div.locked > em { color:#f87171; } .elite-matchup-actions { display:grid;grid-template-columns:1fr 1fr;gap:7px; } .elite-matchup-locks button { border:1px solid rgba(248,113,113,.35);border-radius:8px;padding:9px;color:#fecaca;background:rgba(127,29,29,.22);font-size:9px;font-weight:1000;cursor:pointer; } .elite-matchup-locks > div.locked button { border-color:rgba(53,208,127,.35);color:#d1fae5;background:rgba(53,208,127,.12); } .elite-matchup-locks button.void-matchup { border-color:rgba(148,163,184,.32);color:#e2e8f0;background:rgba(51,65,85,.32); } .elite-matchup-locks button:disabled { opacity:.45;cursor:not-allowed; }
       .elite-seed-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px; } .elite-seed-grid > article { min-width:0;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px;border:1px solid rgba(148,163,184,.13);border-radius:11px;background:rgba(2,6,23,.42); } .elite-seed-grid > article > div { grid-column:1/-1;min-width:0;display:flex;align-items:center;gap:9px; } .elite-seed-grid > article > div > span { min-width:0;display:flex;flex-direction:column; } .elite-seed-grid > article strong,.elite-seed-grid > article small { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; } .elite-seed-grid > article small { color:#64748b;font-size:8px; } .elite-seed-grid label { display:flex;flex-direction:column;gap:4px;padding:7px;border:1px solid rgba(148,163,184,.1);border-radius:8px;background:rgba(255,255,255,.025); } .elite-seed-grid label span { overflow:hidden;text-overflow:ellipsis;font-size:8px;font-weight:1000;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em; } .elite-seed-grid input { width:100%;padding:8px;border:1px solid rgba(53,208,127,.25);border-radius:7px;color:#fff;background:#07110d;text-align:center;font-weight:1000; } .elite-seed-grid > article > p { grid-column:1/-1;margin:2px 0 0;padding-top:8px;border-top:1px solid rgba(148,163,184,.1);color:#94a3b8;font-size:9px;line-height:1.4; }
       .elite-discord-drawer { display:flex;align-items:center;justify-content:space-between;gap:10px;margin:12px 0;padding:12px;border:1px solid rgba(88,101,242,.35);border-radius:12px;background:rgba(88,101,242,.1); }
       .elite-discord-drawer > div { min-width:0;display:flex;flex-direction:column; } .elite-discord-drawer span { color:#a5b4fc;font-size:8px;font-weight:1000;letter-spacing:.12em; } .elite-discord-drawer strong { overflow:hidden;text-overflow:ellipsis; } .elite-discord-drawer button { flex:0 0 auto;border:0;border-radius:7px;padding:8px 10px;color:#fff;background:#5865f2;font-size:9px;font-weight:1000;cursor:pointer; }
       .elite-commissioner-access { display:flex;justify-content:space-between;align-items:center;gap:18px;padding:20px;border:1px solid rgba(167,139,250,.32);border-radius:16px;background:linear-gradient(135deg,rgba(76,29,149,.22),rgba(15,23,42,.92)); } .elite-commissioner-access span { color:#c4b5fd;font-size:9px;font-weight:1000;letter-spacing:.15em; } .elite-commissioner-access h2 { margin:4px 0;font-size:22px; } .elite-commissioner-access p { max-width:780px;margin:0;color:#94a3b8;line-height:1.45; } .elite-commissioner-access > strong { flex:0 0 auto;padding:10px 13px;border:1px solid rgba(167,139,250,.32);border-radius:999px;color:#ddd6fe;background:rgba(139,92,246,.12);font-size:11px; }
       .elite-user-statuses { display:flex;flex-direction:column;align-items:flex-end;gap:5px; } .elite-commissioner-badge { padding:5px 7px;border:1px solid rgba(167,139,250,.38);border-radius:999px;color:#ddd6fe;background:rgba(139,92,246,.13);font-size:7px;font-weight:1000;letter-spacing:.08em; }
       .elite-commissioner-toggle { width:100%;margin-top:10px;padding:9px;border-radius:8px;font-size:9px;font-weight:1000;cursor:pointer; } .elite-commissioner-toggle.grant { border:1px solid rgba(167,139,250,.34);color:#ddd6fe;background:rgba(139,92,246,.12); } .elite-commissioner-toggle.revoke { border:1px solid rgba(248,113,113,.3);color:#fecaca;background:rgba(127,29,29,.16); } .elite-commissioner-toggle:disabled { opacity:.45;cursor:not-allowed; }
+      .league-login-shell { min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 20% 10%,rgba(37,99,235,.22),transparent 35%),radial-gradient(circle at 85% 80%,rgba(220,38,38,.22),transparent 38%),#020617;color:#fff; }
+      .league-login-card { width:min(920px,100%);overflow:hidden;display:grid;grid-template-columns:230px minmax(0,1fr);gap:30px;align-items:center;padding:44px;border:1px solid rgba(96,165,250,.25);border-top:4px solid #dc2626;border-radius:26px;background:linear-gradient(135deg,rgba(5,12,26,.98),rgba(15,23,42,.96));box-shadow:0 40px 120px rgba(0,0,0,.55); }
+      .league-login-mark { width:210px;height:210px;display:grid;place-content:center;text-align:center;border:3px solid #facc15;border-radius:50%;background:radial-gradient(circle,#172554,#030712 70%);box-shadow:inset 0 0 0 8px #dc2626,0 0 60px rgba(37,99,235,.28);transform:rotate(-4deg); }
+      .league-login-mark span { font-size:25px;font-weight:1000;letter-spacing:.12em; }.league-login-mark strong { color:#facc15;font-size:49px;line-height:.86;font-style:italic;letter-spacing:-.07em; }.league-login-mark b { color:#60a5fa;font-size:46px;line-height:.95; }
+      .league-login-kicker { color:#facc15;font-size:10px;font-weight:1000;letter-spacing:.2em; }.league-login-card h1 { margin:8px 0;font-size:clamp(36px,6vw,70px);line-height:.94;letter-spacing:-.06em; }.league-login-card p { max-width:580px;color:#a8b3c7;font-size:16px;line-height:1.55; }.league-login-actions { grid-column:2;display:flex;gap:10px; }.league-login-actions button { min-height:48px;padding:0 22px;border:0;border-radius:10px;color:#fff;background:#5865f2;font-weight:1000;cursor:pointer; }.league-login-actions button.secondary { border:1px solid rgba(148,163,184,.25);background:#0f172a; }.league-login-loader { color:#60a5fa;font-size:11px;font-weight:1000;letter-spacing:.16em;animation:networkPulse 1.2s infinite; }.league-login-error { grid-column:2;padding:11px;border:1px solid rgba(248,113,113,.35);border-radius:9px;color:#fecaca;background:rgba(127,29,29,.2); }.league-login-card footer { grid-column:1/-1;display:flex;justify-content:space-between;padding-top:20px;border-top:1px solid rgba(148,163,184,.15);color:#64748b;font-size:8px;font-weight:1000;letter-spacing:.12em; }
+      @keyframes networkPulse { 50% { opacity:.35; } }
+      .network-page,.redzone-page { font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; }
+      .network-home-panel { display:grid;grid-template-columns:minmax(0,1.7fr) minmax(170px,.55fr) minmax(210px,.7fr);overflow:hidden;border:1px solid rgba(56,189,248,.22);border-radius:17px;background:linear-gradient(125deg,#06131f,#0b1420);box-shadow:0 18px 50px rgba(0,0,0,.22); }.network-home-panel > button { min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:5px;padding:20px;border:0;border-right:1px solid rgba(255,255,255,.08);color:#fff;text-align:left;background:transparent;cursor:pointer; }.network-home-panel > button:first-child { background:radial-gradient(circle at 90% 0%,rgba(56,189,248,.15),transparent 42%); }.network-home-panel > button:last-child { border-right:0; }.network-home-panel span { color:#38bdf8;font-size:8px;font-weight:1000;letter-spacing:.16em; }.network-home-panel h2 { max-width:760px;margin:2px 0;overflow:hidden;font-size:18px;line-height:1.3;text-overflow:ellipsis;white-space:nowrap; }.network-home-panel strong { margin-top:auto;font-size:34px;line-height:1; }.network-home-panel small { color:#64748b;font-size:9px; }.network-home-panel b { margin-top:auto;color:#7dd3fc;font-size:9px; }.network-home-panel button.live { background:radial-gradient(circle at 100% 0%,rgba(220,38,38,.25),transparent 55%); }.network-home-panel button.live span,.network-home-panel button.live b { color:#f87171; }
+      .network-hero,.redzone-hero { position:relative;overflow:hidden;display:flex;align-items:end;justify-content:space-between;gap:20px;padding:32px;border:1px solid rgba(56,189,248,.25);border-radius:22px;background:radial-gradient(circle at 85% 10%,rgba(14,165,233,.18),transparent 35%),linear-gradient(130deg,#06121f,#0f172a);box-shadow:0 24px 70px rgba(0,0,0,.25); }
+      .network-hero::before,.redzone-hero::before { content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 45%,rgba(255,255,255,.03) 45% 55%,transparent 55%);pointer-events:none; }.network-hero > div,.redzone-hero > div { position:relative; }.network-hero > div:first-child > span,.redzone-hero > div:first-child > span { color:#38bdf8;font-size:10px;font-weight:1000;letter-spacing:.2em; }.network-hero h1,.redzone-hero h1 { margin:4px 0;font-size:clamp(50px,8vw,90px);line-height:.88;letter-spacing:-.07em; }.network-hero p,.redzone-hero p { margin:12px 0 0;color:#94a3b8;font-size:15px; }.network-live-presence,.redzone-hero > div:last-child { min-width:160px;display:grid;grid-template-columns:12px 1fr;align-items:center;gap:2px 9px;padding:15px 18px;border:1px solid rgba(56,189,248,.25);border-radius:14px;background:rgba(2,6,23,.55); }.network-live-presence i,.redzone-hero i { width:10px;height:10px;border-radius:50%;background:#22c55e;box-shadow:0 0 18px #22c55e;animation:networkPulse 1.5s infinite; }.network-live-presence strong,.redzone-hero strong { font-size:30px;line-height:1; }.network-live-presence span,.redzone-hero > div:last-child span { grid-column:2;color:#7dd3fc;font-size:8px;font-weight:1000;letter-spacing:.12em; }
+      .network-layout { min-height:680px;display:grid;grid-template-columns:290px minmax(0,1fr);overflow:hidden;border:1px solid rgba(148,163,184,.16);border-radius:20px;background:#070d17; }.network-sidebar { border-right:1px solid rgba(148,163,184,.15);background:linear-gradient(180deg,#091321,#070b12); }.network-sidebar > nav { display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:12px;border-bottom:1px solid rgba(148,163,184,.12); }.network-sidebar > nav button { position:relative;padding:10px 6px;border:1px solid transparent;border-radius:8px;color:#718096;background:transparent;font-size:10px;font-weight:1000;cursor:pointer; }.network-sidebar > nav button.active { border-color:rgba(56,189,248,.3);color:#e0f2fe;background:rgba(14,165,233,.12); }.network-sidebar > nav button b { position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;display:grid;place-items:center;border-radius:999px;color:#fff;background:#dc2626;font-size:8px; }
+      .network-channel-list,.network-conversation-list,.network-member-results { display:grid;gap:4px;padding:9px; }.network-channel-list > button { min-width:0;display:grid;grid-template-columns:34px minmax(0,1fr);gap:9px;align-items:center;padding:10px;border:1px solid transparent;border-radius:10px;color:#cbd5e1;text-align:left;background:transparent;cursor:pointer; }.network-channel-list > button > b { width:32px;height:32px;display:grid;place-items:center;border-radius:8px;color:#38bdf8;background:rgba(14,165,233,.11);font-size:9px; }.network-channel-list > button > span { min-width:0;display:grid;gap:2px; }.network-channel-list strong { font-size:12px; }.network-channel-list small { overflow:hidden;color:#64748b;font-size:8px;text-overflow:ellipsis;white-space:nowrap; }.network-channel-list > button.active { border-color:rgba(56,189,248,.25);background:rgba(14,165,233,.1); }.network-member-search { display:grid;gap:6px;padding:12px; }.network-member-search span { color:#38bdf8;font-size:8px;font-weight:1000;letter-spacing:.14em; }.network-member-search input,.redzone-profile-form input,.redzone-profile-form select { min-width:0;padding:11px;border:1px solid rgba(148,163,184,.2);border-radius:9px;color:#fff;background:#080f1b; }.network-member-results { max-height:250px;overflow-y:auto;border-block:1px solid rgba(148,163,184,.12); }.network-member-results button,.network-conversation-list button { display:flex;align-items:center;justify-content:space-between;gap:7px;padding:9px;border:1px solid transparent;border-radius:9px;color:#fff;text-align:left;background:transparent;cursor:pointer; }.network-conversation-list button.active { border-color:rgba(56,189,248,.25);background:rgba(14,165,233,.1); }.network-conversation-list button > small { color:#64748b;font-size:7px; }
+      .network-identity { min-width:0;display:flex!important;align-items:center!important;flex-direction:row!important;gap:9px!important;text-align:left; }.network-identity > span { min-width:0;display:grid;gap:1px; }.network-identity strong { overflow:hidden;font-size:11px;text-overflow:ellipsis;white-space:nowrap; }.network-identity small { overflow:hidden;color:#64748b;font-size:8px;text-overflow:ellipsis;white-space:nowrap; }.network-identity.compact strong { font-size:10px; }
+      .network-stage { min-width:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;background:radial-gradient(circle at 90% 0%,rgba(14,165,233,.05),transparent 35%); }.network-stage-header,.network-notifications > header,.network-settings > header,.redzone-directory > header { display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 22px;border-bottom:1px solid rgba(148,163,184,.14); }.network-stage-header span,.network-notifications header span,.network-settings header span,.redzone-directory header span { color:#38bdf8;font-size:8px;font-weight:1000;letter-spacing:.16em; }.network-stage-header h2,.network-notifications h2,.network-settings h2,.redzone-directory h2 { margin:3px 0;font-size:24px; }.network-stage-header p,.network-settings header p { margin:0;color:#64748b;font-size:10px; }.network-stage-header button,.network-notifications header button,.redzone-directory header button { border:1px solid rgba(56,189,248,.3);border-radius:8px;padding:9px 12px;color:#bae6fd;background:rgba(14,165,233,.1);font-size:9px;font-weight:1000;cursor:pointer; }
+      .network-message-feed { min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:18px; }.network-message-feed article { position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;padding:11px 13px;border:1px solid rgba(148,163,184,.11);border-radius:12px;background:rgba(15,23,42,.55); }.network-message-feed article.mine { border-color:rgba(56,189,248,.18);background:rgba(14,165,233,.07); }.network-message-feed article p { grid-column:1/-1;margin:0;color:#e2e8f0;font-size:13px;line-height:1.5;white-space:pre-wrap; }.network-message-feed article time { color:#64748b;font-size:8px; }.network-empty,.redzone-empty { min-height:260px;display:grid;place-content:center;gap:6px;color:#64748b;text-align:center; }.network-empty b,.redzone-empty b { color:#cbd5e1;font-size:18px; }.network-composer { display:grid;grid-template-columns:minmax(0,1fr) 100px;gap:8px;padding:14px;border-top:1px solid rgba(148,163,184,.14);background:#080f19; }.network-composer textarea { min-height:52px;max-height:130px;resize:vertical;padding:12px;border:1px solid rgba(148,163,184,.2);border-radius:10px;color:#fff;background:#050b13;font:inherit; }.network-composer button { border:0;border-radius:9px;color:#04131c;background:#38bdf8;font-weight:1000;cursor:pointer; }.network-composer small { grid-column:1/-1;color:#475569;font-size:8px; }
+      .network-notifications,.network-settings { min-height:0;overflow-y:auto; }.network-notifications > button { width:calc(100% - 28px);display:grid;grid-template-columns:10px minmax(0,1fr);gap:10px;margin:7px 14px;padding:13px;border:1px solid rgba(148,163,184,.12);border-radius:10px;color:#fff;text-align:left;background:rgba(15,23,42,.45);cursor:pointer; }.network-notifications > button.unread { border-color:rgba(56,189,248,.35);background:rgba(14,165,233,.1); }.network-notifications > button i { width:8px;height:8px;margin-top:5px;border-radius:50%;background:#334155; }.network-notifications > button.unread i { background:#38bdf8;box-shadow:0 0 10px #38bdf8; }.network-notifications > button span { display:grid;gap:3px; }.network-notifications p { margin:0;color:#94a3b8;font-size:11px; }.network-notifications small { color:#475569;font-size:8px; }.network-settings > section { display:flex;align-items:center;justify-content:space-between;gap:20px;margin:10px 16px;padding:14px;border:1px solid rgba(56,189,248,.15);border-radius:12px;background:rgba(14,165,233,.05); }.network-settings > section > div,.network-setting-grid label span { display:grid;gap:3px; }.network-settings small,.network-setting-grid small { color:#64748b;font-size:9px; }.network-settings button { border:1px solid rgba(56,189,248,.28);border-radius:8px;padding:8px 11px;color:#bae6fd;background:rgba(14,165,233,.1);font-size:9px;font-weight:1000;cursor:pointer; }.network-setting-actions { display:flex;align-items:center;gap:10px; }.network-settings input[type="checkbox"] { width:20px;height:20px;accent-color:#38bdf8; }.network-setting-grid { display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 16px 20px; }.network-setting-grid label { display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px;border:1px solid rgba(148,163,184,.12);border-radius:10px;background:rgba(15,23,42,.4); }
+      .redzone-hero { border-color:rgba(239,68,68,.35);background:radial-gradient(circle at 85% 10%,rgba(220,38,38,.23),transparent 35%),linear-gradient(130deg,#1c0608,#0f172a); }.redzone-hero > div:first-child > span,.redzone-hero > div:last-child span { color:#f87171; }.redzone-hero i { background:#ef4444;box-shadow:0 0 18px #ef4444; }.redzone-hero > div:last-child { border-color:rgba(239,68,68,.32); }.redzone-multiview { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:8px;border:1px solid rgba(239,68,68,.28);border-radius:16px;background:#020409; }.redzone-multiview.streams-1 { grid-template-columns:1fr; }.redzone-multiview article { min-width:0;overflow:hidden;border:1px solid rgba(148,163,184,.2);border-radius:10px;background:#000; }.redzone-multiview article header { display:flex;align-items:center;justify-content:space-between;padding:7px 9px;background:#090f18; }.redzone-multiview article header button { border:0;color:#fff;background:transparent;font-size:20px;cursor:pointer; }.redzone-multiview iframe { width:100%;aspect-ratio:16/9;display:block;border:0;background:#000; }.redzone-player-fallback { aspect-ratio:16/9;display:grid;place-content:center;gap:10px;padding:20px;color:#94a3b8;text-align:center; }.redzone-player-fallback a { color:#f87171; }.redzone-directory { overflow:hidden;border:1px solid rgba(148,163,184,.15);border-radius:18px;background:#070c14; }.redzone-directory header span { color:#f87171; }.redzone-directory header button { border-color:rgba(239,68,68,.35);color:#fecaca;background:rgba(127,29,29,.2); }.redzone-profile-form { display:grid;grid-template-columns:130px 1fr 1.2fr 1fr auto;gap:8px;padding:13px;border-bottom:1px solid rgba(148,163,184,.14);background:rgba(127,29,29,.08); }.redzone-profile-form button { border:0;border-radius:9px;padding:0 14px;color:#fff;background:#dc2626;font-weight:1000; }.redzone-profile-form small { grid-column:1/-1;color:#64748b; }.redzone-stream-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:14px; }.redzone-stream-grid > article { min-width:0;overflow:hidden;display:grid;grid-template-rows:auto 1fr auto;border:1px solid rgba(148,163,184,.14);border-radius:14px;background:linear-gradient(145deg,color-mix(in srgb,var(--stream-team) 22%,#080e17),#080e17 58%); }.redzone-stream-grid > article.live { border-color:rgba(239,68,68,.55);box-shadow:0 0 0 1px rgba(239,68,68,.12),0 18px 45px rgba(127,29,29,.18); }.redzone-thumb { position:relative;aspect-ratio:16/9;display:grid;place-items:center;overflow:hidden;background:#020617; }.redzone-thumb > img { width:100%;height:100%;object-fit:cover; }.redzone-thumb > b,.redzone-thumb > span { position:absolute;top:9px;padding:5px 7px;border-radius:6px;font-size:8px;font-weight:1000;letter-spacing:.1em; }.redzone-thumb > b { left:9px;color:#fff;background:#475569; }.redzone-stream-grid article.live .redzone-thumb > b { background:#dc2626; }.redzone-thumb > span { right:9px;color:#cbd5e1;background:rgba(2,6,23,.78); }.redzone-stream-grid article > div:nth-child(2) { display:grid;gap:8px;padding:13px; }.redzone-stream-grid h3 { margin:0;font-size:15px; }.redzone-stream-grid p { margin:0;color:#64748b;font-size:10px;line-height:1.45; }.redzone-stream-grid footer { display:grid;grid-template-columns:1fr auto;gap:7px;padding:11px;border-top:1px solid rgba(148,163,184,.12); }.redzone-stream-grid footer button,.redzone-stream-grid footer a { display:grid;place-items:center;min-height:36px;border:1px solid rgba(239,68,68,.3);border-radius:8px;color:#fecaca;background:rgba(127,29,29,.15);font-size:8px;font-weight:1000;text-decoration:none;cursor:pointer; }.redzone-stream-grid footer button.selected { color:#fff;background:#dc2626; }.redzone-stream-grid footer button:disabled { opacity:.38;cursor:not-allowed; }.redzone-stream-grid footer a { padding:0 9px;border-color:rgba(148,163,184,.2);color:#cbd5e1;background:#0f172a; }
       @media (max-width:1100px) {
         .elite-books-layout { grid-template-columns:1fr; }
         .elite-books-sidebar { display:grid;grid-template-columns:1fr 1fr;gap:16px; }
         .elite-books-sidebar > .elite-section-head { grid-column:1/-1; }
         .elite-books-home { grid-template-columns:1fr 1fr; } .elite-books-home-brand { grid-column:1/-1; }
+        .redzone-stream-grid { grid-template-columns:1fr 1fr; }.redzone-profile-form { grid-template-columns:1fr 1fr; }.redzone-profile-form button { min-height:42px; }
+        .network-home-panel { grid-template-columns:1fr 1fr; }.network-home-panel > button:first-child { grid-column:1/-1; }.network-home-panel > button:nth-child(2) { border-top:1px solid rgba(255,255,255,.08); }.network-home-panel > button:last-child { border-top:1px solid rgba(255,255,255,.08); }
       }
       @media (max-width:760px) {
         .elite-books-hero { grid-template-columns:1fr; padding:22px; border-radius:18px; }
@@ -7361,9 +7564,10 @@ function GlobalStyle() {
         .elite-myteam-hero { grid-template-columns:86px minmax(0,1fr);padding:18px; }
         .elite-myteam-hero > button { grid-column:1/-1; }
         .elite-manager-markets > div { grid-template-columns:1fr; }
-        .elite-matchup-locks > div { grid-template-columns:1fr 24px 1fr; } .elite-matchup-locks > div > em,.elite-matchup-locks > div > button { grid-column:1/-1; } .elite-matchup-locks > div > em { text-align:center; }
+        .elite-matchup-locks > div { grid-template-columns:1fr 24px 1fr; } .elite-matchup-locks > div > em,.elite-matchup-locks > div > .elite-matchup-actions { grid-column:1/-1; } .elite-matchup-locks > div > em { text-align:center; }
         .elite-seed-grid { grid-template-columns:1fr 1fr; }
         .elite-commissioner-access { align-items:flex-start;flex-direction:column; }
+        .league-login-card { grid-template-columns:1fr;text-align:center; }.league-login-mark { margin:auto; }.league-login-actions,.league-login-error { grid-column:1;justify-content:center; }.network-layout { grid-template-columns:1fr; }.network-sidebar { border-right:0;border-bottom:1px solid rgba(148,163,184,.15); }.network-sidebar > nav { grid-template-columns:repeat(4,1fr); }.network-channel-list,.network-conversation-list { grid-template-columns:repeat(2,1fr); }.network-stage { min-height:620px; }.redzone-multiview { grid-template-columns:1fr; }.redzone-stream-grid { grid-template-columns:1fr; }.redzone-profile-form { grid-template-columns:1fr; }.redzone-profile-form small { grid-column:1; }.network-setting-grid { grid-template-columns:1fr; }
       }
       @media (max-width:520px) {
         .elite-ticker { grid-template-columns:82px minmax(0,1fr); }
@@ -7383,6 +7587,8 @@ function GlobalStyle() {
         .elite-badge-gallery > div:last-child { grid-template-columns:1fr; }
         .elite-myteam-login { margin:10px;padding:25px 18px; }
         .elite-seed-grid { grid-template-columns:1fr; }
+        .league-login-shell { padding:10px; }.league-login-card { padding:25px 18px;border-radius:18px; }.league-login-mark { width:150px;height:150px; }.league-login-mark strong { font-size:36px; }.league-login-mark b { font-size:34px; }.league-login-card footer { align-items:center;flex-direction:column;gap:7px; }.network-hero,.redzone-hero { align-items:flex-start;flex-direction:column;padding:22px; }.network-live-presence,.redzone-hero > div:last-child { min-width:0; }.network-channel-list,.network-conversation-list { grid-template-columns:1fr; }.network-stage-header { align-items:flex-start;flex-direction:column; }.network-composer { grid-template-columns:1fr; }.network-composer button { min-height:44px; }.network-settings > section { align-items:flex-start;flex-direction:column; }.redzone-directory > header { align-items:flex-start;flex-direction:column; }
+        .network-home-panel { grid-template-columns:1fr; }.network-home-panel > button:first-child { grid-column:1; }.network-home-panel > button { border-right:0;border-bottom:1px solid rgba(255,255,255,.08); }.network-home-panel h2 { white-space:normal; }
       }
 `}</style>
   );
@@ -7402,11 +7608,11 @@ function Header({ loading, reload }) {
     </header>
   );
 }
-function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reorderTabs, adminUnlocked, adminCodeInput, setAdminCodeInput, unlockAdmin, teams = [], assignments = [], currentYear, users: navUsers = [], discordSession, linkedDiscordUser, signInWithDiscord, signOutDiscord}) {
+function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reorderTabs, adminUnlocked, adminCodeInput, setAdminCodeInput, unlockAdmin, teams = [], assignments = [], currentYear, users: navUsers = [], discordSession, linkedDiscordUser, signInWithDiscord, signOutDiscord,soundPreferences={}}) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const groups = [
-    { title: "League Hub", keys: ["dashboard", "schedule", "myTeam"] },
+    { title: "League", keys: ["dashboard", "leagueHub", "schedule", "redZone", "myTeam"] },
     { title: "Elite Books", keys: ["eliteBooks", "sportsbookHistory"] },
     { title: "Rankings", keys: ["eloRankings", "powerIndex", "conferencePower", "recruitingRankings"] },
     { title: "Teams", keys: ["allTeamsRatings"] },
@@ -7431,6 +7637,8 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
   const otherTabs = tabs.filter(([key]) => !usedKeys.has(key) && !key.startsWith("coach-"));
 
   function handleSelect(key) {
+    if((key.startsWith("coach-")||key.startsWith("team-"))&&soundPreferences.team_sounds)playEliteSound("team",true);
+    else if(soundPreferences.menu_sounds)playEliteSound("menu",true);
     setActiveTab(key);
     setMenuOpen(false);
   }
@@ -7445,6 +7653,8 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
     const admin = ["#2a123f", "#f97316", "#ffffff"];
 
     if (["dashboard", "schedule", "myTeam", "draftRoom"].includes(tabKey)) return main;
+    if (tabKey==="leagueHub") return ["#071521", "#38bdf8", "#ffffff"];
+    if (tabKey==="redZone") return ["#210608", "#ef4444", "#ffffff"];
     if (["eliteBooks", "sportsbookHistory"].includes(tabKey)) return ["#07110d", "#35d07f", "#ffffff"];
     if (["logoManager", "allTeamsRatings", "leagueDataCenter", "recruitingRankings", "resultsManager"].includes(tabKey)) return data;
     if (["dynastyTimeline", "dynastyRecords", "rivalries", "h2h"].includes(tabKey)) return legacy;
@@ -7542,7 +7752,7 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
       </div>
 
       <nav className="cfb-mobile-nav-v2" style={v2MobileNav} aria-label="Primary mobile navigation">
-        {[["dashboard","Home","H"],["schedule","Games","G"],["eliteBooks","Elite Books","$"],["myTeam","My Team","M"]].map(([key,label,icon])=><button key={key} type="button" style={activeTab===key?v2MobileNavActive:v2MobileNavButton} onClick={()=>handleSelect(key)}><b>{icon}</b><span>{label}</span></button>)}
+        {[["dashboard","Home","H"],["leagueHub","Hub","#"],["schedule","Games","G"],["eliteBooks","Books","$"],["redZone","RedZone","RZ"]].map(([key,label,icon])=><button key={key} type="button" style={activeTab===key?v2MobileNavActive:v2MobileNavButton} onClick={()=>handleSelect(key)}><b>{icon}</b><span>{label}</span></button>)}
         <button type="button" style={v2MobileNavButton} onClick={()=>setMenuOpen(true)}><b>☰</b><span>More</span></button>
       </nav>
 
@@ -7562,17 +7772,7 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
               <button type="button" onClick={discordSession?signOutDiscord:signInWithDiscord}>{discordSession?"Sign out":"Connect Discord"}</button>
             </div>
 
-            <div style={drawerAdminBox}>
-              <div style={drawerGroupTitle}>Commissioner Access</div>
-              {adminUnlocked ? (
-                <div style={adminUnlockedPill}>Unlocked</div>
-              ) : (
-                <div style={adminUnlockRow}>
-                  <input value={adminCodeInput} onChange={(e)=>setAdminCodeInput(e.target.value)} placeholder="Commissioner code" style={drawerInput}/>
-                  <button type="button" onClick={unlockAdmin} style={drawerUnlockButton}>Unlock</button>
-                </div>
-              )}
-            </div>
+            {adminUnlocked&&<div style={drawerAdminBox}><div style={drawerGroupTitle}>Verified Role</div><div style={adminUnlockedPill}>Commissioner</div></div>}
 
             <div style={drawerContent}>
               {visibleGroups.filter((group)=>group.keys.length > 0).map((group) => (
@@ -13341,7 +13541,7 @@ const v2FormWin={display:"inline-grid",placeItems:"center",width:24,height:24,bo
 const v2FormLoss={...v2FormWin,background:"#991b1b",color:"#fee2e2"};
 const v2NextOpponent={display:"flex",alignItems:"center",gap:7};
 
-const v2MobileNav={position:"fixed",left:"max(10px,env(safe-area-inset-left))",right:"max(10px,env(safe-area-inset-right))",bottom:"max(10px,env(safe-area-inset-bottom))",zIndex:150,gridTemplateColumns:"repeat(5,minmax(0,1fr))",gap:4,padding:7,borderRadius:10,background:"rgba(2,6,23,.96)",border:"1px solid rgba(255,255,255,.16)",borderTop:"3px solid #dc2626",backdropFilter:"blur(18px)",boxShadow:"0 18px 60px rgba(0,0,0,.48)"};
+const v2MobileNav={position:"fixed",left:"max(6px,env(safe-area-inset-left))",right:"max(6px,env(safe-area-inset-right))",bottom:"max(8px,env(safe-area-inset-bottom))",zIndex:150,gridTemplateColumns:"repeat(6,minmax(0,1fr))",gap:2,padding:6,borderRadius:12,background:"rgba(2,6,23,.97)",border:"1px solid rgba(255,255,255,.16)",borderTop:"3px solid #dc2626",backdropFilter:"blur(18px)",boxShadow:"0 18px 60px rgba(0,0,0,.48)"};
 const v2MobileNavButton={display:"grid",justifyItems:"center",gap:2,padding:"7px 3px",border:0,borderRadius:11,background:"transparent",color:"#94a3b8",fontSize:10,fontWeight:900,cursor:"pointer"};
 const v2MobileNavActive={...v2MobileNavButton,background:"rgba(250,204,21,.15)",color:"#facc15"};
 
