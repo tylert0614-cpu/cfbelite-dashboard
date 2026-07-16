@@ -2909,6 +2909,7 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
   const [mode,setMode]=useState("channels");
   const [mobileView,setMobileView]=useState("directory");
   const [channels,setChannels]=useState([]);
+  const [categories,setCategories]=useState([]);
   const [selectedChannel,setSelectedChannel]=useState(null);
   const [messages,setMessages]=useState([]);
   const [reactions,setReactions]=useState([]);
