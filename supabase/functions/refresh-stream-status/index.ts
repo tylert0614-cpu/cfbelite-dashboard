@@ -11,6 +11,16 @@ async function appToken(url:string,clientId?:string,clientSecret?:string){
   return (await response.json()).access_token as string;
 }
 
+function platformChannelSlug(profile:any,platform:string){
+  const raw=String(profile.channel_key||profile.channel_url||"").trim();
+  if(!raw)return "";
+  try{
+    const url=new URL(/^https?:\/\//i.test(raw)?raw:`https://${raw}`);
+    if(url.hostname.toLowerCase().includes(`${platform}.`))return decodeURIComponent(url.pathname.split("/").filter(Boolean)[0]||"").replace(/^@/,"");
+  }catch{/* The value is already a channel name rather than a URL. */}
+  return raw.replace(/^@/,"").replace(/^\/+|\/+$/g,"").split(/[/?#]/)[0];
+}
+
 function youtubeHint(profile:any){
   const raw=String(profile.channel_key||profile.channel_url||"").trim();
   const channelMatch=raw.match(/(?:youtube\.com\/channel\/)?(UC[\w-]{20,})/i);
@@ -71,7 +81,9 @@ Deno.serve(async(request)=>{
       try{
         if(profile.platform==="twitch"){
           if(!twitchToken||!twitchClientId)throw new Error("Twitch credentials are not configured");
-          const response=await fetch(`https://api.twitch.tv/helix/streams?user_login=${encodeURIComponent(profile.channel_key)}`,{headers:{Authorization:`Bearer ${twitchToken}`,"Client-Id":twitchClientId}});
+          const twitchSlug=platformChannelSlug(profile,"twitch");
+          if(!twitchSlug)throw new Error("Twitch channel name is missing");
+          const response=await fetch(`https://api.twitch.tv/helix/streams?user_login=${encodeURIComponent(twitchSlug)}`,{headers:{Authorization:`Bearer ${twitchToken}`,"Client-Id":twitchClientId}});
           if(!response.ok)throw new Error(`Twitch returned ${response.status}`);const stream=(await response.json()).data?.[0];
           if(stream)status={...status,is_live:true,stream_title:stream.title,category_name:stream.game_name,thumbnail_url:String(stream.thumbnail_url||"").replace("{width}","640").replace("{height}","360"),viewer_count:stream.viewer_count||0,started_at:stream.started_at};
         }else if(profile.platform==="youtube"){
@@ -82,9 +94,12 @@ Deno.serve(async(request)=>{
           if(video)status={...status,is_live:true,stream_title:video.snippet?.title,thumbnail_url:video.snippet?.thumbnails?.high?.url||video.snippet?.thumbnails?.medium?.url,live_video_id:video.id,viewer_count:Number(video.liveStreamingDetails?.concurrentViewers||0),started_at:video.liveStreamingDetails?.actualStartTime||video.snippet?.publishedAt};
         }else if(profile.platform==="kick"){
           if(!kickToken)throw new Error("Kick credentials are not configured");
-          const response=await fetch(`https://api.kick.com/public/v1/livestreams?broadcaster_user_id=${encodeURIComponent(profile.channel_key)}&limit=1`,{headers:{Authorization:`Bearer ${kickToken}`,Accept:"application/json"}});
-          if(!response.ok)throw new Error(`Kick returned ${response.status}`);const stream=(await response.json()).data?.[0];
-          if(stream)status={...status,is_live:true,stream_title:stream.stream_title,category_name:stream.category?.name,thumbnail_url:stream.thumbnail,viewer_count:stream.viewer_count||0,started_at:stream.started_at};
+          const kickSlug=platformChannelSlug(profile,"kick");
+          if(!kickSlug)throw new Error("Kick channel name is missing");
+          const response=await fetch(`https://api.kick.com/public/v1/channels?slug=${encodeURIComponent(kickSlug)}`,{headers:{Authorization:`Bearer ${kickToken}`,Accept:"application/json"}});
+          if(!response.ok)throw new Error(`Kick returned ${response.status}`);const channel=(await response.json()).data?.[0];
+          const stream=channel?.stream;
+          if(stream?.is_live)status={...status,is_live:true,stream_title:channel.stream_title,category_name:channel.category?.name,thumbnail_url:stream.thumbnail,viewer_count:stream.viewer_count||0,started_at:stream.start_time};
         }
       }catch(platformError){status.last_error=platformError instanceof Error?platformError.message:String(platformError);}
       await supabase.from("live_stream_status").upsert(status,{onConflict:"profile_id"});checked++;if(status.is_live)live++;

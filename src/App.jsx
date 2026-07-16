@@ -2984,11 +2984,15 @@ function normalizeStreamProfile(platformValue,channelKeyValue,channelUrlValue) {
     else channelUrl=`https://www.youtube.com/${source.startsWith("@")?source:`@${source.replace(/^@/,"")}`}`;
   }else if(platform==="twitch"){
     const source=channelUrl||channelKey;
+    const match=source.match(/(?:https?:\/\/)?(?:www\.)?twitch\.tv\/([^/?#]+)/i);
+    channelKey=(match?.[1]||channelKey||source).replace(/^@/,"").replace(/^\/+|\/+$/g,"");
     if(/^https?:\/\//i.test(source))channelUrl=source;
     else if(/^(?:www\.)?twitch\.tv\//i.test(source))channelUrl=withProtocol(source);
     else channelUrl=`https://www.twitch.tv/${source.replace(/^@/,"").replace(/^\/+|\/+$/g,"")}`;
   }else if(platform==="kick"){
     const source=channelUrl||channelKey;
+    const match=source.match(/(?:https?:\/\/)?(?:www\.)?kick\.com\/([^/?#]+)/i);
+    channelKey=(match?.[1]||channelKey||source).replace(/^@/,"").replace(/^\/+|\/+$/g,"");
     if(/^https?:\/\//i.test(source))channelUrl=source;
     else if(/^(?:www\.)?kick\.com\//i.test(source))channelUrl=withProtocol(source);
     else channelUrl=`https://kick.com/${source.replace(/^@/,"").replace(/^\/+|\/+$/g,"")}`;
