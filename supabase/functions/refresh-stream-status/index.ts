@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders={"Content-Type":"application/json"};
+const corsHeaders={"Content-Type":"application/json","Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type"};
 const supabase=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
 async function appToken(url:string,clientId?:string,clientSecret?:string){
@@ -11,7 +11,31 @@ async function appToken(url:string,clientId?:string,clientSecret?:string){
   return (await response.json()).access_token as string;
 }
 
-Deno.serve(async()=>{
+function youtubeHint(profile:any){
+  const raw=String(profile.channel_key||profile.channel_url||"").trim();
+  const channelMatch=raw.match(/(?:youtube\.com\/channel\/)?(UC[\w-]{20,})/i);
+  if(channelMatch)return {channelId:channelMatch[1],handle:null,username:null};
+  const handleMatch=raw.match(/(?:youtube\.com\/)?@([\w.-]+)/i);
+  if(handleMatch)return {channelId:null,handle:handleMatch[1],username:null};
+  const userMatch=raw.match(/youtube\.com\/(?:user|c)\/([\w.-]+)/i);
+  if(userMatch)return {channelId:null,handle:null,username:userMatch[1]};
+  if(raw.startsWith("@"))return {channelId:null,handle:raw.slice(1),username:null};
+  return {channelId:null,handle:null,username:raw.replace(/^\/+|\/+$/g,"")};
+}
+
+async function resolveYoutubeChannel(profile:any,key:string){
+  const hint=youtubeHint(profile);
+  if(hint.channelId)return hint.channelId;
+  const parameter=hint.handle?`forHandle=${encodeURIComponent(hint.handle)}`:`forUsername=${encodeURIComponent(hint.username||"")}`;
+  const response=await fetch(`https://www.googleapis.com/youtube/v3/channels?part=id&${parameter}&maxResults=1&key=${encodeURIComponent(key)}`);
+  if(!response.ok)throw new Error(`YouTube channel lookup returned ${response.status}`);
+  const channelId=(await response.json()).items?.[0]?.id;
+  if(!channelId)throw new Error("YouTube channel was not found. Use the channel ID beginning with UC or the @handle.");
+  return channelId as string;
+}
+
+Deno.serve(async(request)=>{
+  if(request.method==="OPTIONS")return new Response("ok",{headers:corsHeaders});
   try{
     const {data:profiles,error}=await supabase.from("stream_profiles").select("*").eq("enabled",true);
     if(error)throw error;
@@ -33,7 +57,8 @@ Deno.serve(async()=>{
           if(stream)status={...status,is_live:true,stream_title:stream.title,category_name:stream.game_name,thumbnail_url:String(stream.thumbnail_url||"").replace("{width}","640").replace("{height}","360"),viewer_count:stream.viewer_count||0,started_at:stream.started_at};
         }else if(profile.platform==="youtube"){
           if(!youtubeKey)throw new Error("YouTube API key is not configured");
-          const response=await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&eventType=live&channelId=${encodeURIComponent(profile.channel_key)}&maxResults=1&key=${encodeURIComponent(youtubeKey)}`);
+          const channelId=await resolveYoutubeChannel(profile,youtubeKey);
+          const response=await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&eventType=live&channelId=${encodeURIComponent(channelId)}&maxResults=1&key=${encodeURIComponent(youtubeKey)}`);
           if(!response.ok)throw new Error(`YouTube returned ${response.status}`);const video=(await response.json()).items?.[0];
           if(video)status={...status,is_live:true,stream_title:video.snippet?.title,thumbnail_url:video.snippet?.thumbnails?.high?.url||video.snippet?.thumbnails?.medium?.url,live_video_id:video.id?.videoId,started_at:video.snippet?.publishedAt};
         }else if(profile.platform==="kick"){
