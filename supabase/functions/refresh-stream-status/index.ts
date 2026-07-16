@@ -23,15 +23,34 @@ function youtubeHint(profile:any){
   return {channelId:null,handle:null,username:raw.replace(/^\/+|\/+$/g,"")};
 }
 
-async function resolveYoutubeChannel(profile:any,key:string){
+async function resolveYoutubeChannel(profile:any,key:string,previous:any){
+  const resolvedKey=`${String(profile.channel_key||"").trim()}|${String(profile.channel_url||"").trim()}`;
+  if(previous?.youtube_channel_id&&previous?.youtube_uploads_playlist_id&&previous?.youtube_resolved_key===resolvedKey){
+    return {channelId:previous.youtube_channel_id,uploadsPlaylistId:previous.youtube_uploads_playlist_id,resolvedKey};
+  }
   const hint=youtubeHint(profile);
-  if(hint.channelId)return hint.channelId;
-  const parameter=hint.handle?`forHandle=${encodeURIComponent(hint.handle)}`:`forUsername=${encodeURIComponent(hint.username||"")}`;
-  const response=await fetch(`https://www.googleapis.com/youtube/v3/channels?part=id&${parameter}&maxResults=1&key=${encodeURIComponent(key)}`);
+  const parameter=hint.channelId?`id=${encodeURIComponent(hint.channelId)}`:hint.handle?`forHandle=${encodeURIComponent(hint.handle)}`:`forUsername=${encodeURIComponent(hint.username||"")}`;
+  const response=await fetch(`https://www.googleapis.com/youtube/v3/channels?part=id,contentDetails&${parameter}&maxResults=1&key=${encodeURIComponent(key)}`);
   if(!response.ok)throw new Error(`YouTube channel lookup returned ${response.status}`);
-  const channelId=(await response.json()).items?.[0]?.id;
+  const channel=(await response.json()).items?.[0];
+  const channelId=channel?.id;
+  const uploadsPlaylistId=channel?.contentDetails?.relatedPlaylists?.uploads;
   if(!channelId)throw new Error("YouTube channel was not found. Use the channel ID beginning with UC or the @handle.");
-  return channelId as string;
+  if(!uploadsPlaylistId)throw new Error("YouTube uploads playlist was not available for this channel.");
+  return {channelId:String(channelId),uploadsPlaylistId:String(uploadsPlaylistId),resolvedKey};
+}
+
+async function youtubeLiveStatus(profile:any,key:string,previous:any){
+  const resolved=await resolveYoutubeChannel(profile,key,previous);
+  const playlistResponse=await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${encodeURIComponent(resolved.uploadsPlaylistId)}&maxResults=10&key=${encodeURIComponent(key)}`);
+  if(!playlistResponse.ok)throw new Error(`YouTube uploads lookup returned ${playlistResponse.status}`);
+  const videoIds=((await playlistResponse.json()).items||[]).map((item:any)=>item.contentDetails?.videoId).filter(Boolean);
+  if(!videoIds.length)return {...resolved,video:null};
+  const videoResponse=await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,liveStreamingDetails&id=${encodeURIComponent(videoIds.join(","))}&key=${encodeURIComponent(key)}`);
+  if(!videoResponse.ok)throw new Error(`YouTube video lookup returned ${videoResponse.status}`);
+  const videos=(await videoResponse.json()).items||[];
+  const video=videos.find((item:any)=>item.snippet?.liveBroadcastContent==="live"||(item.liveStreamingDetails?.actualStartTime&&!item.liveStreamingDetails?.actualEndTime));
+  return {...resolved,video:video||null};
 }
 
 Deno.serve(async(request)=>{
@@ -47,7 +66,7 @@ Deno.serve(async(request)=>{
     const youtubeKey=Deno.env.get("YOUTUBE_API_KEY");
     let checked=0;let live=0;let alerts=0;
     for(const profile of profiles||[]){
-      const {data:previous}=await supabase.from("live_stream_status").select("is_live").eq("profile_id",profile.id).maybeSingle();
+      const {data:previous}=await supabase.from("live_stream_status").select("is_live,youtube_channel_id,youtube_uploads_playlist_id,youtube_resolved_key").eq("profile_id",profile.id).maybeSingle();
       let status:any={profile_id:profile.id,is_live:false,viewer_count:0,checked_at:new Date().toISOString(),last_error:null};
       try{
         if(profile.platform==="twitch"){
@@ -57,10 +76,10 @@ Deno.serve(async(request)=>{
           if(stream)status={...status,is_live:true,stream_title:stream.title,category_name:stream.game_name,thumbnail_url:String(stream.thumbnail_url||"").replace("{width}","640").replace("{height}","360"),viewer_count:stream.viewer_count||0,started_at:stream.started_at};
         }else if(profile.platform==="youtube"){
           if(!youtubeKey)throw new Error("YouTube API key is not configured");
-          const channelId=await resolveYoutubeChannel(profile,youtubeKey);
-          const response=await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&eventType=live&channelId=${encodeURIComponent(channelId)}&maxResults=1&key=${encodeURIComponent(youtubeKey)}`);
-          if(!response.ok)throw new Error(`YouTube returned ${response.status}`);const video=(await response.json()).items?.[0];
-          if(video)status={...status,is_live:true,stream_title:video.snippet?.title,thumbnail_url:video.snippet?.thumbnails?.high?.url||video.snippet?.thumbnails?.medium?.url,live_video_id:video.id?.videoId,started_at:video.snippet?.publishedAt};
+          const youtube=await youtubeLiveStatus(profile,youtubeKey,previous);
+          status={...status,youtube_channel_id:youtube.channelId,youtube_uploads_playlist_id:youtube.uploadsPlaylistId,youtube_resolved_key:youtube.resolvedKey};
+          const video=youtube.video;
+          if(video)status={...status,is_live:true,stream_title:video.snippet?.title,thumbnail_url:video.snippet?.thumbnails?.high?.url||video.snippet?.thumbnails?.medium?.url,live_video_id:video.id,viewer_count:Number(video.liveStreamingDetails?.concurrentViewers||0),started_at:video.liveStreamingDetails?.actualStartTime||video.snippet?.publishedAt};
         }else if(profile.platform==="kick"){
           if(!kickToken)throw new Error("Kick credentials are not configured");
           const response=await fetch(`https://api.kick.com/public/v1/livestreams?broadcaster_user_id=${encodeURIComponent(profile.channel_key)}&limit=1`,{headers:{Authorization:`Bearer ${kickToken}`,Accept:"application/json"}});
