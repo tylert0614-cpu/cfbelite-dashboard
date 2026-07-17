@@ -1,4 +1,4 @@
-const CACHE_VERSION = "cfbelite-v44";
+const CACHE_VERSION = "cfbelite-v50";
 
 self.addEventListener("push", (event) => {
   let payload = {};
