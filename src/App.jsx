@@ -2934,6 +2934,7 @@ function NetworkRoleManager({roles=[],roleMembers=[],users=[],roleForm,setRoleFo
 }
 
 function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignments=[],weeklyMatchups=[],currentYear,setActiveTab,setError}) {
+  console.info("CFBElite Social build v40.3-active-state-fix");
   const [mode,setMode]=useState("channels");
   const [mobileView,setMobileView]=useState("directory");
   const [channels,setChannels]=useState([]);
@@ -2948,6 +2949,14 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
   const [selectedConversation,setSelectedConversation]=useState(null);
   const [directMessages,setDirectMessages]=useState([]);
   const [notifications,setNotifications]=useState([]);
+  const [socialMessageSearch,setSocialMessageSearch]=useState("");
+  const [pinnedOnly,setPinnedOnly]=useState(false);
+  const [polls,setPolls]=useState([]);
+  const [pollOptions,setPollOptions]=useState([]);
+  const [pollVotes,setPollVotes]=useState([]);
+  const [pollForm,setPollForm]=useState({question:"",description:"",options:["",""],multiple_choice:false,anonymous:false,hide_results:false,ends_at:""});
+  const [reportingUrl,setReportingUrl]=useState("");
+  const [reportingDraft,setReportingDraft]=useState("");
   const [preferences,setPreferences]=useState(null);
   const [draft,setDraft]=useState("");
   const [busy,setBusy]=useState(false);
