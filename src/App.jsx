@@ -1,9 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { Grid } from "@giphy/react-components";
 import { GiphyFetch } from "@giphy/js-fetch-api";
 
-const CFBELITE_SOCIAL_BUILD = "v50-network-media-ui-overhaul";
+const CFBELITE_SOCIAL_BUILD = "v50.1-layout-giphy-hotfix";
 console.info("CFBElite Network build", CFBELITE_SOCIAL_BUILD);
 
 const supabase = createClient(
@@ -3009,22 +3008,55 @@ function NetworkRoleManager({roles=[],roleMembers=[],users=[],roleForm,setRoleFo
 
 function NetworkGiphyPicker({open,onClose,onSelect}) {
   const [query,setQuery]=useState("");
-  const [width,setWidth]=useState(420);
-  const panelRef=useRef(null);
+  const [items,setItems]=useState([]);
+  const [offset,setOffset]=useState(0);
+  const [loading,setLoading]=useState(false);
+  const [error,setPickerError]=useState("");
+  const requestIdRef=useRef(0);
+
+  async function loadGifs({reset=false}={}) {
+    if(!giphyFetch){setPickerError("GIPHY is not configured on this deployment.");return;}
+    const requestId=++requestIdRef.current;
+    const nextOffset=reset?0:offset;
+    setLoading(true);setPickerError("");
+    try{
+      const response=query.trim()
+        ? await giphyFetch.search(query.trim(),{offset:nextOffset,limit:24,rating:"pg-13"})
+        : await giphyFetch.trending({offset:nextOffset,limit:24,rating:"pg-13"});
+      if(requestId!==requestIdRef.current)return;
+      const next=response?.data||[];
+      setItems((current)=>reset?next:[...current,...next.filter((gif)=>!current.some((row)=>row.id===gif.id))]);
+      setOffset(nextOffset+next.length);
+      if(!next.length&&reset)setPickerError("No GIFs found for that search.");
+    }catch(error){
+      console.error("GIPHY picker failed:",error);
+      if(requestId===requestIdRef.current)setPickerError("GIPHY could not load. Confirm the production API key and allowed domain, then try again.");
+    }finally{
+      if(requestId===requestIdRef.current)setLoading(false);
+    }
+  }
+
   useEffect(()=>{
     if(!open)return;
-    const measure=()=>setWidth(Math.max(260,Math.min(560,(panelRef.current?.clientWidth||420)-24)));
-    measure();window.addEventListener("resize",measure);
-    return()=>window.removeEventListener("resize",measure);
-  },[open]);
+    const timer=window.setTimeout(()=>loadGifs({reset:true}),query.trim()?350:0);
+    return()=>window.clearTimeout(timer);
+  },[open,query]);
+
   if(!open)return null;
-  const fetchGifs=(offset)=>query.trim()?giphyFetch.search(query.trim(),{offset,limit:24,rating:"pg-13"}):giphyFetch.trending({offset,limit:24,rating:"pg-13"});
-  return <section ref={panelRef} className="network-giphy-picker" role="dialog" aria-label="Choose a GIF">
+
+  return <section className="network-giphy-picker" role="dialog" aria-label="Choose a GIF">
     <header><div><b>GIFs</b><small>Powered by GIPHY</small></div><button onClick={onClose} aria-label="Close GIF picker">×</button></header>
-    {!giphyFetch?<div className="network-giphy-empty"><b>GIPHY is not configured.</b><span>Add VITE_GIPHY_API_KEY to Vercel and your local environment.</span></div>:<>
-      <label><span>⌕</span><input autoFocus value={query} onChange={(event)=>setQuery(event.target.value)} placeholder="Search GIPHY"/></label>
-      <div className="network-giphy-grid"><Grid key={query||"trending"} width={width} columns={width<380?2:3} gutter={8} fetchGifs={fetchGifs} onGifClick={(gif,event)=>{event.preventDefault();onSelect(gif.images?.original?.url||gif.url);}}/></div>
-    </>}
+    <label><span>⌕</span><input autoFocus value={query} onChange={(event)=>{setQuery(event.target.value);setOffset(0);}} placeholder="Search GIPHY"/></label>
+    {error&&<div className="network-giphy-error"><b>{error}</b><button onClick={()=>loadGifs({reset:true})}>Try again</button></div>}
+    <div className="network-giphy-results">
+      {items.map((gif)=>{
+        const preview=gif.images?.fixed_width_small?.url||gif.images?.fixed_width?.url||gif.images?.original?.url;
+        const original=gif.images?.original?.url||gif.url;
+        return <button key={gif.id} onClick={()=>onSelect(original)}><img src={preview} alt={gif.title||"GIF"} loading="lazy"/></button>;
+      })}
+      {loading&&<div className="network-giphy-loading">Loading GIFs…</div>}
+      {!loading&&!error&&items.length>0&&<button className="network-giphy-more" onClick={()=>loadGifs()}>Load more</button>}
+    </div>
   </section>;
 }
 
@@ -10561,6 +10593,196 @@ function GlobalStyle() {
       .drawer-menu-group:last-child .drawer-menu-grid{grid-template-columns:1fr!important;gap:10px!important}.coach-drawer-tile{grid-template-columns:72px minmax(0,1fr)!important;align-items:center!important;min-height:94px!important;padding:10px 16px 10px 22px!important;border-radius:14px!important;background:linear-gradient(145deg,#0d1727,#07101d)!important;box-shadow:0 12px 28px rgba(0,0,0,.20)!important}.coach-menu-logo-plate-v86{width:64px!important;height:64px!important;min-width:64px!important;border-radius:15px!important}.coach-nav-copy{display:block!important;min-width:0!important;text-align:left!important}.coach-nav-copy strong,.coach-nav-copy small,.coach-nav-copy em{display:block!important;min-width:0!important}.coach-nav-copy strong{overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;font-size:18px!important;line-height:1.12!important;color:#fff!important}.coach-nav-copy small{margin-top:5px!important;font-size:13px!important;color:rgba(255,255,255,.78)!important}.coach-nav-copy em{margin-top:7px!important;font-size:10px!important;font-style:normal!important;color:rgba(250,204,21,.72)!important;letter-spacing:.04em!important}.coach-drawer-tile>img{display:none!important}
       @media(max-width:900px){.cfb-identity-bar{display:grid!important;grid-template-columns:1fr 1fr 1fr!important;overflow:visible!important}.cfb-identity-brand{grid-column:1/-1!important}.cfb-identity-progress,.cfb-identity-featured{display:none!important}.network-channel-list>button{min-height:50px!important;padding:9px 12px!important}.network-channel-list>button strong{font-size:15px!important}.network-composer{margin:0!important;border-radius:0!important;padding:9px 10px calc(9px + env(safe-area-inset-bottom))!important}.network-composer-tools button{min-width:42px!important;height:42px!important}.network-giphy-picker{position:fixed!important;left:0!important;right:0!important;bottom:0!important;width:100%!important;max-height:78vh!important;border-radius:18px 18px 0 0!important;padding:14px 12px calc(14px + env(safe-area-inset-bottom))!important}.coach-drawer-tile{min-height:88px!important;grid-template-columns:62px minmax(0,1fr)!important}.coach-menu-logo-plate-v86{width:56px!important;height:56px!important;min-width:56px!important}}
       @media(max-width:560px){.cfb-identity-bar{grid-template-columns:1fr 1fr!important}.cfb-identity-item:nth-of-type(3){display:none!important}.network-composer{grid-template-columns:1fr!important}.network-composer-tools{grid-row:2;overflow-x:auto;padding:2px 0 0!important}.network-compose-box{grid-row:1}.network-composer>small{display:none!important}.coach-nav-copy strong{font-size:16px!important}}
+
+      /* v50.1-layout-giphy-hotfix */
+
+      /* Universal search must always occupy the full header width. */
+      .cfb-universal-search,
+      .cfb-universal-search-input {
+        display:block !important;
+        width:100% !important;
+        min-width:0 !important;
+        max-width:none !important;
+        box-sizing:border-box !important;
+      }
+      .cfb-universal-search-input {
+        display:grid !important;
+        grid-template-columns:24px minmax(0,1fr) 34px !important;
+        align-items:center !important;
+        gap:8px !important;
+      }
+      .cfb-universal-search-input input {
+        display:block !important;
+        width:100% !important;
+        min-width:0 !important;
+        max-width:none !important;
+        box-sizing:border-box !important;
+        border:0 !important;
+        outline:0 !important;
+        background:transparent !important;
+        color:#fff !important;
+      }
+
+      /* Prevent channel text and badges from sharing the same physical space. */
+      .network-channel-list > button {
+        position:relative !important;
+        display:grid !important;
+        grid-template-columns:34px minmax(0,1fr) !important;
+        grid-template-areas:"icon copy" !important;
+        align-items:center !important;
+        min-height:46px !important;
+        padding:7px 76px 7px 10px !important;
+        overflow:hidden !important;
+      }
+      .network-channel-list > button > :first-child {
+        grid-area:icon !important;
+        align-self:center !important;
+        justify-self:center !important;
+      }
+      .network-channel-list > button > span:not(.network-matchup-logos) {
+        grid-area:copy !important;
+        min-width:0 !important;
+        overflow:hidden !important;
+      }
+      .network-channel-list > button strong {
+        display:block !important;
+        overflow:hidden !important;
+        text-overflow:ellipsis !important;
+        white-space:nowrap !important;
+      }
+      .network-channel-list > button em {
+        position:absolute !important;
+        right:9px !important;
+        top:50% !important;
+        transform:translateY(-50%) !important;
+        max-width:66px !important;
+        overflow:hidden !important;
+        text-overflow:ellipsis !important;
+        white-space:nowrap !important;
+        text-align:right !important;
+        pointer-events:none !important;
+      }
+      .network-matchup-logos {
+        grid-area:icon !important;
+        width:34px !important;
+        overflow:visible !important;
+      }
+      .network-matchup-copy {
+        grid-area:copy !important;
+        min-width:0 !important;
+        overflow:hidden !important;
+      }
+      .network-matchup-copy strong {
+        white-space:nowrap !important;
+        overflow:hidden !important;
+        text-overflow:ellipsis !important;
+      }
+
+      /* Slightly widen the Discord channel rail on desktop. */
+      @media (min-width:901px) {
+        .discord-clone-page .network-layout {
+          grid-template-columns:68px 292px minmax(0,1fr) 248px !important;
+        }
+      }
+
+      /* GIPHY picker no longer depends on the failing React Grid renderer. */
+      .network-giphy-picker {
+        grid-template-rows:auto auto minmax(0,1fr) !important;
+      }
+      .network-giphy-results {
+        display:grid !important;
+        grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+        gap:8px !important;
+        min-height:220px !important;
+        overflow:auto !important;
+        align-content:start !important;
+      }
+      .network-giphy-results > button:not(.network-giphy-more) {
+        min-height:110px !important;
+        padding:0 !important;
+        border:0 !important;
+        border-radius:9px !important;
+        overflow:hidden !important;
+        background:#111214 !important;
+      }
+      .network-giphy-results > button img {
+        width:100% !important;
+        height:100% !important;
+        min-height:110px !important;
+        object-fit:cover !important;
+        display:block !important;
+      }
+      .network-giphy-error {
+        display:flex !important;
+        align-items:center !important;
+        justify-content:space-between !important;
+        gap:10px !important;
+        padding:12px !important;
+        border-radius:9px !important;
+        background:rgba(239,68,68,.10) !important;
+        border:1px solid rgba(239,68,68,.24) !important;
+        color:#fecaca !important;
+      }
+      .network-giphy-error b {
+        font-size:12px !important;
+        line-height:1.35 !important;
+      }
+      .network-giphy-error button,
+      .network-giphy-more {
+        min-height:34px !important;
+        padding:6px 10px !important;
+        border:0 !important;
+        border-radius:7px !important;
+        background:#5865f2 !important;
+        color:#fff !important;
+        font-weight:800 !important;
+      }
+      .network-giphy-more {
+        grid-column:1/-1 !important;
+      }
+      .network-giphy-loading {
+        grid-column:1/-1 !important;
+        padding:20px !important;
+        color:#949ba4 !important;
+        text-align:center !important;
+      }
+
+      /* Keep the identity bar visually dark and evenly aligned. */
+      .cfb-identity-bar > * {
+        display:flex !important;
+        flex-direction:column !important;
+        justify-content:center !important;
+      }
+      .cfb-identity-brand {
+        flex-direction:row !important;
+        align-items:center !important;
+        justify-content:flex-start !important;
+      }
+
+      @media (max-width:900px) {
+        .network-channel-list > button {
+          padding-right:78px !important;
+        }
+        .network-giphy-results {
+          grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+        }
+      }
+
+      @media (max-width:560px) {
+        .cfb-universal-search-input {
+          grid-template-columns:22px minmax(0,1fr) 30px !important;
+        }
+        .network-channel-list > button {
+          min-height:50px !important;
+          padding-left:12px !important;
+          padding-right:82px !important;
+        }
+        .network-channel-list > button em {
+          right:10px !important;
+          max-width:70px !important;
+        }
+      }
+
 `}</style>
   );
 }
