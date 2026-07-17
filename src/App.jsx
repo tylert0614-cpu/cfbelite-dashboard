@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { GiphyFetch } from "@giphy/js-fetch-api";
 
-const CFBELITE_SOCIAL_BUILD = "v50.1-layout-giphy-hotfix";
+const CFBELITE_SOCIAL_BUILD = "v51-sidebar-structural-rebuild";
 console.info("CFBElite Network build", CFBELITE_SOCIAL_BUILD);
 
 const supabase = createClient(
@@ -2968,6 +2968,10 @@ function LeagueHubLegacy({discordSession,linkedDiscordUser,users=[],teams=[],ass
   return <main className="cfb-v2-page network-page"><section className="network-hero"><div><span>CFB ELITE NETWORK</span><h1>CFBElite Network <small style={{fontSize:10,opacity:.5}}>v40.2</small></h1><p>The league conversation, rules, polls and community—without crowding the dashboard home.</p></div><div className="network-live-presence"><i/><strong>{users.filter((row)=>row.is_active!==false).length}</strong><span>League Members</span></div></section><div className="network-layout"><aside className="network-sidebar"><nav><button className={mode==="channels"?"active":""} onClick={()=>setMode("channels")}>Channels</button><button className={mode==="direct"?"active":""} onClick={()=>setMode("direct")}>Messages</button><button className={mode==="notifications"?"active":""} onClick={()=>setMode("notifications")}>Alerts {unread>0&&<b>{unread}</b>}</button><button className={mode==="settings"?"active":""} onClick={()=>setMode("settings")}>Settings</button></nav>{mode==="channels"&&<div className="network-channel-list">{channels.map((channel)=><button key={channel.id} className={String(selectedChannel)===String(channel.id)?"active":""} onClick={()=>setSelectedChannel(channel.id)}><b>{channel.icon}</b><span><strong>{channel.name}</strong><small>{channel.description}</small></span></button>)}</div>}{mode==="direct"&&<><label className="network-member-search"><span>NEW MESSAGE</span><input value={memberSearch} onChange={(event)=>setMemberSearch(event.target.value)} placeholder="Find a league member"/></label>{memberSearch&&<div className="network-member-results">{filteredMembers.map((user)=><button key={user.id} onClick={()=>startConversation(user.id)}><NetworkIdentity userId={user.id} users={users} teams={teams} assignments={assignments} currentYear={currentYear} compact/></button>)}</div>}<div className="network-conversation-list">{conversations.map((conversation)=>{const other=conversationOther(conversation.id);return <button key={conversation.id} className={String(selectedConversation)===String(conversation.id)?"active":""} onClick={()=>setSelectedConversation(conversation.id)}><NetworkIdentity userId={other?.id} users={users} teams={teams} assignments={assignments} currentYear={currentYear} compact/><small>{new Date(conversation.last_message_at).toLocaleDateString()}</small></button>})}</div></>}</aside><section className="network-stage">{mode==="notifications"?<div className="network-notifications"><header><div><span>CFBELITE NETWORK</span><h2>Notifications</h2></div><button onClick={markNotificationsRead}>Mark all read</button></header>{notifications.map((notification)=><button key={notification.id} className={notification.read_at?"":"unread"} onClick={()=>{if(notification.target_tab)setActiveTab?.(notification.target_tab);}}><i>{notification.icon||"CFB"}</i><span><strong>{notification.title}</strong><p>{notification.body}</p><small>{notification.channel_name?`#${notification.channel_name} • `:""}{new Date(notification.created_at).toLocaleString()}</small></span><em>›</em></button>)}</div>:mode==="settings"?<NotificationSettings preferences={preferences} savePreference={savePreference} enablePush={enablePush}/>:<><header className="network-stage-header"><div><span>{mode==="direct"?"PRIVATE CONVERSATION":selectedChannelRow?.channel_type?.toUpperCase()}</span><h2>{mode==="direct"?(conversationOther(selectedConversation)?.discord_username||"Select a conversation"):(selectedChannelRow?.name||"League Channel")}</h2><p>{mode==="direct"?"Only members of this conversation can read these messages.":selectedChannelRow?.description}</p></div>{mode==="channels"&&selectedChannelRow?.slug==="streams"&&<button onClick={()=>setActiveTab?.("redZone")}>Open RedZone</button>}</header><div className="network-message-feed">{displayedMessages.map((message)=><article key={message.id} className={String(message.author_discord_user_id)===String(linkedDiscordUser.id)?"mine":""}><NetworkIdentity userId={message.author_discord_user_id} users={users} teams={teams} assignments={assignments} currentYear={currentYear}/><p>{message.body}</p><time>{new Date(message.created_at).toLocaleString([],{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})}</time></article>)}{!displayedMessages.length&&<div className="network-empty"><b>Start the conversation.</b><span>This space is ready for the league.</span></div>}</div><div className="network-composer"><textarea value={draft} onChange={(event)=>setDraft(event.target.value)} onKeyDown={(event)=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();sendMessage();}}} placeholder={mode==="direct"?"Message privately…":`Message #${selectedChannelRow?.slug||"channel"}…`} disabled={mode==="direct"&&!selectedConversation}/><button disabled={busy||!draft.trim()||(mode==="direct"&&!selectedConversation)} onClick={sendMessage}>{busy?"Sending…":"Send"}</button><small>Enter to send • Shift + Enter for a new line</small></div></>}</section></div></main>;
 }
 
+function cleanNetworkChannelName(value=""){
+  return String(value).replace(/^#+\s*/,"").replace(/\s*#\s*$/,"").replace(/\s{2,}/g," ").trim();
+}
+
 function NetworkChannelMark({channel,size=38}) {
   const style={width:size,height:size};
   return channel?.image_url?<span className="network-channel-mark image" style={style}><img src={channel.image_url} alt=""/></span>:<span className="network-channel-mark glyph" style={style}>#</span>;
@@ -3353,16 +3357,25 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
     const team2=matchup?.team_2||teams.find((team)=>String(team.id)===String(matchup?.team_2_id));
     const isParticipant=[matchup?.team_1_user_id,matchup?.team_2_user_id].some((id)=>String(id)===String(linkedDiscordUser?.id));
     const matchupLabel=team1&&team2?`${getTeamAbbreviation(team1)} vs ${getTeamAbbreviation(team2)}`:"Private scheduling room";
-    return <button key={channel.id} className={`${String(selectedChannel)===String(channel.id)?"active":""} ${channel.is_auto_matchup?"matchup":""}`} onClick={()=>openMobileChannel(channel)}>
-      {channel.is_auto_matchup?<span className="network-matchup-logos"><TeamLogoMark team={team1} size={27}/><b>VS</b><TeamLogoMark team={team2} size={27}/></span>:<NetworkChannelMark channel={channel} size={38}/>} 
-      <span className={channel.is_auto_matchup?"network-matchup-copy":""}>{channel.is_auto_matchup?<><strong>{channel.week||"Matchup Room"}</strong><small>{matchupLabel}</small></>:<><strong>{channel.name}</strong><small>{channel.description}</small></>}</span>
-      {channel.is_auto_matchup?<em>{isParticipant?"YOUR GAME":"MATCHUP"}</em>:(channel.channel_type==="announcements"||channel.is_locked)&&<em>READ ONLY</em>}
+    const statusLabel=channel.is_auto_matchup?(isParticipant?"YOUR GAME":"MATCHUP"):((channel.channel_type==="announcements"||channel.is_locked)?"READ ONLY":"");
+    return <button key={channel.id} className={`${String(selectedChannel)===String(channel.id)?"active":""} ${channel.is_auto_matchup?"network-matchup-row":"network-standard-row"}`} onClick={()=>openMobileChannel(channel)}>
+      <span className="network-channel-leading">
+        {channel.is_auto_matchup
+          ? <span className="network-matchup-logos"><TeamLogoMark team={team1} size={23}/><b>VS</b><TeamLogoMark team={team2} size={23}/></span>
+          : <NetworkChannelMark channel={channel} size={28}/>}
+      </span>
+      <span className="network-channel-copy">
+        {channel.is_auto_matchup
+          ? <><strong>{matchupLabel}</strong><small>{channel.week||"Matchup Room"}</small></>
+          : <><strong>{cleanNetworkChannelName(channel.name)}</strong><small>{channel.description}</small></>}
+      </span>
+      {statusLabel&&<em>{statusLabel}</em>}
     </button>;
   };
   const renderCategory=(category)=>{const categoryChannels=channels.filter((channel)=>String(channel.category_id)===String(category.id));if(!categoryChannels.length)return null;return <React.Fragment key={category.id}><div className="network-channel-category" style={{"--category-color":category.color}}><i/>{category.name.toUpperCase()} <b>{categoryChannels.length}</b></div>{categoryChannels.map(renderChannelButton)}</React.Fragment>;};
-  const mobilePanelTitle=mode==="channels"?(selectedChannelRow?.name||"League Channel"):mode==="direct"?(conversationOther(selectedConversation)?.discord_username||"Direct Messages"):({news:"The Newsroom",notifications:"Alerts",roles:"Roles & Permissions",emojis:"League Emojis",categories:"Channel Categories",settings:"Settings"}[mode]||"CFBElite Network");
+  const mobilePanelTitle=mode==="channels"?(cleanNetworkChannelName(selectedChannelRow?.name)||"League Channel"):mode==="direct"?(conversationOther(selectedConversation)?.discord_username||"Direct Messages"):({news:"The Newsroom",notifications:"Alerts",roles:"Roles & Permissions",emojis:"League Emojis",categories:"Channel Categories",settings:"Settings"}[mode]||"CFBElite Network");
   const mobilePanelSub=mode==="channels"?`${onlineUsers.length} online • #${selectedChannelRow?.slug||"channel"}`:mode==="direct"?"Private conversation":"CFB Elite 27 Network";
-  const composerPlaceholder=postingBlocked?"Posting is restricted in this channel":mode==="direct"?"Message privately…":selectedChannelRow?.is_auto_matchup?"Message this matchup…":`Message #${selectedChannelRow?.name||"channel"}…`;
+  const composerPlaceholder=postingBlocked?"Posting is restricted in this channel":mode==="direct"?"Message privately…":selectedChannelRow?.is_auto_matchup?"Message this matchup…":`Message #${cleanNetworkChannelName(selectedChannelRow?.name)||"channel"}…`;
   const returnToDirectory=()=>{setMobileView("directory");setManageOpen(false);if(!["channels","direct"].includes(mode))setMode("channels");};
 
   if(mode==="news")return <main className="cfb-v2-page network-page newsroom-page"><header className="newsroom-page-bar"><button onClick={()=>{setMode("channels");setMobileView("directory");}}>‹ Back to CFBElite Network</button><div><span>CFB ELITE NETWORK</span><strong>Newsroom Control</strong></div><b>{onlineUsers.length} ONLINE</b></header><LeagueNewsroom articles={newsArticles} jobs={newsJobs} isCommissioner={isCommissioner} busy={newsBusy} onGenerate={generateLeagueNews} onSave={saveNewsDraft} onReview={reviewNewsArticle}/></main>;
@@ -3390,7 +3403,7 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
   {mode==="channels"&&canCreateChannels&&!selectedChannelRow?.is_auto_matchup&&<button onClick={()=>openChannelManager(selectedChannelRow)}>Manage Channel</button>}
 </div></header>{mode==="channels"&&<div className="network-channel-utilities">
   <div className="network-search-wrap">
-    <label><span>⌕</span><input value={socialMessageSearch} onFocus={()=>setNetworkSearchOpen(true)} onChange={(event)=>setSocialMessageSearch(event.target.value)} placeholder={`Search #${selectedChannelRow?.name||"channel"}`}/></label>
+    <label><span>⌕</span><input value={socialMessageSearch} onFocus={()=>setNetworkSearchOpen(true)} onChange={(event)=>setSocialMessageSearch(event.target.value)} placeholder={`Search #${cleanNetworkChannelName(selectedChannelRow?.name)||"channel"}`}/></label>
     <button className="network-search-filter-toggle" onClick={()=>setNetworkSearchOpen((value)=>!value)}>Filters</button>
     {networkSearchOpen&&<div className="network-search-popover">
       <header><b>Search Filters</b><button onClick={()=>setNetworkSearchOpen(false)}>×</button></header>
@@ -10783,6 +10796,34 @@ function GlobalStyle() {
         }
       }
 
+
+      /* v51-sidebar-structural-rebuild */
+      .cfb-identity-brand{gap:12px!important}.cfb-identity-brand>span{flex:0 0 44px!important;width:44px!important;height:44px!important;border-radius:12px!important;display:grid!important;place-items:center!important;font-size:11px!important;line-height:1!important;font-weight:1000!important;color:#fff!important;background:linear-gradient(145deg,#8f1111,#d92727)!important;border:1px solid rgba(250,204,21,.55)!important}.cfb-identity-brand>div{min-width:0!important}.cfb-identity-brand b{display:block!important;font-size:14px!important;white-space:nowrap!important}.cfb-identity-brand small{display:block!important;margin-top:3px!important;font-size:9px!important}
+
+      .network-channel-category{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:center!important;gap:8px!important;min-height:30px!important;margin:12px 4px 4px!important;padding:4px 6px!important;color:#aeb4bd!important;font-size:10px!important;font-weight:1000!important;letter-spacing:.065em!important;line-height:1.1!important}.network-channel-category i{display:none!important}.network-channel-category b{justify-self:end!important;color:#64748b!important;font-size:8px!important;font-weight:900!important}
+
+      .network-channel-list{padding:0 6px 16px!important}
+      .network-channel-list>button{position:relative!important;display:grid!important;grid-template-columns:42px minmax(0,1fr) auto!important;grid-template-areas:"leading copy status"!important;align-items:center!important;column-gap:10px!important;width:100%!important;min-width:0!important;min-height:46px!important;margin:1px 0!important;padding:6px 8px!important;overflow:hidden!important;border:0!important;border-radius:6px!important;background:transparent!important;box-shadow:none!important;text-align:left!important}
+      .network-channel-list>button:hover{background:#35373c!important}.network-channel-list>button.active{background:#404249!important}
+      .network-channel-leading{grid-area:leading!important;width:42px!important;height:34px!important;min-width:42px!important;display:grid!important;place-items:center!important;overflow:visible!important}
+      .network-channel-copy{grid-area:copy!important;min-width:0!important;overflow:hidden!important}
+      .network-channel-copy strong,.network-channel-copy small{display:block!important;min-width:0!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}
+      .network-channel-copy strong{color:#b5bac1!important;font-size:14px!important;font-weight:700!important;line-height:1.2!important}.network-channel-copy small{margin-top:2px!important;color:#7d838d!important;font-size:9px!important;line-height:1.05!important}
+      .network-channel-list>button.active .network-channel-copy strong,.network-channel-list>button:hover .network-channel-copy strong{color:#f2f3f5!important}
+      .network-channel-list>button em{grid-area:status!important;position:static!important;right:auto!important;top:auto!important;transform:none!important;max-width:72px!important;justify-self:end!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;color:#f0b232!important;font-size:7px!important;font-style:normal!important;font-weight:1000!important;letter-spacing:.035em!important;text-align:right!important;pointer-events:none!important}
+
+      .network-standard-row .network-channel-mark{width:28px!important;height:28px!important;min-width:28px!important;display:grid!important;place-items:center!important;border:0!important;background:transparent!important;color:#949ba4!important;font-size:22px!important;line-height:1!important}
+      .network-standard-row .network-channel-mark.glyph{font-size:0!important}.network-standard-row .network-channel-mark.glyph::before{content:"#";font-size:22px!important;font-weight:500!important;color:#949ba4!important}
+
+      .network-matchup-row{min-height:52px!important}
+      .network-matchup-logos{display:grid!important;grid-template-columns:20px 10px 20px!important;align-items:center!important;justify-content:center!important;gap:0!important;width:42px!important;height:34px!important;overflow:visible!important}
+      .network-matchup-logos img{width:20px!important;height:20px!important;object-fit:contain!important}
+      .network-matchup-logos b{font-size:7px!important;color:#facc15!important;text-align:center!important}
+      .network-matchup-row .network-channel-copy strong{font-size:12px!important}.network-matchup-row .network-channel-copy small{color:#949ba4!important;font-size:10px!important}
+
+      @media(min-width:901px){.discord-clone-page .network-layout{grid-template-columns:68px 320px minmax(0,1fr) 248px!important}}
+      @media(max-width:900px){.network-channel-category{min-height:32px!important;margin-top:14px!important;font-size:11px!important}.network-channel-list>button{min-height:50px!important;padding:8px 10px!important}.network-channel-copy strong{font-size:15px!important}.network-channel-list>button em{max-width:76px!important;font-size:7px!important}}
+      @media(max-width:560px){.network-channel-list>button{grid-template-columns:42px minmax(0,1fr) auto!important;padding-right:9px!important}.network-channel-list>button em{position:static!important;right:auto!important;top:auto!important;transform:none!important}}
 `}</style>
   );
 }
