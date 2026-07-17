@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
-const CFBELITE_SOCIAL_BUILD = "v43-ui-ux-polish";
+const CFBELITE_SOCIAL_BUILD = "v44-network-discord-mimic";
 console.info("CFBElite Network build", CFBELITE_SOCIAL_BUILD);
 
 const supabase = createClient(
@@ -992,7 +992,7 @@ export default function App() {
     await saveCommissionerRankings(next);
   }
 
-  const baseTabs = [["dashboard","Home"],["leagueHub","CFBElite Discord"],["newsroom","Newsroom"],["schedule","GameCenter"],["eliteBooks","Elite Books"],["redZone","RedZone"],["myTeam","My Team"],["rankingsCenter","Rankings Center"],["teamsCoaches","Teams & Coaches"],["leagueArchive","League Archive"],["dataIntake","Upload Screenshots"],["automaticRankings","Automatic Rankings"],["gameTop25","Dynasty Top 25"],["teamSchedules","Team Schedules"],["dynastyData","Season Data Archive"],["sportsbookHistory","All-Time Sportsbook"],["allTeamsRatings","Teams"],["eloRankings","User ELO"],["powerIndex","All-Time Coach Rankings"],["rankingHistory","Ranking History"],["conferencePower","Conference Power"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["h2h","User vs User H2H"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],["commissionerCenter","Commissioner Center"],["sportsbookManager","Elite Books Manager"],["weeklyMatchups","Schedule Manager"],["userManager","League Members"],["assignments","Team Assignments"],["leagueDataCenter","League Data Center"],["resultsManager","Results Manager"],["logoManager","Team Assets"],["draftRoom","CFBElite 27 Draft Room"],...coachProfileUsers.map((user) => [`coach-${user.id}`, user.activeTeamName || user.discord_username])];
+  const baseTabs = [["dashboard","Home"],["leagueHub","CFBElite Network"],["newsroom","Newsroom"],["schedule","GameCenter"],["eliteBooks","Elite Books"],["redZone","RedZone"],["myTeam","My Team"],["rankingsCenter","Rankings Center"],["teamsCoaches","Teams & Coaches"],["leagueArchive","League Archive"],["dataIntake","Upload Screenshots"],["automaticRankings","Automatic Rankings"],["gameTop25","Dynasty Top 25"],["teamSchedules","Team Schedules"],["dynastyData","Season Data Archive"],["sportsbookHistory","All-Time Sportsbook"],["allTeamsRatings","Teams"],["eloRankings","User ELO"],["powerIndex","All-Time Coach Rankings"],["rankingHistory","Ranking History"],["conferencePower","Conference Power"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["h2h","User vs User H2H"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],["commissionerCenter","Commissioner Center"],["sportsbookManager","Elite Books Manager"],["weeklyMatchups","Schedule Manager"],["userManager","League Members"],["assignments","Team Assignments"],["leagueDataCenter","League Data Center"],["resultsManager","Results Manager"],["logoManager","Team Assets"],["draftRoom","CFBElite 27 Draft Room"],...coachProfileUsers.map((user) => [`coach-${user.id}`, user.activeTeamName || user.discord_username])];
   const tabs = useMemo(() => {
     const tabMap = new Map(baseTabs);
     const ordered = tabOrder
@@ -2994,7 +2994,7 @@ function NetworkRoleManager({roles=[],roleMembers=[],users=[],roleForm,setRoleFo
 }
 
 function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignments=[],weeklyMatchups=[],currentYear,setActiveTab,setError}) {
-  console.info("CFBElite Discord build v41-discord-clone");
+  console.info("CFBElite Network build v44-network-discord-mimic");
   const [mode,setMode]=useState("channels");
   const [mobileView,setMobileView]=useState("directory");
   const [channels,setChannels]=useState([]);
@@ -3010,6 +3010,9 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
   const [directMessages,setDirectMessages]=useState([]);
   const [notifications,setNotifications]=useState([]);
   const [socialMessageSearch,setSocialMessageSearch]=useState("");
+  const [networkSearchOpen,setNetworkSearchOpen]=useState(false);
+  const [networkSearchAuthor,setNetworkSearchAuthor]=useState("");
+  const [networkSearchHas,setNetworkSearchHas]=useState("any");
   const [pinnedOnly,setPinnedOnly]=useState(false);
   const [polls,setPolls]=useState([]);
   const [pollOptions,setPollOptions]=useState([]);
@@ -3230,7 +3233,17 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
   const conversationOther=(conversationId)=>{const member=conversationMembers.find((row)=>String(row.conversation_id)===String(conversationId)&&String(row.discord_user_id)!==String(linkedDiscordUser.id));return users.find((row)=>String(row.id)===String(member?.discord_user_id));};
   const filteredMembers=users.filter((user)=>user.is_active!==false&&!user.is_banned&&String(user.id)!==String(linkedDiscordUser.id)&&String(user.discord_username).toLowerCase().includes(memberSearch.toLowerCase())).slice(0,12);
   const rawDisplayedMessages=mode==="direct"?directMessages:messages;
-  const displayedMessages=rawDisplayedMessages.filter((message)=>{const searchMatch=!socialMessageSearch||String(message.body||"").toLowerCase().includes(socialMessageSearch.toLowerCase())||String(users.find((user)=>String(user.id)===String(message.author_discord_user_id))?.discord_username||"").toLowerCase().includes(socialMessageSearch.toLowerCase());const pinMatch=!pinnedOnly||Boolean(message.is_pinned);return searchMatch&&pinMatch;});
+  const displayedMessages=rawDisplayedMessages.filter((message)=>{
+    const authorName=String(users.find((user)=>String(user.id)===String(message.author_discord_user_id))?.discord_username||"");
+    const body=String(message.body||"");
+    const searchMatch=!socialMessageSearch||body.toLowerCase().includes(socialMessageSearch.toLowerCase())||authorName.toLowerCase().includes(socialMessageSearch.toLowerCase());
+    const authorMatch=!networkSearchAuthor||authorName.toLowerCase().includes(networkSearchAuthor.toLowerCase());
+    const hasLink=/https?:\/\//i.test(body);
+    const hasImage=/\.(gif|png|jpe?g|webp)(?:\?.*)?$/im.test(body)||/tenor\.com|giphy\.com/i.test(body);
+    const typeMatch=networkSearchHas==="any"||(networkSearchHas==="link"&&hasLink)||(networkSearchHas==="image"&&hasImage);
+    const pinMatch=!pinnedOnly||Boolean(message.is_pinned);
+    return searchMatch&&authorMatch&&typeMatch&&pinMatch;
+  });
   const activePresence=presence.filter((row)=>Date.now()-new Date(row.last_seen_at).getTime()<90000&&row.status!=="offline");
   const presenceUserIds=new Set(activePresence.map((row)=>String(row.discord_user_id)));
   const onlineUsers=users.filter((user)=>presenceUserIds.has(String(user.id))&&!user.is_banned);
@@ -3262,23 +3275,49 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
     </button>;
   };
   const renderCategory=(category)=>{const categoryChannels=channels.filter((channel)=>String(channel.category_id)===String(category.id));if(!categoryChannels.length)return null;return <React.Fragment key={category.id}><div className="network-channel-category" style={{"--category-color":category.color}}><i/>{category.name.toUpperCase()} <b>{categoryChannels.length}</b></div>{categoryChannels.map(renderChannelButton)}</React.Fragment>;};
-  const mobilePanelTitle=mode==="channels"?(selectedChannelRow?.name||"League Channel"):mode==="direct"?(conversationOther(selectedConversation)?.discord_username||"Direct Messages"):({news:"The Newsroom",notifications:"Alerts",roles:"Roles & Permissions",emojis:"League Emojis",categories:"Channel Categories",settings:"Settings"}[mode]||"CFBElite Discord");
+  const mobilePanelTitle=mode==="channels"?(selectedChannelRow?.name||"League Channel"):mode==="direct"?(conversationOther(selectedConversation)?.discord_username||"Direct Messages"):({news:"The Newsroom",notifications:"Alerts",roles:"Roles & Permissions",emojis:"League Emojis",categories:"Channel Categories",settings:"Settings"}[mode]||"CFBElite Network");
   const mobilePanelSub=mode==="channels"?`${onlineUsers.length} online • #${selectedChannelRow?.slug||"channel"}`:mode==="direct"?"Private conversation":"CFB Elite 27 Network";
   const composerPlaceholder=postingBlocked?"Posting is restricted in this channel":mode==="direct"?"Message privately…":selectedChannelRow?.is_auto_matchup?"Message this matchup…":`Message #${selectedChannelRow?.name||"channel"}…`;
   const returnToDirectory=()=>{setMobileView("directory");setManageOpen(false);if(!["channels","direct"].includes(mode))setMode("channels");};
 
-  if(mode==="news")return <main className="cfb-v2-page network-page newsroom-page"><header className="newsroom-page-bar"><button onClick={()=>{setMode("channels");setMobileView("directory");}}>‹ Back to CFBElite Discord</button><div><span>CFB ELITE NETWORK</span><strong>Newsroom Control</strong></div><b>{onlineUsers.length} ONLINE</b></header><LeagueNewsroom articles={newsArticles} jobs={newsJobs} isCommissioner={isCommissioner} busy={newsBusy} onGenerate={generateLeagueNews} onSave={saveNewsDraft} onReview={reviewNewsArticle}/></main>;
+  if(mode==="news")return <main className="cfb-v2-page network-page newsroom-page"><header className="newsroom-page-bar"><button onClick={()=>{setMode("channels");setMobileView("directory");}}>‹ Back to CFBElite Network</button><div><span>CFB ELITE NETWORK</span><strong>Newsroom Control</strong></div><b>{onlineUsers.length} ONLINE</b></header><LeagueNewsroom articles={newsArticles} jobs={newsJobs} isCommissioner={isCommissioner} busy={newsBusy} onGenerate={generateLeagueNews} onSave={saveNewsDraft} onReview={reviewNewsArticle}/></main>;
 
   return <main className={`cfb-v2-page network-page discord-clone-page network-mobile-${mobileView}`}>
-    <section className="network-hero discord-server-banner"><div><span>CFBELITE 27</span><h1>CFBElite Discord</h1><p>League channels, direct messages, reactions, replies and notifications.</p></div><div className="network-live-presence"><i/><strong>{onlineUsers.length}</strong><span>ONLINE</span></div></section>
-    <header className="network-mobile-hub-header"><button onClick={returnToDirectory} aria-label="Back to channels">{mobileView==="directory"?"#":"‹"}</button><div><strong>{mobileView==="directory"?"CFBElite 27 Dynasty":mobilePanelTitle}</strong><small>{mobileView==="directory"?`${onlineUsers.length} online • CFBElite Discord`:mobilePanelSub}</small></div>{mobileView==="directory"?<i className="online"/>:mode==="channels"&&canCreateChannels&&!selectedChannelRow?.is_auto_matchup?<button className="network-mobile-channel-actions" onClick={()=>{openChannelManager(selectedChannelRow);setMobileView("panel");}} aria-label="Manage channel">•••</button>:null}</header>
-    <div className="network-layout"><aside className="network-sidebar">
+    <section className="network-hero discord-server-banner"><div><span>CFBELITE 27</span><h1>CFBElite Network</h1><p>League channels, direct messages, reactions, replies and notifications.</p></div><div className="network-live-presence"><i/><strong>{onlineUsers.length}</strong><span>ONLINE</span></div></section>
+    <header className="network-mobile-hub-header"><button onClick={returnToDirectory} aria-label="Back to channels">{mobileView==="directory"?"#":"‹"}</button><div><strong>{mobileView==="directory"?"CFBElite 27 Dynasty":mobilePanelTitle}</strong><small>{mobileView==="directory"?`${onlineUsers.length} online • CFBElite Network`:mobilePanelSub}</small></div>{mobileView==="directory"?<i className="online"/>:mode==="channels"&&canCreateChannels&&!selectedChannelRow?.is_auto_matchup?<button className="network-mobile-channel-actions" onClick={()=>{openChannelManager(selectedChannelRow);setMobileView("panel");}} aria-label="Manage channel">•••</button>:null}</header>
+    <div className="network-layout">
+      <aside className="network-server-rail" aria-label="CFBElite Network shortcuts">
+        <button className="active" title="CFBElite Network"><span>27</span></button>
+        <i/>
+        <button title="Channels" onClick={()=>{setMode("channels");setMobileView("directory");}}>＃</button>
+        <button title="Direct Messages" onClick={()=>{setMode("direct");setMobileView("directory");}}>●</button>
+        <button title="Notifications" onClick={()=>{setMode("notifications");setMobileView("panel");}}>♢{unread>0&&<b>{unread}</b>}</button>
+        <button title="Newsroom" onClick={()=>{setMode("news");setMobileView("panel");}}>N</button>
+      </aside>
+      <aside className="network-sidebar">
       <div className="network-mobile-directory-title"><strong>CFBElite 27 Dynasty</strong><span>League channels and conversations</span></div>
       <nav><button className={mode==="channels"?"active":""} onClick={()=>{setMode("channels");setMobileView("directory");setManageOpen(false);}}>Channels</button><button className={mode==="direct"?"active":""} onClick={()=>{setMode("direct");setMobileView("directory");setManageOpen(false);}}>Messages</button><button className={mode==="notifications"?"active":""} onClick={()=>{setMode("notifications");setMobileView("panel");setManageOpen(false);}}>Alerts {unread>0&&<b>{unread}</b>}</button><button className={mode==="roles"?"active":""} onClick={()=>{setMode("roles");setMobileView("panel");setManageOpen(false);}}>Roles</button><button className={mode==="emojis"?"active":""} onClick={()=>{setMode("emojis");setMobileView("panel");setManageOpen(false);}}>Emojis</button><button className={mode==="settings"?"active":""} onClick={()=>{setMode("settings");setMobileView("panel");setManageOpen(false);}}>Settings</button></nav>
       {mode==="channels"&&<><div className="network-sidebar-label"><span>CHANNELS</span>{canCreateChannels&&<span className="network-sidebar-tools"><button onClick={()=>{setCategoryForm({id:null,name:"",color:"#38bdf8",sort_order:(categories.at(-1)?.sort_order||0)+10,is_system:false});setMode("categories");setMobileView("panel");setManageOpen(false);}}>Categories</button><button onClick={()=>{openChannelManager();setMobileView("panel");}}>＋ New</button></span>}</div><div className="network-channel-list">{categories.map(renderCategory)}{uncategorizedChannels.length>0&&<><div className="network-channel-category"><i/>OTHER <b>{uncategorizedChannels.length}</b></div>{uncategorizedChannels.map(renderChannelButton)}</>}</div><div className="network-online-roster"><header><i/><span>ONLINE NOW</span><b>{onlineUsers.length}</b></header>{onlineUsers.slice(0,12).map((user)=><div key={user.id}><span className="network-presence-dot"/><NetworkIdentity userId={user.id} users={users} teams={teams} assignments={assignments} currentYear={currentYear} compact/></div>)}{!onlineUsers.length&&<small>No other members are active right now.</small>}</div></>}
       {mode==="direct"&&<><label className="network-member-search"><span>NEW MESSAGE</span><input value={memberSearch} onChange={(event)=>setMemberSearch(event.target.value)} placeholder="Find a league member"/></label>{memberSearch&&<div className="network-member-results">{filteredMembers.map((user)=><button key={user.id} onClick={()=>startConversation(user.id)}><NetworkIdentity userId={user.id} users={users} teams={teams} assignments={assignments} currentYear={currentYear} compact/></button>)}</div>}<div className="network-conversation-list">{conversations.map((conversation)=>{const other=conversationOther(conversation.id);return <button key={conversation.id} className={String(selectedConversation)===String(conversation.id)?"active":""} onClick={()=>{setSelectedConversation(conversation.id);setMobileView("chat");}}><NetworkIdentity userId={other?.id} users={users} teams={teams} assignments={assignments} currentYear={currentYear} compact/><small>{new Date(conversation.last_message_at).toLocaleDateString()}</small></button>;})}</div></>}
     </aside><section className="network-stage">
-      {mode==="roles"?<NetworkRoleManager roles={roles} roleMembers={roleMembers} users={users} roleForm={roleForm} setRoleForm={setRoleForm} isCommissioner={isCommissioner} busy={busy} saveRole={saveRole} deleteRole={deleteRole} toggleRoleMember={toggleRoleMember}/>:mode==="emojis"?<NetworkEmojiLibrary customEmojis={customEmojis} isCommissioner={isCommissioner} emojiUpload={emojiUpload} setEmojiUpload={setEmojiUpload} emojiBusy={emojiBusy} uploadCustomEmoji={uploadCustomEmoji} deleteCustomEmoji={deleteCustomEmoji}/>:mode==="categories"?<NetworkCategoryManager categories={categories} categoryForm={categoryForm} setCategoryForm={setCategoryForm} busy={busy} saveCategory={saveCategory} deleteCategory={deleteCategory}/>:mode==="notifications"?<div className="network-notifications"><header><div><span>INBOX</span><h2>Notifications</h2></div><button onClick={markNotificationsRead}>Mark all read</button></header>{notifications.map((notification)=><button key={notification.id} className={notification.read_at?"":"unread"} onClick={()=>{if(notification.target_tab)setActiveTab?.(notification.target_tab);}}><i/><span><strong>{notification.title}</strong><p>{notification.body}</p><small>{new Date(notification.created_at).toLocaleString()}</small></span></button>)}</div>:mode==="settings"?<NotificationSettings preferences={preferences} savePreference={savePreference} enablePush={enablePush}/>:manageOpen?<div className="network-channel-manager"><header><div><span>COMMISSIONER CHANNEL CONTROL</span><h2>{channelForm.id?`Manage #${channelForm.name}`:"Create a Channel"}</h2><p>Brand the channel, assign its category and control member posting.</p></div><button onClick={()=>setManageOpen(false)}>Close</button></header><div className="network-channel-form"><label><span>Channel Name</span><input value={channelForm.name} onChange={(event)=>setChannelForm({...channelForm,name:event.target.value,slug:channelForm.id?channelForm.slug:event.target.value.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")})}/></label><label><span>URL Slug</span><input value={channelForm.slug} onChange={(event)=>setChannelForm({...channelForm,slug:event.target.value})}/></label><label className="wide"><span>Description</span><input value={channelForm.description} onChange={(event)=>setChannelForm({...channelForm,description:event.target.value})}/></label><label><span>Category</span><select value={channelForm.category_id||""} onChange={(event)=>setChannelForm({...channelForm,category_id:event.target.value})}><option value="">No Category</option>{categories.map((category)=><option key={category.id} value={category.id}>{category.name}</option>)}</select></label><label className="wide"><span>Channel Logo Image URL (optional)</span><input value={channelForm.image_url} onChange={(event)=>setChannelForm({...channelForm,image_url:event.target.value})} placeholder="https://…"/></label><label><span>Channel Type</span><select value={channelForm.channel_type} onChange={(event)=>setChannelForm({...channelForm,channel_type:event.target.value})}><option value="public">Public</option><option value="announcements">Announcements</option><option value="game">Game Day</option><option value="sportsbook">Sportsbook</option><option value="streams">Streams</option></select></label><label><span>Order</span><input type="number" value={channelForm.sort_order} onChange={(event)=>setChannelForm({...channelForm,sort_order:event.target.value})}/></label><label className="network-lock-toggle"><input type="checkbox" checked={Boolean(channelForm.is_locked)} onChange={(event)=>setChannelForm({...channelForm,is_locked:event.target.checked})}/><span>Commissioner / manager posting only</span></label><div className="network-manager-actions"><button disabled={busy} onClick={saveChannel}>{busy?"Saving…":"Save Channel"}</button>{channelForm.id&&<button className="danger" onClick={archiveChannel}>Delete Channel</button>}</div></div>{channelForm.id&&<div className="network-permission-panel"><header><div><span>INDIVIDUAL PERMISSIONS</span><h3>Member Access Overrides</h3></div></header><div><label><span>League Member</span><select value={permissionUserId} onChange={(event)=>selectPermissionUser(event.target.value)}><option value="">Select a member…</option>{users.filter((user)=>!user.is_banned).map((user)=><option key={user.id} value={user.id}>{user.discord_username}</option>)}</select></label>{permissionUserId&&<><label><span>View Channel</span><select value={permissionDraft.view} onChange={(event)=>setPermissionDraft({...permissionDraft,view:event.target.value})}><option value="inherit">League Default</option><option value="allow">Allow</option><option value="deny">Deny</option></select></label><label><span>Post Messages</span><select value={permissionDraft.post} onChange={(event)=>setPermissionDraft({...permissionDraft,post:event.target.value})}><option value="inherit">Channel Default</option><option value="allow">Allow</option><option value="deny">Deny</option></select></label><label><span>Manage Channel</span><select value={permissionDraft.manage} onChange={(event)=>setPermissionDraft({...permissionDraft,manage:event.target.value})}><option value="inherit">No Override</option><option value="allow">Allow</option><option value="deny">Deny</option></select></label><label><span>Muted Until</span><input type="datetime-local" value={permissionDraft.muted_until} onChange={(event)=>setPermissionDraft({...permissionDraft,muted_until:event.target.value})}/></label><button onClick={saveChannelPermission}>Save Permission</button></>}</div></div>}</div>:<><header className="network-stage-header"><div className="network-stage-channel"><NetworkChannelMark channel={mode==="channels"?selectedChannelRow:null} size={48}/><div><span>{mode==="direct"?"PRIVATE CONVERSATION":selectedChannelRow?.channel_type?.toUpperCase()}</span><h2>{mode==="direct"?(conversationOther(selectedConversation)?.discord_username||"Select a conversation"):(selectedChannelRow?.name||"League Channel")}</h2><p>{mode==="direct"?"Only members of this conversation can read these messages.":selectedChannelRow?.description}</p></div></div><div className="network-stage-actions">{mode==="channels"&&selectedChannelRow?.slug==="streams"&&<button onClick={()=>setActiveTab?.("redZone")}>Open RedZone</button>}{mode==="channels"&&canCreateChannels&&!selectedChannelRow?.is_auto_matchup&&<button onClick={()=>openChannelManager(selectedChannelRow)}>Manage Channel</button>}</div></header>{mode==="channels"&&<div className="network-channel-utilities"><label><span>⌕</span><input value={socialMessageSearch} onChange={(event)=>setSocialMessageSearch(event.target.value)} placeholder={`Search #${selectedChannelRow?.name||"channel"}`}/></label><button className={pinnedOnly?"active":""} onClick={()=>setPinnedOnly((value)=>!value)}>📌 {pinnedOnly?"Showing Pins":"Pinned"}</button></div>}{mode==="channels"&&selectedChannelRow?.slug==="player-reporting"&&<section className="network-reporting-card"><div><span>CONFIDENTIAL REPORTING</span><h3>Report a League Member</h3><p>Use the official Google Form. Reports stay outside the public channel and go directly to the commissioner review workflow.</p></div>{reportingUrl?<a href={reportingUrl} target="_blank" rel="noreferrer">Open Player Report Form ↗</a>:<b>Reporting form link has not been added yet.</b>}{isCommissioner&&<div><input value={reportingDraft} onChange={(event)=>setReportingDraft(event.target.value)} placeholder="Paste the Google Form URL"/><button onClick={saveReportingUrl}>Save Link</button></div>}</section>}{mode==="channels"&&selectedChannelRow?.slug==="polls"&&<section className="network-poll-zone">{isCommissioner&&<div className="network-poll-builder"><header><span>CREATE A POLL</span><h3>Ask the League</h3></header><input value={pollForm.question} onChange={(event)=>setPollForm({...pollForm,question:event.target.value})} placeholder="Poll question"/><textarea value={pollForm.description} onChange={(event)=>setPollForm({...pollForm,description:event.target.value})} placeholder="Optional context"/>{pollForm.options.map((option,index)=><div key={index}><input value={option} onChange={(event)=>setPollForm({...pollForm,options:pollForm.options.map((value,itemIndex)=>itemIndex===index?event.target.value:value)})} placeholder={`Choice ${index+1}`}/>{pollForm.options.length>2&&<button onClick={()=>setPollForm({...pollForm,options:pollForm.options.filter((_,itemIndex)=>itemIndex!==index)})}>×</button>}</div>)}<button className="secondary" onClick={()=>setPollForm({...pollForm,options:[...pollForm.options,""]})}>＋ Add Choice</button><div className="network-poll-options"><label><input type="checkbox" checked={pollForm.multiple_choice} onChange={(event)=>setPollForm({...pollForm,multiple_choice:event.target.checked})}/> Multiple choices</label><label><input type="checkbox" checked={pollForm.anonymous} onChange={(event)=>setPollForm({...pollForm,anonymous:event.target.checked})}/> Anonymous voting</label><label><input type="checkbox" checked={pollForm.hide_results} onChange={(event)=>setPollForm({...pollForm,hide_results:event.target.checked})}/> Hide results until close</label><label>Ends <input type="datetime-local" value={pollForm.ends_at} onChange={(event)=>setPollForm({...pollForm,ends_at:event.target.value})}/></label></div><button disabled={busy} onClick={createPoll}>Publish Poll</button></div>}<div className="network-poll-list">{polls.map((poll)=>{const options=pollOptions.filter((row)=>String(row.poll_id)===String(poll.id));const votes=pollVotes.filter((row)=>String(row.poll_id)===String(poll.id));const myVotes=new Set(votes.filter((row)=>String(row.discord_user_id)===String(linkedDiscordUser.id)).map((row)=>String(row.option_id)));const total=votes.length;const hidden=poll.hide_results&&!poll.is_closed&&new Date(poll.ends_at||"2999-01-01")>new Date();return <article key={poll.id}><header><div><span>{pollCountdown(poll)}</span><h3>{poll.question}</h3><p>{poll.description}</p></div>{isCommissioner&&!poll.is_closed&&<button onClick={()=>closePoll(poll)}>Close Poll</button>}</header><div>{options.map((option)=>{const count=votes.filter((vote)=>String(vote.option_id)===String(option.id)).length;const pct=total?Math.round((count/total)*100):0;return <button key={option.id} className={myVotes.has(String(option.id))?"voted":""} disabled={poll.is_closed||new Date(poll.ends_at||"2999-01-01")<=new Date()} onClick={()=>votePoll(poll,option.id)}><span><b>{option.option_text}</b><em>{hidden?"Results hidden":`${count} vote${count===1?"":"s"} • ${pct}%`}</em></span>{!hidden&&<i style={{width:`${pct}%`}}/>}</button>})}</div><footer>{total} total vote{total===1?"":"s"} • {poll.multiple_choice?"Multiple choice":"Single choice"} • {poll.anonymous?"Anonymous":"Public voters"}</footer></article>})}{!polls.length&&<div className="network-empty"><b>No polls yet.</b><span>A commissioner can create the first league poll above.</span></div>}</div></section>}<div className="network-message-feed">{displayedMessages.map((message)=>{const parent=displayedMessages.find((row)=>String(row.id)===String(message.reply_to_id));const mine=String(message.author_discord_user_id)===String(linkedDiscordUser.id);return <article key={message.id} className={mine?"mine":""}>{parent&&<button className="network-reply-context" onClick={()=>document.getElementById(`network-message-${parent.id}`)?.scrollIntoView({behavior:"smooth",block:"center"})}><b>↳ {users.find((user)=>String(user.id)===String(parent.author_discord_user_id))?.discord_username||"League Member"}</b><span><NetworkMessageBody body={parent.body} customEmojis={customEmojis}/></span></button>}<div id={`network-message-${message.id}`} className="network-message-head"><NetworkIdentity userId={message.author_discord_user_id} users={users} teams={teams} assignments={assignments} currentYear={currentYear}/><time>{new Date(message.created_at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}{message.edited_at?" • edited":""}</time></div><p><NetworkMessageBody body={message.body} customEmojis={customEmojis}/></p><div className="network-message-toolbar"><button onClick={()=>setReplyingTo(message)}>↩ Reply</button>{mode==="channels"&&canModerate&&<button className={message.is_pinned?"pinned":""} onClick={()=>togglePinnedMessage(message)}>📌 {message.is_pinned?"Unpin":"Pin"}</button>}{mode==="channels"&&(mine||canModerate)&&<><button onClick={()=>editMessage(message)}>Edit</button><button className="danger" onClick={()=>deleteMessage(message)}>Delete</button></>}</div>{mode==="channels"&&<div className="network-reaction-row">{reactionsFor(message.id).map((item)=><button key={item.reaction} className={item.mine?"mine":""} onClick={()=>toggleReaction(message.id,item.reaction)}><NetworkEmojiToken value={item.reaction} customEmojis={customEmojis}/> <b>{item.count}</b></button>)}<span className="network-quick-react">{NETWORK_EMOJIS.slice(0,6).map((emoji)=><button key={emoji} onClick={()=>toggleReaction(message.id,emoji)}>{emoji}</button>)}</span>{customEmojis.slice(0,4).map((emoji)=><button key={emoji.id} onClick={()=>toggleReaction(message.id,`:${emoji.name}:`)}><img src={emoji.image_url} alt={emoji.name}/></button>)}</div>}</article>;})}{!displayedMessages.length&&<div className="network-empty"><b>Start the conversation.</b><span>This space is ready for the league.</span></div>}</div><div className="network-composer">{replyingTo&&<div className="network-replying"><span><b>Replying to {users.find((user)=>String(user.id)===String(replyingTo.author_discord_user_id))?.discord_username||"League Member"}</b><small>{replyingTo.body}</small></span><button onClick={()=>setReplyingTo(null)}>×</button></div>}<div className="network-compose-box"><textarea value={draft} onChange={(event)=>setDraft(event.target.value)} onKeyDown={(event)=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();sendMessage();}}} placeholder={composerPlaceholder} disabled={(mode==="direct"&&!selectedConversation)||postingBlocked}/><button className="network-gif-toggle" onClick={addGif} title="Add GIF">GIF</button><button className="network-emoji-toggle" onClick={()=>setEmojiOpen(!emojiOpen)} title="Add emoji">☺</button>{emojiOpen&&<div className="network-emoji-picker">{NETWORK_EMOJIS.map((emoji)=><button key={emoji} onClick={()=>{setDraft((value)=>`${value}${emoji}`);setEmojiOpen(false);}}>{emoji}</button>)}{customEmojis.map((emoji)=><button key={emoji.id} title={`:${emoji.name}:`} onClick={()=>{setDraft((value)=>`${value}:${emoji.name}:`);setEmojiOpen(false);}}><img src={emoji.image_url} alt={emoji.name}/></button>)}</div>}</div><button className="network-send" disabled={busy||!draft.trim()||(mode==="direct"&&!selectedConversation)||postingBlocked} onClick={sendMessage}>{busy?"Sending…":"Send"}</button><small>Enter to send • Shift + Enter for a new line</small></div></>}</section><aside className="network-member-rail"><header><span>LEAGUE MEMBERS</span><b>{onlineUsers.length} ONLINE</b></header><div>{displayMembers.map((user)=>{const role=topRoleForUser(user.id);const online=presenceUserIds.has(String(user.id));return <button key={user.id} onClick={()=>String(user.id)!==String(linkedDiscordUser.id)&&startConversation(user.id)}><i className={online?"online":""}/><NetworkIdentity userId={user.id} users={users} teams={teams} assignments={assignments} currentYear={currentYear} compact/><em style={{color:role?.color||"#64748b"}}>{role?.name||"League Member"}</em></button>})}</div></aside></div>
+      {mode==="roles"?<NetworkRoleManager roles={roles} roleMembers={roleMembers} users={users} roleForm={roleForm} setRoleForm={setRoleForm} isCommissioner={isCommissioner} busy={busy} saveRole={saveRole} deleteRole={deleteRole} toggleRoleMember={toggleRoleMember}/>:mode==="emojis"?<NetworkEmojiLibrary customEmojis={customEmojis} isCommissioner={isCommissioner} emojiUpload={emojiUpload} setEmojiUpload={setEmojiUpload} emojiBusy={emojiBusy} uploadCustomEmoji={uploadCustomEmoji} deleteCustomEmoji={deleteCustomEmoji}/>:mode==="categories"?<NetworkCategoryManager categories={categories} categoryForm={categoryForm} setCategoryForm={setCategoryForm} busy={busy} saveCategory={saveCategory} deleteCategory={deleteCategory}/>:mode==="notifications"?<div className="network-notifications"><header><div><span>INBOX</span><h2>Notifications</h2></div><button onClick={markNotificationsRead}>Mark all read</button></header>{notifications.map((notification)=><button key={notification.id} className={notification.read_at?"":"unread"} onClick={()=>{if(notification.target_tab)setActiveTab?.(notification.target_tab);}}><i/><span><strong>{notification.title}</strong><p>{notification.body}</p><small>{new Date(notification.created_at).toLocaleString()}</small></span></button>)}</div>:mode==="settings"?<NotificationSettings preferences={preferences} savePreference={savePreference} enablePush={enablePush}/>:manageOpen?<div className="network-channel-manager"><header><div><span>COMMISSIONER CHANNEL CONTROL</span><h2>{channelForm.id?`Manage #${channelForm.name}`:"Create a Channel"}</h2><p>Brand the channel, assign its category and control member posting.</p></div><button onClick={()=>setManageOpen(false)}>Close</button></header><div className="network-channel-form"><label><span>Channel Name</span><input value={channelForm.name} onChange={(event)=>setChannelForm({...channelForm,name:event.target.value,slug:channelForm.id?channelForm.slug:event.target.value.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")})}/></label><label><span>URL Slug</span><input value={channelForm.slug} onChange={(event)=>setChannelForm({...channelForm,slug:event.target.value})}/></label><label className="wide"><span>Description</span><input value={channelForm.description} onChange={(event)=>setChannelForm({...channelForm,description:event.target.value})}/></label><label><span>Category</span><select value={channelForm.category_id||""} onChange={(event)=>setChannelForm({...channelForm,category_id:event.target.value})}><option value="">No Category</option>{categories.map((category)=><option key={category.id} value={category.id}>{category.name}</option>)}</select></label><label className="wide"><span>Channel Logo Image URL (optional)</span><input value={channelForm.image_url} onChange={(event)=>setChannelForm({...channelForm,image_url:event.target.value})} placeholder="https://…"/></label><label><span>Channel Type</span><select value={channelForm.channel_type} onChange={(event)=>setChannelForm({...channelForm,channel_type:event.target.value})}><option value="public">Public</option><option value="announcements">Announcements</option><option value="game">Game Day</option><option value="sportsbook">Sportsbook</option><option value="streams">Streams</option></select></label><label><span>Order</span><input type="number" value={channelForm.sort_order} onChange={(event)=>setChannelForm({...channelForm,sort_order:event.target.value})}/></label><label className="network-lock-toggle"><input type="checkbox" checked={Boolean(channelForm.is_locked)} onChange={(event)=>setChannelForm({...channelForm,is_locked:event.target.checked})}/><span>Commissioner / manager posting only</span></label><div className="network-manager-actions"><button disabled={busy} onClick={saveChannel}>{busy?"Saving…":"Save Channel"}</button>{channelForm.id&&<button className="danger" onClick={archiveChannel}>Delete Channel</button>}</div></div>{channelForm.id&&<div className="network-permission-panel"><header><div><span>INDIVIDUAL PERMISSIONS</span><h3>Member Access Overrides</h3></div></header><div><label><span>League Member</span><select value={permissionUserId} onChange={(event)=>selectPermissionUser(event.target.value)}><option value="">Select a member…</option>{users.filter((user)=>!user.is_banned).map((user)=><option key={user.id} value={user.id}>{user.discord_username}</option>)}</select></label>{permissionUserId&&<><label><span>View Channel</span><select value={permissionDraft.view} onChange={(event)=>setPermissionDraft({...permissionDraft,view:event.target.value})}><option value="inherit">League Default</option><option value="allow">Allow</option><option value="deny">Deny</option></select></label><label><span>Post Messages</span><select value={permissionDraft.post} onChange={(event)=>setPermissionDraft({...permissionDraft,post:event.target.value})}><option value="inherit">Channel Default</option><option value="allow">Allow</option><option value="deny">Deny</option></select></label><label><span>Manage Channel</span><select value={permissionDraft.manage} onChange={(event)=>setPermissionDraft({...permissionDraft,manage:event.target.value})}><option value="inherit">No Override</option><option value="allow">Allow</option><option value="deny">Deny</option></select></label><label><span>Muted Until</span><input type="datetime-local" value={permissionDraft.muted_until} onChange={(event)=>setPermissionDraft({...permissionDraft,muted_until:event.target.value})}/></label><button onClick={saveChannelPermission}>Save Permission</button></>}</div></div>}</div>:<><header className="network-stage-header"><div className="network-stage-channel"><NetworkChannelMark channel={mode==="channels"?selectedChannelRow:null} size={48}/><div><span>{mode==="direct"?"PRIVATE CONVERSATION":selectedChannelRow?.channel_type?.toUpperCase()}</span><h2>{mode==="direct"?(conversationOther(selectedConversation)?.discord_username||"Select a conversation"):(selectedChannelRow?.name||"League Channel")}</h2><p>{mode==="direct"?"Only members of this conversation can read these messages.":selectedChannelRow?.description}</p></div></div><div className="network-stage-actions">
+  <button className="network-members-toggle" onClick={()=>setMobileView("members")}>Members</button>
+  {mode==="channels"&&selectedChannelRow?.slug==="streams"&&<button onClick={()=>setActiveTab?.("redZone")}>Open RedZone</button>}
+  {mode==="channels"&&canCreateChannels&&!selectedChannelRow?.is_auto_matchup&&<button onClick={()=>openChannelManager(selectedChannelRow)}>Manage Channel</button>}
+</div></header>{mode==="channels"&&<div className="network-channel-utilities">
+  <div className="network-search-wrap">
+    <label><span>⌕</span><input value={socialMessageSearch} onFocus={()=>setNetworkSearchOpen(true)} onChange={(event)=>setSocialMessageSearch(event.target.value)} placeholder={`Search #${selectedChannelRow?.name||"channel"}`}/></label>
+    <button className="network-search-filter-toggle" onClick={()=>setNetworkSearchOpen((value)=>!value)}>Filters</button>
+    {networkSearchOpen&&<div className="network-search-popover">
+      <header><b>Search Filters</b><button onClick={()=>setNetworkSearchOpen(false)}>×</button></header>
+      <label><span>From a specific user</span><input value={networkSearchAuthor} onChange={(event)=>setNetworkSearchAuthor(event.target.value)} placeholder="Coach username"/></label>
+      <label><span>Includes a specific type</span><select value={networkSearchHas} onChange={(event)=>setNetworkSearchHas(event.target.value)}><option value="any">Any message</option><option value="link">Has a link</option><option value="image">Has an image or GIF</option></select></label>
+      <button className={pinnedOnly?"active":""} onClick={()=>setPinnedOnly((value)=>!value)}>📌 {pinnedOnly?"Pinned only":"Include pinned only"}</button>
+      <footer><button onClick={()=>{setSocialMessageSearch("");setNetworkSearchAuthor("");setNetworkSearchHas("any");setPinnedOnly(false);}}>Clear filters</button><button onClick={()=>setNetworkSearchOpen(false)}>Done</button></footer>
+    </div>}
+  </div>
+  <button className={pinnedOnly?"active":""} onClick={()=>setPinnedOnly((value)=>!value)}>📌 {pinnedOnly?"Showing Pins":"Pinned"}</button>
+</div>}{mode==="channels"&&selectedChannelRow?.slug==="player-reporting"&&<section className="network-reporting-card"><div><span>CONFIDENTIAL REPORTING</span><h3>Report a League Member</h3><p>Use the official Google Form. Reports stay outside the public channel and go directly to the commissioner review workflow.</p></div>{reportingUrl?<a href={reportingUrl} target="_blank" rel="noreferrer">Open Player Report Form ↗</a>:<b>Reporting form link has not been added yet.</b>}{isCommissioner&&<div><input value={reportingDraft} onChange={(event)=>setReportingDraft(event.target.value)} placeholder="Paste the Google Form URL"/><button onClick={saveReportingUrl}>Save Link</button></div>}</section>}{mode==="channels"&&selectedChannelRow?.slug==="polls"&&<section className="network-poll-zone">{isCommissioner&&<div className="network-poll-builder"><header><span>CREATE A POLL</span><h3>Ask the League</h3></header><input value={pollForm.question} onChange={(event)=>setPollForm({...pollForm,question:event.target.value})} placeholder="Poll question"/><textarea value={pollForm.description} onChange={(event)=>setPollForm({...pollForm,description:event.target.value})} placeholder="Optional context"/>{pollForm.options.map((option,index)=><div key={index}><input value={option} onChange={(event)=>setPollForm({...pollForm,options:pollForm.options.map((value,itemIndex)=>itemIndex===index?event.target.value:value)})} placeholder={`Choice ${index+1}`}/>{pollForm.options.length>2&&<button onClick={()=>setPollForm({...pollForm,options:pollForm.options.filter((_,itemIndex)=>itemIndex!==index)})}>×</button>}</div>)}<button className="secondary" onClick={()=>setPollForm({...pollForm,options:[...pollForm.options,""]})}>＋ Add Choice</button><div className="network-poll-options"><label><input type="checkbox" checked={pollForm.multiple_choice} onChange={(event)=>setPollForm({...pollForm,multiple_choice:event.target.checked})}/> Multiple choices</label><label><input type="checkbox" checked={pollForm.anonymous} onChange={(event)=>setPollForm({...pollForm,anonymous:event.target.checked})}/> Anonymous voting</label><label><input type="checkbox" checked={pollForm.hide_results} onChange={(event)=>setPollForm({...pollForm,hide_results:event.target.checked})}/> Hide results until close</label><label>Ends <input type="datetime-local" value={pollForm.ends_at} onChange={(event)=>setPollForm({...pollForm,ends_at:event.target.value})}/></label></div><button disabled={busy} onClick={createPoll}>Publish Poll</button></div>}<div className="network-poll-list">{polls.map((poll)=>{const options=pollOptions.filter((row)=>String(row.poll_id)===String(poll.id));const votes=pollVotes.filter((row)=>String(row.poll_id)===String(poll.id));const myVotes=new Set(votes.filter((row)=>String(row.discord_user_id)===String(linkedDiscordUser.id)).map((row)=>String(row.option_id)));const total=votes.length;const hidden=poll.hide_results&&!poll.is_closed&&new Date(poll.ends_at||"2999-01-01")>new Date();return <article key={poll.id}><header><div><span>{pollCountdown(poll)}</span><h3>{poll.question}</h3><p>{poll.description}</p></div>{isCommissioner&&!poll.is_closed&&<button onClick={()=>closePoll(poll)}>Close Poll</button>}</header><div>{options.map((option)=>{const count=votes.filter((vote)=>String(vote.option_id)===String(option.id)).length;const pct=total?Math.round((count/total)*100):0;return <button key={option.id} className={myVotes.has(String(option.id))?"voted":""} disabled={poll.is_closed||new Date(poll.ends_at||"2999-01-01")<=new Date()} onClick={()=>votePoll(poll,option.id)}><span><b>{option.option_text}</b><em>{hidden?"Results hidden":`${count} vote${count===1?"":"s"} • ${pct}%`}</em></span>{!hidden&&<i style={{width:`${pct}%`}}/>}</button>})}</div><footer>{total} total vote{total===1?"":"s"} • {poll.multiple_choice?"Multiple choice":"Single choice"} • {poll.anonymous?"Anonymous":"Public voters"}</footer></article>})}{!polls.length&&<div className="network-empty"><b>No polls yet.</b><span>A commissioner can create the first league poll above.</span></div>}</div></section>}<div className="network-message-feed">{displayedMessages.map((message)=>{const parent=displayedMessages.find((row)=>String(row.id)===String(message.reply_to_id));const mine=String(message.author_discord_user_id)===String(linkedDiscordUser.id);return <article key={message.id} className={mine?"mine":""}>{parent&&<button className="network-reply-context" onClick={()=>document.getElementById(`network-message-${parent.id}`)?.scrollIntoView({behavior:"smooth",block:"center"})}><b>↳ {users.find((user)=>String(user.id)===String(parent.author_discord_user_id))?.discord_username||"League Member"}</b><span><NetworkMessageBody body={parent.body} customEmojis={customEmojis}/></span></button>}<div id={`network-message-${message.id}`} className="network-message-head"><NetworkIdentity userId={message.author_discord_user_id} users={users} teams={teams} assignments={assignments} currentYear={currentYear}/><time>{new Date(message.created_at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}{message.edited_at?" • edited":""}</time></div><p><NetworkMessageBody body={message.body} customEmojis={customEmojis}/></p><div className="network-message-toolbar"><button onClick={()=>setReplyingTo(message)}>↩ Reply</button>{mode==="channels"&&canModerate&&<button className={message.is_pinned?"pinned":""} onClick={()=>togglePinnedMessage(message)}>📌 {message.is_pinned?"Unpin":"Pin"}</button>}{mode==="channels"&&(mine||canModerate)&&<><button onClick={()=>editMessage(message)}>Edit</button><button className="danger" onClick={()=>deleteMessage(message)}>Delete</button></>}</div>{mode==="channels"&&<div className="network-reaction-row">{reactionsFor(message.id).map((item)=><button key={item.reaction} className={item.mine?"mine":""} onClick={()=>toggleReaction(message.id,item.reaction)}><NetworkEmojiToken value={item.reaction} customEmojis={customEmojis}/> <b>{item.count}</b></button>)}<span className="network-quick-react">{NETWORK_EMOJIS.slice(0,6).map((emoji)=><button key={emoji} onClick={()=>toggleReaction(message.id,emoji)}>{emoji}</button>)}</span>{customEmojis.slice(0,4).map((emoji)=><button key={emoji.id} onClick={()=>toggleReaction(message.id,`:${emoji.name}:`)}><img src={emoji.image_url} alt={emoji.name}/></button>)}</div>}</article>;})}{!displayedMessages.length&&<div className="network-empty"><b>Start the conversation.</b><span>This space is ready for the league.</span></div>}</div><div className="network-composer">{replyingTo&&<div className="network-replying"><span><b>Replying to {users.find((user)=>String(user.id)===String(replyingTo.author_discord_user_id))?.discord_username||"League Member"}</b><small>{replyingTo.body}</small></span><button onClick={()=>setReplyingTo(null)}>×</button></div>}<div className="network-compose-box"><textarea value={draft} onChange={(event)=>setDraft(event.target.value)} onKeyDown={(event)=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();sendMessage();}}} placeholder={composerPlaceholder} disabled={(mode==="direct"&&!selectedConversation)||postingBlocked}/><button className="network-gif-toggle" onClick={addGif} title="Add GIF">GIF</button><button className="network-emoji-toggle" onClick={()=>setEmojiOpen(!emojiOpen)} title="Add emoji">☺</button>{emojiOpen&&<div className="network-emoji-picker">{NETWORK_EMOJIS.map((emoji)=><button key={emoji} onClick={()=>{setDraft((value)=>`${value}${emoji}`);setEmojiOpen(false);}}>{emoji}</button>)}{customEmojis.map((emoji)=><button key={emoji.id} title={`:${emoji.name}:`} onClick={()=>{setDraft((value)=>`${value}:${emoji.name}:`);setEmojiOpen(false);}}><img src={emoji.image_url} alt={emoji.name}/></button>)}</div>}</div><button className="network-send" disabled={busy||!draft.trim()||(mode==="direct"&&!selectedConversation)||postingBlocked} onClick={sendMessage}>{busy?"Sending…":"Send"}</button><small>Enter to send • Shift + Enter for a new line</small></div></>}</section><aside className="network-member-rail"><header><span>LEAGUE MEMBERS</span><b>{onlineUsers.length} ONLINE</b></header><div>{displayMembers.map((user)=>{const role=topRoleForUser(user.id);const online=presenceUserIds.has(String(user.id));return <button key={user.id} onClick={()=>String(user.id)!==String(linkedDiscordUser.id)&&startConversation(user.id)}><i className={online?"online":""}/><NetworkIdentity userId={user.id} users={users} teams={teams} assignments={assignments} currentYear={currentYear} compact/><em style={{color:role?.color||"#64748b"}}>{role?.name||"League Member"}</em></button>})}</div></aside></div>
   </main>;
 }
 
@@ -9729,6 +9768,731 @@ function GlobalStyle() {
         .discord-clone-page .network-message-feed { padding-bottom:98px!important; }
         .discord-clone-page .network-composer { margin:0 8px 8px!important; }
       }
+
+      /* v44-network-discord-mimic */
+      :root {
+        --discord-bg: #1e1f22;
+        --discord-panel: #2b2d31;
+        --discord-chat: #313338;
+        --discord-deep: #111214;
+        --discord-hover: #35373c;
+        --discord-selected: #404249;
+        --discord-text: #f2f3f5;
+        --discord-muted: #949ba4;
+        --discord-link: #00a8fc;
+        --discord-green: #23a559;
+        --discord-blurple: #5865f2;
+      }
+
+      /* Compact league status bar — never stack into the broken card layout. */
+      .cfb-identity-bar {
+        position: relative !important;
+        top: auto !important;
+        display: flex !important;
+        align-items: stretch !important;
+        min-height: 54px !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        border-radius: 12px !important;
+        white-space: nowrap !important;
+      }
+      .cfb-identity-bar > * {
+        flex: 0 0 auto !important;
+        min-width: 124px !important;
+        min-height: 54px !important;
+        padding: 8px 12px !important;
+      }
+      .cfb-identity-brand { min-width: 174px !important; }
+      .cfb-identity-progress { min-width: 176px !important; }
+      .cfb-identity-featured { min-width: 184px !important; }
+      .cfb-identity-brand > span { width:34px !important; height:34px !important; }
+      .cfb-identity-item b, .cfb-identity-featured b { font-size:12px !important; }
+
+      /* Header search belongs to the product header, not as a tiny floating field. */
+      .cfb-universal-search {
+        margin: 0 0 14px !important;
+        max-width: none !important;
+      }
+      .cfb-universal-search-input {
+        min-height: 46px !important;
+        width: 100% !important;
+        border-radius: 12px !important;
+      }
+
+      /* True Discord desktop proportions. */
+      .discord-clone-page {
+        max-width: none !important;
+        gap: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 16px;
+        background: var(--discord-bg);
+      }
+      .discord-clone-page .network-hero {
+        display: none !important;
+      }
+      .discord-clone-page .network-mobile-hub-header {
+        display: none !important;
+      }
+      .discord-clone-page .network-layout {
+        display: grid !important;
+        grid-template-columns: 68px 260px minmax(0,1fr) 248px !important;
+        min-height: min(78vh, 900px) !important;
+        height: calc(100vh - 190px) !important;
+        max-height: 920px !important;
+        background: var(--discord-chat) !important;
+      }
+
+      .network-server-rail {
+        display: flex !important;
+        flex-direction: column;
+        align-items: center;
+        gap: 9px;
+        padding: 12px 8px;
+        background: var(--discord-deep);
+        border-right: 1px solid rgba(255,255,255,.04);
+      }
+      .network-server-rail > i {
+        width: 32px;
+        height: 2px;
+        border-radius: 999px;
+        background: rgba(255,255,255,.08);
+      }
+      .network-server-rail button {
+        position: relative;
+        width: 44px;
+        min-width: 44px;
+        height: 44px;
+        min-height: 44px;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: #2b2d31;
+        color: #dbdee1;
+        font-size: 16px;
+        font-weight: 900;
+      }
+      .network-server-rail button:hover,
+      .network-server-rail button.active {
+        border-radius: 14px;
+        background: var(--discord-blurple);
+        color: #fff;
+      }
+      .network-server-rail button.active::before {
+        content:"";
+        position:absolute;
+        left:-8px;
+        width:4px;
+        height:30px;
+        border-radius:0 4px 4px 0;
+        background:#fff;
+      }
+      .network-server-rail button b {
+        position:absolute;
+        right:-3px;
+        top:-4px;
+        min-width:18px;
+        height:18px;
+        display:grid;
+        place-items:center;
+        border-radius:999px;
+        background:#f23f42;
+        color:#fff;
+        font-size:9px;
+      }
+      .network-server-rail button:first-child span {
+        display:grid;
+        place-items:center;
+        width:100%;
+        height:100%;
+        border-radius:inherit;
+        background:linear-gradient(145deg,#7f1d1d,#facc15);
+        color:#fff;
+        font-size:12px;
+        letter-spacing:-.03em;
+      }
+
+      .discord-clone-page .network-sidebar {
+        min-width: 0 !important;
+        width: auto !important;
+        max-width: none !important;
+        background: var(--discord-panel) !important;
+        border: 0 !important;
+        border-right: 1px solid rgba(0,0,0,.22) !important;
+        border-radius: 0 !important;
+        overflow: hidden auto !important;
+      }
+      .discord-clone-page .network-mobile-directory-title {
+        display: block !important;
+        position: sticky;
+        top: 0;
+        z-index: 3;
+        padding: 14px 14px 12px !important;
+        background: #2b2d31;
+        box-shadow: 0 1px 0 rgba(0,0,0,.3);
+      }
+      .discord-clone-page .network-mobile-directory-title strong {
+        color: var(--discord-text);
+        font-size: 15px;
+      }
+      .discord-clone-page .network-mobile-directory-title span {
+        display:none;
+      }
+      .discord-clone-page .network-sidebar > nav {
+        display:flex !important;
+        gap:4px !important;
+        padding:8px !important;
+        overflow-x:auto;
+        background:#2b2d31;
+      }
+      .discord-clone-page .network-sidebar > nav button {
+        min-height:34px !important;
+        padding:7px 9px !important;
+        border-radius:5px !important;
+        border:0 !important;
+        background:transparent !important;
+        color:var(--discord-muted) !important;
+        font-size:11px !important;
+      }
+      .discord-clone-page .network-sidebar > nav button.active,
+      .discord-clone-page .network-sidebar > nav button:hover {
+        background:var(--discord-selected) !important;
+        color:var(--discord-text) !important;
+      }
+      .network-sidebar-label {
+        padding:12px 10px 6px !important;
+        color:var(--discord-muted) !important;
+        font-size:10px !important;
+      }
+      .network-sidebar-tools { opacity:.75; }
+      .network-channel-list { padding:0 6px 12px !important; }
+      .network-channel-category {
+        min-height:28px !important;
+        margin-top:7px !important;
+        padding:6px 6px 3px !important;
+        color:var(--discord-muted) !important;
+        font-size:10px !important;
+        letter-spacing:.04em !important;
+      }
+      .network-channel-category i {
+        width:0 !important;
+        margin:0 !important;
+      }
+      .network-channel-list > button {
+        grid-template-columns:28px minmax(0,1fr) auto !important;
+        min-height:36px !important;
+        margin:1px 0 !important;
+        padding:5px 8px !important;
+        border:0 !important;
+        border-radius:5px !important;
+        background:transparent !important;
+        color:var(--discord-muted) !important;
+        box-shadow:none !important;
+      }
+      .network-channel-list > button:hover {
+        background:var(--discord-hover) !important;
+        color:#dbdee1 !important;
+      }
+      .network-channel-list > button.active {
+        background:var(--discord-selected) !important;
+        color:var(--discord-text) !important;
+      }
+      .network-channel-list > button strong {
+        font-size:13px !important;
+        line-height:1.15 !important;
+      }
+      .network-channel-list > button small {
+        display:none !important;
+      }
+      .network-channel-list > button em {
+        font-size:7px !important;
+        color:#f0b232 !important;
+      }
+      .network-channel-mark {
+        width:24px !important;
+        height:24px !important;
+        background:transparent !important;
+        border:0 !important;
+        color:var(--discord-muted) !important;
+        font-size:22px !important;
+      }
+      .network-matchup-logos {
+        transform:scale(.78);
+        transform-origin:left center;
+      }
+      .network-online-roster {
+        display:none !important;
+      }
+
+      .discord-clone-page .network-stage {
+        min-width:0 !important;
+        display:grid !important;
+        grid-template-rows:auto auto minmax(0,1fr) auto !important;
+        border:0 !important;
+        border-radius:0 !important;
+        background:var(--discord-chat) !important;
+        overflow:hidden !important;
+      }
+      .network-stage-header {
+        min-height:48px !important;
+        padding:8px 14px !important;
+        border-bottom:1px solid rgba(0,0,0,.35) !important;
+        background:var(--discord-chat) !important;
+        box-shadow:0 1px 0 rgba(255,255,255,.02);
+      }
+      .network-stage-header .network-stage-channel {
+        gap:9px !important;
+      }
+      .network-stage-header h2 {
+        margin:0 !important;
+        font-size:15px !important;
+        color:var(--discord-text) !important;
+      }
+      .network-stage-header p,
+      .network-stage-header span {
+        display:none !important;
+      }
+      .network-stage-actions button {
+        min-height:32px !important;
+        padding:6px 9px !important;
+        border:0 !important;
+        background:transparent !important;
+        color:var(--discord-muted) !important;
+        font-size:11px !important;
+      }
+
+      .network-channel-utilities {
+        position:relative;
+        display:flex !important;
+        justify-content:flex-end !important;
+        gap:7px !important;
+        padding:7px 10px !important;
+        background:var(--discord-chat) !important;
+        border-bottom:1px solid rgba(0,0,0,.20) !important;
+      }
+      .network-search-wrap {
+        position:relative;
+        display:flex;
+        align-items:center;
+        gap:5px;
+      }
+      .network-channel-utilities label {
+        width:min(330px,40vw) !important;
+        min-height:32px !important;
+        border:0 !important;
+        border-radius:4px !important;
+        background:#1e1f22 !important;
+      }
+      .network-channel-utilities input {
+        min-height:32px !important;
+        color:#dbdee1 !important;
+        font-size:12px !important;
+      }
+      .network-channel-utilities > button,
+      .network-search-filter-toggle {
+        min-height:32px !important;
+        padding:5px 9px !important;
+        border:0 !important;
+        border-radius:4px !important;
+        background:transparent !important;
+        color:var(--discord-muted) !important;
+        font-size:11px !important;
+      }
+      .network-channel-utilities > button:hover,
+      .network-search-filter-toggle:hover {
+        color:#fff !important;
+        background:var(--discord-hover) !important;
+      }
+      .network-search-popover {
+        position:absolute;
+        z-index:30;
+        top:calc(100% + 8px);
+        right:0;
+        width:min(360px,88vw);
+        display:grid;
+        gap:10px;
+        padding:12px;
+        border:1px solid rgba(255,255,255,.10);
+        border-radius:8px;
+        background:#232428;
+        box-shadow:0 20px 60px rgba(0,0,0,.55);
+      }
+      .network-search-popover header,
+      .network-search-popover footer {
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:8px;
+      }
+      .network-search-popover header button {
+        min-height:28px;
+        width:28px;
+        border:0;
+        background:transparent;
+        color:var(--discord-muted);
+      }
+      .network-search-popover label {
+        display:grid !important;
+        gap:5px;
+        width:100% !important;
+        background:transparent !important;
+      }
+      .network-search-popover label > span {
+        color:var(--discord-text);
+        font-size:12px;
+        font-weight:800;
+      }
+      .network-search-popover input,
+      .network-search-popover select {
+        width:100%;
+        min-height:38px !important;
+        border:1px solid rgba(255,255,255,.08);
+        border-radius:4px;
+        background:#111214;
+        color:#fff;
+        padding:8px 10px;
+      }
+      .network-search-popover footer button {
+        flex:1;
+        min-height:36px;
+        border:0;
+        border-radius:4px;
+        background:var(--discord-blurple);
+        color:#fff;
+        font-weight:800;
+      }
+      .network-search-popover footer button:first-child {
+        background:transparent;
+        color:var(--discord-muted);
+      }
+
+      .network-message-feed {
+        min-height:0 !important;
+        padding:12px 0 24px !important;
+        overflow-y:auto !important;
+        background:var(--discord-chat) !important;
+      }
+      .network-message-feed article {
+        position:relative;
+        grid-template-columns:42px minmax(0,1fr) auto !important;
+        gap:10px !important;
+        margin:0 !important;
+        padding:5px 14px !important;
+        border:0 !important;
+        border-radius:0 !important;
+        background:transparent !important;
+        box-shadow:none !important;
+      }
+      .network-message-feed article:hover {
+        background:rgba(2,2,3,.08) !important;
+      }
+      .network-message-feed article time {
+        color:var(--discord-muted) !important;
+        font-size:10px !important;
+      }
+      .network-message-head strong {
+        font-size:14px !important;
+      }
+      .network-message-feed article p {
+        margin:2px 0 0 !important;
+        color:#dbdee1 !important;
+        font-size:14px !important;
+        line-height:1.38 !important;
+      }
+      .network-message-media {
+        max-width:min(520px,100%) !important;
+        max-height:430px !important;
+        border-radius:8px !important;
+      }
+      .network-reaction-row button {
+        min-height:28px !important;
+        padding:3px 7px !important;
+        border-radius:6px !important;
+        background:#2b2d31 !important;
+      }
+      .network-reply-context {
+        margin-left:52px !important;
+        border-left:2px solid #4e5058 !important;
+        background:transparent !important;
+      }
+      .network-message-toolbar {
+        top:-18px !important;
+        right:14px !important;
+        border:1px solid rgba(255,255,255,.08) !important;
+        border-radius:6px !important;
+        background:#2b2d31 !important;
+        box-shadow:0 8px 18px rgba(0,0,0,.35) !important;
+      }
+
+      .network-composer {
+        position:relative !important;
+        display:grid !important;
+        grid-template-columns:auto auto minmax(0,1fr) auto !important;
+        gap:6px !important;
+        align-items:end !important;
+        margin:0 14px 14px !important;
+        padding:7px !important;
+        border:0 !important;
+        border-radius:8px !important;
+        background:#383a40 !important;
+        box-shadow:none !important;
+      }
+      .network-compose-box {
+        min-width:0 !important;
+      }
+      .network-composer textarea {
+        min-height:42px !important;
+        max-height:150px !important;
+        padding:10px 8px !important;
+        border:0 !important;
+        background:transparent !important;
+        color:#dbdee1 !important;
+        resize:none !important;
+        font-size:14px !important;
+      }
+      .network-gif-toggle,
+      .network-emoji-toggle,
+      .network-send {
+        min-width:38px !important;
+        width:38px !important;
+        min-height:38px !important;
+        height:38px !important;
+        padding:0 !important;
+        border:0 !important;
+        border-radius:6px !important;
+        background:transparent !important;
+        color:var(--discord-muted) !important;
+      }
+      .network-gif-toggle:hover,
+      .network-emoji-toggle:hover,
+      .network-send:hover {
+        background:rgba(255,255,255,.06) !important;
+        color:#fff !important;
+      }
+      .network-composer small { display:none !important; }
+
+      .network-member-rail {
+        display:block !important;
+        min-width:0 !important;
+        width:auto !important;
+        max-width:none !important;
+        padding:12px 8px !important;
+        border:0 !important;
+        border-left:1px solid rgba(0,0,0,.24) !important;
+        border-radius:0 !important;
+        background:var(--discord-panel) !important;
+        overflow-y:auto !important;
+      }
+      .network-member-rail > header {
+        min-height:30px !important;
+        color:var(--discord-muted) !important;
+        font-size:10px !important;
+      }
+      .network-member-rail > div > button {
+        grid-template-columns:30px minmax(0,1fr) !important;
+        min-height:42px !important;
+        padding:5px 6px !important;
+        border:0 !important;
+        border-radius:5px !important;
+        background:transparent !important;
+      }
+      .network-member-rail > div > button:hover {
+        background:var(--discord-hover) !important;
+      }
+      .network-member-rail em {
+        font-size:9px !important;
+      }
+      .network-members-toggle { display:none !important; }
+
+      /* Coach profiles: one clean horizontal row per team, no broken wrapping. */
+      .drawer-menu-group:last-child .drawer-menu-grid {
+        display:grid !important;
+        grid-template-columns:1fr !important;
+        gap:7px !important;
+      }
+      .coach-drawer-tile {
+        display:grid !important;
+        grid-template-columns:58px minmax(0,1fr) auto !important;
+        min-height:72px !important;
+        padding:7px 12px 7px 18px !important;
+        border-radius:12px !important;
+      }
+      .coach-menu-logo-plate-v86 {
+        width:54px !important;
+        height:54px !important;
+        min-width:54px !important;
+      }
+      .coach-menu-logo-plate-v86 img {
+        max-width:46px !important;
+        max-height:46px !important;
+      }
+      .coach-drawer-tile strong {
+        display:block !important;
+        overflow:hidden !important;
+        text-overflow:ellipsis !important;
+        white-space:nowrap !important;
+        font-size:16px !important;
+        line-height:1.1 !important;
+      }
+      .coach-drawer-tile small {
+        display:block !important;
+        margin-top:3px !important;
+        overflow:hidden !important;
+        text-overflow:ellipsis !important;
+        white-space:nowrap !important;
+        font-size:11px !important;
+      }
+
+      /* Mobile behaves like Discord: channel directory, then full chat, then members drawer. */
+      @media (max-width: 900px) {
+        .discord-clone-page {
+          min-height:calc(100vh - 112px) !important;
+          border-radius:0 !important;
+        }
+        .discord-clone-page .network-mobile-hub-header {
+          display:flex !important;
+          min-height:58px !important;
+          padding:9px 12px !important;
+          background:#1e1f22 !important;
+          border-bottom:1px solid rgba(255,255,255,.05) !important;
+        }
+        .discord-clone-page .network-layout {
+          display:block !important;
+          height:calc(100vh - 170px) !important;
+          min-height:620px !important;
+          max-height:none !important;
+        }
+        .network-server-rail {
+          display:none !important;
+        }
+        .network-sidebar,
+        .network-stage,
+        .network-member-rail {
+          position:absolute !important;
+          inset:58px 0 0 !important;
+          width:100% !important;
+          height:auto !important;
+          max-width:none !important;
+          transform:translateX(0);
+          transition:transform .22s ease, opacity .22s ease;
+        }
+        .network-mobile-directory .network-sidebar {
+          display:block !important;
+          z-index:3;
+        }
+        .network-mobile-directory .network-stage,
+        .network-mobile-directory .network-member-rail {
+          display:none !important;
+        }
+        .network-mobile-chat .network-sidebar {
+          display:none !important;
+        }
+        .network-mobile-chat .network-stage {
+          display:grid !important;
+          z-index:3;
+        }
+        .network-mobile-chat .network-member-rail {
+          display:none !important;
+        }
+        .network-mobile-members .network-sidebar,
+        .network-mobile-members .network-stage {
+          display:none !important;
+        }
+        .network-mobile-members .network-member-rail {
+          display:block !important;
+          z-index:4;
+          padding:16px 14px !important;
+        }
+        .network-members-toggle {
+          display:inline-flex !important;
+        }
+        .discord-clone-page .network-sidebar {
+          padding-bottom:82px !important;
+        }
+        .discord-clone-page .network-sidebar > nav {
+          position:sticky;
+          top:0;
+          z-index:4;
+        }
+        .network-channel-list > button {
+          min-height:46px !important;
+          padding:8px 12px !important;
+        }
+        .network-channel-list > button strong {
+          font-size:15px !important;
+        }
+        .network-stage-header {
+          min-height:52px !important;
+        }
+        .network-channel-utilities {
+          justify-content:stretch !important;
+        }
+        .network-search-wrap,
+        .network-channel-utilities label {
+          width:100% !important;
+        }
+        .network-channel-utilities > button {
+          flex:0 0 auto;
+        }
+        .network-message-feed {
+          padding-bottom:12px !important;
+        }
+        .network-message-feed article {
+          grid-template-columns:40px minmax(0,1fr) !important;
+          padding:7px 12px !important;
+        }
+        .network-message-feed article time {
+          grid-column:2;
+        }
+        .network-composer {
+          position:sticky !important;
+          bottom:0 !important;
+          margin:0 !important;
+          border-radius:0 !important;
+          padding:8px 10px calc(8px + env(safe-area-inset-bottom)) !important;
+        }
+        .coach-drawer-tile {
+          grid-template-columns:52px minmax(0,1fr) !important;
+          min-height:66px !important;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .cfb-identity-bar {
+          display:grid !important;
+          grid-template-columns:1fr 1fr !important;
+          overflow:visible !important;
+        }
+        .cfb-identity-brand {
+          grid-column:1/-1 !important;
+          min-width:0 !important;
+        }
+        .cfb-identity-bar > * {
+          min-width:0 !important;
+        }
+        .cfb-identity-progress,
+        .cfb-identity-featured {
+          display:none !important;
+        }
+        .network-channel-utilities {
+          display:grid !important;
+          grid-template-columns:minmax(0,1fr) auto !important;
+        }
+        .network-search-filter-toggle {
+          display:none !important;
+        }
+        .network-search-popover {
+          position:fixed !important;
+          left:12px !important;
+          right:12px !important;
+          top:100px !important;
+          width:auto !important;
+        }
+      }
+
 `}</style>
   );
 }
@@ -10061,7 +10825,7 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
       </div>
 
       <nav className="cfb-mobile-nav-v2" style={v2MobileNav} aria-label="Primary mobile navigation">
-        {[["dashboard","Home","H"],["leagueHub","Discord","#"],["schedule","Games","G"],["eliteBooks","Books","$"],["redZone","RedZone","RZ"]].map(([key,label,icon])=><button key={key} type="button" style={activeTab===key?v2MobileNavActive:v2MobileNavButton} onClick={()=>handleSelect(key)}><b>{icon}</b><span>{label}</span></button>)}
+        {[["dashboard","Home","H"],["leagueHub","Network","#"],["schedule","Games","G"],["eliteBooks","Books","$"],["redZone","RedZone","RZ"]].map(([key,label,icon])=><button key={key} type="button" style={activeTab===key?v2MobileNavActive:v2MobileNavButton} onClick={()=>handleSelect(key)}><b>{icon}</b><span>{label}</span></button>)}
         <button type="button" style={v2MobileNavButton} onClick={()=>setMenuOpen(true)}><b>☰</b><span>More</span></button>
       </nav>
 

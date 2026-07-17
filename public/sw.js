@@ -1,4 +1,4 @@
-const CACHE_VERSION = "cfbelite-v43";
+const CACHE_VERSION = "cfbelite-v44";
 
 self.addEventListener("push", (event) => {
   let payload = {};
@@ -20,10 +20,10 @@ self.addEventListener("push", (event) => {
     message: "💬",
   };
   const prefix = iconMap[type] || "🏈";
-  const title = `${prefix} ${payload.title || data.title || "CFBElite27"}`;
+  const title = `${prefix} ${payload.title || data.title || "CFBElite Network"}`;
   const body = payload.body || data.body || "There is a new league update.";
   const url = data.url || payload.url || "/";
-  const channel = data.channel || data.context || "CFBElite27";
+  const channel = data.channel || data.context || "CFBElite Network";
 
   event.waitUntil(
     self.registration.showNotification(title, {
