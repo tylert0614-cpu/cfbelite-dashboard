@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
-const CFBELITE_SOCIAL_BUILD = "v40.2-search-hotfix";
-console.info("CFBElite Social build", CFBELITE_SOCIAL_BUILD);
+const CFBELITE_SOCIAL_BUILD = "v43-ui-ux-polish";
+console.info("CFBElite Network build", CFBELITE_SOCIAL_BUILD);
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -772,7 +772,38 @@ function isErrorMessage(message) {
 }
 
 function LeagueLoginGate({ready,session,linkedUser,signIn,signOut,retry,error}) {
-  return <><GlobalStyle/><main className="league-login-shell"><section className="league-login-card"><div className="league-login-mark"><span>CFB</span><strong>ELITE</strong><b>27</b></div><div><span className="league-login-kicker">THE PRIVATE HOME OF THE DYNASTY</span><h1>{!ready?"Opening the stadium…":session&&!linkedUser?"Linking your league identity…":"Your league. Your network. Your legacy."}</h1><p>{!ready?"Checking your secure session.":session&&!linkedUser?"Your Discord login is valid. We are matching it to your active CFB Elite membership.":"Sign in with your league Discord account to enter the secured CFB Elite 27 network."}</p></div>{error&&<div className="league-login-error">{error}</div>}<div className="league-login-actions">{!ready?<span className="league-login-loader">LIVE DATABASE</span>:!session?<button onClick={signIn}>Continue with Discord</button>:<><button onClick={retry}>Retry League Link</button><button className="secondary" onClick={signOut}>Sign Out</button></>}</div><footer><span>SECURE LEAGUE ACCESS</span><span>ELITE BOOKS • GAMECENTER • REDZONE • CFBELITE SOCIAL</span></footer></section></main></>;
+  return <><GlobalStyle/><main className="league-login-shell"><section className="league-login-card"><div className="league-login-mark"><span>CFB</span><strong>ELITE</strong><b>27</b></div><div><span className="league-login-kicker">THE PRIVATE HOME OF THE DYNASTY</span><h1>{!ready?"Opening the stadium…":session&&!linkedUser?"Linking your league identity…":"Your league. Your network. Your legacy."}</h1><p>{!ready?"Checking your secure session.":session&&!linkedUser?"Your Discord login is valid. We are matching it to your active CFB Elite membership.":"Sign in with your league Discord account to enter the secured CFB Elite 27 network."}</p></div>{error&&<div className="league-login-error">{error}</div>}<div className="league-login-actions">{!ready?<span className="league-login-loader">LIVE DATABASE</span>:!session?<button onClick={signIn}>Continue with Discord</button>:<><button onClick={retry}>Retry League Link</button><button className="secondary" onClick={signOut}>Sign Out</button></>}</div><footer><span>SECURE LEAGUE ACCESS</span><span>ELITE BOOKS • GAMECENTER • REDZONE • CFBELITE NETWORK</span></footer></section></main></>;
+}
+
+
+class FeatureErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error, info) {
+    console.error("CFBElite feature recovered from an error:", error, info);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <section className="cfb-feature-fallback">
+          <span>FEATURE TEMPORARILY UNAVAILABLE</span>
+          <h2>{this.props.title || "This section"} did not load</h2>
+          <p>The rest of CFBElite is still available. Refresh this section or return later.</p>
+          <button type="button" onClick={() => this.setState({ error: null })}>Try Again</button>
+        </section>
+      );
+    }
+
+    return this.props.children;
+  }
 }
 
 export default function App() {
@@ -961,7 +992,7 @@ export default function App() {
     await saveCommissionerRankings(next);
   }
 
-  const baseTabs = [["dashboard","Home"],["leagueHub","CFBElite Social"],["newsroom","Newsroom"],["schedule","GameCenter"],["eliteBooks","Elite Books"],["redZone","RedZone"],["myTeam","My Team"],["rankingsCenter","Rankings Center"],["teamsCoaches","Teams & Coaches"],["leagueArchive","League Archive"],["dataIntake","Upload Screenshots"],["automaticRankings","Automatic Rankings"],["gameTop25","Dynasty Top 25"],["teamSchedules","Team Schedules"],["dynastyData","Season Data Archive"],["sportsbookHistory","All-Time Sportsbook"],["allTeamsRatings","Teams"],["eloRankings","User ELO"],["powerIndex","All-Time Coach Rankings"],["rankingHistory","Ranking History"],["conferencePower","Conference Power"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["h2h","User vs User H2H"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],["commissionerCenter","Commissioner Center"],["sportsbookManager","Elite Books Manager"],["weeklyMatchups","Schedule Manager"],["userManager","League Members"],["assignments","Team Assignments"],["leagueDataCenter","League Data Center"],["resultsManager","Results Manager"],["logoManager","Team Assets"],["draftRoom","CFBElite 27 Draft Room"],...coachProfileUsers.map((user) => [`coach-${user.id}`, user.activeTeamName || user.discord_username])];
+  const baseTabs = [["dashboard","Home"],["leagueHub","CFBElite Discord"],["newsroom","Newsroom"],["schedule","GameCenter"],["eliteBooks","Elite Books"],["redZone","RedZone"],["myTeam","My Team"],["rankingsCenter","Rankings Center"],["teamsCoaches","Teams & Coaches"],["leagueArchive","League Archive"],["dataIntake","Upload Screenshots"],["automaticRankings","Automatic Rankings"],["gameTop25","Dynasty Top 25"],["teamSchedules","Team Schedules"],["dynastyData","Season Data Archive"],["sportsbookHistory","All-Time Sportsbook"],["allTeamsRatings","Teams"],["eloRankings","User ELO"],["powerIndex","All-Time Coach Rankings"],["rankingHistory","Ranking History"],["conferencePower","Conference Power"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["h2h","User vs User H2H"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],["commissionerCenter","Commissioner Center"],["sportsbookManager","Elite Books Manager"],["weeklyMatchups","Schedule Manager"],["userManager","League Members"],["assignments","Team Assignments"],["leagueDataCenter","League Data Center"],["resultsManager","Results Manager"],["logoManager","Team Assets"],["draftRoom","CFBElite 27 Draft Room"],...coachProfileUsers.map((user) => [`coach-${user.id}`, user.activeTeamName || user.discord_username])];
   const tabs = useMemo(() => {
     const tabMap = new Map(baseTabs);
     const ordered = tabOrder
@@ -1032,9 +1063,16 @@ export default function App() {
       .select("*")
       .order("season_year", { ascending: false })
       .order("final_rank");
-    const firstError = [teamsRes, settingsRes, tabOrderRes, usersRes, assignmentsRes, standingsRes, rankingsRes, resultsRes, weeklyMatchupsRes, draftPicks27Res, draftSettings27Res, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, seasonStatsRes, teamStatsRes, historyRes].find((r) => r.error)?.error;
-    if (firstError) setError(firstError.message);
-    else {
+    const loadResponses = [teamsRes, settingsRes, tabOrderRes, usersRes, assignmentsRes, standingsRes, rankingsRes, resultsRes, weeklyMatchupsRes, draftPicks27Res, draftSettings27Res, aaRes, awardsRes, heismanRes, championsRes, draftRes, playoffRes, recruitingRes, seasonStatsRes, teamStatsRes, historyRes, conferenceAssetsRes, rankingSnapshotsRes, rankingHistoryRes];
+    const loadErrors = loadResponses.filter((response)=>response?.error).map((response)=>response.error);
+    if (loadErrors.length) {
+      console.warn("CFBElite optional data sources unavailable:", loadErrors.map((item)=>item.message));
+      const criticalError = [teamsRes, usersRes, assignmentsRes].find((response)=>response?.error)?.error;
+      setError(criticalError ? `Core league data could not load: ${criticalError.message}` : "");
+    } else {
+      setError("");
+    }
+    {
       if (tabOrderRes.data?.tab_order) setTabOrder(tabOrderRes.data.tab_order);
       if (settingsRes.data) {
         setCurrentYear(String(settingsRes.data.current_year));
@@ -1770,14 +1808,14 @@ export default function App() {
 
   if(!authReady||!discordSession||!linkedDiscordUser) return <LeagueLoginGate ready={authReady} session={discordSession} linkedUser={linkedDiscordUser} signIn={signInWithDiscord} signOut={signOutDiscord} retry={()=>linkDiscordIdentity(discordSession)} error={error}/>;
 
-  return <><GlobalStyle/><div style={page}><div style={container}><Header loading={loading} reload={loadData}/>{error && <div style={isErrorMessage(error) ? errorBox : successBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} draggedTab={draggedTab} setDraggedTab={setDraggedTab} reorderTabs={reorderTabs} adminUnlocked={adminUnlocked} adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin} teams={teamOptions} assignments={assignments} currentYear={currentYear} users={userOptions} discordSession={discordSession} linkedDiscordUser={linkedDiscordUser} signInWithDiscord={signInWithDiscord} signOutDiscord={signOutDiscord} soundPreferences={soundPreferences} draftIsLive={Boolean(draftSettings27?.is_live)}/>
+  return <><GlobalStyle/><div style={page} className={`cfb-app cfb-page-${activeTab}`}><div style={container} className="cfb-app-container"><Header loading={loading} reload={loadData}/><LeagueIdentityBar currentYear={currentYear} currentWeek={currentWeek} advanceAt={advanceAt} weeklyMatchups={weeklyMatchups} results={results} teams={teamOptions} setActiveTab={setActiveTab}/><AppSkeleton visible={loading && !teams.length}/>{error && <div style={isErrorMessage(error) ? errorBox : successBox}>{error}</div>}<TabBar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} draggedTab={draggedTab} setDraggedTab={setDraggedTab} reorderTabs={reorderTabs} adminUnlocked={adminUnlocked} adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin} teams={teamOptions} assignments={assignments} currentYear={currentYear} users={userOptions} discordSession={discordSession} linkedDiscordUser={linkedDiscordUser} signInWithDiscord={signInWithDiscord} signOutDiscord={signOutDiscord} soundPreferences={soundPreferences} draftIsLive={Boolean(draftSettings27?.is_live)}/><UniversalSearchBar tabs={tabs} teams={teamOptions} users={userOptions} assignments={assignments} weeklyMatchups={weeklyMatchups} results={results} currentYear={currentYear} setActiveTab={setActiveTab}/>
     {activeTab === "draftRoom" && <DraftRoom teams={teamOptions} users={userOptions} picks={draftPicks27} settings={draftSettings27} conferenceAssets={conferenceAssets} startClock={startDraftClock} pauseClock={pauseDraftClock} resumeClock={resumeDraftClock} announcePick={announceDraftPick} revealPick={revealDraftPick} undoPick={undoDraftPick}/>}     
     {activeTab === "dashboard" && <DashboardV2 teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} allResults={results} weeklyMatchups={weeklyMatchups} conferenceAssets={conferenceAssets} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} teamSeasonStats={teamSeasonStats} currentYear={currentYear} currentWeek={currentWeek} advanceAt={advanceAt} rankingSnapshots={rankingSnapshots} adminUnlocked={adminUnlocked} sportsbook={sportsbook} linkedDiscordUser={linkedDiscordUser} setCurrentYear={(value)=>{setCurrentYear(value); setNewResult((prev)=>({...prev, season_year: Number(value)})); setNewWeeklyMatchup((prev)=>({...prev,season_year:Number(value)}));}} setCurrentWeek={(value)=>{setCurrentWeek(value); setNewResult((prev)=>({...prev, week: value})); setNewWeeklyMatchup((prev)=>({...prev,week:value}));}} saveSettings={saveLeagueSettings} goToTeam={goToTeam} setActiveTab={setActiveTab}/>} 
     {activeTab === "rankingsCenter" && <RankingsCenterV38 setActiveTab={setActiveTab}/>} 
     {activeTab === "teamsCoaches" && <TeamsCoachesCenterV38 teams={activeTeamOptions} users={userOptions} assignments={assignments} currentYear={currentYear} setActiveTab={setActiveTab}/>} 
     {activeTab === "leagueArchive" && <LeagueArchiveCenterV38 setActiveTab={setActiveTab}/>} 
     {activeTab === "automaticRankings" && <AutomaticRankingsPageV38 teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} currentYear={currentYear} currentWeek={currentWeek} rankingSnapshots={rankingSnapshots} goToTeam={goToTeam} setActiveTab={setActiveTab}/>} 
-    {activeTab === "leagueHub" && <LeagueHub discordSession={discordSession} linkedDiscordUser={linkedDiscordUser} users={userOptions} teams={activeTeamOptions} assignments={assignments} weeklyMatchups={weeklyMatchups} currentYear={currentYear} setActiveTab={setActiveTab} setError={setError}/>} 
+    {activeTab === "leagueHub" && <FeatureErrorBoundary title="CFBElite Network"><LeagueHub discordSession={discordSession} linkedDiscordUser={linkedDiscordUser} users={userOptions} teams={activeTeamOptions} assignments={assignments} weeklyMatchups={weeklyMatchups} currentYear={currentYear} setActiveTab={setActiveTab} setError={setError}/></FeatureErrorBoundary>} 
     {activeTab === "newsroom" && <NewsroomPlatform discordSession={discordSession} linkedDiscordUser={linkedDiscordUser} users={userOptions} teams={activeTeamOptions} assignments={assignments} currentYear={currentYear} setActiveTab={setActiveTab} setError={setError}/>} 
     {activeTab === "dataIntake" && <LeagueDataIntakeCenter discordSession={discordSession} linkedDiscordUser={linkedDiscordUser} currentYear={currentYear} currentWeek={currentWeek} adminUnlocked={adminUnlocked} setError={setError}/>} 
     {activeTab === "gameTop25" && <CapturedTop25Page currentYear={currentYear} teams={teamOptions} setActiveTab={setActiveTab}/>} 
@@ -2616,6 +2654,27 @@ function GameCenterTeam({ team, rank, user, compact = false }) {
   );
 }
 
+
+function gameCenterResultInsights(row) {
+  if (!row?.result) return [];
+  const score1 = Number(scoreForScheduledTeam(row.result, row.team_1_id));
+  const score2 = Number(scoreForScheduledTeam(row.result, row.team_2_id));
+  const team1Won = score1 > score2;
+  const winner = team1Won ? row.team1 : row.team2;
+  const winnerRank = Number(team1Won ? row.rank1 : row.rank2);
+  const loserRank = Number(team1Won ? row.rank2 : row.rank1);
+  const tags = Array.isArray(row.result.tags) ? row.result.tags.join(" ") : String(row.result.tags || "");
+  const insights = [{ label:`${getTeamAbbreviation(winner)} WIN`, kind:"winner" }];
+
+  if (winnerRank && loserRank && winnerRank > loserRank) insights.push({ label:"RANKED UPSET", kind:"upset" });
+  if (/overtime|\bot\b/i.test(tags) || row.result.overtime) insights.push({ label:"OVERTIME", kind:"overtime" });
+  if (row.result.player_of_game || row.result.player_of_the_game) {
+    insights.push({ label:`POTG: ${row.result.player_of_game || row.result.player_of_the_game}`, kind:"player" });
+  }
+
+  return insights;
+}
+
 function GameCenterV2({ teams = [], users = [], assignments = [], weeklyMatchups = [], results = [], currentYear = "2026", currentWeek = "Week 1", conferenceAssets = [], adminUnlocked = false, loadData = async()=>{}, setActiveTab }) {
   const [weekFilter, setWeekFilter] = useState(currentWeek || "all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -2681,6 +2740,7 @@ function GameCenterV2({ teams = [], users = [], assignments = [], weeklyMatchups
         <V2MatchupTeam team={row.team2} rank={row.rank2} user={row.user2} compact side="HOME"/>
       </div>
       <div style={v2GameMeta}><span><ConferenceLogoMark conference={row.team1?.conference} conferenceAssets={conferenceAssets} size={22}/> vs <ConferenceLogoMark conference={row.team2?.conference} conferenceAssets={conferenceAssets} size={22}/></span><span>{row.scheduled_at?new Date(row.scheduled_at).toLocaleString():"Time TBD"}</span></div>
+      {row.result && <div className="cfb-game-result-insights">{gameCenterResultInsights(row).map((item)=><span key={item.label} data-kind={item.kind}>{item.label}</span>)}</div>}
       {(row.stream_url||row.vod_url||row.notes)&&<div style={v2GameLinks}>{row.stream_url&&<a href={row.stream_url} target="_blank" rel="noreferrer">Live Stream</a>}{row.vod_url&&<a href={row.vod_url} target="_blank" rel="noreferrer">Watch VOD</a>}{row.notes&&<span>{row.notes}</span>}</div>}
       {adminUnlocked&&<div style={v2CardActions}><button onClick={()=>chooseGame(row)}>{row.is_game_of_week?"★ Featured":"☆ Feature"}</button></div>}
     </article>):<div style={v2Empty}>No matchups match these filters.</div>}</div>
@@ -2893,7 +2953,7 @@ function LeagueHubLegacy({discordSession,linkedDiscordUser,users=[],teams=[],ass
   const conversationOther=(conversationId)=>{const member=conversationMembers.find((row)=>String(row.conversation_id)===String(conversationId)&&String(row.discord_user_id)!==String(linkedDiscordUser.id));return users.find((row)=>String(row.id)===String(member?.discord_user_id));};
   const filteredMembers=users.filter((user)=>user.is_active!==false&&String(user.id)!==String(linkedDiscordUser.id)&&String(user.discord_username).toLowerCase().includes(memberSearch.toLowerCase())).slice(0,12);
   const displayedMessages=mode==="direct"?directMessages:messages;
-  return <main className="cfb-v2-page network-page"><section className="network-hero"><div><span>CFB ELITE NETWORK</span><h1>CFBElite Social <small style={{fontSize:10,opacity:.5}}>v40.2</small></h1><p>The league conversation, rules, polls and community—without crowding the dashboard home.</p></div><div className="network-live-presence"><i/><strong>{users.filter((row)=>row.is_active!==false).length}</strong><span>League Members</span></div></section><div className="network-layout"><aside className="network-sidebar"><nav><button className={mode==="channels"?"active":""} onClick={()=>setMode("channels")}>Channels</button><button className={mode==="direct"?"active":""} onClick={()=>setMode("direct")}>Messages</button><button className={mode==="notifications"?"active":""} onClick={()=>setMode("notifications")}>Alerts {unread>0&&<b>{unread}</b>}</button><button className={mode==="settings"?"active":""} onClick={()=>setMode("settings")}>Settings</button></nav>{mode==="channels"&&<div className="network-channel-list">{channels.map((channel)=><button key={channel.id} className={String(selectedChannel)===String(channel.id)?"active":""} onClick={()=>setSelectedChannel(channel.id)}><b>{channel.icon}</b><span><strong>{channel.name}</strong><small>{channel.description}</small></span></button>)}</div>}{mode==="direct"&&<><label className="network-member-search"><span>NEW MESSAGE</span><input value={memberSearch} onChange={(event)=>setMemberSearch(event.target.value)} placeholder="Find a league member"/></label>{memberSearch&&<div className="network-member-results">{filteredMembers.map((user)=><button key={user.id} onClick={()=>startConversation(user.id)}><NetworkIdentity userId={user.id} users={users} teams={teams} assignments={assignments} currentYear={currentYear} compact/></button>)}</div>}<div className="network-conversation-list">{conversations.map((conversation)=>{const other=conversationOther(conversation.id);return <button key={conversation.id} className={String(selectedConversation)===String(conversation.id)?"active":""} onClick={()=>setSelectedConversation(conversation.id)}><NetworkIdentity userId={other?.id} users={users} teams={teams} assignments={assignments} currentYear={currentYear} compact/><small>{new Date(conversation.last_message_at).toLocaleDateString()}</small></button>})}</div></>}</aside><section className="network-stage">{mode==="notifications"?<div className="network-notifications"><header><div><span>CFBELITE SOCIAL</span><h2>Notifications</h2></div><button onClick={markNotificationsRead}>Mark all read</button></header>{notifications.map((notification)=><button key={notification.id} className={notification.read_at?"":"unread"} onClick={()=>{if(notification.target_tab)setActiveTab?.(notification.target_tab);}}><i>{notification.icon||"CFB"}</i><span><strong>{notification.title}</strong><p>{notification.body}</p><small>{notification.channel_name?`#${notification.channel_name} • `:""}{new Date(notification.created_at).toLocaleString()}</small></span><em>›</em></button>)}</div>:mode==="settings"?<NotificationSettings preferences={preferences} savePreference={savePreference} enablePush={enablePush}/>:<><header className="network-stage-header"><div><span>{mode==="direct"?"PRIVATE CONVERSATION":selectedChannelRow?.channel_type?.toUpperCase()}</span><h2>{mode==="direct"?(conversationOther(selectedConversation)?.discord_username||"Select a conversation"):(selectedChannelRow?.name||"League Channel")}</h2><p>{mode==="direct"?"Only members of this conversation can read these messages.":selectedChannelRow?.description}</p></div>{mode==="channels"&&selectedChannelRow?.slug==="streams"&&<button onClick={()=>setActiveTab?.("redZone")}>Open RedZone</button>}</header><div className="network-message-feed">{displayedMessages.map((message)=><article key={message.id} className={String(message.author_discord_user_id)===String(linkedDiscordUser.id)?"mine":""}><NetworkIdentity userId={message.author_discord_user_id} users={users} teams={teams} assignments={assignments} currentYear={currentYear}/><p>{message.body}</p><time>{new Date(message.created_at).toLocaleString([],{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})}</time></article>)}{!displayedMessages.length&&<div className="network-empty"><b>Start the conversation.</b><span>This space is ready for the league.</span></div>}</div><div className="network-composer"><textarea value={draft} onChange={(event)=>setDraft(event.target.value)} onKeyDown={(event)=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();sendMessage();}}} placeholder={mode==="direct"?"Message privately…":`Message #${selectedChannelRow?.slug||"channel"}…`} disabled={mode==="direct"&&!selectedConversation}/><button disabled={busy||!draft.trim()||(mode==="direct"&&!selectedConversation)} onClick={sendMessage}>{busy?"Sending…":"Send"}</button><small>Enter to send • Shift + Enter for a new line</small></div></>}</section></div></main>;
+  return <main className="cfb-v2-page network-page"><section className="network-hero"><div><span>CFB ELITE NETWORK</span><h1>CFBElite Network <small style={{fontSize:10,opacity:.5}}>v40.2</small></h1><p>The league conversation, rules, polls and community—without crowding the dashboard home.</p></div><div className="network-live-presence"><i/><strong>{users.filter((row)=>row.is_active!==false).length}</strong><span>League Members</span></div></section><div className="network-layout"><aside className="network-sidebar"><nav><button className={mode==="channels"?"active":""} onClick={()=>setMode("channels")}>Channels</button><button className={mode==="direct"?"active":""} onClick={()=>setMode("direct")}>Messages</button><button className={mode==="notifications"?"active":""} onClick={()=>setMode("notifications")}>Alerts {unread>0&&<b>{unread}</b>}</button><button className={mode==="settings"?"active":""} onClick={()=>setMode("settings")}>Settings</button></nav>{mode==="channels"&&<div className="network-channel-list">{channels.map((channel)=><button key={channel.id} className={String(selectedChannel)===String(channel.id)?"active":""} onClick={()=>setSelectedChannel(channel.id)}><b>{channel.icon}</b><span><strong>{channel.name}</strong><small>{channel.description}</small></span></button>)}</div>}{mode==="direct"&&<><label className="network-member-search"><span>NEW MESSAGE</span><input value={memberSearch} onChange={(event)=>setMemberSearch(event.target.value)} placeholder="Find a league member"/></label>{memberSearch&&<div className="network-member-results">{filteredMembers.map((user)=><button key={user.id} onClick={()=>startConversation(user.id)}><NetworkIdentity userId={user.id} users={users} teams={teams} assignments={assignments} currentYear={currentYear} compact/></button>)}</div>}<div className="network-conversation-list">{conversations.map((conversation)=>{const other=conversationOther(conversation.id);return <button key={conversation.id} className={String(selectedConversation)===String(conversation.id)?"active":""} onClick={()=>setSelectedConversation(conversation.id)}><NetworkIdentity userId={other?.id} users={users} teams={teams} assignments={assignments} currentYear={currentYear} compact/><small>{new Date(conversation.last_message_at).toLocaleDateString()}</small></button>})}</div></>}</aside><section className="network-stage">{mode==="notifications"?<div className="network-notifications"><header><div><span>CFBELITE NETWORK</span><h2>Notifications</h2></div><button onClick={markNotificationsRead}>Mark all read</button></header>{notifications.map((notification)=><button key={notification.id} className={notification.read_at?"":"unread"} onClick={()=>{if(notification.target_tab)setActiveTab?.(notification.target_tab);}}><i>{notification.icon||"CFB"}</i><span><strong>{notification.title}</strong><p>{notification.body}</p><small>{notification.channel_name?`#${notification.channel_name} • `:""}{new Date(notification.created_at).toLocaleString()}</small></span><em>›</em></button>)}</div>:mode==="settings"?<NotificationSettings preferences={preferences} savePreference={savePreference} enablePush={enablePush}/>:<><header className="network-stage-header"><div><span>{mode==="direct"?"PRIVATE CONVERSATION":selectedChannelRow?.channel_type?.toUpperCase()}</span><h2>{mode==="direct"?(conversationOther(selectedConversation)?.discord_username||"Select a conversation"):(selectedChannelRow?.name||"League Channel")}</h2><p>{mode==="direct"?"Only members of this conversation can read these messages.":selectedChannelRow?.description}</p></div>{mode==="channels"&&selectedChannelRow?.slug==="streams"&&<button onClick={()=>setActiveTab?.("redZone")}>Open RedZone</button>}</header><div className="network-message-feed">{displayedMessages.map((message)=><article key={message.id} className={String(message.author_discord_user_id)===String(linkedDiscordUser.id)?"mine":""}><NetworkIdentity userId={message.author_discord_user_id} users={users} teams={teams} assignments={assignments} currentYear={currentYear}/><p>{message.body}</p><time>{new Date(message.created_at).toLocaleString([],{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})}</time></article>)}{!displayedMessages.length&&<div className="network-empty"><b>Start the conversation.</b><span>This space is ready for the league.</span></div>}</div><div className="network-composer"><textarea value={draft} onChange={(event)=>setDraft(event.target.value)} onKeyDown={(event)=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();sendMessage();}}} placeholder={mode==="direct"?"Message privately…":`Message #${selectedChannelRow?.slug||"channel"}…`} disabled={mode==="direct"&&!selectedConversation}/><button disabled={busy||!draft.trim()||(mode==="direct"&&!selectedConversation)} onClick={sendMessage}>{busy?"Sending…":"Send"}</button><small>Enter to send • Shift + Enter for a new line</small></div></>}</section></div></main>;
 }
 
 function NetworkChannelMark({channel,size=38}) {
@@ -2934,7 +2994,7 @@ function NetworkRoleManager({roles=[],roleMembers=[],users=[],roleForm,setRoleFo
 }
 
 function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignments=[],weeklyMatchups=[],currentYear,setActiveTab,setError}) {
-  console.info("CFBElite Social build v40.3-active-state-fix");
+  console.info("CFBElite Discord build v41-discord-clone");
   const [mode,setMode]=useState("channels");
   const [mobileView,setMobileView]=useState("directory");
   const [channels,setChannels]=useState([]);
@@ -3202,16 +3262,16 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
     </button>;
   };
   const renderCategory=(category)=>{const categoryChannels=channels.filter((channel)=>String(channel.category_id)===String(category.id));if(!categoryChannels.length)return null;return <React.Fragment key={category.id}><div className="network-channel-category" style={{"--category-color":category.color}}><i/>{category.name.toUpperCase()} <b>{categoryChannels.length}</b></div>{categoryChannels.map(renderChannelButton)}</React.Fragment>;};
-  const mobilePanelTitle=mode==="channels"?(selectedChannelRow?.name||"League Channel"):mode==="direct"?(conversationOther(selectedConversation)?.discord_username||"Direct Messages"):({news:"The Newsroom",notifications:"Alerts",roles:"Roles & Permissions",emojis:"League Emojis",categories:"Channel Categories",settings:"Settings"}[mode]||"CFBElite Social");
+  const mobilePanelTitle=mode==="channels"?(selectedChannelRow?.name||"League Channel"):mode==="direct"?(conversationOther(selectedConversation)?.discord_username||"Direct Messages"):({news:"The Newsroom",notifications:"Alerts",roles:"Roles & Permissions",emojis:"League Emojis",categories:"Channel Categories",settings:"Settings"}[mode]||"CFBElite Discord");
   const mobilePanelSub=mode==="channels"?`${onlineUsers.length} online • #${selectedChannelRow?.slug||"channel"}`:mode==="direct"?"Private conversation":"CFB Elite 27 Network";
   const composerPlaceholder=postingBlocked?"Posting is restricted in this channel":mode==="direct"?"Message privately…":selectedChannelRow?.is_auto_matchup?"Message this matchup…":`Message #${selectedChannelRow?.name||"channel"}…`;
   const returnToDirectory=()=>{setMobileView("directory");setManageOpen(false);if(!["channels","direct"].includes(mode))setMode("channels");};
 
-  if(mode==="news")return <main className="cfb-v2-page network-page newsroom-page"><header className="newsroom-page-bar"><button onClick={()=>{setMode("channels");setMobileView("directory");}}>‹ Back to CFBElite Social</button><div><span>CFB ELITE NETWORK</span><strong>Newsroom Control</strong></div><b>{onlineUsers.length} ONLINE</b></header><LeagueNewsroom articles={newsArticles} jobs={newsJobs} isCommissioner={isCommissioner} busy={newsBusy} onGenerate={generateLeagueNews} onSave={saveNewsDraft} onReview={reviewNewsArticle}/></main>;
+  if(mode==="news")return <main className="cfb-v2-page network-page newsroom-page"><header className="newsroom-page-bar"><button onClick={()=>{setMode("channels");setMobileView("directory");}}>‹ Back to CFBElite Discord</button><div><span>CFB ELITE NETWORK</span><strong>Newsroom Control</strong></div><b>{onlineUsers.length} ONLINE</b></header><LeagueNewsroom articles={newsArticles} jobs={newsJobs} isCommissioner={isCommissioner} busy={newsBusy} onGenerate={generateLeagueNews} onSave={saveNewsDraft} onReview={reviewNewsArticle}/></main>;
 
-  return <main className={`cfb-v2-page network-page network-mobile-${mobileView}`}>
-    <section className="network-hero"><div><span>CFB ELITE NETWORK</span><h1>League Hub</h1><p>Every announcement, conversation and rivalry—inside the dynasty.</p></div><div className="network-hero-badges"><b>LIVE LEAGUE CHAT</b><b>PRIVATE MATCHUP ROOMS</b><b>CUSTOM REACTIONS</b></div><div className="network-live-presence"><i/><strong>{onlineUsers.length}</strong><span>ONLINE NOW</span></div></section>
-    <header className="network-mobile-hub-header"><button onClick={returnToDirectory} aria-label="Back to channels">{mobileView==="directory"?"#":"‹"}</button><div><strong>{mobileView==="directory"?"CFBElite 27 Dynasty":mobilePanelTitle}</strong><small>{mobileView==="directory"?`${onlineUsers.length} online • CFBElite Social`:mobilePanelSub}</small></div>{mobileView==="directory"?<i className="online"/>:mode==="channels"&&canCreateChannels&&!selectedChannelRow?.is_auto_matchup?<button className="network-mobile-channel-actions" onClick={()=>{openChannelManager(selectedChannelRow);setMobileView("panel");}} aria-label="Manage channel">•••</button>:null}</header>
+  return <main className={`cfb-v2-page network-page discord-clone-page network-mobile-${mobileView}`}>
+    <section className="network-hero discord-server-banner"><div><span>CFBELITE 27</span><h1>CFBElite Discord</h1><p>League channels, direct messages, reactions, replies and notifications.</p></div><div className="network-live-presence"><i/><strong>{onlineUsers.length}</strong><span>ONLINE</span></div></section>
+    <header className="network-mobile-hub-header"><button onClick={returnToDirectory} aria-label="Back to channels">{mobileView==="directory"?"#":"‹"}</button><div><strong>{mobileView==="directory"?"CFBElite 27 Dynasty":mobilePanelTitle}</strong><small>{mobileView==="directory"?`${onlineUsers.length} online • CFBElite Discord`:mobilePanelSub}</small></div>{mobileView==="directory"?<i className="online"/>:mode==="channels"&&canCreateChannels&&!selectedChannelRow?.is_auto_matchup?<button className="network-mobile-channel-actions" onClick={()=>{openChannelManager(selectedChannelRow);setMobileView("panel");}} aria-label="Manage channel">•••</button>:null}</header>
     <div className="network-layout"><aside className="network-sidebar">
       <div className="network-mobile-directory-title"><strong>CFBElite 27 Dynasty</strong><span>League channels and conversations</span></div>
       <nav><button className={mode==="channels"?"active":""} onClick={()=>{setMode("channels");setMobileView("directory");setManageOpen(false);}}>Channels</button><button className={mode==="direct"?"active":""} onClick={()=>{setMode("direct");setMobileView("directory");setManageOpen(false);}}>Messages</button><button className={mode==="notifications"?"active":""} onClick={()=>{setMode("notifications");setMobileView("panel");setManageOpen(false);}}>Alerts {unread>0&&<b>{unread}</b>}</button><button className={mode==="roles"?"active":""} onClick={()=>{setMode("roles");setMobileView("panel");setManageOpen(false);}}>Roles</button><button className={mode==="emojis"?"active":""} onClick={()=>{setMode("emojis");setMobileView("panel");setManageOpen(false);}}>Emojis</button><button className={mode==="settings"?"active":""} onClick={()=>{setMode("settings");setMobileView("panel");setManageOpen(false);}}>Settings</button></nav>
@@ -3483,7 +3543,7 @@ function EliteBooksHistory({sportsbook={},users=[],currentYear,setActiveTab}) {
 }
 
 function MyTeamHub({linkedDiscordUser,discordSession,teams=[],users=[],assignments=[],results=[],weeklyMatchups=[],sportsbook={},currentYear,currentWeek,signInWithDiscord,setActiveTab}) {
-  if(!discordSession||!linkedDiscordUser)return <main className="cfb-v2-page"><section className="elite-myteam-login"><span>PERSONALIZED CFBELITE SOCIAL</span><h1>My Team</h1><p>Sign in with Discord to see your team, next opponent, sportsbook card, futures and badges in one place.</p><button onClick={signInWithDiscord}>Continue with Discord</button></section></main>;
+  if(!discordSession||!linkedDiscordUser)return <main className="cfb-v2-page"><section className="elite-myteam-login"><span>PERSONALIZED CFBELITE NETWORK</span><h1>My Team</h1><p>Sign in with Discord to see your team, next opponent, sportsbook card, futures and badges in one place.</p><button onClick={signInWithDiscord}>Continue with Discord</button></section></main>;
   const assignment=assignments.find((row)=>String(row.discord_user_id)===String(linkedDiscordUser.id)&&assignmentActiveForYear(row,currentYear));
   const team=teams.find((row)=>String(row.id)===String(assignment?.team_id));
   const next=(weeklyMatchups||[]).find((row)=>String(row.season_year)===String(currentYear)&&String(row.week)===String(currentWeek)&&(String(row.team_1_id)===String(team?.id)||String(row.team_2_id)===String(team?.id)));
@@ -3513,7 +3573,7 @@ function EliteBooksManager({sportsbook={},users=[],teams=[],assignments=[],curre
 function NetworkHomePanel({linkedDiscordUser,setActiveTab}) {
   const [pulse,setPulse]=useState({live:0,unread:0,announcement:null});
   useEffect(()=>{let active=true;async function load(){const [statusRes,notificationRes,channelRes]=await Promise.all([supabase.from("live_stream_status").select("profile_id").eq("is_live",true),supabase.from("app_notifications").select("id").is("read_at",null),supabase.from("league_channels").select("id").eq("slug","announcements").maybeSingle()]);let announcement=null;if(channelRes.data?.id){const messageRes=await supabase.from("league_channel_messages").select("body,created_at").eq("channel_id",channelRes.data.id).is("deleted_at",null).order("created_at",{ascending:false}).limit(1);announcement=messageRes.data?.[0]||null;}if(active)setPulse({live:statusRes.data?.length||0,unread:notificationRes.data?.length||0,announcement});}load();const timer=window.setInterval(load,NETWORK_REFRESH_MS);return()=>{active=false;window.clearInterval(timer);};},[linkedDiscordUser?.id]);
-  return <section className="network-home-panel"><button onClick={()=>setActiveTab?.("leagueHub")}><span>CFBELITE SOCIAL</span><h2>{pulse.announcement?.body||"The league conversation lives here."}</h2><small>{pulse.announcement?`Latest announcement • ${new Date(pulse.announcement.created_at).toLocaleDateString()}`:"Channels, private messages, announcements and alerts"}</small><b>Enter the Hub →</b></button><button onClick={()=>setActiveTab?.("leagueHub")}><span>MY INBOX</span><strong>{pulse.unread}</strong><small>Unread notification{pulse.unread===1?"":"s"}</small></button><button className={pulse.live?"live":""} onClick={()=>setActiveTab?.("redZone")}><span>REDZONE</span><strong>{pulse.live}</strong><small>{pulse.live?"League streams live now":"Streams currently live"}</small><b>{pulse.live?"Watch Now →":"Open Control Room →"}</b></button></section>;
+  return <section className="network-home-panel"><button onClick={()=>setActiveTab?.("leagueHub")}><span>CFBELITE NETWORK</span><h2>{pulse.announcement?.body||"The league conversation lives here."}</h2><small>{pulse.announcement?`Latest announcement • ${new Date(pulse.announcement.created_at).toLocaleDateString()}`:"Channels, private messages, announcements and alerts"}</small><b>Enter the Hub →</b></button><button onClick={()=>setActiveTab?.("leagueHub")}><span>MY INBOX</span><strong>{pulse.unread}</strong><small>Unread notification{pulse.unread===1?"":"s"}</small></button><button className={pulse.live?"live":""} onClick={()=>setActiveTab?.("redZone")}><span>REDZONE</span><strong>{pulse.live}</strong><small>{pulse.live?"League streams live now":"Streams currently live"}</small><b>{pulse.live?"Watch Now →":"Open Control Room →"}</b></button></section>;
 }
 
 function HomeNewsroomRail({setActiveTab}) {
@@ -3641,7 +3701,7 @@ function HomeLeaguePulseV38({sportsbook={},linkedDiscordUser,currentYear,current
   const lineCount=(sportsbook.lines||[]).filter((line)=>String(line.board_id)===String(board?.id)).length;
   const myStanding=(sportsbook.seasonStandings||[]).find((row)=>String(row.season_year)===String(currentYear)&&String(row.discord_user_id)===String(linkedDiscordUser?.id));
   return <section className="home-pulse-v38"><header><div><span>LEAGUE PULSE</span><h2>Everything happening now</h2></div><small>{currentWeek}</small></header><div>
-    <button type="button" onClick={()=>setActiveTab?.("leagueHub")}><span>CFBELITE SOCIAL</span><strong>{pulse.unread}</strong><small>unread alert{pulse.unread===1?"":"s"}</small><p>{pulse.announcement?.body||"League chat, scheduling and announcements"}</p></button>
+    <button type="button" onClick={()=>setActiveTab?.("leagueHub")}><span>CFBELITE NETWORK</span><strong>{pulse.unread}</strong><small>unread alert{pulse.unread===1?"":"s"}</small><p>{pulse.announcement?.body||"League chat, scheduling and announcements"}</p></button>
     <button type="button" onClick={()=>setActiveTab?.("eliteBooks")}><span>ELITE BOOKS</span><strong>{myStanding?.total_points||0} PTS</strong><small>{lineCount} game{lineCount===1?"":"s"} on the board</small><p>{board?.status?`${String(board.status).toUpperCase()} weekly board`:"Weekly card will appear after generation"}</p></button>
     <button type="button" className={pulse.live?"live":""} onClick={()=>setActiveTab?.("redZone")}><span>REDZONE</span><strong>{pulse.live}</strong><small>stream{pulse.live===1?"":"s"} live</small><p>{pulse.live?"Watch the league live now":"Stream control room is standing by"}</p></button>
   </div></section>;
@@ -4001,7 +4061,7 @@ function DashboardRedesign({ teams, users, assignments, results, allResults, wee
                   <span><small>RATING</small><b>{row.avgRating}</b></span>
                 </div>
               </div>
-            )) : <div style={mutedText}>No conference data yet.</div>}
+            )) : <EmptyState icon="🏟️" title="No conference data yet" description="Conference metrics will populate after teams and results are available."/>}
           </div>
         </div>
       </section>
@@ -4098,7 +4158,524 @@ function HeadlineTicker({ teams, users, assignments, results, allResults, allAme
   const tickerLines = lines.concat(lines).concat(lines);
 
   return <div style={tickerWrap}>
-    <style>{`@keyframes cfbeliteTicker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }`}</style>
+    <style>{`@keyframes cfbeliteTicker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+
+      /* v43-ui-ux-polish */
+      :root {
+        --cfb-space-1: 4px;
+        --cfb-space-2: 8px;
+        --cfb-space-3: 12px;
+        --cfb-space-4: 16px;
+        --cfb-space-5: 20px;
+        --cfb-space-6: 24px;
+        --cfb-space-8: 32px;
+        --cfb-radius-sm: 10px;
+        --cfb-radius-md: 16px;
+        --cfb-radius-lg: 22px;
+        --cfb-card-bg: linear-gradient(155deg, rgba(15,21,33,.97), rgba(4,7,13,.99));
+        --cfb-card-border: rgba(255,255,255,.12);
+        --cfb-card-shadow: 0 18px 50px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.06);
+        --cfb-transition: 160ms cubic-bezier(.2,.8,.2,1);
+        --cfb-body-size: 16px;
+        --cfb-muted: rgba(226,232,240,.70);
+      }
+
+      html { scroll-behavior: smooth; }
+      body { font-size: var(--cfb-body-size); line-height: 1.55; }
+      .cfb-app-container { display:grid; gap: var(--cfb-space-4); }
+
+      h1 { font-size: clamp(44px, 7vw, 84px); line-height: .92; letter-spacing: -.055em; }
+      h2 { font-size: clamp(25px, 3vw, 36px); line-height: 1.02; letter-spacing: -.035em; }
+      h3 { font-size: clamp(18px, 2vw, 24px); line-height: 1.08; letter-spacing: -.02em; }
+      p, li, label, input, select, textarea, button { font-size: 15px; }
+      small { font-size: 12px; }
+
+      button, a, input, select, textarea {
+        transition: transform var(--cfb-transition), border-color var(--cfb-transition), background var(--cfb-transition), box-shadow var(--cfb-transition), color var(--cfb-transition), opacity var(--cfb-transition);
+      }
+
+      button { min-height: 42px; }
+      button:hover { transform: translateY(-1px); }
+      button:active { transform: translateY(0) scale(.99); }
+      button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+        outline: 2px solid rgba(250,204,21,.85);
+        outline-offset: 2px;
+      }
+
+      .cfb-identity-bar {
+        position: sticky;
+        top: 8px;
+        z-index: 70;
+        display: grid;
+        grid-template-columns: minmax(170px,1.1fr) repeat(3,minmax(110px,.75fr)) minmax(180px,1fr) minmax(170px,1fr);
+        gap: 1px;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,.13);
+        border-radius: 16px;
+        background: rgba(2,6,15,.92);
+        box-shadow: 0 16px 46px rgba(0,0,0,.34);
+        backdrop-filter: blur(18px);
+      }
+
+      .cfb-identity-bar button,
+      .cfb-identity-item {
+        min-width: 0;
+        min-height: 58px;
+        padding: 10px 13px;
+        border: 0;
+        border-radius: 0;
+        background: linear-gradient(145deg, rgba(15,23,42,.92), rgba(6,10,18,.96));
+        color: #fff;
+        text-align: left;
+      }
+
+      .cfb-identity-bar > * + * { border-left: 1px solid rgba(255,255,255,.08); }
+      .cfb-identity-brand { display:flex; align-items:center; gap:10px; }
+      .cfb-identity-brand > span {
+        width: 38px; height:38px; display:grid; place-items:center;
+        border-radius: 11px; background:linear-gradient(145deg,#dc2626,#7f1d1d);
+        box-shadow:0 8px 20px rgba(220,38,38,.28); font-weight:1000; font-size:12px;
+      }
+      .cfb-identity-brand b, .cfb-identity-brand small { display:block; }
+      .cfb-identity-item small, .cfb-identity-featured small, .cfb-identity-brand small {
+        display:block; color:rgba(226,232,240,.55); font-size:9px; font-weight:1000; letter-spacing:.09em; text-transform:uppercase;
+      }
+      .cfb-identity-item b, .cfb-identity-featured b { display:block; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; }
+      .cfb-identity-progress span { display:block; height:4px; margin-top:7px; overflow:hidden; border-radius:999px; background:rgba(255,255,255,.08); }
+      .cfb-identity-progress i { display:block; height:100%; border-radius:999px; background:linear-gradient(90deg,#dc2626,#facc15); }
+      .cfb-identity-featured { border-left:2px solid rgba(250,204,21,.45) !important; }
+
+      .cfb-app-skeleton {
+        display:grid; gap:14px; padding:24px; border-radius:22px; border:1px solid var(--cfb-card-border); background:var(--cfb-card-bg);
+      }
+      .cfb-skeleton-line, .cfb-skeleton-card span {
+        position:relative; overflow:hidden; border-radius:999px; background:rgba(255,255,255,.07);
+      }
+      .cfb-skeleton-line::after, .cfb-skeleton-card span::after {
+        content:""; position:absolute; inset:0; transform:translateX(-100%);
+        background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent);
+        animation:cfb-shimmer 1.35s infinite;
+      }
+      .cfb-skeleton-title { width:42%; height:34px; }
+      .cfb-skeleton-subtitle { width:26%; height:14px; }
+      .cfb-skeleton-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+      .cfb-skeleton-card { display:grid; gap:12px; min-height:170px; padding:18px; border-radius:18px; background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.08); }
+      .cfb-skeleton-card span:nth-child(1){width:45%;height:14px}.cfb-skeleton-card span:nth-child(2){width:72%;height:28px}.cfb-skeleton-card span:nth-child(3){width:90%;height:12px}
+      @keyframes cfb-shimmer { 100% { transform:translateX(100%); } }
+
+      .cfb-empty-state {
+        display:flex; align-items:center; justify-content:center; gap:14px; min-height:150px;
+        padding:24px; border:1px dashed rgba(255,255,255,.15); border-radius:18px;
+        background:linear-gradient(145deg,rgba(15,23,42,.56),rgba(2,6,23,.75)); color:#fff; text-align:left;
+      }
+      .cfb-empty-icon { width:48px;height:48px;display:grid;place-items:center;border-radius:14px;background:rgba(255,255,255,.07);font-size:23px; }
+      .cfb-empty-state h3 { margin:0; font-size:18px; }
+      .cfb-empty-state p { margin:4px 0 0; color:var(--cfb-muted); font-size:13px; }
+      .cfb-empty-state button { margin-left:auto; padding:9px 14px; border-radius:11px; border:1px solid rgba(250,204,21,.25); background:rgba(250,204,21,.10); color:#facc15; font-weight:900; }
+
+      .cfb-team-branded-page {
+        position:relative; isolation:isolate;
+      }
+      .cfb-team-branded-page::before {
+        content:""; position:absolute; z-index:-1; inset:-14px -14px auto; height:260px; pointer-events:none;
+        background:radial-gradient(circle at 12% 20%, color-mix(in srgb, var(--team-primary) 34%, transparent), transparent 46%),
+                   radial-gradient(circle at 86% 0%, color-mix(in srgb, var(--team-secondary) 20%, transparent), transparent 40%);
+        filter:saturate(1.12);
+      }
+
+      .cfb-app section,
+      .cfb-app article {
+        scroll-margin-top: 96px;
+      }
+
+      .cfb-app table {
+        border-collapse: separate;
+        border-spacing: 0;
+        font-size: 14px;
+      }
+      .cfb-app thead th {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        background: rgba(8,12,20,.98);
+        backdrop-filter: blur(12px);
+      }
+      .cfb-app tbody tr { transition: background var(--cfb-transition), transform var(--cfb-transition); }
+      .cfb-app tbody tr:nth-child(even) { background: rgba(255,255,255,.018); }
+      .cfb-app tbody tr:hover { background: rgba(250,204,21,.045); }
+      .cfb-app td, .cfb-app th { padding: 12px 13px; }
+
+      .cfb-app [style*="borderRadius: 20"],
+      .cfb-app [style*="border-radius: 20"] {
+        box-shadow: var(--cfb-card-shadow);
+      }
+
+      @media (prefers-reduced-motion: no-preference) {
+        .cfb-app > * { animation:cfb-page-in .24s ease both; }
+        @keyframes cfb-page-in { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:none; } }
+      }
+
+      @media (max-width: 1040px) {
+        .cfb-identity-bar { grid-template-columns:1.2fr repeat(2,.8fr) 1fr; }
+        .cfb-identity-item:nth-of-type(3), .cfb-identity-featured { display:none; }
+        .cfb-skeleton-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      }
+
+      @media (max-width: 720px) {
+        :root { --cfb-body-size:15px; }
+        body { overflow-x:hidden; }
+        h1 { font-size:clamp(38px,13vw,62px); }
+        h2 { font-size:clamp(23px,8vw,32px); }
+        p, li, label, input, select, textarea, button { font-size:15px; }
+        small { font-size:11px; }
+
+        .cfb-app-container { gap:12px; }
+        .cfb-identity-bar {
+          position:relative; top:auto; grid-template-columns:1.1fr .75fr .75fr;
+          overflow-x:auto; border-radius:14px;
+        }
+        .cfb-identity-bar > * { min-width:118px; }
+        .cfb-identity-brand { min-width:160px !important; }
+        .cfb-identity-progress { display:none; }
+        .cfb-identity-item:nth-of-type(3), .cfb-identity-featured { display:none; }
+
+        .cfb-skeleton-grid { grid-template-columns:1fr; }
+        .cfb-skeleton-title { width:72%; }
+        .cfb-skeleton-subtitle { width:48%; }
+
+        .cfb-empty-state { display:grid; justify-items:center; text-align:center; }
+        .cfb-empty-state button { margin-left:0; width:100%; }
+
+        button, input, select, textarea { min-height:46px; }
+        .cfb-app table { min-width:720px; }
+        .cfb-app td, .cfb-app th { padding:11px 10px; }
+      }
+
+      @media (max-width: 430px) {
+        .cfb-identity-bar { grid-template-columns:1fr 1fr; }
+        .cfb-identity-brand { grid-column:1 / -1; }
+        .cfb-identity-item:nth-of-type(2) { border-left:0; }
+      }
+
+      /* v42-unified-experience */
+      :root {
+        --cfb-ui-radius: 16px;
+        --cfb-ui-radius-lg: 22px;
+        --cfb-ui-pad: 18px;
+        --cfb-ui-border: rgba(255,255,255,.12);
+        --cfb-ui-panel: linear-gradient(155deg, rgba(17,24,39,.97), rgba(4,7,13,.99));
+      }
+
+      body {
+        font-size: 16px;
+        line-height: 1.5;
+      }
+
+      button, input, select, textarea {
+        font: inherit;
+      }
+
+      button {
+        min-height: 42px;
+        transition: transform .16s ease, border-color .16s ease, background .16s ease, box-shadow .16s ease, opacity .16s ease;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+      }
+
+      h1, h2, h3 {
+        text-wrap: balance;
+      }
+
+      table {
+        font-size: 14px;
+      }
+
+      th {
+        font-size: 12px;
+        letter-spacing: .055em;
+      }
+
+      td {
+        font-size: 14px;
+      }
+
+      .cfb-v2-page,
+      .cfb-discord-shell,
+      .cfb-social-shell {
+        font-size: 15px;
+      }
+
+      .cfb-feature-fallback {
+        display: grid;
+        gap: 12px;
+        justify-items: start;
+        padding: 28px;
+        border-radius: var(--cfb-ui-radius-lg);
+        border: 1px solid rgba(248,113,113,.25);
+        background: linear-gradient(145deg, rgba(69,10,10,.45), rgba(15,23,42,.98));
+        color: #fff;
+      }
+
+      .cfb-feature-fallback > span {
+        color: #fca5a5;
+        font-size: 12px;
+        font-weight: 1000;
+        letter-spacing: .12em;
+      }
+
+      .cfb-feature-fallback h2 {
+        margin: 0;
+        font-size: clamp(26px, 4vw, 42px);
+      }
+
+      .cfb-feature-fallback p {
+        margin: 0;
+        color: rgba(226,232,240,.78);
+      }
+
+      .cfb-feature-fallback button {
+        border: 1px solid rgba(255,255,255,.16);
+        border-radius: 12px;
+        padding: 10px 16px;
+        background: rgba(255,255,255,.08);
+        color: #fff;
+        font-weight: 900;
+      }
+
+      .cfb-universal-search {
+        position: relative;
+        z-index: 80;
+        margin: 10px 0 16px;
+      }
+
+      .cfb-universal-search-input {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 10px;
+        min-height: 50px;
+        padding: 0 14px;
+        border-radius: 15px;
+        border: 1px solid rgba(255,255,255,.13);
+        background: linear-gradient(145deg, rgba(15,23,42,.98), rgba(3,7,18,.98));
+        box-shadow: 0 14px 36px rgba(0,0,0,.24);
+      }
+
+      .cfb-universal-search-input > span {
+        color: #facc15;
+        font-size: 24px;
+        line-height: 1;
+      }
+
+      .cfb-universal-search-input input {
+        width: 100%;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: #fff;
+        font-size: 15px;
+        font-weight: 800;
+      }
+
+      .cfb-universal-search-input button {
+        min-height: 32px;
+        width: 32px;
+        border: 0;
+        border-radius: 9px;
+        background: rgba(255,255,255,.08);
+        color: #fff;
+      }
+
+      .cfb-universal-search-results {
+        position: absolute;
+        inset: calc(100% + 8px) 0 auto 0;
+        display: grid;
+        gap: 5px;
+        max-height: min(520px, 65vh);
+        overflow: auto;
+        padding: 10px;
+        border-radius: 16px;
+        border: 1px solid rgba(255,255,255,.14);
+        background: rgba(8,12,20,.99);
+        box-shadow: 0 24px 70px rgba(0,0,0,.55);
+      }
+
+      .cfb-universal-search-results > button {
+        display: grid;
+        grid-template-columns: 42px 1fr auto;
+        gap: 11px;
+        align-items: center;
+        width: 100%;
+        min-width: 0;
+        padding: 10px;
+        border: 1px solid transparent;
+        border-radius: 12px;
+        background: transparent;
+        color: #fff;
+        text-align: left;
+      }
+
+      .cfb-universal-search-results > button:hover {
+        border-color: rgba(250,204,21,.24);
+        background: rgba(250,204,21,.07);
+      }
+
+      .cfb-search-result-logo {
+        width: 42px;
+        height: 42px;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        border-radius: 11px;
+        background: rgba(255,255,255,.08);
+        color: #facc15;
+        font-weight: 1000;
+      }
+
+      .cfb-search-result-logo img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+
+      .cfb-universal-search-results b,
+      .cfb-universal-search-results small {
+        display: block;
+      }
+
+      .cfb-universal-search-results b {
+        font-size: 14px;
+      }
+
+      .cfb-universal-search-results small {
+        margin-top: 2px;
+        color: rgba(226,232,240,.68);
+        font-size: 12px;
+      }
+
+      .cfb-universal-search-results em {
+        color: rgba(226,232,240,.52);
+        font-size: 10px;
+        font-style: normal;
+        font-weight: 1000;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+      }
+
+      .cfb-search-empty {
+        padding: 18px;
+        color: rgba(226,232,240,.68);
+        text-align: center;
+      }
+
+      .cfb-game-result-insights {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        margin-top: 12px;
+      }
+
+      .cfb-game-result-insights span {
+        padding: 5px 8px;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,.12);
+        background: rgba(255,255,255,.06);
+        color: rgba(248,250,252,.88);
+        font-size: 10px;
+        font-weight: 1000;
+        letter-spacing: .05em;
+      }
+
+      .cfb-game-result-insights span[data-kind="upset"] {
+        border-color: rgba(248,113,113,.35);
+        background: rgba(248,113,113,.12);
+        color: #fecaca;
+      }
+
+      .cfb-game-result-insights span[data-kind="overtime"] {
+        border-color: rgba(250,204,21,.35);
+        background: rgba(250,204,21,.10);
+        color: #fde68a;
+      }
+
+      @media (max-width: 900px) {
+        body {
+          font-size: 15px;
+        }
+
+        .cfb-v2-page {
+          gap: 14px !important;
+        }
+
+        .cfb-v2-page h1 {
+          font-size: clamp(40px, 12vw, 68px) !important;
+        }
+
+        .cfb-v2-game-grid,
+        .cfb-v2-card-grid,
+        .cfb-dashboard-grid {
+          grid-template-columns: 1fr !important;
+        }
+
+        .cfb-discord-shell {
+          min-height: 70vh;
+        }
+
+        table {
+          min-width: 760px;
+        }
+      }
+
+      @media (max-width: 620px) {
+        body {
+          font-size: 15px;
+        }
+
+        .cfb-universal-search {
+          margin-top: 8px;
+        }
+
+        .cfb-universal-search-input {
+          min-height: 48px;
+        }
+
+        .cfb-universal-search-results {
+          position: fixed;
+          left: 10px;
+          right: 10px;
+          top: 116px;
+          max-height: calc(100vh - 136px);
+        }
+
+        .cfb-universal-search-results > button {
+          grid-template-columns: 40px minmax(0,1fr);
+        }
+
+        .cfb-universal-search-results em {
+          display: none;
+        }
+
+        .cfb-v2-featured-matchup,
+        .cfb-v2-card-matchup {
+          grid-template-columns: 1fr auto 1fr !important;
+          gap: 8px !important;
+        }
+
+        button,
+        input,
+        select,
+        textarea {
+          min-height: 44px;
+        }
+
+        td, th {
+          padding: 11px 10px !important;
+        }
+      }
+
+`}</style>
     <div style={tickerContent}>{tickerLines.map((line,index)=><span key={index}>📰 {line}</span>)}</div>
   </div>;
 }
@@ -8923,7 +9500,7 @@ function GlobalStyle() {
         .cfb-center-hero-v38 { align-items:flex-start;flex-direction:column;padding:22px 18px; }.cfb-center-hero-v38 h1 { font-size:45px; }.cfb-center-hero-v38 > button { width:100%; }.cfb-center-groups-v38 { grid-template-columns:1fr; }.cfb-center-group-v38 > div > button { padding:14px 15px; }.cfb-center-group-v38 > div > button strong { font-size:15px; }.cfb-center-group-v38 > div > button small { white-space:normal;line-height:1.35; }
       }
 
-      /* v39 CFBElite Social */
+      /* v39 CFBElite Network */
       .network-channel-utilities{display:flex;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(148,163,184,.12);background:rgba(2,6,23,.72)}
       .network-channel-utilities label{min-width:0;flex:1;display:flex;align-items:center;gap:8px;padding:9px 12px;border:1px solid rgba(148,163,184,.16);border-radius:999px;background:#111827}.network-channel-utilities input{min-width:0;width:100%;border:0;outline:0;color:#fff;background:transparent}.network-channel-utilities button{padding:9px 12px;border:1px solid rgba(148,163,184,.16);border-radius:999px;color:#cbd5e1;background:#111827}.network-channel-utilities button.active{border-color:#facc15;color:#facc15;background:rgba(250,204,21,.08)}
       .network-message-media{display:block;max-width:min(460px,100%);max-height:360px;margin-top:8px;border-radius:14px;object-fit:contain;background:#020617}.network-message-link{color:#60a5fa;text-decoration:underline;overflow-wrap:anywhere}.network-media-link{display:block}
@@ -9013,6 +9590,145 @@ function GlobalStyle() {
         .data-check-item { grid-template-columns:28px minmax(0,1fr)!important; }
         .data-check-item select { grid-column:1/-1; width:100%; }
       }
+
+      /* v41 Discord clone treatment */
+      .discord-clone-page {
+        --discord-bg:#313338;
+        --discord-sidebar:#2b2d31;
+        --discord-deep:#1e1f22;
+        --discord-input:#383a40;
+        --discord-hover:#35373c;
+        --discord-active:#404249;
+        --discord-text:#f2f3f5;
+        --discord-muted:#b5bac1;
+        --discord-blue:#5865f2;
+        max-width:none!important;
+        padding:0!important;
+        gap:0!important;
+        background:var(--discord-deep)!important;
+        border-radius:18px;
+        overflow:hidden;
+      }
+      .discord-clone-page .discord-server-banner {
+        min-height:68px!important;
+        padding:14px 18px!important;
+        margin:0!important;
+        border:0!important;
+        border-bottom:1px solid rgba(0,0,0,.35)!important;
+        border-radius:0!important;
+        background:var(--discord-deep)!important;
+        box-shadow:none!important;
+      }
+      .discord-clone-page .discord-server-banner h1 { font-size:20px!important; letter-spacing:0!important; margin:0!important; }
+      .discord-clone-page .discord-server-banner p,
+      .discord-clone-page .discord-server-banner > div > span { display:none!important; }
+      .discord-clone-page .network-layout {
+        min-height:calc(100vh - 150px)!important;
+        border:0!important;
+        border-radius:0!important;
+        background:var(--discord-bg)!important;
+        box-shadow:none!important;
+      }
+      .discord-clone-page .network-sidebar {
+        width:300px!important;
+        background:var(--discord-sidebar)!important;
+        border-right:0!important;
+      }
+      .discord-clone-page .network-sidebar > nav {
+        padding:8px!important;
+        background:var(--discord-sidebar)!important;
+        border:0!important;
+        display:grid!important;
+        grid-template-columns:repeat(3,1fr)!important;
+        gap:4px!important;
+      }
+      .discord-clone-page .network-sidebar > nav button {
+        min-height:36px!important;
+        padding:7px 8px!important;
+        border:0!important;
+        border-radius:6px!important;
+        background:transparent!important;
+        color:var(--discord-muted)!important;
+        box-shadow:none!important;
+      }
+      .discord-clone-page .network-sidebar > nav button:hover { background:var(--discord-hover)!important; color:var(--discord-text)!important; }
+      .discord-clone-page .network-sidebar > nav button.active { background:var(--discord-active)!important; color:#fff!important; box-shadow:none!important; }
+      .discord-clone-page .network-sidebar-label,
+      .discord-clone-page .network-channel-category {
+        color:#949ba4!important;
+        background:transparent!important;
+        border:0!important;
+        font-size:11px!important;
+        font-weight:800!important;
+        letter-spacing:.03em!important;
+      }
+      .discord-clone-page .network-channel-list { padding:0 8px 10px!important; }
+      .discord-clone-page .network-channel-list > button {
+        min-height:38px!important;
+        padding:6px 8px!important;
+        margin:1px 0!important;
+        border:0!important;
+        border-radius:6px!important;
+        background:transparent!important;
+        color:var(--discord-muted)!important;
+        box-shadow:none!important;
+      }
+      .discord-clone-page .network-channel-list > button:hover { background:var(--discord-hover)!important; color:var(--discord-text)!important; transform:none!important; }
+      .discord-clone-page .network-channel-list > button.active { background:var(--discord-active)!important; color:#fff!important; }
+      .discord-clone-page .network-channel-list > button strong { color:inherit!important; font-size:15px!important; }
+      .discord-clone-page .network-channel-list > button small { display:none!important; }
+      .discord-clone-page .network-online-roster { border-top:1px solid rgba(0,0,0,.28)!important; background:#232428!important; }
+      .discord-clone-page .network-stage,
+      .discord-clone-page .network-message-feed { background:var(--discord-bg)!important; }
+      .discord-clone-page .network-stage-header {
+        min-height:58px!important;
+        padding:10px 16px!important;
+        border:0!important;
+        border-bottom:1px solid rgba(0,0,0,.35)!important;
+        background:var(--discord-bg)!important;
+        box-shadow:0 1px 0 rgba(0,0,0,.2)!important;
+      }
+      .discord-clone-page .network-stage-header h2 { font-size:18px!important; color:var(--discord-text)!important; }
+      .discord-clone-page .network-stage-header p { color:var(--discord-muted)!important; }
+      .discord-clone-page .network-message-feed { padding:12px 0 110px!important; }
+      .discord-clone-page .network-message-feed article {
+        border:0!important;
+        border-radius:0!important;
+        padding:8px 16px!important;
+        margin:0!important;
+        background:transparent!important;
+        box-shadow:none!important;
+      }
+      .discord-clone-page .network-message-feed article:hover { background:#2e3035!important; }
+      .discord-clone-page .network-message-feed article p { color:#dbdee1!important; font-size:16px!important; line-height:1.35!important; }
+      .discord-clone-page .network-message-feed time { color:#949ba4!important; font-size:11px!important; }
+      .discord-clone-page .network-composer {
+        position:sticky!important;
+        bottom:0!important;
+        margin:0 16px 16px!important;
+        padding:0!important;
+        border:0!important;
+        background:transparent!important;
+      }
+      .discord-clone-page .network-compose-box,
+      .discord-clone-page .network-composer textarea {
+        border:0!important;
+        border-radius:8px!important;
+        background:var(--discord-input)!important;
+        color:var(--discord-text)!important;
+        box-shadow:none!important;
+      }
+      .discord-clone-page .network-send { background:var(--discord-blue)!important; border-radius:6px!important; }
+      .discord-clone-page button { transition:background-color .12s ease,color .12s ease,opacity .12s ease!important; }
+      .drawer-menu-group:last-child { margin-top:18px!important; padding-top:16px!important; border-top:1px solid rgba(255,255,255,.10)!important; }
+      @media (max-width:760px) {
+        .discord-clone-page { border-radius:0!important; }
+        .discord-clone-page .discord-server-banner { display:none!important; }
+        .discord-clone-page .network-sidebar { width:100%!important; }
+        .discord-clone-page .network-mobile-hub-header { background:var(--discord-deep)!important; border-bottom:1px solid rgba(0,0,0,.35)!important; }
+        .discord-clone-page .network-message-feed { padding-bottom:98px!important; }
+        .discord-clone-page .network-composer { margin:0 8px 8px!important; }
+      }
 `}</style>
   );
 }
@@ -9031,17 +9747,191 @@ function Header({ loading, reload }) {
     </header>
   );
 }
+
+
+function LeagueIdentityBar({ currentYear, currentWeek, advanceAt, weeklyMatchups = [], results = [], teams = [], setActiveTab }) {
+  const weekGames = (weeklyMatchups || []).filter((row)=>
+    String(row.season_year)===String(currentYear) &&
+    String(row.week)===String(currentWeek)
+  );
+  const weekResults = (results || []).filter((row)=>
+    String(row.season_year)===String(currentYear) &&
+    String(row.week)===String(currentWeek)
+  );
+  const completed = weekGames.filter((game)=>weekResults.some((result)=>
+    (String(result.team_1_id)===String(game.team_1_id) && String(result.team_2_id)===String(game.team_2_id)) ||
+    (String(result.team_1_id)===String(game.team_2_id) && String(result.team_2_id)===String(game.team_1_id))
+  )).length;
+  const featured = weekGames.find((row)=>row.is_game_of_week);
+  const team1 = teams.find((team)=>String(team.id)===String(featured?.team_1_id));
+  const team2 = teams.find((team)=>String(team.id)===String(featured?.team_2_id));
+  const advanceLabel = advanceAt ? new Date(advanceAt).toLocaleString([], { month:"short", day:"numeric", hour:"numeric", minute:"2-digit" }) : "Not scheduled";
+
+  return (
+    <section className="cfb-identity-bar" aria-label="League status">
+      <button type="button" className="cfb-identity-brand" onClick={()=>setActiveTab("dashboard")}>
+        <span>CFB</span>
+        <div><b>CFBElite27</b><small>League status</small></div>
+      </button>
+      <div className="cfb-identity-item">
+        <small>Season</small>
+        <b>{currentYear}</b>
+      </div>
+      <div className="cfb-identity-item">
+        <small>Current week</small>
+        <b>{currentWeek}</b>
+      </div>
+      <div className="cfb-identity-item">
+        <small>Advance</small>
+        <b>{advanceLabel}</b>
+      </div>
+      <button type="button" className="cfb-identity-item cfb-identity-progress" onClick={()=>setActiveTab("schedule")}>
+        <small>User games complete</small>
+        <b>{completed}/{weekGames.length}</b>
+        <span><i style={{width:`${weekGames.length ? Math.min(100,(completed/weekGames.length)*100) : 0}%`}}/></span>
+      </button>
+      <button type="button" className="cfb-identity-featured" onClick={()=>setActiveTab("schedule")}>
+        <small>Game of the Week</small>
+        <b>{featured ? `${getTeamAbbreviation(team1)} vs ${getTeamAbbreviation(team2)}` : "Not selected"}</b>
+      </button>
+    </section>
+  );
+}
+
+function AppSkeleton({ visible }) {
+  if (!visible) return null;
+  return (
+    <section className="cfb-app-skeleton" aria-label="Loading dashboard">
+      <div className="cfb-skeleton-line cfb-skeleton-title"/>
+      <div className="cfb-skeleton-line cfb-skeleton-subtitle"/>
+      <div className="cfb-skeleton-grid">
+        {Array.from({length:6},(_,index)=><div key={index} className="cfb-skeleton-card"><span/><span/><span/></div>)}
+      </div>
+    </section>
+  );
+}
+
+function EmptyState({ icon = "🏈", title = "Nothing here yet", description = "Data will appear here when it becomes available.", actionLabel, onAction }) {
+  return (
+    <div className="cfb-empty-state">
+      <span className="cfb-empty-icon">{icon}</span>
+      <div><h3>{title}</h3><p>{description}</p></div>
+      {actionLabel && onAction && <button type="button" onClick={onAction}>{actionLabel}</button>}
+    </div>
+  );
+}
+
+function UniversalSearchBar({ tabs = [], teams = [], users = [], assignments = [], weeklyMatchups = [], results = [], currentYear, setActiveTab }) {
+  const [query, setQuery] = useState("");
+  const normalized = query.trim().toLowerCase();
+
+  const resultsList = useMemo(() => {
+    if (!normalized) return [];
+
+    const items = [];
+
+    tabs.forEach(([key, label]) => {
+      if (String(label || "").toLowerCase().includes(normalized)) {
+        items.push({ key:`page-${key}`, type:"Page", title:label, subtitle:"Open dashboard section", action:()=>setActiveTab(key) });
+      }
+    });
+
+    teams.forEach((team) => {
+      const assignment =
+        assignments.find((row)=>String(row.team_id)===String(team.id) && row.status==="Active") ||
+        assignments.find((row)=>String(row.team_id)===String(team.id));
+      const coach = users.find((user)=>String(user.id)===String(assignment?.discord_user_id));
+      const haystack = `${team.name || ""} ${team.abbreviation || ""} ${team.conference || ""} ${coach?.discord_username || ""}`.toLowerCase();
+      if (haystack.includes(normalized)) {
+        items.push({
+          key:`team-${team.id}`,
+          type:"Team",
+          title:team.name,
+          subtitle:coach?.discord_username ? `${coach.discord_username} • ${team.conference || "Conference TBD"}` : team.conference || "Team page",
+          logo:team.logo_url,
+          action:()=>setActiveTab(assignment?.discord_user_id ? `coach-${assignment.discord_user_id}` : `team-${team.id}`),
+        });
+      }
+    });
+
+    users.forEach((user) => {
+      if (!String(user.discord_username || "").toLowerCase().includes(normalized)) return;
+      const assignment = assignments.find((row)=>String(row.discord_user_id)===String(user.id) && row.status==="Active");
+      const team = teams.find((item)=>String(item.id)===String(assignment?.team_id));
+      items.push({
+        key:`coach-${user.id}`,
+        type:"Coach",
+        title:user.discord_username,
+        subtitle:team?.name || "Coach profile",
+        logo:team?.logo_url,
+        action:()=>setActiveTab(`coach-${user.id}`),
+      });
+    });
+
+    weeklyMatchups.forEach((row) => {
+      if (String(row.season_year) !== String(currentYear)) return;
+      const team1 = row.team_1 || teams.find((team)=>String(team.id)===String(row.team_1_id));
+      const team2 = row.team_2 || teams.find((team)=>String(team.id)===String(row.team_2_id));
+      const label = `${row.week || ""} ${team1?.name || ""} ${team2?.name || ""}`.toLowerCase();
+      if (label.includes(normalized)) {
+        items.push({
+          key:`game-${row.id || `${row.week}-${row.team_1_id}-${row.team_2_id}`}`,
+          type:"Game",
+          title:`${team1?.name || "Team TBD"} vs ${team2?.name || "Team TBD"}`,
+          subtitle:`${row.week || "Week TBD"} • GameCenter`,
+          action:()=>setActiveTab("schedule"),
+        });
+      }
+    });
+
+    return items.slice(0, 12);
+  }, [normalized, tabs, teams, users, assignments, weeklyMatchups, currentYear, setActiveTab]);
+
+  function choose(item) {
+    item.action();
+    setQuery("");
+  }
+
+  return (
+    <div className="cfb-universal-search">
+      <div className="cfb-universal-search-input">
+        <span>⌕</span>
+        <input value={query} onChange={(event)=>setQuery(event.target.value)} placeholder="Search teams, coaches, games, and pages"/>
+        {query && <button type="button" onClick={()=>setQuery("")}>×</button>}
+      </div>
+      {normalized && (
+        <div className="cfb-universal-search-results">
+          {resultsList.length ? resultsList.map((item)=>(
+            <button type="button" key={item.key} onClick={()=>choose(item)}>
+              <span className="cfb-search-result-logo">
+                {item.logo ? <img src={item.logo} alt=""/> : item.type.slice(0,1)}
+              </span>
+              <span><b>{item.title}</b><small>{item.subtitle}</small></span>
+              <em>{item.type}</em>
+            </button>
+          )) : <div className="cfb-search-empty">No matching teams, coaches, games, or pages.</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reorderTabs, adminUnlocked, adminCodeInput, setAdminCodeInput, unlockAdmin, teams = [], assignments = [], currentYear, users: navUsers = [], discordSession, linkedDiscordUser, signInWithDiscord, signOutDiscord,soundPreferences={},draftIsLive=false}) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuSearch,setMenuSearch]=useState("");
+
+  const tabMap = new Map(tabs);
+  const coachKeys = tabs
+    .filter(([key]) => key.startsWith("coach-"))
+    .sort((a,b)=>String(a[1]||"").localeCompare(String(b[1]||""), undefined, { sensitivity:"base", numeric:true }))
+    .map(([key])=>key);
 
   const groups = [
     { title: "Primary", primary:true, keys: ["dashboard", "leagueHub", "schedule", "eliteBooks", "redZone"] },
     { title: "Explore", keys: ["newsroom", "myTeam", "rankingsCenter", "teamsCoaches", "leagueArchive", "dataIntake", ...(draftIsLive?["draftRoom"]:[])] },
     { title: "Commissioner", keys: adminUnlocked ? ["commissionerCenter"] : [] },
+    { title: "Coach Profiles", coach:true, keys: coachKeys },
   ];
-
-  const tabMap = new Map(tabs);
   const navMeta={dashboard:["⌂","League overview"],leagueHub:["#","Chat, roles and channels"],newsroom:["N","Verified league coverage"],dataIntake:["⇧","Screenshot intake and checklist"],schedule:["G","Games and final scores"],redZone:["●","Live league streams"],myTeam:["M","Your personal headquarters"],eliteBooks:["$","Weekly picks and futures"],rankingsCenter:["R","All league ranking systems"],teamsCoaches:["T","Teams, schedules and coach profiles"],leagueArchive:["A","Records, trophies and league history"],commissionerCenter:["⚙","Private league operations"],draftRoom:["D","Live league draft"]};
   const visibleGroups = groups.filter((group) => group.keys.length > 0);
 
@@ -9171,7 +10061,7 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
       </div>
 
       <nav className="cfb-mobile-nav-v2" style={v2MobileNav} aria-label="Primary mobile navigation">
-        {[["dashboard","Home","H"],["leagueHub","Hub","#"],["schedule","Games","G"],["eliteBooks","Books","$"],["redZone","RedZone","RZ"]].map(([key,label,icon])=><button key={key} type="button" style={activeTab===key?v2MobileNavActive:v2MobileNavButton} onClick={()=>handleSelect(key)}><b>{icon}</b><span>{label}</span></button>)}
+        {[["dashboard","Home","H"],["leagueHub","Discord","#"],["schedule","Games","G"],["eliteBooks","Books","$"],["redZone","RedZone","RZ"]].map(([key,label,icon])=><button key={key} type="button" style={activeTab===key?v2MobileNavActive:v2MobileNavButton} onClick={()=>handleSelect(key)}><b>{icon}</b><span>{label}</span></button>)}
         <button type="button" style={v2MobileNavButton} onClick={()=>setMenuOpen(true)}><b>☰</b><span>More</span></button>
       </nav>
 
@@ -9201,7 +10091,9 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
                   <div style={drawerGroupTitle}>{group.title}</div>
                   <div className="drawer-menu-grid">{group.keys
                     .filter((key) => tabMap.has(key)&&(!menuSearch||`${tabMap.get(key)} ${group.title} ${navMeta[key]?.[1]||""}`.toLowerCase().includes(menuSearch.toLowerCase())))
-                    .map((key) => <NavButton key={key} tabKey={key} label={tabMap.get(key)} />)}</div>
+                    .map((key) => group.coach
+                      ? <CoachNavButton key={key} tabKey={key} label={tabMap.get(key)} />
+                      : <NavButton key={key} tabKey={key} label={tabMap.get(key)} />)}</div>
                 </div>
               ))}
             </div>

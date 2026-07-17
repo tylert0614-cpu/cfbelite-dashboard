@@ -1,35 +1,66 @@
-const APP_NAME="CFBElite Social";
-self.addEventListener("push",(event)=>{
-  let payload={};
-  try{payload=event.data?event.data.json():{};}catch{payload={body:event.data?.text()||"New league activity"};}
-  const channel=payload.channel_name||payload.channel||payload.data?.channel_name||"CFBElite Social";
-  const author=payload.author_name||payload.author||payload.data?.author_name||"League Update";
-  const body=payload.body||payload.message||"You have a new league notification.";
-  const title=payload.title||`${author} • ${channel}`;
-  const options={
-    body,
-    icon:payload.icon||payload.avatar_url||"/cfbelite27-logo.png",
-    badge:payload.badge||"/cfbelite27-logo.png",
-    image:payload.image||undefined,
-    tag:payload.tag||`${payload.type||"social"}-${payload.channel_id||channel}`,
-    renotify:payload.renotify!==false,
-    timestamp:payload.timestamp?new Date(payload.timestamp).getTime():Date.now(),
-    vibrate:[160,70,160],
-    requireInteraction:Boolean(payload.require_interaction),
-    silent:Boolean(payload.silent),
-    data:{url:payload.url||payload.target_url||payload.data?.url||"/",channel,author,...(payload.data||{})},
-    actions:[{action:"open",title:"Open"},{action:"dismiss",title:"Dismiss"}],
+const CACHE_VERSION = "cfbelite-v43";
+
+self.addEventListener("push", (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    payload = { body: event.data ? event.data.text() : "New CFBElite update." };
+  }
+
+  const data = payload.data || {};
+  const type = String(data.type || payload.type || "update").toLowerCase();
+  const iconMap = {
+    announcement: "📣",
+    final: "🏈",
+    game: "🏈",
+    gameday: "🎙️",
+    poll: "🗳️",
+    rankings: "📊",
+    message: "💬",
   };
-  event.waitUntil(self.registration.showNotification(title,options));
+  const prefix = iconMap[type] || "🏈";
+  const title = `${prefix} ${payload.title || data.title || "CFBElite27"}`;
+  const body = payload.body || data.body || "There is a new league update.";
+  const url = data.url || payload.url || "/";
+  const channel = data.channel || data.context || "CFBElite27";
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: data.icon || payload.icon || "/icons/icon-192.png",
+      badge: data.badge || payload.badge || "/icons/badge-96.png",
+      image: data.image || payload.image,
+      tag: data.tag || `${type}:${channel}`,
+      renotify: Boolean(data.renotify),
+      requireInteraction: Boolean(data.requireInteraction),
+      timestamp: Number(data.timestamp || Date.now()),
+      vibrate: [120, 70, 120],
+      data: { ...data, url },
+      actions: [
+        { action: "open", title: "Open CFBElite" },
+        { action: "dismiss", title: "Dismiss" },
+      ],
+    })
+  );
 });
-self.addEventListener("notificationclick",(event)=>{
+
+self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  if(event.action==="dismiss")return;
-  const url=event.notification.data?.url||"/";
-  event.waitUntil(clients.matchAll({type:"window",includeUncontrolled:true}).then((windows)=>{
-    const exact=windows.find((client)=>client.url===new URL(url,self.location.origin).href);
-    const app=exact||windows.find((client)=>client.url.startsWith(self.location.origin));
-    if(app){return app.focus().then(()=>app.navigate(url));}
-    return clients.openWindow(url);
-  }));
+  if (event.action === "dismiss") return;
+
+  const target = new URL(event.notification.data?.url || "/", self.location.origin).href;
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+      const existing = windows.find((client) => client.url === target || client.url.startsWith(self.location.origin));
+      if (existing) {
+        existing.navigate(target);
+        return existing.focus();
+      }
+      return clients.openWindow(target);
+    })
+  );
 });
+
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
