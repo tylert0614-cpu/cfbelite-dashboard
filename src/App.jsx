@@ -2810,6 +2810,7 @@ function LeagueHubLegacy({discordSession,linkedDiscordUser,users=[],teams=[],ass
   const [directMessages,setDirectMessages]=useState([]);
   const [notifications,setNotifications]=useState([]);
   const [messageSearch,setMessageSearch]=useState("");
+  const messagesSearch=messageSearch;
   const [pinnedOnly,setPinnedOnly]=useState(false);
   const [polls,setPolls]=useState([]);
   const [pollOptions,setPollOptions]=useState([]);
@@ -3507,12 +3508,27 @@ function NetworkHomePanel({linkedDiscordUser,setActiveTab}) {
 function HomeNewsroomRail({setActiveTab}) {
   const [articles,setArticles]=useState([]);const [expanded,setExpanded]=useState(null);
   useEffect(()=>{let active=true;async function load(){const {data}=await supabase.from("league_news_articles").select("id,season_year,week_label,category,headline,dek,body,published_at").eq("status","published").order("published_at",{ascending:false}).limit(3);if(active)setArticles(data||[]);}load();const channel=supabase.channel?.("home-newsroom-v35").on("postgres_changes",{event:"*",schema:"public",table:"league_news_articles"},load).subscribe();return()=>{active=false;if(channel)supabase.removeChannel?.(channel);};},[]);
-  return <section className="home-newsroom-rail"><header><div><span>CFB ELITE NEWSWIRE</span><h2>From the Newsroom</h2><p>Commissioner-reviewed coverage of the league’s user-controlled programs.</p></div><button onClick={()=>setActiveTab?.("newsroom")}>Open Newsroom →</button></header>{articles.length?<div>{articles.map((article,index)=>{const open=String(expanded)===String(article.id);return <article key={article.id} className={open?"open":""}><button onClick={()=>setExpanded(open?null:article.id)}><span>{index===0?"LATEST":String(article.category||"story").toUpperCase()}</span><h3>{article.headline}</h3><small>{article.season_year} • {article.week_label}</small><i>{open?"−":"＋"}</i></button>{open&&<div><strong>{article.dek}</strong><p>{article.body}</p><button onClick={()=>setActiveTab?.("newsroom")}>Read & discuss in Newsroom</button></div>}</article>;})}</div>:<div className="home-newsroom-empty"><b>The wire is warming up.</b><span>Published stories will appear here automatically.</span></div>}</section>;
+  return <section className="home-newsroom-rail"><header><div><span>CFB ELITE NEWSWIRE</span><h2>From the Newsroom</h2><p>Commissioner-reviewed coverage of the league’s user-controlled programs.</p></div><button onClick={()=>setActiveTab?.("newsroom")}>Open Newsroom →</button></header>{articles.length?<div>{articles.map((article,index)=>{const open=String(expanded)===String(article.id);return <article key={article.id} className={open?"open":""}><button onClick={()=>setExpanded(open?null:article.id)}><span>{index===0?"LATEST":String(article.category||"story").toUpperCase()}</span><h3>{article.headline}</h3><small>{article.season_year} • {article.week_label}</small><i>{open?"−":"＋"}</i></button>{open&&<div><strong>{article.dek}</strong><p>{article.body}</p><button onClick={()=>setActiveTab?.("newsroom")}>Read & discuss in Newsroom</button></div>}</article>;})}</div>:<div className="home-newsroom-empty"><div><b>The wire is warming up.</b><span>Published stories will appear here automatically.</span></div><button onClick={()=>setActiveTab?.("newsroom")}>Open Newsroom →</button></div>}</section>;
 }
 
 function DataOpsHomePanel({currentYear,currentWeek,setActiveTab}){
-  const [items,setItems]=useState([]);
-  useEffect(()=>{let active=true;(async()=>{await supabase.rpc("ensure_league_upload_checklist",{p_season_year:Number(currentYear),p_week_label:currentWeek||""});const {data}=await supabase.from("league_upload_checklist").select("id,status,title").eq("season_year",Number(currentYear)).eq("cycle","weekly").eq("week_key",currentWeek||"").order("sort_order");if(active)setItems(data||[]);})();return()=>{active=false;};},[currentYear,currentWeek]);
+  const weeklyFallback=[
+    {id:"fallback-user-games",status:"pending",title:"Completed user-game result packs"},
+    {id:"fallback-scores",status:"pending",title:"Final scores entered"},
+    {id:"fallback-team-stats",status:"pending",title:"Team statistics captured"},
+    {id:"fallback-player-stats",status:"pending",title:"Player statistics captured"},
+    {id:"fallback-top25",status:"pending",title:"Dynasty Top 25 captured"},
+    {id:"fallback-schedules",status:"pending",title:"Team schedules updated"},
+    {id:"fallback-streams",status:"pending",title:"Required stream VODs confirmed"},
+    {id:"fallback-advance",status:"pending",title:"Advance readiness confirmed"},
+  ];
+  const [items,setItems]=useState(weeklyFallback);
+  useEffect(()=>{let active=true;(async()=>{
+    const ensure=await supabase.rpc("ensure_league_upload_checklist",{p_season_year:Number(currentYear),p_week_label:currentWeek||""});
+    if(ensure.error){if(active)setItems(weeklyFallback);return;}
+    const {data,error}=await supabase.from("league_upload_checklist").select("id,status,title").eq("season_year",Number(currentYear)).eq("cycle","weekly").eq("week_key",currentWeek||"").order("sort_order");
+    if(active)setItems(error||!data?.length?weeklyFallback:data);
+  })();return()=>{active=false;};},[currentYear,currentWeek]);
   const cleared=items.filter((row)=>row.status!=="pending").length;const percent=items.length?Math.round(cleared/items.length*100):0;
   return <section className="home-data-ops"><div><span>WEEKLY DATA CONTROL</span><h2>{currentWeek} Upload Checklist</h2><p>{cleared} of {items.length||8} requirements cleared. Approved screenshots update the archive and complete matching tasks automatically.</p></div><div className="home-data-progress"><b>{percent}%</b><span><i style={{width:`${percent}%`}}/></span></div><div><button onClick={()=>setActiveTab?.("dataIntake")}>Upload & Review</button><button onClick={()=>setActiveTab?.("dynastyData")}>Season Archive</button></div></section>;
 }
@@ -8905,6 +8921,87 @@ function GlobalStyle() {
       .network-poll-zone{display:grid;gap:14px;padding:14px;border-bottom:1px solid rgba(148,163,184,.12)}.network-poll-builder{display:grid;gap:10px;padding:16px;border:1px solid rgba(56,189,248,.2);border-radius:16px;background:rgba(14,165,233,.05)}.network-poll-builder>input,.network-poll-builder>textarea,.network-poll-builder>div>input,.network-poll-options input[type=datetime-local]{padding:10px;border:1px solid rgba(148,163,184,.18);border-radius:9px;color:#fff;background:#050a12}.network-poll-builder>div:not(.network-poll-options){display:flex;gap:6px}.network-poll-builder>div>input{min-width:0;flex:1}.network-poll-options{display:flex;flex-wrap:wrap;gap:12px;color:#cbd5e1;font-size:11px}.network-poll-list{display:grid;gap:12px}.network-poll-list article{display:grid;gap:12px;padding:16px;border:1px solid rgba(148,163,184,.16);border-radius:16px;background:#0c1423}.network-poll-list article>header{display:flex;justify-content:space-between;gap:10px}.network-poll-list article h3{margin:4px 0;color:#fff}.network-poll-list article p{margin:0;color:#94a3b8}.network-poll-list article>div{display:grid;gap:7px}.network-poll-list article>div>button{position:relative;overflow:hidden;padding:11px;border:1px solid rgba(148,163,184,.16);border-radius:10px;text-align:left;color:#fff;background:#111827}.network-poll-list article>div>button.voted{border-color:#facc15}.network-poll-list article>div>button span{position:relative;z-index:2;display:flex;justify-content:space-between;gap:8px}.network-poll-list article>div>button em{color:#94a3b8;font-size:10px}.network-poll-list article>div>button i{position:absolute;inset:0 auto 0 0;z-index:1;background:rgba(56,189,248,.14)}.network-poll-list footer{color:#64748b;font-size:10px}
       .network-notifications>button{grid-template-columns:44px minmax(0,1fr) 18px!important;align-items:center!important}.network-notifications>button>i{width:38px!important;height:38px!important;display:grid;place-items:center;border-radius:12px!important;color:#facc15!important;font-size:10px;font-weight:1000;background:linear-gradient(145deg,#16223a,#0a1020)!important}.network-notifications>button>em{color:#64748b;font-style:normal;font-size:22px}.network-notifications>button p{line-height:1.35}.network-notifications>button small{display:block;margin-top:5px}
       @media(max-width:700px){.network-channel-utilities{position:sticky;top:0;z-index:7}.network-reporting-card>div:last-child{display:grid}.network-poll-options{display:grid}.network-poll-list article>header{display:grid}.network-poll-list article>div>button span{display:grid}.network-message-media{max-height:260px}}
+
+      /* v40 unified presentation system */
+      :root {
+        --cfb-surface:#0d1524;
+        --cfb-surface-2:#111c2e;
+        --cfb-border:rgba(148,163,184,.16);
+        --cfb-text:#f8fafc;
+        --cfb-muted:#9aa8bb;
+        --cfb-accent:#facc15;
+        --cfb-radius:18px;
+        --cfb-shadow:0 18px 50px rgba(0,0,0,.24);
+      }
+      html { scroll-behavior:smooth; }
+      body { text-rendering:optimizeLegibility; -webkit-font-smoothing:antialiased; }
+      button,a,input,select,textarea { font:inherit; }
+      button,a { -webkit-tap-highlight-color:transparent; }
+      button { transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease,background .16s ease,color .16s ease; }
+      @media (hover:hover) {
+        button:not(:disabled):hover { transform:translateY(-1px); }
+        .cfb-v2-page > section:hover,.network-stage,.network-directory { border-color:rgba(250,204,21,.22); }
+      }
+      button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible {
+        outline:2px solid rgba(96,165,250,.9); outline-offset:2px;
+      }
+      .cfb-v2-page { gap:18px!important; }
+      .cfb-v2-page > section:not([class*="elite-"]),
+      .network-stage,.network-directory,.network-sidebar,
+      .data-upload-card,.data-queue-card,.data-review-card,.data-checklist-card {
+        border:1px solid var(--cfb-border)!important;
+        border-radius:var(--cfb-radius)!important;
+        box-shadow:var(--cfb-shadow);
+      }
+      .cfb-v2-page h1,.cfb-v2-page h2,.cfb-v2-page h3 { letter-spacing:-.025em; }
+      .cfb-v2-page p,.network-stage p { line-height:1.55; }
+      .network-channel-list > button,.network-message-feed article,
+      .data-import-list > button,.data-check-item {
+        transition:transform .16s ease,background .16s ease,border-color .16s ease,box-shadow .16s ease;
+      }
+      @media (hover:hover) {
+        .network-channel-list > button:hover,.data-import-list > button:hover { transform:translateX(3px); }
+        .network-message-feed article:hover,.data-check-item:hover { background:rgba(255,255,255,.025); }
+      }
+      .network-stage-header,.network-channel-utilities { gap:12px; }
+      .network-channel-utilities input { min-width:0; }
+      .network-message-feed article { padding-block:14px; }
+      .network-message-body { line-height:1.55; overflow-wrap:anywhere; }
+      .network-reply-preview { border-left:3px solid rgba(96,165,250,.65); background:rgba(96,165,250,.06); }
+      .home-newsroom-rail { min-height:0!important; }
+      .home-newsroom-empty {
+        grid-column:1/-1; min-height:116px; padding:22px; display:flex!important;
+        align-items:center; justify-content:space-between; gap:18px;
+        background:linear-gradient(110deg,rgba(15,23,42,.92),rgba(31,18,28,.88));
+      }
+      .home-newsroom-empty > div { display:grid; gap:6px; }
+      .home-newsroom-empty b { color:#fff; font-size:18px; }
+      .home-newsroom-empty span { color:var(--cfb-muted); font-size:13px; }
+      .home-newsroom-empty button { border:1px solid rgba(250,204,21,.3);border-radius:10px;padding:10px 14px;color:#facc15;background:rgba(250,204,21,.08);font-weight:900; }
+      .data-checklist-progress { border-radius:12px; }
+      .data-phase-grid article { min-width:0; }
+      .data-check-item strong,.data-check-item small { overflow-wrap:anywhere; }
+      @media (max-width:900px) {
+        .cfb-v2-page { gap:12px!important; }
+        .cfb-v2-page > section:not([class*="elite-"]) { padding:15px!important; }
+        .network-stage-header { align-items:flex-start; }
+        .network-channel-utilities { display:grid!important; grid-template-columns:1fr auto; }
+        .data-phase-grid { grid-template-columns:1fr!important; }
+        .home-newsroom-empty { align-items:flex-start; flex-direction:column; }
+        .home-newsroom-empty button { width:100%; }
+      }
+      @media (max-width:640px) {
+        .cfb-v2-page h1 { font-size:clamp(34px,12vw,54px)!important; line-height:.95!important; }
+        .cfb-v2-page h2 { font-size:clamp(21px,7vw,30px)!important; }
+        .network-channel-utilities { grid-template-columns:1fr!important; }
+        .network-channel-utilities > button { width:100%; }
+        .network-message-feed article { grid-template-columns:40px minmax(0,1fr)!important; gap:9px!important; }
+        .network-message-feed .network-identity img { width:34px!important; height:34px!important; }
+        .network-message-toolbar { opacity:1!important; flex-wrap:wrap; }
+        .network-quick-react { opacity:1!important; }
+        .data-check-item { grid-template-columns:28px minmax(0,1fr)!important; }
+        .data-check-item select { grid-column:1/-1; width:100%; }
+      }
 `}</style>
   );
 }
