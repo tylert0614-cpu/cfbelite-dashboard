@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { GiphyFetch } from "@giphy/js-fetch-api";
 
-const CFBELITE_SOCIAL_BUILD = "v51-sidebar-structural-rebuild";
+const CFBELITE_SOCIAL_BUILD = "v51.1-sidebar-isolation-hotfix";
 console.info("CFBElite Network build", CFBELITE_SOCIAL_BUILD);
 
 const supabase = createClient(
@@ -3356,23 +3356,35 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
     const team1=matchup?.team_1||teams.find((team)=>String(team.id)===String(matchup?.team_1_id));
     const team2=matchup?.team_2||teams.find((team)=>String(team.id)===String(matchup?.team_2_id));
     const isParticipant=[matchup?.team_1_user_id,matchup?.team_2_user_id].some((id)=>String(id)===String(linkedDiscordUser?.id));
-    const matchupLabel=team1&&team2?`${getTeamAbbreviation(team1)} vs ${getTeamAbbreviation(team2)}`:"Private scheduling room";
-    const statusLabel=channel.is_auto_matchup?(isParticipant?"YOUR GAME":"MATCHUP"):((channel.channel_type==="announcements"||channel.is_locked)?"READ ONLY":"");
-    return <button key={channel.id} className={`${String(selectedChannel)===String(channel.id)?"active":""} ${channel.is_auto_matchup?"network-matchup-row":"network-standard-row"}`} onClick={()=>openMobileChannel(channel)}>
-      <span className="network-channel-leading">
-        {channel.is_auto_matchup
-          ? <span className="network-matchup-logos"><TeamLogoMark team={team1} size={23}/><b>VS</b><TeamLogoMark team={team2} size={23}/></span>
-          : <NetworkChannelMark channel={channel} size={28}/>}
+    const isMatchup=Boolean(channel.is_auto_matchup);
+    const cleanName=cleanNetworkChannelName(channel.name);
+    const statusLabel=isMatchup?(isParticipant?"YOUR GAME":"MATCHUP"):((channel.channel_type==="announcements"||channel.is_locked)?"READ ONLY":"");
+    const matchupName=team1&&team2?`${getTeamAbbreviation(team1)} vs ${getTeamAbbreviation(team2)}`:"Private scheduling room";
+
+    return <button
+      key={channel.id}
+      className={`sidebar-row-v511 ${String(selectedChannel)===String(channel.id)?"is-active":""} ${isMatchup?"is-matchup":"is-channel"}`}
+      onClick={()=>openMobileChannel(channel)}
+    >
+      <span className="sidebar-leading-v511">
+        {isMatchup
+          ? <span className="sidebar-matchup-logos-v511">
+              {team1?.logo_url?<img src={team1.logo_url} alt=""/>:<span/>}
+              <b>VS</b>
+              {team2?.logo_url?<img src={team2.logo_url} alt=""/>:<span/>}
+            </span>
+          : <span className="sidebar-hash-v511">#</span>}
       </span>
-      <span className="network-channel-copy">
-        {channel.is_auto_matchup
-          ? <><strong>{matchupLabel}</strong><small>{channel.week||"Matchup Room"}</small></>
-          : <><strong>{cleanNetworkChannelName(channel.name)}</strong><small>{channel.description}</small></>}
+
+      <span className="sidebar-copy-v511">
+        <strong>{isMatchup?matchupName:cleanName}</strong>
+        {isMatchup&&<small>{channel.week||"Matchup Room"}</small>}
       </span>
-      {statusLabel&&<em>{statusLabel}</em>}
+
+      {statusLabel&&<em className="sidebar-status-v511">{statusLabel}</em>}
     </button>;
   };
-  const renderCategory=(category)=>{const categoryChannels=channels.filter((channel)=>String(channel.category_id)===String(category.id));if(!categoryChannels.length)return null;return <React.Fragment key={category.id}><div className="network-channel-category" style={{"--category-color":category.color}}><i/>{category.name.toUpperCase()} <b>{categoryChannels.length}</b></div>{categoryChannels.map(renderChannelButton)}</React.Fragment>;};
+  const renderCategory=(category)=>{const categoryChannels=channels.filter((channel)=>String(channel.category_id)===String(category.id));if(!categoryChannels.length)return null;return <React.Fragment key={category.id}><div className="sidebar-category-v511"><span>{category.name.toUpperCase()}</span><b>{categoryChannels.length}</b></div>{categoryChannels.map(renderChannelButton)}</React.Fragment>;};
   const mobilePanelTitle=mode==="channels"?(cleanNetworkChannelName(selectedChannelRow?.name)||"League Channel"):mode==="direct"?(conversationOther(selectedConversation)?.discord_username||"Direct Messages"):({news:"The Newsroom",notifications:"Alerts",roles:"Roles & Permissions",emojis:"League Emojis",categories:"Channel Categories",settings:"Settings"}[mode]||"CFBElite Network");
   const mobilePanelSub=mode==="channels"?`${onlineUsers.length} online • #${selectedChannelRow?.slug||"channel"}`:mode==="direct"?"Private conversation":"CFB Elite 27 Network";
   const composerPlaceholder=postingBlocked?"Posting is restricted in this channel":mode==="direct"?"Message privately…":selectedChannelRow?.is_auto_matchup?"Message this matchup…":`Message #${cleanNetworkChannelName(selectedChannelRow?.name)||"channel"}…`;
@@ -3385,8 +3397,6 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
     <header className="network-mobile-hub-header"><button onClick={returnToDirectory} aria-label="Back to channels">{mobileView==="directory"?"#":"‹"}</button><div><strong>{mobileView==="directory"?"CFBElite 27 Dynasty":mobilePanelTitle}</strong><small>{mobileView==="directory"?`${onlineUsers.length} online • CFBElite Network`:mobilePanelSub}</small></div>{mobileView==="directory"?<i className="online"/>:mode==="channels"&&canCreateChannels&&!selectedChannelRow?.is_auto_matchup?<button className="network-mobile-channel-actions" onClick={()=>{openChannelManager(selectedChannelRow);setMobileView("panel");}} aria-label="Manage channel">•••</button>:null}</header>
     <div className="network-layout">
       <aside className="network-server-rail" aria-label="CFBElite Network shortcuts">
-        <button className={mode==="channels"?"active":""} title="CFBElite Network" onClick={()=>{setMode("channels");setMobileView("directory");}}><img src={NETWORK_RAIL_ASSETS.network} alt="CFBElite Network"/></button>
-        <i/>
         <button className={mode==="direct"?"active":""} title="Direct Messages" onClick={()=>{setMode("direct");setMobileView("directory");}}><img src={NETWORK_RAIL_ASSETS.messages} alt="Direct Messages"/></button>
         <button className={mode==="notifications"?"active":""} title="Notifications" onClick={()=>{setMode("notifications");setMobileView("panel");}}><img src={NETWORK_RAIL_ASSETS.alerts} alt="Notifications"/>{unread>0&&<b>{unread}</b>}</button>
         <button className={mode==="news"?"active":""} title="Newsroom" onClick={()=>{setMode("news");setMobileView("panel");}}><img src={NETWORK_RAIL_ASSETS.newsroom} alt="Newsroom"/></button>
@@ -10824,6 +10834,189 @@ function GlobalStyle() {
       @media(min-width:901px){.discord-clone-page .network-layout{grid-template-columns:68px 320px minmax(0,1fr) 248px!important}}
       @media(max-width:900px){.network-channel-category{min-height:32px!important;margin-top:14px!important;font-size:11px!important}.network-channel-list>button{min-height:50px!important;padding:8px 10px!important}.network-channel-copy strong{font-size:15px!important}.network-channel-list>button em{max-width:76px!important;font-size:7px!important}}
       @media(max-width:560px){.network-channel-list>button{grid-template-columns:42px minmax(0,1fr) auto!important;padding-right:9px!important}.network-channel-list>button em{position:static!important;right:auto!important;top:auto!important;transform:none!important}}
+
+      /* v51.1-sidebar-isolation-hotfix */
+
+      .network-server-rail {
+        padding-top:14px !important;
+      }
+
+      .sidebar-category-v511 {
+        all:unset !important;
+        box-sizing:border-box !important;
+        display:grid !important;
+        grid-template-columns:minmax(0,1fr) auto !important;
+        align-items:center !important;
+        gap:8px !important;
+        width:100% !important;
+        min-height:30px !important;
+        margin:14px 0 4px !important;
+        padding:4px 8px !important;
+        color:#aeb4bd !important;
+        font-family:inherit !important;
+      }
+      .sidebar-category-v511 span {
+        min-width:0 !important;
+        overflow:hidden !important;
+        text-overflow:ellipsis !important;
+        white-space:nowrap !important;
+        font-size:10px !important;
+        font-weight:1000 !important;
+        letter-spacing:.065em !important;
+      }
+      .sidebar-category-v511 b {
+        justify-self:end !important;
+        color:#64748b !important;
+        font-size:8px !important;
+        font-weight:900 !important;
+      }
+
+      .sidebar-row-v511 {
+        all:unset !important;
+        box-sizing:border-box !important;
+        display:grid !important;
+        grid-template-columns:42px minmax(0,1fr) auto !important;
+        align-items:center !important;
+        gap:10px !important;
+        width:100% !important;
+        min-width:0 !important;
+        min-height:46px !important;
+        margin:1px 0 !important;
+        padding:6px 8px !important;
+        border-radius:6px !important;
+        color:#b5bac1 !important;
+        cursor:pointer !important;
+        font-family:inherit !important;
+        text-align:left !important;
+        overflow:hidden !important;
+      }
+      .sidebar-row-v511:hover {
+        background:#35373c !important;
+      }
+      .sidebar-row-v511.is-active {
+        background:#404249 !important;
+        color:#f2f3f5 !important;
+      }
+
+      .sidebar-leading-v511 {
+        all:unset !important;
+        box-sizing:border-box !important;
+        width:42px !important;
+        height:34px !important;
+        display:grid !important;
+        place-items:center !important;
+        overflow:visible !important;
+      }
+
+      .sidebar-hash-v511 {
+        all:unset !important;
+        display:block !important;
+        color:#949ba4 !important;
+        font-size:22px !important;
+        font-weight:500 !important;
+        line-height:1 !important;
+      }
+
+      .sidebar-copy-v511 {
+        all:unset !important;
+        box-sizing:border-box !important;
+        display:block !important;
+        min-width:0 !important;
+        overflow:hidden !important;
+        font-family:inherit !important;
+      }
+      .sidebar-copy-v511 strong,
+      .sidebar-copy-v511 small {
+        display:block !important;
+        min-width:0 !important;
+        overflow:hidden !important;
+        text-overflow:ellipsis !important;
+        white-space:nowrap !important;
+        font-family:inherit !important;
+      }
+      .sidebar-copy-v511 strong {
+        color:inherit !important;
+        font-size:14px !important;
+        font-weight:700 !important;
+        line-height:1.2 !important;
+      }
+      .sidebar-copy-v511 small {
+        margin-top:2px !important;
+        color:#8b919a !important;
+        font-size:10px !important;
+        line-height:1.1 !important;
+      }
+
+      .sidebar-status-v511 {
+        all:unset !important;
+        box-sizing:border-box !important;
+        justify-self:end !important;
+        max-width:76px !important;
+        overflow:hidden !important;
+        text-overflow:ellipsis !important;
+        white-space:nowrap !important;
+        color:#f0b232 !important;
+        font-family:inherit !important;
+        font-size:7px !important;
+        font-style:normal !important;
+        font-weight:1000 !important;
+        letter-spacing:.035em !important;
+        text-align:right !important;
+      }
+
+      .sidebar-matchup-logos-v511 {
+        all:unset !important;
+        box-sizing:border-box !important;
+        display:grid !important;
+        grid-template-columns:20px 10px 20px !important;
+        align-items:center !important;
+        justify-content:center !important;
+        width:42px !important;
+        height:34px !important;
+      }
+      .sidebar-matchup-logos-v511 img {
+        width:20px !important;
+        height:20px !important;
+        object-fit:contain !important;
+        display:block !important;
+      }
+      .sidebar-matchup-logos-v511 b {
+        color:#facc15 !important;
+        font-size:7px !important;
+        font-weight:1000 !important;
+        text-align:center !important;
+      }
+
+      .sidebar-row-v511.is-matchup {
+        min-height:52px !important;
+      }
+      .sidebar-row-v511.is-matchup .sidebar-copy-v511 strong {
+        font-size:12px !important;
+      }
+
+      @media (min-width:901px) {
+        .discord-clone-page .network-layout {
+          grid-template-columns:58px 330px minmax(0,1fr) 248px !important;
+        }
+      }
+
+      @media (max-width:900px) {
+        .sidebar-category-v511 {
+          min-height:32px !important;
+          margin-top:15px !important;
+        }
+        .sidebar-category-v511 span {
+          font-size:11px !important;
+        }
+        .sidebar-row-v511 {
+          min-height:50px !important;
+          padding:8px 10px !important;
+        }
+        .sidebar-copy-v511 strong {
+          font-size:15px !important;
+        }
+      }
+
 `}</style>
   );
 }
