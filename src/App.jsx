@@ -9945,8 +9945,18 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
   const primaryKeys=["dashboard","leagueHub","schedule","eliteBooks","redZone"];
   const exploreKeys=["newsroom","myTeam","rankingsCenter","teamsCoaches","leagueArchive","dataIntake",...(draftIsLive?["draftRoom"]:[])];
   const commissionerKeys=adminUnlocked?["commissionerCenter"]:[];
+  // These already have a dedicated home inside Rankings Center, League Archive, Teams & Coaches
+  // or the Commissioner Center tool grid — keeping them here too just duplicated every page as a
+  // second, uncategorized nav entry. They stay fully reachable (and searchable) via their hub;
+  // this only keeps them out of the flat menu list.
+  const HOUSED_IN_A_HUB=new Set([
+    "automaticRankings","gameTop25","conferencePower","eloRankings","powerIndex","recruitingRankings","rankingHistory",
+    "dynastyData","dynastyTimeline","dynastyRecords","rivalries","h2h","allAmericans","awards","heismans","nationalChampions","coachHOF","playerHOF",
+    "allTeamsRatings","teamSchedules",
+    "sportsbookManager","weeklyMatchups","userManager","assignments","leagueDataCenter","resultsManager","logoManager",
+  ]);
   const groupedKeys=new Set([...primaryKeys,...exploreKeys,...commissionerKeys,...coachKeys]);
-  const additionalKeys=tabs.map(([key])=>key).filter((key)=>!groupedKeys.has(key)&&!key.startsWith("coach-"));
+  const additionalKeys=tabs.map(([key])=>key).filter((key)=>!groupedKeys.has(key)&&!key.startsWith("coach-")&&!HOUSED_IN_A_HUB.has(key));
   const groups = [
     { title: "Primary", primary:true, keys: primaryKeys },
     { title: "Explore", keys: exploreKeys },
