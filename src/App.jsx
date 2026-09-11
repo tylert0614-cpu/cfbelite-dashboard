@@ -5385,6 +5385,18 @@ function coachHofCriteria(row) {
   const winPct = row.games ? row.wins / row.games : 0;
   const estimatedSeasons = Math.floor((row.games || 0) / 12);
 
+  // A ring is not required, but skipping it means every other number has to be
+  // exceptional — this path demands elite win rate, real conference-title volume,
+  // heavy top-10 win totals, a deep accolade count, and a much higher prestige
+  // floor, all at once. It should be at least as hard to clear as the title paths,
+  // not an easier side door for a long-but-unspectacular career.
+  const noRingResume =
+    winPct >= .750 &&
+    row.confTitles >= 4 &&
+    row.top10Wins >= 25 &&
+    accolades >= 90 &&
+    row.rawPrestige >= 260;
+
   const qualifies =
     row.games >= 100 &&
     winPct >= .700 &&
@@ -5393,7 +5405,7 @@ function coachHofCriteria(row) {
       row.nattys >= 2 ||
       (row.nattys >= 1 && (row.confTitles >= 3 || row.top10Wins >= 15)) ||
       (row.confTitles >= 5 && row.top10Wins >= 20) ||
-      (accolades >= 65 && row.top10Wins >= 12)
+      noRingResume
     );
 
   const reasons = [];
@@ -5403,7 +5415,7 @@ function coachHofCriteria(row) {
   if (row.nattys >= 2) reasons.push("Multiple National Championships");
   if (row.confTitles >= 5) reasons.push("5+ Conference Titles");
   if (row.top10Wins >= 20) reasons.push("20+ Top 10 Wins");
-  if (accolades >= 65) reasons.push("65+ Major Accolades");
+  if (noRingResume) reasons.push("Championship-Caliber Résumé Without a Title");
 
   return { qualifies, reasons };
 }
@@ -5414,7 +5426,7 @@ function CoachHallOfFame({ users, teams, assignments, results, allAmericans, awa
     .map((row)=>({ ...row, hofCriteria: coachHofCriteria(row) }))
     .filter((row)=>row.hofCriteria.qualifies && row.rawPrestige >= 180)
     .sort((a,b)=>b.rawPrestige-a.rawPrestige || b.wins-a.wins);
-  return <section style={card}><h2 style={sectionTitle}>Coach Hall of Fame</h2><p style={mutedText}>Coach Hall of Fame is intentionally extremely difficult: true dynasty résumés only. Qualifiers require multiple national titles or long-term dominance with elite wins, conference titles, major accolades, and a major HOF score.</p>{rows.length ? <div style={hofGrid}>{rows.map((row)=><CoachHofCard key={row.userId || row.discord} row={row} teams={teams} assignments={assignments}/>)}</div> : <div style={miniRow}>No coaches have met Hall of Fame criteria yet.</div>}</section>;
+  return <section style={card}><h2 style={sectionTitle}>Coach Hall of Fame</h2><p style={mutedText}>Coach Hall of Fame is intentionally extremely difficult: true dynasty résumés only. A championship isn't mandatory, but skipping one means everything else has to be exceptional — elite win rate, real conference-title volume, heavy ranked-win totals, a deep accolade count, and a prestige score to match. Induction is automatic once a coach's numbers clear the bar; there's no manual review.</p>{rows.length ? <div style={hofGrid}>{rows.map((row)=><CoachHofCard key={row.userId || row.discord} row={row} teams={teams} assignments={assignments}/>)}</div> : <div style={miniRow}>No coaches have met Hall of Fame criteria yet.</div>}</section>;
 }
 
 
