@@ -28,8 +28,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(title, {
       body,
-      icon: data.icon || payload.icon || "/icons/icon-192.png",
-      badge: data.badge || payload.badge || "/icons/badge-96.png",
+      icon: data.icon || payload.icon || "/app-icon-192.png",
+      badge: data.badge || payload.badge || "/app-icon-192.png",
       image: data.image || payload.image,
       tag: data.tag || `${type}:${channel}`,
       renotify: Boolean(data.renotify),

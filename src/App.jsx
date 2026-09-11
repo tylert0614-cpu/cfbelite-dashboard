@@ -13,10 +13,10 @@ const supabase = createClient(
 
 const svgDataUri=(svg)=>`data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 const NETWORK_RAIL_ASSETS={
-  network:svgDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#7f1d1d"/><stop offset="1" stop-color="#facc15"/></linearGradient></defs><circle cx="32" cy="32" r="30" fill="#0b1020" stroke="url(#g)" stroke-width="3"/><path d="M18 19h28v26H18z" fill="url(#g)"/><text x="32" y="38" text-anchor="middle" font-family="Arial" font-size="18" font-weight="900" fill="white">27</text></svg>`),
+  network:svgDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#274d73"/><stop offset="1" stop-color="#c9d0d9"/></linearGradient></defs><circle cx="32" cy="32" r="30" fill="#0b1020" stroke="url(#g)" stroke-width="3"/><path d="M18 19h28v26H18z" fill="url(#g)"/><text x="32" y="38" text-anchor="middle" font-family="Arial" font-size="18" font-weight="900" fill="white">27</text></svg>`),
   messages:svgDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#2b2d31"/><path d="M17 19h30v21H31l-9 7v-7h-5z" fill="#dbeafe"/><circle cx="25" cy="30" r="2" fill="#5865f2"/><circle cx="32" cy="30" r="2" fill="#5865f2"/><circle cx="39" cy="30" r="2" fill="#5865f2"/></svg>`),
-  alerts:svgDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#2b2d31"/><path d="M23 39h18l-3-5v-7a6 6 0 0 0-12 0v7z" fill="#facc15"/><path d="M28 42h8a4 4 0 0 1-8 0z" fill="#f8fafc"/></svg>`),
-  newsroom:svgDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#2b2d31"/><path d="M17 18h30v28H17z" fill="#e5e7eb"/><path d="M22 23h20v6H22zm0 10h9v8h-9zm12 0h8v2h-8zm0 5h8v2h-8z" fill="#111827"/><path d="M18 18h29v5H18z" fill="#dc2626"/></svg>`),
+  alerts:svgDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#2b2d31"/><path d="M23 39h18l-3-5v-7a6 6 0 0 0-12 0v7z" fill="#c9d0d9"/><path d="M28 42h8a4 4 0 0 1-8 0z" fill="#eef1f6"/></svg>`),
+  newsroom:svgDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#2b2d31"/><path d="M17 18h30v28H17z" fill="#e5e7eb"/><path d="M22 23h20v6H22zm0 10h9v8h-9zm12 0h8v2h-8zm0 5h8v2h-8z" fill="#111827"/><path d="M18 18h29v5H18z" fill="#3e7fc1"/></svg>`),
 };
 const GIPHY_API_KEY=String(import.meta.env.VITE_GIPHY_API_KEY||"").trim().replace(/^[\'"]|[\'"]$/g,"");
 const giphyFetch=GIPHY_API_KEY?new GiphyFetch(GIPHY_API_KEY):null;
@@ -52,11 +52,38 @@ function playEliteSound(kind="notification",enabled=true) {
   window.setTimeout(()=>context.close?.(),1400);
 }
 
+const HAPTIC_PATTERNS={tap:8,select:[10,30,14],success:[14,40,14,40,22],warning:[16,60,16],error:[24,50,24,50,24]};
+function triggerHaptic(kind="tap",enabled=true) {
+  if(!enabled||typeof navigator==="undefined"||typeof navigator.vibrate!=="function") return;
+  try{ navigator.vibrate(HAPTIC_PATTERNS[kind]||HAPTIC_PATTERNS.tap); }catch{ /* unsupported or blocked by the browser */ }
+}
+
+// Shared glassmorphism style bases — defined early so every module-scope style object
+// that spreads them (some are declared before a component ever calls them) is safe from
+// the temporal-dead-zone crash this previously had when they lived near the bottom of the file.
+const liquidGlassPanel = {
+  background: "linear-gradient(155deg,rgba(14,19,30,.97),rgba(4,7,13,.99))",
+  backdropFilter: "blur(20px) saturate(135%)",
+  WebkitBackdropFilter: "blur(20px) saturate(135%)",
+  border: "1px solid rgba(255,255,255,.11)",
+  borderTop: "3px solid var(--cfb-red)",
+  borderRadius: 10,
+  padding: 24,
+  boxShadow: "0 20px 56px rgba(0,0,0,.36),inset 0 1px rgba(255,255,255,.045)",
+  marginBottom: 20,
+};
+const liquidGlassTile = {
+  background: "linear-gradient(155deg,rgba(15,21,33,.94),rgba(4,7,13,.98))",
+  border: "1px solid rgba(255,255,255,.10)",
+  borderRadius: 9,
+  padding: 13,
+  boxShadow: "0 16px 44px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.05)",
+};
+
 const WEEKS = ["Week 0","Week 1","Week 2","Week 3","Week 4","Week 5","Week 6","Week 7","Week 8","Week 9","Week 10","Week 11","Week 12","Week 13","Week 14","Conference Championship Week","Bowl Week 1","Bowl Week 2","Bowl Week 3","National Championship Week"];
 function weekIndex(week) { const index = WEEKS.indexOf(week); return index === -1 ? 999 : index; }
 const POSITIONS = ["Coach","QB","RB","WR","TE","LT","LG","C","RG","RT","EDGE","DT","SAM","WILL","MIKE","CB","FS","SS","KR","PR","K","P"];
 const YEARS = Array.from({ length: 25 }, (_, index) => String(2026 + index));
-const ALL_AMERICAN_TYPES = ["First-Team", "Second-Team", "Freshman"];
 const AWARD_NAMES = ["Bear Bryant COTY Award","Broyels Award - Top Coordinator","Unitas Golden Arm","Davey O'Brien Award","Edge Rusher of The Year","Fred Biletnikoff Award","Chuck Bednarik Award","Bronko Nagurski Award","Doak Walker Award","John Mackey Award","Lombardi Award","Lou Groza Award","Maxwell Award","Walter Camp Award","Outland Trophy","Paycom Jim Thorpe Award","Ray Guy Award","Rimington Award","Jet Award","Dick Butkus Award","Shaun Alexander Award"];
 
 const EMPTY_RESULT = { season_year: 2029, week: "Week 1", team_1_id: "", team_2_id: "", team_1_user_id: "", team_2_user_id: "", team_1_score: "", team_2_score: "", team_1_rank: "", team_2_rank: "", tags: "User vs User" };
@@ -206,35 +233,8 @@ function getTeamPrimary(team) {
 }
 
 function getTeamSecondary(team) {
-  return team?.secondary_color || "#facc15";
+  return team?.secondary_color || "var(--cfb-gold)";
 }
-
-function teamPageTheme(team) {
-  const primary = getTeamPrimary(team);
-  const secondary = getTeamSecondary(team);
-  const accent = team?.accent_color || secondary || "#facc15";
-  return {
-    ...liquidGlassPanel,
-    position: "relative",
-    overflow: "hidden",
-    border: `1px solid ${accent}66`,
-    background: `radial-gradient(circle at 8% 0%, ${accent}26, transparent 34%), radial-gradient(circle at 100% 10%, ${secondary}22, transparent 28%), linear-gradient(145deg, ${primary}e8 0%, rgba(15,23,42,.72) 48%, rgba(2,6,23,.90) 100%)`,
-    boxShadow: `0 30px 90px ${primary}66, inset 0 1px 0 rgba(255,255,255,.18)`,
-  };
-}
-
-function TeamWatermark({ team }) {
-  const url = team?.logo_url || team?.logo || team?.image_url;
-  if (!url) return null;
-  return <img src={url} alt="" style={teamWatermark}/>;
-}
-
-function ChampionshipRings({ count = 0 }) {
-  const safe = Math.min(Number(count) || 0, 12);
-  if (!safe) return <span style={mutedText}>No rings yet</span>;
-  return <span style={ringRow}>{Array.from({length:safe}, (_,i)=><span key={i} title="National Championship">💍</span>)}</span>;
-}
-
 
 function sortRows(rows, sortState, keyGetters) {
   const key = sortState?.key;
@@ -250,50 +250,6 @@ function sortRows(rows, sortState, keyGetters) {
   });
 }
 
-function SortHeader({ label, sortKey, sortState, setSortState }) {
-  const active = sortState?.key === sortKey;
-  const arrow = !active ? "↕" : sortState.direction === "asc" ? "↑" : "↓";
-  return (
-    <button type="button" style={sortHeaderButton} onClick={() => setSortState((prev)=>({ key: sortKey, direction: prev?.key === sortKey && prev.direction === "desc" ? "asc" : "desc" }))}>
-      {label} {arrow}
-    </button>
-  );
-}
-
-function isUserVsUserResult(result, assignments, year) {
-  const y = year || result.season_year;
-  const u1 = result.team_1_user_id || coachForTeamYear(result.team_1_id, y, assignments)?.discord_user_id;
-  const u2 = result.team_2_user_id || coachForTeamYear(result.team_2_id, y, assignments)?.discord_user_id;
-  return Boolean(u1 && u2);
-}
-
-function resultUserLabels(result, assignments, users) {
-  const u1 = result.team_1_user_id || coachForTeamYear(result.team_1_id, result.season_year, assignments)?.discord_user_id;
-  const u2 = result.team_2_user_id || coachForTeamYear(result.team_2_id, result.season_year, assignments)?.discord_user_id;
-  return {
-    user1: users.find((u)=>u.id===u1)?.discord_username || "CPU",
-    user2: users.find((u)=>u.id===u2)?.discord_username || "CPU",
-    user1Id: u1 || null,
-    user2Id: u2 || null,
-    isUserVsUser: Boolean(u1 && u2),
-  };
-}
-
-
-function activeAssignmentsForLeague(assignments, teams) {
-  const validTeamIds = new Set(teams.map((team)=>team.id));
-  const seenUsers = new Set();
-  return assignments.filter((assignment)=>{
-    if (assignment.status !== "Active") return false;
-    if (!assignment.discord_user_id || !assignment.team_id) return false;
-    if (!validTeamIds.has(assignment.team_id)) return false;
-    if (seenUsers.has(assignment.discord_user_id)) return false;
-    seenUsers.add(assignment.discord_user_id);
-    return true;
-  });
-}
-
-
 const DRAFT_PRESTIGE_OPTIONS = ["", "0.5", "1", "1.5", "2", "2.5", "3", "3.5", "4", "4.5", "5"];
 const CONFERENCE_ASSET_NAMES = ["American", "CUSA", "MAC", "Mountain West", "PAC 12", "Sun Belt", "SEC", "ACC", "Big Ten", "Big 12"];
 
@@ -301,7 +257,7 @@ function ConferenceLogoMark({ conference, conferenceAssets = [], size = 42 }) {
   const asset = (conferenceAssets || []).find((row)=>cleanConference(row.conference_name) === cleanConference(conference));
   const url = asset?.logo_url;
   if (!url) {
-    return <span style={{ width:size, height:size, borderRadius:12, display:"inline-grid", placeItems:"center", background:"rgba(255,255,255,.06)", border:"1px solid rgba(255,255,255,.10)", color:"#f8fafc", fontWeight:1000, fontSize:Math.max(10, size*.26) }}>{String(conference || "CFB").slice(0,3).toUpperCase()}</span>;
+    return <span style={{ width:size, height:size, borderRadius:12, display:"inline-grid", placeItems:"center", background:"rgba(255,255,255,.06)", border:"1px solid rgba(255,255,255,.10)", color:"var(--cfb-text)", fontWeight:1000, fontSize:Math.max(10, size*.26) }}>{String(conference || "CFB").slice(0,3).toUpperCase()}</span>;
   }
   return <span style={{ width:size, height:size, display:"inline-grid", placeItems:"center" }}><img src={url} alt="" style={{ width:size, height:size, objectFit:"contain", display:"block" }}/></span>;
 }
@@ -395,26 +351,6 @@ function TeamLabel({ team, name }) {
       <span>{displayName}</span>
     </span>
   );
-}
-
-function championshipRowsByDiscord(champions) {
-  const map = new Map();
-
-  champions.forEach((champion) => {
-    const discord = champion.discord_users?.discord_username || "Unassigned";
-    const teamName = champion.teams?.name || "Team TBD";
-    const year = champion.season_year || "Year TBD";
-
-    if (!map.has(discord)) {
-      map.set(discord, { discord, total: 0, teams: [] });
-    }
-
-    const row = map.get(discord);
-    row.total += 1;
-    row.teams.push(`${year} ${teamName}`);
-  });
-
-  return [...map.values()].sort((a, b) => b.total - a.total || a.discord.localeCompare(b.discord));
 }
 
 function coachForTeamYear(teamId, year, assignments) {
@@ -683,95 +619,6 @@ function recordBookRows(users, teams, assignments, results, allAmericans, awards
   ];
 }
 
-function weeklyNewsItems(results, teams, currentYear, currentWeek) {
-  const yearResults = results.filter((row) => String(row.season_year) === String(currentYear));
-  if (!yearResults.length) return [`No ${currentYear} results have been recorded yet. Once results are entered, this page will automatically generate storylines.`];
-
-  const currentWeekResults = yearResults.filter((row) => row.week === currentWeek);
-  const source = currentWeekResults.length ? currentWeekResults : yearResults;
-  const seen = new Set();
-  const uniqueGames = source.filter((game) => {
-    const key = game.id || `${game.season_year}-${game.week}-${game.team_1_id}-${game.team_2_id}-${game.team_1_score}-${game.team_2_score}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  }).slice(0, 12);
-
-  const stories = uniqueGames.map((game) => {
-    const team1 = game.team_1?.name || teamNameById(game.team_1_id, teams);
-    const team2 = game.team_2?.name || teamNameById(game.team_2_id, teams);
-    const s1 = Number(game.team_1_score || 0);
-    const s2 = Number(game.team_2_score || 0);
-    const team1Won = s1 >= s2;
-    const winner = team1Won ? team1 : team2;
-    const loser = team1Won ? team2 : team1;
-    const winScore = Math.max(s1, s2);
-    const loseScore = Math.min(s1, s2);
-    const rankedLoser = team1Won ? game.team_2_rank : game.team_1_rank;
-    const rankedText = Number(rankedLoser) >= 1 && Number(rankedLoser) <= 25 ? ` over ranked #${rankedLoser} ${loser}` : ` over ${loser}`;
-    return `${game.week}: ${winner} defeated${rankedText}, ${winScore}-${loseScore}.`;
-  });
-
-  return [
-    currentWeekResults.length
-      ? `${currentWeekResults.length} result${currentWeekResults.length === 1 ? "" : "s"} recorded for ${currentYear} ${currentWeek}.`
-      : `No results are recorded for ${currentYear} ${currentWeek} yet. Showing latest ${currentYear} storylines instead.`,
-    ...stories,
-  ];
-}
-
-function sortableValue(value) {
-  const number = Number(value);
-  if (Number.isFinite(number)) return number;
-  return String(value || "").toLowerCase();
-}
-
-function compareForSort(a, b, key, direction) {
-  const multiplier = direction === "asc" ? 1 : -1;
-
-  if (key === "record") {
-    const aWinPct = a.games ? a.wins / a.games : 0;
-    const bWinPct = b.games ? b.wins / b.games : 0;
-    if (aWinPct !== bWinPct) return (aWinPct - bWinPct) * multiplier;
-    if (a.wins !== b.wins) return (a.wins - b.wins) * multiplier;
-    if (a.losses !== b.losses) return (b.losses - a.losses) * multiplier;
-    return a.teamName.localeCompare(b.teamName);
-  }
-
-  const av = sortableValue(a[key]);
-  const bv = sortableValue(b[key]);
-
-  if (typeof av === "number" && typeof bv === "number") {
-    if (av !== bv) return (av - bv) * multiplier;
-    return a.teamName.localeCompare(b.teamName);
-  }
-
-  const textCompare = String(av).localeCompare(String(bv));
-  return textCompare * multiplier;
-}
-
-function SortButton({ label, sortKey, sortState, setSortState }) {
-  const active = sortState?.key === sortKey;
-  const arrow = active ? (sortState.direction === "desc" ? " ▼" : " ▲") : "";
-
-  return (
-    <button
-      type="button"
-      onClick={() =>
-        setSortState((prev) => ({
-          key: sortKey,
-          direction: prev?.key === sortKey && prev.direction === "desc" ? "asc" : "desc",
-        }))
-      }
-      style={sortButton}
-    >
-      {label}{arrow}
-    </button>
-  
-);
-}
-
-
 function isErrorMessage(message) {
   const value = String(message || "").toLowerCase();
   return value.includes("failed") ||
@@ -784,7 +631,7 @@ function isErrorMessage(message) {
 }
 
 function LeagueLoginGate({ready,session,linkedUser,signIn,signOut,retry,error}) {
-  return <><GlobalStyle/><main className="league-login-shell"><section className="league-login-card"><div className="league-login-mark"><span>27</span><strong>ELITE</strong><b>27</b></div><div><span className="league-login-kicker">THE PRIVATE HOME OF THE DYNASTY</span><h1>{!ready?"Opening the stadium…":session&&!linkedUser?"Linking your league identity…":"Your league. Your network. Your legacy."}</h1><p>{!ready?"Checking your secure session.":session&&!linkedUser?"Your Discord login is valid. We are matching it to your active CFB Elite membership.":"Sign in with your league Discord account to enter the secured CFB Elite 27 network."}</p></div>{error&&<div className="league-login-error">{error}</div>}<div className="league-login-actions">{!ready?<span className="league-login-loader">LIVE DATABASE</span>:!session?<button onClick={signIn}>Continue with Discord</button>:<><button onClick={retry}>Retry League Link</button><button className="secondary" onClick={signOut}>Sign Out</button></>}</div><footer><span>SECURE LEAGUE ACCESS</span><span>ELITE BOOKS • GAMECENTER • REDZONE • CFBELITE NETWORK</span></footer></section></main></>;
+  return <><GlobalStyle/><main className="league-login-shell"><section className="league-login-card"><img src="/logo-floating-480.png" alt="CFBElite" className="league-login-mark" /><div><span className="league-login-kicker">THE PRIVATE HOME OF THE DYNASTY</span><h1>{!ready?"Opening the stadium…":session&&!linkedUser?"Linking your league identity…":"Sign in to your dynasty."}</h1><p>{!ready?"Checking your secure session.":session&&!linkedUser?"Your Discord login is valid. We are matching it to your active CFB Elite membership.":"Sign in with your league Discord account to enter the secured CFB Elite 27 network."}</p></div>{error&&<div className="league-login-error">{error}</div>}<div className="league-login-actions">{!ready?<span className="league-login-loader">LIVE DATABASE</span>:!session?<button onClick={signIn}>Continue with Discord</button>:<><button onClick={retry}>Retry League Link</button><button className="secondary" onClick={signOut}>Sign Out</button></>}</div><footer><span>SECURE LEAGUE ACCESS</span><span>ELITE BOOKS • GAMECENTER • REDZONE • CFBELITE NETWORK</span></footer></section></main></>;
 }
 
 
@@ -1155,7 +1002,7 @@ export default function App() {
   },[discordSession?.user?.id]);
   useEffect(()=>setAdminUnlocked(Boolean(linkedDiscordUser?.is_commissioner)),[linkedDiscordUser?.is_commissioner]);
   useEffect(()=>{const sync=()=>{try{setSoundPreferences(JSON.parse(localStorage.getItem("cfb-network-preferences")||"{}"));}catch{}};window.addEventListener("cfb-preferences",sync);return()=>window.removeEventListener("cfb-preferences",sync);},[]);
-  useEffect(()=>{if(!discordSession?.user?.id)return;const channel=supabase.channel?.(`app-alerts-${discordSession.user.id}`).on("postgres_changes",{event:"INSERT",schema:"public",table:"app_notifications",filter:`auth_user_id=eq.${discordSession.user.id}`},(payload)=>{if(soundPreferences.sound_enabled!==false)playEliteSound("notification",true);setError(payload?.new?.title||"New league notification");}).subscribe();return()=>{if(channel)supabase.removeChannel?.(channel);};},[discordSession?.user?.id,soundPreferences.sound_enabled]);
+  useEffect(()=>{if(!discordSession?.user?.id)return;const channel=supabase.channel?.(`app-alerts-${discordSession.user.id}`).on("postgres_changes",{event:"INSERT",schema:"public",table:"app_notifications",filter:`auth_user_id=eq.${discordSession.user.id}`},(payload)=>{if(soundPreferences.sound_enabled!==false)playEliteSound("notification",true);triggerHaptic("select",soundPreferences.haptics_enabled!==false);setError(payload?.new?.title||"New league notification");}).subscribe();return()=>{if(channel)supabase.removeChannel?.(channel);};},[discordSession?.user?.id,soundPreferences.sound_enabled,soundPreferences.haptics_enabled]);
   useEffect(()=>{if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});},[]);
   useEffect(()=>{
     if(!discordSession?.user?.id||!linkedDiscordUser?.id)return undefined;
@@ -1871,176 +1718,6 @@ export default function App() {
 
 
 
-function matchupUserLabel(userId, users) {
-  return users.find((user) => user.id === userId)?.discord_username || "Unassigned";
-}
-
-function matchupScore(row, teams, users, assignments, results) {
-  const t1 = teams.find((team) => team.id === row.team_1_id) || row.team_1;
-  const t2 = teams.find((team) => team.id === row.team_2_id) || row.team_2;
-  if (!t1 || !t2) return { score: 0, reasons: ["Missing team data"] };
-
-  const rankings = computerRankingRows(teams, results, assignments, users);
-  const rankMap = new Map(rankings.map((item) => [item.team.id, item.rank]));
-  const t1Rank = rankMap.get(t1.id) || 32;
-  const t2Rank = rankMap.get(t2.id) || 32;
-  const combinedRankValue = Math.max(0, 100 - ((t1Rank + t2Rank - 2) * 2.1));
-
-  const team1UserId = row.team_1_user_id || coachForTeamYear(t1.id, row.season_year, assignments)?.discord_user_id;
-  const team2UserId = row.team_2_user_id || coachForTeamYear(t2.id, row.season_year, assignments)?.discord_user_id;
-  const userRows = allTimeUserRankingRows(users, teams, assignments, results);
-  const userRankMap = new Map(userRows.map((item, index) => [item.user.id, index + 1]));
-  const u1Rank = userRankMap.get(team1UserId) || 32;
-  const u2Rank = userRankMap.get(team2UserId) || 32;
-  const userTierValue = ((u1Rank <= 8 ? 100 : u1Rank <= 16 ? 75 : u1Rank <= 24 ? 50 : 25) + (u2Rank <= 8 ? 100 : u2Rank <= 16 ? 75 : u2Rank <= 24 ? 50 : 25)) / 2;
-
-  const r1 = recordFromResults(t1.id, results);
-  const r2 = recordFromResults(t2.id, results);
-  const recordValue = ((r1.wins + r2.wins) * 5) + Math.max(0, 20 - ((r1.losses + r2.losses) * 2));
-  const rankedBonus = t1Rank <= 25 && t2Rank <= 25 ? 10 : t1Rank <= 25 || t2Rank <= 25 ? 5 : 0;
-  const topTierBonus = u1Rank <= 8 && u2Rank <= 8 ? 12 : u1Rank <= 16 && u2Rank <= 16 ? 6 : 0;
-
-  const score = Math.min(100, (combinedRankValue * 0.38) + (userTierValue * 0.32) + (recordValue * 0.18) + rankedBonus + topTierBonus);
-  const reasons = [];
-  if (t1Rank <= 25 && t2Rank <= 25) reasons.push("ranked matchup");
-  if (u1Rank <= 8 && u2Rank <= 8) reasons.push("two top-tier users");
-  else if (u1Rank <= 16 && u2Rank <= 16) reasons.push("strong user matchup");
-  if (r1.wins + r2.wins >= 8) reasons.push("strong combined record");
-  if (rankedBonus) reasons.push("poll implications");
-  return { score: Number(score.toFixed(1)), reasons: reasons.length ? reasons : ["best available matchup"], t1Rank, t2Rank, u1Rank, u2Rank };
-}
-
-function weeklyMatchupRows(rows, teams, users, assignments, results, currentYear, currentWeek) {
-  return rows
-    .filter((row) => String(row.season_year) === String(currentYear) && row.week === currentWeek)
-    .map((row) => ({ ...row, game: matchupScore(row, teams, users, assignments, results) }))
-    .sort((a,b) => b.game.score - a.game.score);
-}
-
-function GameOfTheWeekDashboard({ teams, users, assignments, results, weeklyMatchups, currentYear, currentWeek }) {
-  const rows = weeklyMatchupRows(weeklyMatchups, teams, users, assignments, results, currentYear, currentWeek);
-  const game = rows[0];
-  if (!game) return <section style={card}><h2 style={sectionTitle}>🔥 Draft Room</h2><p style={mutedText}>No weekly matchups entered for {currentYear} {currentWeek} yet.</p></section>;
-  return <section style={card}><h2 style={sectionTitle}>🔥 Draft Room</h2><div style={gotwCard}><div style={gotwTeam}><TeamLabel team={game.team_1 || teams.find((t)=>t.id===game.team_1_id)}/><span>{game.user_1?.discord_username || matchupUserLabel(game.team_1_user_id, users)}</span></div><div style={gotwScore}>{game.game.score}</div><div style={gotwTeam}><TeamLabel team={game.team_2 || teams.find((t)=>t.id===game.team_2_id)}/><span>{game.user_2?.discord_username || matchupUserLabel(game.team_2_user_id, users)}</span></div></div><p style={mutedText}>Why: {game.game.reasons.join(" • ")}</p></section>;
-}
-
-
-
-
-function userResultsFor(userId, results, assignments) {
-  return results.filter((result) => {
-    const team1UserId = result.team_1_user_id || coachForTeamYear(result.team_1_id, result.season_year, assignments)?.discord_user_id;
-    const team2UserId = result.team_2_user_id || coachForTeamYear(result.team_2_id, result.season_year, assignments)?.discord_user_id;
-    return team1UserId === userId || team2UserId === userId;
-  });
-}
-
-function streakFromGames(games, userId, assignments) {
-  const ordered = [...games].sort((a,b)=>{
-    const yearDiff = Number(a.season_year||0)-Number(b.season_year||0);
-    if (yearDiff) return yearDiff;
-    const weekDiff = weekIndex(a.week)-weekIndex(b.week);
-    if (weekDiff) return weekDiff;
-    return new Date(a.created_at||0)-new Date(b.created_at||0);
-  });
-  let currentType = null;
-  let currentCount = 0;
-  let bestWin = 0;
-  let bestLoss = 0;
-  ordered.forEach((result)=>{
-    const team1UserId = result.team_1_user_id || coachForTeamYear(result.team_1_id, result.season_year, assignments)?.discord_user_id;
-    const isTeam1 = team1UserId === userId;
-    const forPts = Number(isTeam1 ? result.team_1_score : result.team_2_score) || 0;
-    const againstPts = Number(isTeam1 ? result.team_2_score : result.team_1_score) || 0;
-    const type = forPts > againstPts ? "W" : forPts < againstPts ? "L" : "T";
-    if (type === currentType) currentCount += 1;
-    else { currentType = type; currentCount = 1; }
-    if (type === "W") bestWin = Math.max(bestWin, currentCount);
-    if (type === "L") bestLoss = Math.max(bestLoss, currentCount);
-  });
-  return { current: currentType && currentType !== "T" ? `${currentType}${currentCount}` : "—", longestWin: bestWin, longestLoss: bestLoss };
-}
-
-function bestAndWorstGames(userId, results, assignments) {
-  const games = userResultsFor(userId, results, assignments);
-  let best = null;
-  let worst = null;
-
-  games.forEach((result)=>{
-    const team1UserId = result.team_1_user_id || coachForTeamYear(result.team_1_id, result.season_year, assignments)?.discord_user_id;
-    const isTeam1 = team1UserId === userId;
-    const forPts = Number(isTeam1 ? result.team_1_score : result.team_2_score) || 0;
-    const againstPts = Number(isTeam1 ? result.team_2_score : result.team_1_score) || 0;
-    const opponentRank = Number(isTeam1 ? result.team_2_rank : result.team_1_rank) || 99;
-    const opponentName = isTeam1 ? result.team_2?.name : result.team_1?.name;
-    const margin = forPts - againstPts;
-    const bestValue = margin + (opponentRank <= 25 ? (30 - opponentRank) : 0);
-    const row = { result, opponentName, forPts, againstPts, margin, bestValue, opponentRank };
-
-    if (margin > 0 && (!best || bestValue > best.bestValue)) best = row;
-
-    if (margin < 0) {
-      if (!worst || margin < worst.margin || (margin === worst.margin && opponentRank > worst.opponentRank)) {
-        worst = row;
-      }
-    }
-  });
-
-  return { best, worst };
-}
-
-function DynastyHeadlines({ teams, users, assignments, results, allResults, allAmericans, awards, heismans, nationalChampions, recruiting, currentYear, currentWeek }) {
-  const headlines = [];
-  const weekResults = results.filter((row)=>String(row.season_year) === String(currentYear) && row.week === currentWeek);
-  const rankings = computerRankingRows(teams, results, assignments, users);
-  const eloRows = userEloRows(users, assignments, allResults);
-  const topTeam = rankings[0];
-  const topUser = eloRows[0];
-
-  weekResults.forEach((row)=>{
-    const s1 = Number(row.team_1_score||0), s2 = Number(row.team_2_score||0);
-    const winner = s1 >= s2 ? row.team_1 : row.team_2;
-    const loser = s1 >= s2 ? row.team_2 : row.team_1;
-    const winScore = Math.max(s1,s2);
-    const loseScore = Math.min(s1,s2);
-    const margin = winScore - loseScore;
-    const winnerRank = s1 >= s2 ? row.team_1_rank : row.team_2_rank;
-    const loserRank = s1 >= s2 ? row.team_2_rank : row.team_1_rank;
-
-    if (Number(loserRank) > 0 && Number(loserRank) <= 10 && (!winnerRank || Number(winnerRank) > Number(loserRank))) {
-      headlines.push(`${winner?.name || "A team"} shook up the league with a ${winScore}-${loseScore} upset over #${loserRank} ${loser?.name || "a ranked opponent"}.`);
-    } else if (margin >= 28) {
-      headlines.push(`${winner?.name || "A team"} made a statement with a ${margin}-point win over ${loser?.name || "their opponent"}, ${winScore}-${loseScore}.`);
-    } else if (margin <= 7) {
-      headlines.push(`${winner?.name || "A team"} survived a tight one against ${loser?.name || "their opponent"}, escaping ${winScore}-${loseScore}.`);
-    }
-  });
-
-  if (topTeam) headlines.push(`${topTeam.teamName} owns the #1 computer ranking at ${topTeam.score}, backed by a ${topTeam.wins}-${topTeam.losses} record and ${topTeam.qw} quality win${topTeam.qw === 1 ? "" : "s"}.`);
-  if (topUser) headlines.push(`${topUser.discord} leads the User ELO race with an adjusted ELO of ${topUser.adjustedElo || topUser.elo}.`);
-  const riser = rankings.filter((row)=>row.top25 > 0 || row.qw > 0).sort((a,b)=>b.qw-a.qw || b.score-a.score)[0];
-  if (riser && riser.teamName !== topTeam?.teamName) headlines.push(`${riser.teamName} continues building a stronger résumé with ${riser.qw} quality win${riser.qw === 1 ? "" : "s"} and a ${riser.wins}-${riser.losses} mark.`);
-  const bestClass = recruiting.filter((row)=>String(row.season_year) === String(currentYear) && Number(row.rank)>0).sort((a,b)=>Number(a.rank)-Number(b.rank))[0];
-  if (bestClass) headlines.push(`${bestClass.teams?.name || teamNameById(bestClass.team_id, teams)} is setting the recruiting tone with the #${bestClass.rank} class in ${currentYear}.`);
-  const currentHeisman = heismans.filter((row)=>String(row.season_year) === String(currentYear))[0];
-  if (currentHeisman) headlines.push(`${currentHeisman.player_name} gives ${currentHeisman.teams?.name || teamNameById(currentHeisman.team_id, teams)} a national spotlight as the latest Heisman winner on the board.`);
-  if (!headlines.length) headlines.push("Record games, awards, Heismans, and recruiting classes to generate richer league headlines.");
-
-  return <section style={glassCard}><h2 style={sectionTitle}>📰 Dynasty Headlines</h2><div style={headlineList}>{headlines.slice(0,8).map((line,index)=><div key={index} style={headlineItem}>• {line}</div>)}</div></section>;
-}
-
-function MilestoneTracker({ users, teams, assignments, results }) {
-  const rows = allTimeUserRankingRows(users, teams, assignments, results);
-  const milestones = [];
-  rows.forEach((row)=>{
-    [50,100,150,200,250,300].forEach((target)=>{
-      if (row.wins <= target && target - row.wins <= 5) milestones.push({ name: row.discord, text: `${target - row.wins} win${target-row.wins===1?"":"s"} from ${target} career wins` });
-    });
-    if (row.games && row.games % 50 >= 45) milestones.push({ name: row.discord, text: `${50 - (row.games % 50)} game${50-(row.games%50)===1?"":"s"} from ${Math.ceil(row.games/50)*50} career games` });
-  });
-  return <section style={card}><h2 style={sectionTitle}>🎯 Milestone Tracker</h2><div style={threeCol}>{milestones.slice(0,9).map((m,i)=><div key={i} style={miniCard}><h3 style={miniTitle}>{m.name}</h3><div style={mutedText}>{m.text}</div></div>)}</div>{!milestones.length && <div style={miniRow}>No milestone alerts right now.</div>}</section>;
-}
-
 function Rivalries({ users, teams, assignments, results }) {
   const map = new Map();
   results.forEach((result)=>{
@@ -2100,141 +1777,6 @@ function dynastyPrestigeTier(score) {
   return { stars: "⭐", label: "Basement", tier: "Basement" };
 }
 
-function dynastyPrestigeRows(teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats = []) {
-  const hofPlayersByTeam = new Map();
-  if (typeof playerHallRows === "function") {
-    try {
-      playerHallRows(teams, assignments, results, allAmericans, awards, heismans, nationalChampions).forEach((row)=>{
-        hofPlayersByTeam.set(row.teamId, (hofPlayersByTeam.get(row.teamId) || 0) + 1);
-      });
-    } catch (e) {}
-  }
-
-  const rawRows = teams.map((team)=>{
-    const rec = recordFromResults(team.id, results);
-    const games = rec.wins + rec.losses;
-    const winPct = games ? rec.wins / games : 0;
-    const nattys = nationalChampions.filter((row)=>row.team_id===team.id).length + titleCount(team.id, results, "National Championship Week");
-    const confTitles = titleCount(team.id, results, "Conference Championship Week");
-    const bowl = bowlRecord(team.id, results);
-    const top10 = top10Wins(team.id, results);
-    const aa = allAmericans.filter((row)=>row.team_id===team.id).length;
-    const awardCount = awards.filter((row)=>row.team_id===team.id).length;
-    const heismanCount = heismans.filter((row)=>row.team_id===team.id).length;
-    const recruitingRows = recruiting.filter((row)=>row.team_id===team.id && Number(row.rank)>0);
-    const avgRecruitRank = recruitingRows.length ? recruitingRows.reduce((sum,row)=>sum+Number(row.rank),0)/recruitingRows.length : null;
-    const bestRecruitRank = recruitingRows.length ? Math.min(...recruitingRows.map((row)=>Number(row.rank))) : null;
-    const top25Classes = recruitingRows.filter((row)=>Number(row.rank)<=25).length;
-    const teamStats = teamSeasonStats.filter((row)=>row.team_id===team.id);
-    const manualTop10 = teamStats.reduce((sum,row)=>sum+Number(row.top10_wins || 0),0);
-    const manualConf = teamStats.reduce((sum,row)=>sum+Number(row.conference_titles || 0),0);
-    const manualNatty = teamStats.reduce((sum,row)=>sum+Number(row.national_titles || 0),0);
-    const hofPlayers = hofPlayersByTeam.get(team.id) || 0;
-
-    const titleScore = (nattys + manualNatty) * 26 + (confTitles + manualConf) * 10;
-    const winningScore = winPct * 22 + Math.min(rec.wins * .8, 30) + bowl.wins * 2;
-    const eliteWinScore = (top10 + manualTop10) * 4.5;
-    const talentScore = heismanCount * 7 + awardCount * 2.5 + aa * 1.25 + hofPlayers * 7;
-    const recruitingScore = avgRecruitRank ? Math.max(0, 28 - avgRecruitRank * .72) + top25Classes * 1.6 + (bestRecruitRank === 1 ? 8 : bestRecruitRank && bestRecruitRank <= 5 ? 4 : 0) : 0;
-    const longevityScore = Math.min(games * .45, 14);
-
-    const rawScore = titleScore + winningScore + eliteWinScore + talentScore + recruitingScore + longevityScore;
-    return { team, rec, games, winPct, nattys: nattys + manualNatty, confTitles: confTitles + manualConf, top10: top10 + manualTop10, bowl, aa, awardCount, heismanCount, avgRecruitRank, bestRecruitRank, top25Classes, hofPlayers, rawScore };
-  });
-
-  const maxRaw = Math.max(1, ...rawRows.map((row)=>row.rawScore));
-  return rawRows.map((row)=>{
-    const score = Number(Math.min(100, (row.rawScore / maxRaw) * 100).toFixed(1));
-    return { ...row, score, tier: dynastyPrestigeTier(score) };
-  }).sort((a,b)=>b.score-a.score || b.nattys-a.nattys || b.rec.wins-a.rec.wins || a.team.name.localeCompare(b.team.name));
-}
-
-function PrestigeHistory({ teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats }) {
-  const years = [...new Set([
-    ...results.map((r)=>r.season_year),
-    ...recruiting.map((r)=>r.season_year),
-    ...teamSeasonStats.map((r)=>r.season_year),
-  ].filter(Boolean).map(Number))].sort((a,b)=>a-b);
-
-  const currentRows = dynastyPrestigeRows(teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats);
-  const topRows = currentRows.slice(0,12);
-
-  function scoreForYear(teamId, year) {
-    const rows = dynastyPrestigeRows(
-      teams.filter((t)=>t.id===teamId),
-      assignments,
-      results.filter((r)=>Number(r.season_year)<=year),
-      allAmericans.filter((r)=>Number(r.season_year)<=year),
-      awards.filter((r)=>Number(r.season_year)<=year),
-      heismans.filter((r)=>Number(r.season_year)<=year),
-      nationalChampions.filter((r)=>Number(r.season_year)<=year),
-      recruiting.filter((r)=>Number(r.season_year)<=year),
-      teamSeasonStats.filter((r)=>Number(r.season_year)<=year)
-    );
-    return rows[0]?.score || 0;
-  }
-
-  return (
-    <section style={broadcastPageCard}>
-      <h2 style={sectionTitle}>Prestige History</h2>
-      <p style={mutedText}>Blue Blood score, movement, trendline bars, and historical prestige ranking by season.</p>
-      <div style={prestigeHistoryGrid}>
-        {topRows.map((row)=>{
-          const trend = years.slice(-6).map((year)=>({ year, score: scoreForYear(row.team.id, year) }));
-          const last = trend[trend.length-1]?.score || row.score;
-          const prev = trend[trend.length-2]?.score || Math.max(0,last-1);
-          const delta = last - prev;
-          return (
-            <div key={row.team.id} style={prestigeHistoryCard}>
-              <div style={leaderRow}><b><TeamLabel team={row.team}/></b><span>{delta >= 0 ? "⬆️" : "⬇️"} {delta >= 0 ? "+" : ""}{delta.toFixed(1)}</span></div>
-              <div style={prestigeScore}>{row.score}</div>
-              <div style={prestigeTierPill}>{row.tier.stars} {row.tier.label}</div>
-              <div style={trendBars}>
-                {trend.map((item)=><div key={item.year} title={`${item.year}: ${item.score}`} style={{...trendBar, height: `${Math.max(8,item.score)}%`}} />)}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-function ProgramPrestige({ teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats = [] }) {
-  const rows = dynastyPrestigeRows(teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats);
-
-  return (
-    <section style={broadcastCard}>
-      <h2 style={sectionTitle}>Dynasty Prestige Engine</h2>
-      <p style={mutedText}>Prestige uses titles, win percentage, Top 10 wins, recruiting average/peaks, Heismans, All-Americans, awards, bowl success, Hall of Fame players, and manually-entered team season stats.</p>
-      <div style={prestigeGrid}>
-        {rows.map((row, index)=>(
-          <div key={row.team.id} style={prestigeCard}>
-            <div style={leaderRow}>
-              <b>#{index + 1}</b>
-              <span style={prestigeTierPill}>{row.tier.stars} {row.tier.label}</span>
-            </div>
-            <div style={prestigeTeamName}><TeamLabel team={row.team}/></div>
-            <div style={prestigeScore}>{row.score}</div><div style={positiveTrend}>+{Math.max(0.1, (row.score/22)).toFixed(1)} from last season</div>
-            <div style={prestigeMiniGrid}>
-              <span>Record <b>{row.rec.wins}-{row.rec.losses}</b></span>
-              <span>Win % <b>{(row.winPct*100).toFixed(1)}%</b></span>
-              <span>Nattys <b>{row.nattys}</b></span>
-              <span>Conf <b>{row.confTitles}</b></span>
-              <span>Top 10 <b>{row.top10}</b></span>
-              <span>Avg Recruit <b>{row.avgRecruitRank ? `#${row.avgRecruitRank.toFixed(1)}` : "—"}</b></span>
-              <span>Best Recruit <b>{row.bestRecruitRank ? `#${row.bestRecruitRank}` : "—"}</b></span>
-              <span>AA/Awards <b>{row.aa}/{row.awardCount}</b></span>
-              <span>Heisman <b>{row.heismanCount}</b></span>
-              <span>HOF Players <b>{row.hofPlayers}</b></span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 function DynastyPowerIndex({ users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting }) {
   const coachRows = getCoachStats(users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
   const elo = userEloRows(users, assignments, results);
@@ -2262,57 +1804,6 @@ function DynastyPowerIndex({ users, teams, assignments, results, allAmericans, a
 }
 
 
-function BestWorstPanel({ user, results, assignments }) {
-  const streak = streakFromGames(userResultsFor(user.id, results, assignments), user.id, assignments);
-  const { best, worst } = bestAndWorstGames(user.id, results, assignments);
-  return <div style={twoCol}><div style={miniCard}><h3 style={miniTitle}>Streaks</h3><div style={leaderRow}><span>Current</span><b>{streak.current}</b></div><div style={leaderRow}><span>Longest Win Streak</span><b>{streak.longestWin}</b></div><div style={leaderRow}><span>Longest Losing Streak</span><b>{streak.longestLoss}</b></div></div><div style={miniCard}><h3 style={miniTitle}>Best Win / Worst Loss</h3><div style={miniRow}>Best Win: {best ? `${best.opponentName} ${best.forPts}-${best.againstPts}` : "—"}</div><div style={miniRow}>Worst Loss: {worst ? `${worst.opponentName} ${worst.forPts}-${worst.againstPts}` : "—"}</div></div></div>;
-}
-
-
-
-function dynastyWireItems({ rankingDetails = [], results = [], teams = [], recruiting = [], prestigeRows = [], currentYear }) {
-  const items = [];
-  const currentResults = (results || []).filter((row)=>String(row.season_year) === String(currentYear));
-  currentResults.slice(-12).reverse().forEach((result)=>{
-    const t1 = teams.find((team)=>team.id===result.team_1_id) || result.team_1 || result.teams_1;
-    const t2 = teams.find((team)=>team.id===result.team_2_id) || result.team_2 || result.teams_2;
-    const s1 = Number(result.team_1_score);
-    const s2 = Number(result.team_2_score);
-    if (!t1 || !t2 || Number.isNaN(s1) || Number.isNaN(s2)) return;
-    const r1 = Number(result.team_1_rank || rankingDetails.find((row)=>row.team?.id===t1.id)?.rank || 0);
-    const r2 = Number(result.team_2_rank || rankingDetails.find((row)=>row.team?.id===t2.id)?.rank || 0);
-    const winner = s1 > s2 ? t1 : t2;
-    const loser = s1 > s2 ? t2 : t1;
-    const winnerRank = s1 > s2 ? r1 : r2;
-    const loserRank = s1 > s2 ? r2 : r1;
-    if (loserRank && (!winnerRank || winnerRank > loserRank + 5)) {
-      items.push({ title: `Upset Alert: ${winner.name} defeats #${loserRank} ${loser.name}`, meta: "Largest upset watch", icon: "🚨" });
-    } else if (loserRank && loserRank <= 10) {
-      items.push({ title: `Resume Builder: ${winner.name} adds a Top 10 win`, meta: "CFP résumé boost", icon: "📈" });
-    } else {
-      items.push({ title: `${winner.name} takes down ${loser.name} ${Math.max(s1,s2)}-${Math.min(s1,s2)}`, meta: "Final score", icon: "🏈" });
-    }
-  });
-
-  const topClass = (recruiting || [])
-    .filter((row)=>String(row.season_year) === String(currentYear) && Number(row.rank) > 0)
-    .sort((a,b)=>Number(a.rank)-Number(b.rank))[0];
-  if (topClass) {
-    items.push({ title: `Recruiting Win: ${teamNameById(topClass.team_id, teams)} lands the #${topClass.rank} class`, meta: "Signing day watch", icon: "📝" });
-  }
-
-  if (rankingDetails[0]) {
-    items.push({ title: `${rankingDetails[0].teamName} holds #1 in the CFBElite Automatic Rankings`, meta: "CFP committee desk", icon: "🏆" });
-  }
-
-  if (prestigeRows[0]) {
-    const tier = dynastyPrestigeTier(prestigeRows[0].score);
-    items.push({ title: `${prestigeRows[0].team.name} is a ${tier.label} program`, meta: `Prestige ${prestigeRows[0].score}`, icon: "⭐" });
-  }
-
-  return items.slice(0,8);
-}
-
 function coachMilestonesForStats(stats = {}) {
   const rows = [];
   const wins = Number(stats.wins || 0);
@@ -2329,19 +1820,6 @@ function coachMilestonesForStats(stats = {}) {
   if (awards >= 5) rows.push({ label: "Award Factory", icon: "⭐" });
   return rows;
 }
-
-function dynastyHallOfFameScore(row = {}) {
-  return Number((
-    (Number(row.wins || 0) * 1.2) +
-    (Number(row.nattys || 0) * 45) +
-    (Number(row.confTitles || 0) * 18) +
-    (Number(row.awards || 0) * 6) +
-    (Number(row.heismans || 0) * 18) +
-    (Number(row.top10Wins || 0) * 8) +
-    (Number(row.prestige || row.rawPrestige || 0) * 0.28)
-  ).toFixed(1));
-}
-
 
 function scheduledResultFor(matchup, results = [], seasonYear = null) {
   return results.find((game)=>
@@ -2401,271 +1879,12 @@ function countdownParts(target, now = Date.now()) {
   return { expired:false, days, hours, minutes, label:`${days ? `${days}d ` : ""}${hours}h ${minutes}m` };
 }
 
-function sanitizeFileName(value) {
-  return String(value || "cfbelite").replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "");
-}
-
-function loadCanvasImage(url) {
-  return new Promise((resolve)=>{
-    if (!url) return resolve(null);
-    const image = new Image();
-    image.crossOrigin = "anonymous";
-    image.onload = ()=>resolve(image);
-    image.onerror = ()=>resolve(null);
-    image.src = url;
-  });
-}
-
-function drawCoverLogo(ctx, image, x, y, size, fallback) {
-  ctx.save();
-  ctx.fillStyle = "rgba(255,255,255,.08)";
-  ctx.beginPath(); ctx.roundRect(x, y, size, size, 28); ctx.fill();
-  if (image) {
-    const ratio = Math.min((size-28)/image.width, (size-28)/image.height);
-    const width = image.width*ratio;
-    const height = image.height*ratio;
-    ctx.drawImage(image, x+(size-width)/2, y+(size-height)/2, width, height);
-  } else {
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "900 44px Inter, Arial";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(fallback, x+size/2, y+size/2);
-  }
-  ctx.restore();
-}
-
-async function downloadMatchupGraphic({ team1, team2, user1, user2, result, week, seasonYear, label = "GAMECENTER" }) {
-  const canvas = document.createElement("canvas");
-  canvas.width = 1200; canvas.height = 675;
-  const ctx = canvas.getContext("2d");
-  const primary1 = getTeamPrimary(team1);
-  const primary2 = getTeamPrimary(team2);
-  const gradient = ctx.createLinearGradient(0,0,1200,675);
-  gradient.addColorStop(0, primary1); gradient.addColorStop(.48, "#020617"); gradient.addColorStop(1, primary2);
-  ctx.fillStyle = gradient; ctx.fillRect(0,0,1200,675);
-  ctx.fillStyle = "rgba(2,6,23,.36)"; ctx.fillRect(0,0,1200,675);
-  ctx.fillStyle = "#facc15"; ctx.fillRect(0,0,1200,12);
-  ctx.textAlign = "center";
-  ctx.fillStyle = "#facc15"; ctx.font = "900 24px Inter, Arial"; ctx.fillText(`CFBELITE 27 • ${label}`,600,60);
-  ctx.fillStyle = "#ffffff"; ctx.font = "900 38px Inter, Arial"; ctx.fillText(`${seasonYear} • ${week}`,600,108);
-  const [logo1, logo2] = await Promise.all([loadCanvasImage(getHelmetUrl(team1)), loadCanvasImage(getHelmetUrl(team2))]);
-  drawCoverLogo(ctx, logo1, 190, 145, 180, getTeamAbbreviation(team1).slice(0,3));
-  drawCoverLogo(ctx, logo2, 830, 145, 180, getTeamAbbreviation(team2).slice(0,3));
-  const score1 = result ? scoreForScheduledTeam(result, team1?.id) : null;
-  const score2 = result ? scoreForScheduledTeam(result, team2?.id) : null;
-  ctx.fillStyle = "#ffffff"; ctx.font = "900 36px Inter, Arial";
-  ctx.fillText(team1?.name || "Team 1",280,385); ctx.fillText(team2?.name || "Team 2",920,385);
-  ctx.fillStyle = "#cbd5e1"; ctx.font = "700 22px Inter, Arial";
-  ctx.fillText(user1 || "User TBD",280,425); ctx.fillText(user2 || "User TBD",920,425);
-  ctx.fillStyle = "#facc15"; ctx.font = "1000 82px Inter, Arial";
-  ctx.fillText(result ? `${score1}–${score2}` : "VS",600,365);
-  if (result) {
-    ctx.fillStyle = "#facc15"; ctx.font = "900 25px Inter, Arial"; ctx.fillText("FINAL",600,425);
-  }
-  ctx.fillStyle = "rgba(255,255,255,.76)"; ctx.font = "700 20px Inter, Arial";
-  ctx.fillText("CFBElite 27 Online Dynasty",600,620);
-  const blob = await new Promise((resolve)=>canvas.toBlob(resolve,"image/png"));
-  if (!blob) return false;
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a"); link.href=url;
-  link.download=`${sanitizeFileName(`${week}-${team1?.name}-vs-${team2?.name}`)}.png`;
-  document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
-  return true;
-}
-
-async function downloadRankingsGraphic(rankings, seasonYear, week) {
-  const canvas=document.createElement("canvas"); canvas.width=1200; canvas.height=1200;
-  const ctx=canvas.getContext("2d");
-  const gradient=ctx.createLinearGradient(0,0,1200,1200); gradient.addColorStop(0,"#2e1065"); gradient.addColorStop(.55,"#0f172a"); gradient.addColorStop(1,"#020617");
-  ctx.fillStyle=gradient; ctx.fillRect(0,0,1200,1200); ctx.fillStyle="#facc15"; ctx.fillRect(0,0,1200,14);
-  ctx.fillStyle="#facc15"; ctx.font="900 28px Inter, Arial"; ctx.fillText("CFBELITE 27",70,72);
-  ctx.fillStyle="#ffffff"; ctx.font="1000 58px Inter, Arial"; ctx.fillText("AUTOMATIC TOP 10",70,140);
-  ctx.fillStyle="#cbd5e1"; ctx.font="700 24px Inter, Arial"; ctx.fillText(`${seasonYear} • ${week}`,70,182);
-  rankings.slice(0,10).forEach((row,index)=>{
-    const y=250+index*86; ctx.fillStyle=index===0?"rgba(250,204,21,.18)":"rgba(255,255,255,.055)"; ctx.fillRect(60,y-50,1080,68);
-    ctx.fillStyle="#facc15"; ctx.font="1000 34px Inter, Arial"; ctx.fillText(`#${index+1}`,82,y-6);
-    ctx.fillStyle="#ffffff"; ctx.font="900 29px Inter, Arial"; ctx.fillText(row.teamName,175,y-7);
-    ctx.textAlign="right"; ctx.fillStyle="#cbd5e1"; ctx.font="800 23px Inter, Arial"; ctx.fillText(`${row.wins}-${row.losses}`,960,y-7);
-    ctx.fillStyle="#facc15"; ctx.fillText(Number(row.rating||0).toFixed(1),1110,y-7); ctx.textAlign="left";
-  });
-  ctx.fillStyle="rgba(255,255,255,.65)"; ctx.font="700 20px Inter, Arial"; ctx.fillText("Generated from live CFBElite league data",70,1148);
-  const blob=await new Promise((resolve)=>canvas.toBlob(resolve,"image/png")); if(!blob) return false;
-  const url=URL.createObjectURL(blob); const link=document.createElement("a"); link.href=url; link.download=`CFBElite27-${sanitizeFileName(`${seasonYear}-${week}`)}-Top10.png`; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url); return true;
-}
-
-async function copyLeagueText(text) {
-  try { await navigator.clipboard.writeText(text); return true; }
-  catch { return false; }
-}
-
-function GameCenter({ teams = [], users = [], assignments = [], weeklyMatchups = [], results = [], currentYear = "2026", currentWeek = "Week 1", conferenceAssets = [], adminUnlocked = false, loadData = async()=>{} }) {
-  const [weekFilter, setWeekFilter] = useState("all");
-  const [teamFilter, setTeamFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-
-  const seasonResults = (results || []).filter((row)=>String(row.season_year)===String(currentYear));
-  const activeUserTeamIds = new Set(assignments.filter((row)=>row.status==="Active" && row.discord_user_id && row.team_id).map((row)=>String(row.team_id)));
-  const rankings = computerRankingRows(teams, seasonResults, assignments, users).filter((row)=>activeUserTeamIds.has(String(row.team?.id)));
-  const rankMap = new Map(rankings.map((row,index)=>[String(row.team?.id), index+1]));
-  const weeks = Array.from(new Set((weeklyMatchups || []).filter((row)=>String(row.season_year)===String(currentYear)).map((row)=>String(row.week))))
-    .sort((a,b)=>Number(a.replace(/\D/g,""))-Number(b.replace(/\D/g,"")));
-
-  function matchupResult(row) {
-    return seasonResults.find((game)=>
-      String(game.week)===String(row.week) &&
-      (
-        (String(game.team_1_id)===String(row.team_1_id) && String(game.team_2_id)===String(row.team_2_id)) ||
-        (String(game.team_1_id)===String(row.team_2_id) && String(game.team_2_id)===String(row.team_1_id))
-      )
-    ) || null;
-  }
-
-  function coachName(teamId, explicitUserId) {
-    const userId = explicitUserId ||
-      assignments.find((row)=>String(row.team_id)===String(teamId) && row.status==="Active")?.discord_user_id;
-    return users.find((user)=>String(user.id)===String(userId))?.discord_username || "User TBD";
-  }
-
-  const allRows = (weeklyMatchups || [])
-    .filter((row)=>String(row.season_year)===String(currentYear))
-    .map((row)=>{
-      const team1 = row.team_1 || teams.find((team)=>String(team.id)===String(row.team_1_id));
-      const team2 = row.team_2 || teams.find((team)=>String(team.id)===String(row.team_2_id));
-      const result = matchupResult(row);
-      return {
-        ...row,
-        team1,
-        team2,
-        result,
-        rank1:rankMap.get(String(row.team_1_id)) || "—",
-        rank2:rankMap.get(String(row.team_2_id)) || "—",
-        user1:coachName(row.team_1_id,row.team_1_user_id),
-        user2:coachName(row.team_2_id,row.team_2_user_id),
-      };
-    });
-
-  async function selectGameOfWeek(row) {
-    const { error: clearError } = await supabase
-      .from("weekly_matchups")
-      .update({ is_game_of_week:false })
-      .eq("season_year", Number(row.season_year || currentYear))
-      .eq("week", String(row.week));
-    if (clearError) return window.alert(clearError.message);
-
-    const { error: setError } = await supabase
-      .from("weekly_matchups")
-      .update({ is_game_of_week:true })
-      .eq("id", row.id);
-    if (setError) return window.alert(setError.message);
-
-    await loadData();
-  }
-
-  const rows = allRows.filter((row)=>{
-    const normalizedWeekFilter = String(weekFilter || "all").trim().toLowerCase();
-    const normalizedStatusFilter = String(statusFilter || "all").trim().toLowerCase();
-    const weekMatch = normalizedWeekFilter === "all" || normalizedWeekFilter.startsWith("all week") || String(row.week).toLowerCase()===normalizedWeekFilter;
-    const haystack = `${row.team1?.name||""} ${row.team2?.name||""} ${row.user1} ${row.user2}`.toLowerCase();
-    const teamMatch = !teamFilter || haystack.includes(teamFilter.toLowerCase());
-    const statusMatch = normalizedStatusFilter === "all" || normalizedStatusFilter.startsWith("all game") || (normalizedStatusFilter==="final" ? Boolean(row.result) : !row.result);
-    return weekMatch && teamMatch && statusMatch;
-  });
-
-  const currentWeekRows = allRows.filter((row)=>String(row.week)===String(currentWeek));
-  const gameOfWeek = currentWeekRows.find((row)=>row.is_game_of_week) || [...currentWeekRows].sort((a,b)=>{
-    const av=(Number(a.rank1)||99)+(Number(a.rank2)||99);
-    const bv=(Number(b.rank1)||99)+(Number(b.rank2)||99);
-    return av-bv;
-  })[0] || null;
-
-  return (
-    <section style={gameCenterPageV87}>
-      <div style={gameCenterHeroV87}>
-        <div>
-          <span style={eyebrow}>CFBElite {currentYear}</span>
-          <h1 style={gameCenterTitleV87}>GameCenter</h1>
-          <p style={mutedText}>User-vs-user schedule with live automated rankings, team logos, coaches, and final scores.</p>
-        </div>
-        <div style={gameCenterHeroStatV87}><b>{allRows.length}</b><span>Scheduled Games</span></div>
-      </div>
-
-      <div style={gameCenterControlNoteV90}>
-        <b>Commissioner Control:</b> Use “Choose as Game of the Week” on any matchup card.
-      </div>
-
-      <div className="cfb-gamecenter-filters-v87" style={gameCenterFiltersV87}>
-        <select style={input} value={weekFilter} onChange={(e)=>setWeekFilter(e.target.value)}>
-          <option value="all">All Weeks</option>
-          {weeks.map((week)=><option key={week} value={week}>{week}</option>)}
-        </select>
-        <input style={input} value={teamFilter} onChange={(e)=>setTeamFilter(e.target.value)} placeholder="Search team or Discord user"/>
-        <select style={input} value={statusFilter} onChange={(e)=>setStatusFilter(e.target.value)}>
-          <option value="all">All Games</option>
-          <option value="upcoming">Upcoming</option>
-          <option value="final">Final</option>
-        </select>
-      </div>
-
-      {gameOfWeek && (
-        <div style={{...gameCenterFeaturedV87, background:`linear-gradient(135deg, ${getTeamPrimary(gameOfWeek.team1)}88, rgba(2,6,23,.96), ${getTeamPrimary(gameOfWeek.team2)}66)`}}>
-          <div style={gameCenterFeaturedLabelV87}>★★★★★ GAME OF THE WEEK</div>
-          <div style={gameCenterFeaturedTeamsV87}>
-            <GameCenterTeam team={gameOfWeek.team1} rank={gameOfWeek.rank1} user={gameOfWeek.user1}/>
-            <div style={gameCenterVsV87}>{gameOfWeek.result ? "FINAL" : "VS"}</div>
-            <GameCenterTeam team={gameOfWeek.team2} rank={gameOfWeek.rank2} user={gameOfWeek.user2}/>
-          </div>
-        </div>
-      )}
-
-      <div style={gameCenterGridV87}>
-        {rows.length ? rows.map((row)=>(
-          <div key={row.id || `${row.week}-${row.team_1_id}-${row.team_2_id}`} style={{...gameCenterCardV87, borderColor:`${getTeamSecondary(row.team1)}55`}}>
-            <div style={gameCenterCardTopV87}><span>{row.week}</span><b>{row.is_game_of_week ? "★ GAME OF THE WEEK" : row.result ? "FINAL" : "UPCOMING"}</b></div>
-            <div style={gameCenterMatchupV87}>
-              <GameCenterTeam team={row.team1} rank={row.rank1} user={row.user1} compact/>
-              <div style={gameCenterVsV87}>{row.result ? scoreForScheduledTeam(row.result,row.team_1_id) : "VS"}</div>
-              <GameCenterTeam team={row.team2} rank={row.rank2} user={row.user2} compact/>
-            </div>
-            {row.result && <div style={gameCenterFinalScoreV87}>{scoreForScheduledTeam(row.result,row.team_1_id)} - {scoreForScheduledTeam(row.result,row.team_2_id)}</div>}
-            <div className="cfb-gamecenter-meta-v89" style={gameCenterMetaV89}>
-              <span style={gameCenterConferenceLogosV90}>
-                <ConferenceLogoMark conference={row.team1?.conference} conferenceAssets={conferenceAssets} size={22}/>
-                <b>VS</b>
-                <ConferenceLogoMark conference={row.team2?.conference} conferenceAssets={conferenceAssets} size={22}/>
-              </span>
-              <span>{Number(row.rank1) <= 25 && Number(row.rank2) <= 25 ? "Top 25 Matchup" : Number(row.rank1) <= 25 || Number(row.rank2) <= 25 ? "Ranked Team Featured" : "User Matchup"}</span>
-            </div>
-            {adminUnlocked && <button style={gameCenterGotwButtonV89} onClick={()=>selectGameOfWeek(row)}>
-              {row.is_game_of_week ? "★ Selected Game of the Week" : "☆ Choose as Game of the Week"}
-            </button>}
-          </div>
-        )) : <div style={tableEmptyStateV43}>No matchups match the selected filters.</div>}
-      </div>
-    </section>
-  );
-}
-
 function scoreForScheduledTeam(result, teamId) {
   if (!result) return "—";
   if (String(result.team_1_id)===String(teamId)) return result.team_1_score;
   if (String(result.team_2_id)===String(teamId)) return result.team_2_score;
   return "—";
 }
-
-function GameCenterTeam({ team, rank, user, compact = false }) {
-  return (
-    <div style={compact ? gameCenterTeamCompactV90 : gameCenterTeamV90}>
-      <div style={gameCenterRankLogoV91}>
-        <TeamLogoMark team={team} size={compact ? 48 : 78}/>
-        <b style={gameCenterRankBadgeV91}>#{rank}</b>
-      </div>
-      <strong style={gameCenterTeamNameV90}>{team?.name || "Team TBD"}</strong>
-      <small style={gameCenterUserV90}>{user || "User TBD"}</small>
-    </div>
-  );
-}
-
 
 function gameCenterResultInsights(row) {
   if (!row?.result) return [];
@@ -2767,56 +1986,6 @@ function V2MatchupTeam({team,rank,user,compact=false,side}) {
   </div>;
 }
 
-function conferencePowerData({ teams = [], users = [], assignments = [], results = [], allResults = [], allAmericans = [], awards = [], heismans = [], nationalChampions = [], recruiting = [] }) {
-  const activeAssignments = assignments.filter((assignment)=>assignment.status === "Active" && assignment.team_id && assignment.discord_user_id);
-  const activeTeamIds = new Set(activeAssignments.map((assignment)=>String(assignment.team_id)));
-  const activeTeams = teams.filter((team)=>activeTeamIds.has(String(team.id)));
-  const rankingRows = computerRankingRows(activeTeams, results, assignments, users);
-  const eloRows = userEloRows(users, assignments, allResults.length ? allResults : results);
-  const eloMap = new Map(eloRows.map((row)=>[String(row.user.id),row.adjustedElo || row.elo]));
-  const rankingMap = new Map(rankingRows.map((row)=>[String(row.team.id),row]));
-  const conferenceMap = new Map();
-
-  activeTeams.forEach((team)=>{
-    const conference = normalizeDraftConference(team.conference) || "Unassigned";
-    if (!conferenceMap.has(conference)) conferenceMap.set(conference,{conference,teams:0,recordWins:0,recordLosses:0,teamScore:0,eloScore:0,nattys:0,confTitles:0,recruitingScore:0,recruitingCount:0,allAmericans:0,awards:0,heismans:0,top25:0});
-    const row = conferenceMap.get(conference);
-    const ranking = rankingMap.get(String(team.id));
-    const rec = recordFromResults(team.id,results);
-    const activeAssignment = activeAssignments.find((assignment)=>String(assignment.team_id)===String(team.id));
-    const userElo = eloMap.get(String(activeAssignment?.discord_user_id)) || 1500;
-    const fullResults = allResults.length ? allResults : results;
-    const latestRecruit = recruiting.filter((item)=>String(item.team_id)===String(team.id) && Number(item.rank)>0).sort((a,b)=>Number(b.season_year)-Number(a.season_year)||Number(a.rank)-Number(b.rank))[0];
-    row.teams += 1;
-    row.recordWins += rec.wins;
-    row.recordLosses += rec.losses;
-    row.teamScore += ranking?.score || 0;
-    row.eloScore += Math.max(0,Math.min(100,(userElo-1300)/4));
-    row.nattys += Math.max(nationalChampions.filter((item)=>String(item.team_id)===String(team.id)).length,titleCount(team.id,fullResults,"National Championship Week"));
-    row.confTitles += titleCount(team.id,fullResults,"Conference Championship Week");
-    row.allAmericans += allAmericans.filter((item)=>String(item.team_id)===String(team.id)).length;
-    row.awards += awards.filter((item)=>String(item.team_id)===String(team.id)).length;
-    row.heismans += heismans.filter((item)=>String(item.team_id)===String(team.id)).length;
-    if (ranking?.rank<=25) row.top25 += 1;
-    if (latestRecruit) { row.recruitingScore += Math.max(0,101-Number(latestRecruit.rank)); row.recruitingCount += 1; }
-  });
-
-  return [...conferenceMap.values()].map((row)=>{
-    const games=row.recordWins+row.recordLosses;
-    const performance=row.teams?Math.max(0,Math.min(100,row.teamScore/row.teams)):50;
-    const userStrength=row.teams?row.eloScore/row.teams:0;
-    const winPct=games?row.recordWins/games:0;
-    const recordScore=games?winPct*100:50;
-    const rankedDepth=row.teams?(row.top25/row.teams)*100:0;
-    const championshipScore=row.teams?Math.min(100,((row.nattys*30)+(row.confTitles*10))/row.teams):0;
-    const recruitingAvg=row.recruitingCount?row.recruitingScore/row.recruitingCount:45;
-    const recognitionScore=row.teams?Math.min(100,((row.allAmericans*2)+(row.awards*4)+(row.heismans*12))/row.teams):0;
-    const currentPerformanceScore=(performance*.70)+(recordScore*.20)+(rankedDepth*.10);
-    const power=(currentPerformanceScore*.50)+(userStrength*.20)+(championshipScore*.12)+(recruitingAvg*.10)+(recognitionScore*.08);
-    return {...row,games,winPct,performance,userStrength,championshipScore,recruitingAvg,recognitionScore,currentPerformanceScore,power:Number(power.toFixed(1))};
-  }).sort((a,b)=>b.power-a.power);
-}
-
 function formatAmericanOdds(value) {
   const number=Number(value||0); return number>0?`+${number}`:`${number}`;
 }
@@ -2847,20 +2016,6 @@ function CurrentWeekTicker({teams=[],weeklyMatchups=[],results=[],currentYear,cu
   </section>;
 }
 
-function EliteBooksHomePanel({sportsbook={},linkedDiscordUser,currentYear,currentWeek,setActiveTab}) {
-  const seasonRows=(sportsbook.seasonStandings||[]).filter((row)=>String(row.season_year)===String(currentYear)).sort((a,b)=>Number(b.total_points)-Number(a.total_points));
-  const board=currentSportsbookBoard(sportsbook,currentYear,currentWeek);
-  const myId=sportsbookUserId(linkedDiscordUser);
-  const mine=seasonRows.find((row)=>String(row.discord_user_id)===myId);
-  const myBadges=(sportsbook.badgeAwards||[]).filter((row)=>String(row.discord_user_id)===myId&&String(row.season_year)===String(currentYear));
-  return <section className="elite-books-home">
-    <div className="elite-books-home-brand"><span>CFBELITE 27 SPORTSBOOK</span><h2>ELITE <i>BOOKS</i></h2><p>Current-week picks. Dynamic points. Season-long bragging rights.</p><button type="button" onClick={()=>setActiveTab?.("eliteBooks")}>Enter the Sportsbook →</button></div>
-    <div className="elite-books-home-board"><div><span>{currentWeek} BOARD</span><b className={`elite-status elite-status-${board?.status||"draft"}`}>{String(board?.status||"awaiting lines").toUpperCase()}</b></div><strong>{(sportsbook.lines||[]).filter((line)=>String(line.board_id)===String(board?.id)).length}</strong><small>Games on the board</small></div>
-    <div className="elite-books-home-leaders"><span>SEASON LEADERS</span>{seasonRows.slice(0,3).map((row,index)=><div key={row.discord_user_id}><b>#{index+1}</b><strong>{row.discord_username||"Discord Coach"}</strong><em>{row.total_points} pts</em></div>)}{!seasonRows.length&&<small>Standings begin after the first graded pick.</small>}</div>
-    <div className="elite-books-home-me"><span>MY TICKET</span>{linkedDiscordUser?<><strong>{mine?.total_points||0} PTS</strong><small>{mine?.correct_picks||0} correct • {myBadges.length} badge{myBadges.length===1?"":"s"}</small><button type="button" onClick={()=>setActiveTab?.("myTeam")}>View My Hub</button></>:<><strong>DISCORD LOGIN</strong><small>Sign in to lock picks to your profile.</small></>}</div>
-  </section>;
-}
-
 function networkTeamForUser(userId,teams,assignments,currentYear) {
   const assignment=assignments.find((row)=>String(row.discord_user_id)===String(userId)&&assignmentActiveForYear(row,currentYear))||assignments.find((row)=>String(row.discord_user_id)===String(userId)&&row.status==="Active");
   return teams.find((team)=>String(team.id)===String(assignment?.team_id));
@@ -2870,102 +2025,6 @@ function NetworkIdentity({userId,users,teams,assignments,currentYear,compact=fal
   const user=users.find((row)=>String(row.id)===String(userId));
   const team=networkTeamForUser(userId,teams,assignments,currentYear);
   return <span className={`network-identity ${compact?"compact":""}`}><TeamLogoMark team={team} size={compact?28:38}/><span><strong>{user?.discord_username||"League Member"}</strong>{!compact&&<small>{team?.name||"CFB Elite"}</small>}</span></span>;
-}
-
-function LeagueHubLegacy({discordSession,linkedDiscordUser,users=[],teams=[],assignments=[],currentYear,setActiveTab,setError}) {
-  const [mode,setMode]=useState("channels");
-  const [channels,setChannels]=useState([]);
-  const [categories,setCategories]=useState([]);
-  const [selectedChannel,setSelectedChannel]=useState(null);
-  const [messages,setMessages]=useState([]);
-  const [reactions,setReactions]=useState([]);
-  const [conversations,setConversations]=useState([]);
-  const [conversationMembers,setConversationMembers]=useState([]);
-  const [selectedConversation,setSelectedConversation]=useState(null);
-  const [directMessages,setDirectMessages]=useState([]);
-  const [notifications,setNotifications]=useState([]);
-  const [socialMessageSearch,setSocialMessageSearch]=useState("");
-  const [pinnedOnly,setPinnedOnly]=useState(false);
-  const [polls,setPolls]=useState([]);
-  const [pollOptions,setPollOptions]=useState([]);
-  const [pollVotes,setPollVotes]=useState([]);
-  const [pollForm,setPollForm]=useState({question:"",description:"",options:["",""],multiple_choice:false,anonymous:false,hide_results:false,ends_at:""});
-  const [reportingUrl,setReportingUrl]=useState("");
-  const [reportingDraft,setReportingDraft]=useState("");
-  const [preferences,setPreferences]=useState(null);
-  const [draft,setDraft]=useState("");
-  const [busy,setBusy]=useState(false);
-  const [memberSearch,setMemberSearch]=useState("");
-  const lastNotificationRef=useRef(null);
-
-  async function loadNetworkShell() {
-    if(!discordSession?.user) return;
-    await supabase.rpc("ensure_league_network_profile");
-    const [channelRes,conversationRes,memberRes,notificationRes,prefRes]=await Promise.all([
-      supabase.from("league_channels").select("*").eq("is_archived",false).order("sort_order"),
-      supabase.from("direct_conversations").select("*").order("last_message_at",{ascending:false}),
-      supabase.from("direct_conversation_members").select("*"),
-      supabase.from("app_notifications").select("*").order("created_at",{ascending:false}).limit(80),
-      supabase.from("notification_preferences").select("*").eq("auth_user_id",discordSession.user.id).maybeSingle(),
-    ]);
-    const nextChannels=channelRes.data||[];
-    setChannels(nextChannels); setSelectedChannel((current)=>current||nextChannels[0]?.id||null);
-    setConversations(conversationRes.data||[]); setConversationMembers(memberRes.data||[]);
-    const nextNotifications=notificationRes.data||[];
-    if(lastNotificationRef.current&&nextNotifications[0]?.id&&nextNotifications[0].id!==lastNotificationRef.current&&prefRes.data?.sound_enabled!==false) playEliteSound("notification",true);
-    lastNotificationRef.current=nextNotifications[0]?.id||lastNotificationRef.current;
-    const nextPreferences=prefRes.data||null;setNotifications(nextNotifications); setPreferences(nextPreferences);
-    if(nextPreferences){localStorage.setItem("cfb-network-preferences",JSON.stringify(nextPreferences));window.dispatchEvent(new Event("cfb-preferences"));}
-  }
-  async function loadChannelMessages() {
-    if(!selectedChannel) return;
-    const [messageRes,reactionRes]=await Promise.all([supabase.from("league_channel_messages").select("*").eq("channel_id",selectedChannel).is("deleted_at",null).order("created_at",{ascending:true}).limit(250),supabase.from("league_message_reactions").select("*")]);
-    if(messageRes.error)setError?.(messageRes.error.message); else setMessages(messageRes.data||[]);setReactions(reactionRes.data||[]);
-  }
-  async function loadDirectMessages() {
-    if(!selectedConversation) return;
-    const {data,error}=await supabase.from("direct_messages").select("*").eq("conversation_id",selectedConversation).is("deleted_at",null).order("created_at",{ascending:true}).limit(250);
-    if(error)setError?.(error.message); else {setDirectMessages(data||[]);await supabase.rpc("mark_direct_conversation_read",{p_conversation_id:selectedConversation});}
-  }
-  useEffect(()=>{loadNetworkShell();const timer=window.setInterval(loadNetworkShell,NETWORK_REFRESH_MS);const channel=supabase.channel?.("league-network-ui").on("postgres_changes",{event:"INSERT",schema:"public",table:"league_channel_messages"},()=>loadChannelMessages()).on("postgres_changes",{event:"INSERT",schema:"public",table:"direct_messages"},()=>loadDirectMessages()).on("postgres_changes",{event:"INSERT",schema:"public",table:"app_notifications"},()=>loadNetworkShell()).subscribe();return()=>{window.clearInterval(timer);if(channel)supabase.removeChannel?.(channel);};},[discordSession?.user?.id,selectedChannel,selectedConversation]);
-  useEffect(()=>{loadChannelMessages();},[selectedChannel]);
-  useEffect(()=>{loadDirectMessages();},[selectedConversation]);
-
-  async function sendMessage() {
-    if(!draft.trim()||busy)return; setBusy(true);
-    const rpc=mode==="direct"?supabase.rpc("send_direct_message",{p_conversation_id:selectedConversation,p_body:draft.trim()}):supabase.rpc("send_league_channel_message",{p_channel_id:selectedChannel,p_body:draft.trim()});
-    const {error}=await rpc; setBusy(false);
-    if(error){setError?.(`Message not sent: ${error.message}`);return;}
-    setDraft(""); if(mode==="direct")await loadDirectMessages();else await loadChannelMessages();
-  }
-  async function startConversation(userId) {
-    setBusy(true);const {data,error}=await supabase.rpc("start_direct_conversation",{p_other_discord_user_id:String(userId)});setBusy(false);
-    if(error){setError?.(`Conversation could not start: ${error.message}`);return;}
-    await loadNetworkShell();setSelectedConversation(data);setMode("direct");setMemberSearch("");
-  }
-  async function savePreference(field,value) {
-    const next={...(preferences||{}),auth_user_id:discordSession.user.id,discord_user_id:String(linkedDiscordUser.id),[field]:value,updated_at:new Date().toISOString()};
-    setPreferences(next);localStorage.setItem("cfb-network-preferences",JSON.stringify(next));window.dispatchEvent(new Event("cfb-preferences"));const {error}=await supabase.from("notification_preferences").upsert(next,{onConflict:"auth_user_id"});if(error)setError?.(`Preference not saved: ${error.message}`);
-  }
-  async function enablePush() {
-    try{
-      if(!("serviceWorker" in navigator)||!("PushManager" in window))throw new Error("Push notifications are not supported in this browser.");
-      const permission=await Notification.requestPermission();if(permission!=="granted")throw new Error("Notification permission was not granted.");
-      const vapid=import.meta.env.VITE_VAPID_PUBLIC_KEY;if(!vapid)throw new Error("Push delivery will activate after the commissioner installs the VAPID public key.");
-      const registration=await navigator.serviceWorker.register("/sw.js");
-      const bytes=Uint8Array.from(atob(vapid.replace(/-/g,"+").replace(/_/g,"/")),(char)=>char.charCodeAt(0));
-      const subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:bytes});const json=subscription.toJSON();
-      const {error}=await supabase.from("push_subscriptions").upsert({auth_user_id:discordSession.user.id,endpoint:json.endpoint,p256dh:json.keys.p256dh,auth_secret:json.keys.auth,user_agent:navigator.userAgent,last_used_at:new Date().toISOString()},{onConflict:"endpoint"});
-      if(error)throw error;await savePreference("push_enabled",true);setError?.("Push notifications enabled on this device.");
-    }catch(error){setError?.(error.message);}
-  }
-  async function markNotificationsRead() {await supabase.rpc("mark_app_notification_read",{});await loadNetworkShell();}
-  const selectedChannelRow=channels.find((row)=>String(row.id)===String(selectedChannel));
-  const unread=notifications.filter((row)=>!row.read_at).length;
-  const conversationOther=(conversationId)=>{const member=conversationMembers.find((row)=>String(row.conversation_id)===String(conversationId)&&String(row.discord_user_id)!==String(linkedDiscordUser.id));return users.find((row)=>String(row.id)===String(member?.discord_user_id));};
-  const filteredMembers=users.filter((user)=>user.is_active!==false&&String(user.id)!==String(linkedDiscordUser.id)&&String(user.discord_username).toLowerCase().includes(memberSearch.toLowerCase())).slice(0,12);
-  const displayedMessages=mode==="direct"?directMessages:messages;
-  return <main className="cfb-v2-page network-page"><section className="network-hero"><div><span>CFB ELITE NETWORK</span><h1>CFBElite Network <small style={{fontSize:10,opacity:.5}}>v40.2</small></h1><p>The league conversation, rules, polls and community—without crowding the dashboard home.</p></div><div className="network-live-presence"><i/><strong>{users.filter((row)=>row.is_active!==false).length}</strong><span>League Members</span></div></section><div className="network-layout"><aside className="network-sidebar"><nav><button className={mode==="channels"?"active":""} onClick={()=>setMode("channels")}>Channels</button><button className={mode==="direct"?"active":""} onClick={()=>setMode("direct")}>Messages</button><button className={mode==="notifications"?"active":""} onClick={()=>setMode("notifications")}>Alerts {unread>0&&<b>{unread}</b>}</button><button className={mode==="settings"?"active":""} onClick={()=>setMode("settings")}>Settings</button></nav>{mode==="channels"&&<div className="network-channel-list">{channels.map((channel)=><button key={channel.id} className={String(selectedChannel)===String(channel.id)?"active":""} onClick={()=>setSelectedChannel(channel.id)}><b>{channel.icon}</b><span><strong>{channel.name}</strong><small>{channel.description}</small></span></button>)}</div>}{mode==="direct"&&<><label className="network-member-search"><span>NEW MESSAGE</span><input value={memberSearch} onChange={(event)=>setMemberSearch(event.target.value)} placeholder="Find a league member"/></label>{memberSearch&&<div className="network-member-results">{filteredMembers.map((user)=><button key={user.id} onClick={()=>startConversation(user.id)}><NetworkIdentity userId={user.id} users={users} teams={teams} assignments={assignments} currentYear={currentYear} compact/></button>)}</div>}<div className="network-conversation-list">{conversations.map((conversation)=>{const other=conversationOther(conversation.id);return <button key={conversation.id} className={String(selectedConversation)===String(conversation.id)?"active":""} onClick={()=>setSelectedConversation(conversation.id)}><NetworkIdentity userId={other?.id} users={users} teams={teams} assignments={assignments} currentYear={currentYear} compact/><small>{new Date(conversation.last_message_at).toLocaleDateString()}</small></button>})}</div></>}</aside><section className="network-stage">{mode==="notifications"?<div className="network-notifications"><header><div><span>CFBELITE NETWORK</span><h2>Notifications</h2></div><button onClick={markNotificationsRead}>Mark all read</button></header>{notifications.map((notification)=><button key={notification.id} className={notification.read_at?"":"unread"} onClick={()=>{if(notification.target_tab)setActiveTab?.(notification.target_tab);}}><i>{notification.icon||"CFB"}</i><span><strong>{notification.title}</strong><p>{notification.body}</p><small>{notification.channel_name?`#${notification.channel_name} • `:""}{new Date(notification.created_at).toLocaleString()}</small></span><em>›</em></button>)}</div>:mode==="settings"?<NotificationSettings preferences={preferences} savePreference={savePreference} enablePush={enablePush}/>:<><header className="network-stage-header"><div><span>{mode==="direct"?"PRIVATE CONVERSATION":selectedChannelRow?.channel_type?.toUpperCase()}</span><h2>{mode==="direct"?(conversationOther(selectedConversation)?.discord_username||"Select a conversation"):(selectedChannelRow?.name||"League Channel")}</h2><p>{mode==="direct"?"Only members of this conversation can read these messages.":selectedChannelRow?.description}</p></div>{mode==="channels"&&selectedChannelRow?.slug==="streams"&&<button onClick={()=>setActiveTab?.("redZone")}>Open RedZone</button>}</header><div className="network-message-feed">{displayedMessages.map((message)=><article key={message.id} className={String(message.author_discord_user_id)===String(linkedDiscordUser.id)?"mine":""}><NetworkIdentity userId={message.author_discord_user_id} users={users} teams={teams} assignments={assignments} currentYear={currentYear}/><p>{message.body}</p><time>{new Date(message.created_at).toLocaleString([],{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})}</time></article>)}{!displayedMessages.length&&<div className="network-empty"><b>Start the conversation.</b><span>This space is ready for the league.</span></div>}</div><div className="network-composer"><textarea value={draft} onChange={(event)=>setDraft(event.target.value)} onKeyDown={(event)=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();sendMessage();}}} placeholder={mode==="direct"?"Message privately…":`Message #${selectedChannelRow?.slug||"channel"}…`} disabled={mode==="direct"&&!selectedConversation}/><button disabled={busy||!draft.trim()||(mode==="direct"&&!selectedConversation)} onClick={sendMessage}>{busy?"Sending…":"Send"}</button><small>Enter to send • Shift + Enter for a new line</small></div></>}</section></div></main>;
 }
 
 function cleanNetworkChannelName(value=""){
@@ -3001,12 +2060,12 @@ function NetworkEmojiLibrary({customEmojis=[],isCommissioner,emojiUpload,setEmoj
 }
 
 function NetworkCategoryManager({categories=[],categoryForm,setCategoryForm,busy,saveCategory,deleteCategory}){
-  return <div className="network-category-manager"><header><div><span>CHANNEL ARCHITECTURE</span><h2>Categories</h2><p>Organize league conversations into clear, branded sections.</p></div><b>{categories.length} ACTIVE</b></header><div className="network-category-layout"><aside><button className={!categoryForm.id?"active":""} onClick={()=>setCategoryForm({id:null,name:"",color:"#38bdf8",sort_order:(categories.at(-1)?.sort_order||0)+10,is_system:false})}>＋ New Category</button>{categories.map((category)=><button key={category.id} className={String(category.id)===String(categoryForm.id)?"active":""} onClick={()=>setCategoryForm({...category})}><i style={{background:category.color}}/><span><strong>{category.name}</strong><small>Display order {category.sort_order}</small></span>{category.is_system&&<em>CORE</em>}</button>)}</aside><section><label><span>Category Name</span><input value={categoryForm.name} onChange={(event)=>setCategoryForm({...categoryForm,name:event.target.value})} placeholder="League Central"/></label><label><span>Accent Color</span><input type="color" value={categoryForm.color||"#38bdf8"} onChange={(event)=>setCategoryForm({...categoryForm,color:event.target.value})}/></label><label><span>Display Order</span><input type="number" value={categoryForm.sort_order} onChange={(event)=>setCategoryForm({...categoryForm,sort_order:event.target.value})}/></label><div className="network-category-preview" style={{"--category-color":categoryForm.color||"#38bdf8"}}><i/><strong>{categoryForm.name||"New Category"}</strong></div><div className="network-manager-actions"><button disabled={busy} onClick={saveCategory}>{busy?"Saving…":categoryForm.id?"Save Category":"Create Category"}</button>{categoryForm.id&&!categoryForm.is_system&&<button className="danger" onClick={()=>deleteCategory(categoryForm)}>Delete Category</button>}</div></section></div></div>;
+  return <div className="network-category-manager"><header><div><span>CHANNEL ARCHITECTURE</span><h2>Categories</h2><p>Organize league conversations into clear, branded sections.</p></div><b>{categories.length} ACTIVE</b></header><div className="network-category-layout"><aside><button className={!categoryForm.id?"active":""} onClick={()=>setCategoryForm({id:null,name:"",color:"#4f8fa8",sort_order:(categories.at(-1)?.sort_order||0)+10,is_system:false})}>＋ New Category</button>{categories.map((category)=><button key={category.id} className={String(category.id)===String(categoryForm.id)?"active":""} onClick={()=>setCategoryForm({...category})}><i style={{background:category.color}}/><span><strong>{category.name}</strong><small>Display order {category.sort_order}</small></span>{category.is_system&&<em>CORE</em>}</button>)}</aside><section><label><span>Category Name</span><input value={categoryForm.name} onChange={(event)=>setCategoryForm({...categoryForm,name:event.target.value})} placeholder="League Central"/></label><label><span>Accent Color</span><input type="color" value={categoryForm.color||"#4f8fa8"} onChange={(event)=>setCategoryForm({...categoryForm,color:event.target.value})}/></label><label><span>Display Order</span><input type="number" value={categoryForm.sort_order} onChange={(event)=>setCategoryForm({...categoryForm,sort_order:event.target.value})}/></label><div className="network-category-preview" style={{"--category-color":categoryForm.color||"#4f8fa8"}}><i/><strong>{categoryForm.name||"New Category"}</strong></div><div className="network-manager-actions"><button disabled={busy} onClick={saveCategory}>{busy?"Saving…":categoryForm.id?"Save Category":"Create Category"}</button>{categoryForm.id&&!categoryForm.is_system&&<button className="danger" onClick={()=>deleteCategory(categoryForm)}>Delete Category</button>}</div></section></div></div>;
 }
 function NetworkRoleManager({roles=[],roleMembers=[],users=[],roleForm,setRoleForm,isCommissioner,busy,saveRole,deleteRole,toggleRoleMember}){
   const selected=roles.find((role)=>String(role.id)===String(roleForm.id));
   const assigned=(userId)=>roleMembers.some((row)=>String(row.role_id)===String(roleForm.id)&&String(row.discord_user_id)===String(userId));
-  return <div className="network-role-manager"><header><div><span>LEAGUE IDENTITY SYSTEM</span><h2>Roles & Permissions</h2><p>Build the league staff, moderators and custom identity groups that power the Hub.</p></div><b>{roles.length} ROLES</b></header><div className="network-role-layout"><aside><button className={!roleForm.id?"active":""} onClick={()=>setRoleForm({id:null,name:"",color:"#38bdf8",position:100,can_manage_channels:false,can_manage_messages:false,can_manage_members:false,is_managed:false})}>＋ Create Role</button>{roles.map((role)=><button key={role.id} className={String(role.id)===String(roleForm.id)?"active":""} onClick={()=>setRoleForm({...role})}><i style={{background:role.color}}/><span><strong>{role.name}</strong><small>{roleMembers.filter((row)=>String(row.role_id)===String(role.id)).length} members</small></span>{role.is_managed&&<em>BUILT IN</em>}</button>)}</aside><section><div className="network-role-form"><label><span>Role Name</span><input disabled={!isCommissioner||roleForm.is_managed} value={roleForm.name} onChange={(event)=>setRoleForm({...roleForm,name:event.target.value})} placeholder="Game Day Moderator"/></label><label><span>Role Color</span><input disabled={!isCommissioner||roleForm.is_managed} type="color" value={roleForm.color||"#38bdf8"} onChange={(event)=>setRoleForm({...roleForm,color:event.target.value})}/></label><label><span>Display Order</span><input disabled={!isCommissioner||roleForm.is_managed} type="number" value={roleForm.position} onChange={(event)=>setRoleForm({...roleForm,position:event.target.value})}/></label><div className="network-role-preview" style={{"--role-color":roleForm.color||"#94a3b8"}}><i/><strong>{roleForm.name||"New Role"}</strong></div><div className="network-role-permissions"><span>ROLE POWERS</span>{[["can_manage_channels","Create and manage channels"],["can_manage_messages","Moderate league messages"],["can_manage_members","Assign custom roles"]].map(([key,label])=><label key={key}><input type="checkbox" disabled={!isCommissioner||roleForm.is_managed} checked={Boolean(roleForm[key])} onChange={(event)=>setRoleForm({...roleForm,[key]:event.target.checked})}/><span>{label}</span></label>)}</div>{isCommissioner&&!roleForm.is_managed&&<div className="network-role-actions"><button disabled={busy} onClick={saveRole}>{busy?"Saving…":roleForm.id?"Save Role":"Create Role"}</button>{roleForm.id&&<button className="danger" onClick={()=>deleteRole(selected)}>Delete Role</button>}</div>}</div>{roleForm.id&&<div className="network-role-members"><header><span>ROLE MEMBERS</span><b>{roleMembers.filter((row)=>String(row.role_id)===String(roleForm.id)).length} ASSIGNED</b></header><div>{users.filter((user)=>user.is_active!==false&&!user.is_banned).map((user)=><label key={user.id}><NetworkIdentity userId={user.id} users={users} teams={[]} assignments={[]} currentYear={null} compact/><input type="checkbox" disabled={!isCommissioner||roleForm.is_managed||busy} checked={assigned(user.id)} onChange={(event)=>toggleRoleMember(roleForm.id,user.id,event.target.checked)}/></label>)}</div></div>}</section></div></div>;
+  return <div className="network-role-manager"><header><div><span>LEAGUE IDENTITY SYSTEM</span><h2>Roles & Permissions</h2><p>Build the league staff, moderators and custom identity groups that power the Hub.</p></div><b>{roles.length} ROLES</b></header><div className="network-role-layout"><aside><button className={!roleForm.id?"active":""} onClick={()=>setRoleForm({id:null,name:"",color:"#4f8fa8",position:100,can_manage_channels:false,can_manage_messages:false,can_manage_members:false,is_managed:false})}>＋ Create Role</button>{roles.map((role)=><button key={role.id} className={String(role.id)===String(roleForm.id)?"active":""} onClick={()=>setRoleForm({...role})}><i style={{background:role.color}}/><span><strong>{role.name}</strong><small>{roleMembers.filter((row)=>String(row.role_id)===String(role.id)).length} members</small></span>{role.is_managed&&<em>BUILT IN</em>}</button>)}</aside><section><div className="network-role-form"><label><span>Role Name</span><input disabled={!isCommissioner||roleForm.is_managed} value={roleForm.name} onChange={(event)=>setRoleForm({...roleForm,name:event.target.value})} placeholder="Game Day Moderator"/></label><label><span>Role Color</span><input disabled={!isCommissioner||roleForm.is_managed} type="color" value={roleForm.color||"#4f8fa8"} onChange={(event)=>setRoleForm({...roleForm,color:event.target.value})}/></label><label><span>Display Order</span><input disabled={!isCommissioner||roleForm.is_managed} type="number" value={roleForm.position} onChange={(event)=>setRoleForm({...roleForm,position:event.target.value})}/></label><div className="network-role-preview" style={{"--role-color":roleForm.color||"var(--cfb-muted)"}}><i/><strong>{roleForm.name||"New Role"}</strong></div><div className="network-role-permissions"><span>ROLE POWERS</span>{[["can_manage_channels","Create and manage channels"],["can_manage_messages","Moderate league messages"],["can_manage_members","Assign custom roles"]].map(([key,label])=><label key={key}><input type="checkbox" disabled={!isCommissioner||roleForm.is_managed} checked={Boolean(roleForm[key])} onChange={(event)=>setRoleForm({...roleForm,[key]:event.target.checked})}/><span>{label}</span></label>)}</div>{isCommissioner&&!roleForm.is_managed&&<div className="network-role-actions"><button disabled={busy} onClick={saveRole}>{busy?"Saving…":roleForm.id?"Save Role":"Create Role"}</button>{roleForm.id&&<button className="danger" onClick={()=>deleteRole(selected)}>Delete Role</button>}</div>}</div>{roleForm.id&&<div className="network-role-members"><header><span>ROLE MEMBERS</span><b>{roleMembers.filter((row)=>String(row.role_id)===String(roleForm.id)).length} ASSIGNED</b></header><div>{users.filter((user)=>user.is_active!==false&&!user.is_banned).map((user)=><label key={user.id}><NetworkIdentity userId={user.id} users={users} teams={[]} assignments={[]} currentYear={null} compact/><input type="checkbox" disabled={!isCommissioner||roleForm.is_managed||busy} checked={assigned(user.id)} onChange={(event)=>toggleRoleMember(roleForm.id,user.id,event.target.checked)}/></label>)}</div></div>}</section></div></div>;
 }
 
 
@@ -3226,11 +2285,11 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
   const [newsArticles,setNewsArticles]=useState([]);
   const [newsJobs,setNewsJobs]=useState([]);
   const [newsBusy,setNewsBusy]=useState(false);
-  const [roleForm,setRoleForm]=useState({id:null,name:"",color:"#38bdf8",position:100,can_manage_channels:false,can_manage_messages:false,can_manage_members:false,is_managed:false});
+  const [roleForm,setRoleForm]=useState({id:null,name:"",color:"#4f8fa8",position:100,can_manage_channels:false,can_manage_messages:false,can_manage_members:false,is_managed:false});
   const [manageOpen,setManageOpen]=useState(false);
   const [organizeOpen,setOrganizeOpen]=useState(false);
   const [channelForm,setChannelForm]=useState({id:null,name:"",slug:"",description:"",icon:"#",image_url:"",channel_type:"public",category_id:"",sort_order:100,is_locked:false});
-  const [categoryForm,setCategoryForm]=useState({id:null,name:"",color:"#38bdf8",sort_order:100,is_system:false});
+  const [categoryForm,setCategoryForm]=useState({id:null,name:"",color:"#4f8fa8",sort_order:100,is_system:false});
   const [permissionUserId,setPermissionUserId]=useState("");
   const [permissionDraft,setPermissionDraft]=useState({view:"inherit",post:"inherit",manage:"inherit",muted_until:""});
   const lastNotificationRef=useRef(null);
@@ -3375,7 +2434,7 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
   function openChannelManager(channel=null){const row=channel||{id:null,name:"",slug:"",description:"",icon:"#",image_url:"",channel_type:"public",category_id:categories[0]?.id||"",sort_order:(channels.at(-1)?.sort_order||0)+10,is_locked:false};setChannelForm({...row,image_url:row.image_url||"",category_id:row.category_id||""});setPermissionUserId("");setPermissionDraft({view:"inherit",post:"inherit",manage:"inherit",muted_until:""});setManageOpen(true);}
   async function saveChannel(){setBusy(true);const {data,error}=await supabase.rpc("manage_league_channel",{p_channel_id:channelForm.id||null,p_name:channelForm.name,p_slug:channelForm.slug,p_description:channelForm.description||"",p_icon:channelForm.icon||"#",p_image_url:channelForm.image_url||null,p_channel_type:channelForm.channel_type,p_sort_order:Number(channelForm.sort_order)||100,p_is_locked:Boolean(channelForm.is_locked)});if(error){setBusy(false);setError?.(`Channel not saved: ${error.message}`);return;}const saved=Array.isArray(data)?data[0]:data;const channelId=saved?.id||channelForm.id;const categoryResult=await supabase.rpc("set_league_channel_category",{p_channel_id:channelId,p_category_id:channelForm.category_id||null});setBusy(false);if(categoryResult.error){setError?.(`Channel saved, but its category was not updated: ${categoryResult.error.message}`);return;}await loadNetworkShell();setSelectedChannel(channelId||selectedChannel);setManageOpen(false);setError?.("Channel settings saved.");}
   async function archiveChannel(){if(!channelForm.id||!window.confirm(`Delete #${channelForm.name}? Existing messages will be preserved in the archive.`))return;const {error}=await supabase.rpc("archive_league_channel",{p_channel_id:channelForm.id,p_archived:true});if(error)setError?.(`Channel not deleted: ${error.message}`);else{setManageOpen(false);await loadNetworkShell();}}
-  async function saveCategory(){setBusy(true);const {data,error}=await supabase.rpc("manage_league_channel_category",{p_category_id:categoryForm.id||null,p_name:categoryForm.name,p_color:categoryForm.color||"#38bdf8",p_sort_order:Number(categoryForm.sort_order)||100});setBusy(false);if(error){setError?.(`Category not saved: ${error.message}`);return;}const saved=Array.isArray(data)?data[0]:data;await loadNetworkShell();if(saved)setCategoryForm({...saved});setError?.("Channel category saved.");}
+  async function saveCategory(){setBusy(true);const {data,error}=await supabase.rpc("manage_league_channel_category",{p_category_id:categoryForm.id||null,p_name:categoryForm.name,p_color:categoryForm.color||"#4f8fa8",p_sort_order:Number(categoryForm.sort_order)||100});setBusy(false);if(error){setError?.(`Category not saved: ${error.message}`);return;}const saved=Array.isArray(data)?data[0]:data;await loadNetworkShell();if(saved)setCategoryForm({...saved});setError?.("Channel category saved.");}
 
   async function persistCategoryOrder(category,sortOrder){
     const direct=await supabase.from("league_channel_categories").update({sort_order:sortOrder,updated_at:new Date().toISOString()}).eq("id",category.id);
@@ -3383,7 +2442,7 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
     const fallback=await supabase.rpc("manage_league_channel_category",{
       p_category_id:category.id,
       p_name:category.name,
-      p_color:category.color||"#38bdf8",
+      p_color:category.color||"#4f8fa8",
       p_sort_order:sortOrder,
     });
     return fallback.error||null;
@@ -3475,7 +2534,7 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
     await loadNetworkShell();
   }
 
-  async function deleteCategory(category){if(!category?.id||category.is_system||!window.confirm(`Delete the ${category.name} category? Its channels will remain available.`))return;setBusy(true);const {error}=await supabase.rpc("archive_league_channel_category",{p_category_id:category.id});setBusy(false);if(error){setError?.(`Category not deleted: ${error.message}`);return;}setCategoryForm({id:null,name:"",color:"#38bdf8",sort_order:100,is_system:false});await loadNetworkShell();setError?.("Category deleted; its channels remain available.");}
+  async function deleteCategory(category){if(!category?.id||category.is_system||!window.confirm(`Delete the ${category.name} category? Its channels will remain available.`))return;setBusy(true);const {error}=await supabase.rpc("archive_league_channel_category",{p_category_id:category.id});setBusy(false);if(error){setError?.(`Category not deleted: ${error.message}`);return;}setCategoryForm({id:null,name:"",color:"#4f8fa8",sort_order:100,is_system:false});await loadNetworkShell();setError?.("Category deleted; its channels remain available.");}
   async function optimizeEmojiFile(file){
     if(file.type==="image/gif"||file.size<=524288)return {body:file,extension:(file.name.split(".").pop()||"gif").toLowerCase(),contentType:file.type};
     const objectUrl=URL.createObjectURL(file);
@@ -3511,7 +2570,7 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
     const {data,error}=await supabase.rpc("manage_league_role",{p_role_id:roleForm.id||null,p_name:roleForm.name,p_color:roleForm.color,p_position:Number(roleForm.position)||100,p_can_manage_channels:Boolean(roleForm.can_manage_channels),p_can_manage_messages:Boolean(roleForm.can_manage_messages),p_can_manage_members:Boolean(roleForm.can_manage_members)});
     setBusy(false);if(error){setError?.(`Role not saved: ${error.message}`);return;}const saved=Array.isArray(data)?data[0]:data;await loadNetworkShell();if(saved)setRoleForm({...saved});setError?.("League role saved.");
   }
-  async function deleteRole(role){if(!role||!isCommissioner||!window.confirm(`Delete the ${role.name} role?`))return;setBusy(true);const {error}=await supabase.rpc("delete_league_role",{p_role_id:role.id});setBusy(false);if(error)setError?.(`Role not deleted: ${error.message}`);else{setRoleForm({id:null,name:"",color:"#38bdf8",position:100,can_manage_channels:false,can_manage_messages:false,can_manage_members:false,is_managed:false});await loadNetworkShell();}}
+  async function deleteRole(role){if(!role||!isCommissioner||!window.confirm(`Delete the ${role.name} role?`))return;setBusy(true);const {error}=await supabase.rpc("delete_league_role",{p_role_id:role.id});setBusy(false);if(error)setError?.(`Role not deleted: ${error.message}`);else{setRoleForm({id:null,name:"",color:"#4f8fa8",position:100,can_manage_channels:false,can_manage_messages:false,can_manage_members:false,is_managed:false});await loadNetworkShell();}}
   async function toggleRoleMember(roleId,userId,assigned){setBusy(true);const {error}=await supabase.rpc("set_league_role_member",{p_role_id:roleId,p_discord_user_id:String(userId),p_assigned:Boolean(assigned)});setBusy(false);if(error)setError?.(`Role membership not changed: ${error.message}`);else await loadNetworkShell();}
   function selectPermissionUser(userId){setPermissionUserId(userId);const row=permissions.find((item)=>String(item.channel_id)===String(channelForm.id)&&String(item.discord_user_id)===String(userId));const tri=(value)=>value===true?"allow":value===false?"deny":"inherit";setPermissionDraft({view:tri(row?.can_view),post:tri(row?.can_post),manage:tri(row?.can_manage),muted_until:row?.muted_until?String(row.muted_until).slice(0,16):""});}
   async function saveChannelPermission(){if(!permissionUserId||!channelForm.id)return;const parse=(value)=>value==="allow"?true:value==="deny"?false:null;const {error}=await supabase.rpc("set_league_channel_permission",{p_channel_id:channelForm.id,p_discord_user_id:String(permissionUserId),p_can_view:parse(permissionDraft.view),p_can_post:parse(permissionDraft.post),p_can_manage:parse(permissionDraft.manage),p_muted_until:permissionDraft.muted_until?new Date(permissionDraft.muted_until).toISOString():null});if(error)setError?.(`Permission not saved: ${error.message}`);else{setError?.("Channel permission saved.");await loadNetworkShell();}}
@@ -3620,7 +2679,7 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
       <aside className="network-sidebar">
       <div className="network-mobile-directory-title"><strong>CFBElite 27 Dynasty</strong><span>League channels and conversations</span></div>
       <nav><button className={mode==="channels"?"active":""} onClick={()=>{setMode("channels");setMobileView("directory");setManageOpen(false);}}>Channels</button><button className={mode==="direct"?"active":""} onClick={()=>{setMode("direct");setMobileView("directory");setManageOpen(false);}}>Messages</button><button className={mode==="notifications"?"active":""} onClick={()=>{setMode("notifications");setMobileView("panel");setManageOpen(false);}}>Alerts {unread>0&&<b>{unread}</b>}</button><button className={mode==="roles"?"active":""} onClick={()=>{setMode("roles");setMobileView("panel");setManageOpen(false);}}>Roles</button><button className={mode==="emojis"?"active":""} onClick={()=>{setMode("emojis");setMobileView("panel");setManageOpen(false);}}>Emojis</button><button className={mode==="settings"?"active":""} onClick={()=>{setMode("settings");setMobileView("panel");setManageOpen(false);}}>Settings</button></nav>
-      {mode==="channels"&&<><div className="network-sidebar-label"><span>CHANNELS</span>{canCreateChannels&&<span className="network-sidebar-tools"><button onClick={()=>{setOrganizeOpen(true);setMobileView("panel");setManageOpen(false);}}>Organize</button><button onClick={()=>{setCategoryForm({id:null,name:"",color:"#38bdf8",sort_order:(categories.at(-1)?.sort_order||0)+10,is_system:false});setMode("categories");setMobileView("panel");setManageOpen(false);}}>Categories</button><button onClick={()=>{openChannelManager();setMobileView("panel");}}>＋ New</button></span>}</div><div className="cfbn-directory-v53">{categories.map(renderCategory)}{uncategorizedChannels.length>0&&<><div className="cfbn-category-v53"><span>OTHER</span><b>{uncategorizedChannels.length}</b></div>{uncategorizedChannels.map(renderChannelButton)}</>}</div><div className="network-online-roster"><header><i/><span>ONLINE NOW</span><b>{onlineUsers.length}</b></header>{onlineUsers.slice(0,12).map((user)=><div key={user.id}><span className="network-presence-dot"/><NetworkIdentity userId={user.id} users={users} teams={teams} assignments={assignments} currentYear={currentYear} compact/></div>)}{!onlineUsers.length&&<small>No other members are active right now.</small>}</div></>}
+      {mode==="channels"&&<><div className="network-sidebar-label"><span>CHANNELS</span>{canCreateChannels&&<span className="network-sidebar-tools"><button onClick={()=>{setOrganizeOpen(true);setMobileView("panel");setManageOpen(false);}}>Organize</button><button onClick={()=>{setCategoryForm({id:null,name:"",color:"#4f8fa8",sort_order:(categories.at(-1)?.sort_order||0)+10,is_system:false});setMode("categories");setMobileView("panel");setManageOpen(false);}}>Categories</button><button onClick={()=>{openChannelManager();setMobileView("panel");}}>＋ New</button></span>}</div><div className="cfbn-directory-v53">{categories.map(renderCategory)}{uncategorizedChannels.length>0&&<><div className="cfbn-category-v53"><span>OTHER</span><b>{uncategorizedChannels.length}</b></div>{uncategorizedChannels.map(renderChannelButton)}</>}</div><div className="network-online-roster"><header><i/><span>ONLINE NOW</span><b>{onlineUsers.length}</b></header>{onlineUsers.slice(0,12).map((user)=><div key={user.id}><span className="network-presence-dot"/><NetworkIdentity userId={user.id} users={users} teams={teams} assignments={assignments} currentYear={currentYear} compact/></div>)}{!onlineUsers.length&&<small>No other members are active right now.</small>}</div></>}
       {mode==="direct"&&<><label className="network-member-search"><span>NEW MESSAGE</span><input value={memberSearch} onChange={(event)=>setMemberSearch(event.target.value)} placeholder="Find a league member"/></label>{memberSearch&&<div className="network-member-results">{filteredMembers.map((user)=><button key={user.id} onClick={()=>startConversation(user.id)}><NetworkIdentity userId={user.id} users={users} teams={teams} assignments={assignments} currentYear={currentYear} compact/></button>)}</div>}<div className="network-conversation-list">{conversations.map((conversation)=>{const other=conversationOther(conversation.id);return <button key={conversation.id} className={String(selectedConversation)===String(conversation.id)?"active":""} onClick={()=>{setSelectedConversation(conversation.id);setMobileView("chat");}}><NetworkIdentity userId={other?.id} users={users} teams={teams} assignments={assignments} currentYear={currentYear} compact/><small>{new Date(conversation.last_message_at).toLocaleDateString()}</small></button>;})}</div></>}
     </aside><section className="network-stage">
       {organizeOpen?<NetworkOrganizer categories={categories} channels={channels} busy={busy} onClose={()=>{setOrganizeOpen(false);setMobileView("directory");}} onMoveCategory={moveCategory} onMoveChannel={moveChannel} onMoveChannelToCategory={moveChannelToCategory}/>:mode==="roles"?<NetworkRoleManager roles={roles} roleMembers={roleMembers} users={users} roleForm={roleForm} setRoleForm={setRoleForm} isCommissioner={isCommissioner} busy={busy} saveRole={saveRole} deleteRole={deleteRole} toggleRoleMember={toggleRoleMember}/>:mode==="emojis"?<NetworkEmojiLibrary customEmojis={customEmojis} isCommissioner={isCommissioner} emojiUpload={emojiUpload} setEmojiUpload={setEmojiUpload} emojiBusy={emojiBusy} uploadCustomEmoji={uploadCustomEmoji} deleteCustomEmoji={deleteCustomEmoji}/>:mode==="categories"?<NetworkCategoryManager categories={categories} categoryForm={categoryForm} setCategoryForm={setCategoryForm} busy={busy} saveCategory={saveCategory} deleteCategory={deleteCategory}/>:mode==="notifications"?<div className="network-notifications"><header><div><span>INBOX</span><h2>Notifications</h2></div><button onClick={markNotificationsRead}>Mark all read</button></header>{notifications.map((notification)=><button key={notification.id} className={notification.read_at?"":"unread"} onClick={()=>{if(notification.target_tab)setActiveTab?.(notification.target_tab);}}><i/><span><strong>{notification.title}</strong><p>{notification.body}</p><small>{new Date(notification.created_at).toLocaleString()}</small></span></button>)}</div>:mode==="settings"?<NotificationSettings preferences={preferences} savePreference={savePreference} enablePush={enablePush}/>:manageOpen?<div className="network-channel-manager"><header><div><span>COMMISSIONER CHANNEL CONTROL</span><h2>{channelForm.id?`Manage #${channelForm.name}`:"Create a Channel"}</h2><p>Brand the channel, assign its category and control member posting.</p></div><button onClick={()=>setManageOpen(false)}>Close</button></header><div className="network-channel-form"><label><span>Channel Name</span><input value={channelForm.name} onChange={(event)=>setChannelForm({...channelForm,name:event.target.value,slug:channelForm.id?channelForm.slug:event.target.value.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")})}/></label><label><span>URL Slug</span><input value={channelForm.slug} onChange={(event)=>setChannelForm({...channelForm,slug:event.target.value})}/></label><label className="wide"><span>Description</span><input value={channelForm.description} onChange={(event)=>setChannelForm({...channelForm,description:event.target.value})}/></label><label><span>Category</span><select value={channelForm.category_id||""} onChange={(event)=>setChannelForm({...channelForm,category_id:event.target.value})}><option value="">No Category</option>{categories.map((category)=><option key={category.id} value={category.id}>{category.name}</option>)}</select></label><label className="wide"><span>Channel Logo Image URL (optional)</span><input value={channelForm.image_url} onChange={(event)=>setChannelForm({...channelForm,image_url:event.target.value})} placeholder="https://…"/></label><label><span>Channel Type</span><select value={channelForm.channel_type} onChange={(event)=>setChannelForm({...channelForm,channel_type:event.target.value})}><option value="public">Public</option><option value="announcements">Announcements</option><option value="game">Game Day</option><option value="sportsbook">Sportsbook</option><option value="streams">Streams</option></select></label><label><span>Order</span><input type="number" value={channelForm.sort_order} onChange={(event)=>setChannelForm({...channelForm,sort_order:event.target.value})}/></label><label className="network-lock-toggle"><input type="checkbox" checked={Boolean(channelForm.is_locked)} onChange={(event)=>setChannelForm({...channelForm,is_locked:event.target.checked})}/><span>Commissioner / manager posting only</span></label><div className="network-manager-actions"><button disabled={busy} onClick={saveChannel}>{busy?"Saving…":"Save Channel"}</button>{channelForm.id&&<button className="danger" onClick={archiveChannel}>Delete Channel</button>}</div></div>{channelForm.id&&<div className="network-permission-panel"><header><div><span>INDIVIDUAL PERMISSIONS</span><h3>Member Access Overrides</h3></div></header><div><label><span>League Member</span><select value={permissionUserId} onChange={(event)=>selectPermissionUser(event.target.value)}><option value="">Select a member…</option>{users.filter((user)=>!user.is_banned).map((user)=><option key={user.id} value={user.id}>{user.discord_username}</option>)}</select></label>{permissionUserId&&<><label><span>View Channel</span><select value={permissionDraft.view} onChange={(event)=>setPermissionDraft({...permissionDraft,view:event.target.value})}><option value="inherit">League Default</option><option value="allow">Allow</option><option value="deny">Deny</option></select></label><label><span>Post Messages</span><select value={permissionDraft.post} onChange={(event)=>setPermissionDraft({...permissionDraft,post:event.target.value})}><option value="inherit">Channel Default</option><option value="allow">Allow</option><option value="deny">Deny</option></select></label><label><span>Manage Channel</span><select value={permissionDraft.manage} onChange={(event)=>setPermissionDraft({...permissionDraft,manage:event.target.value})}><option value="inherit">No Override</option><option value="allow">Allow</option><option value="deny">Deny</option></select></label><label><span>Muted Until</span><input type="datetime-local" value={permissionDraft.muted_until} onChange={(event)=>setPermissionDraft({...permissionDraft,muted_until:event.target.value})}/></label><button onClick={saveChannelPermission}>Save Permission</button></>}</div></div>}</div>:<><header className="network-stage-header"><div className="network-stage-channel"><NetworkChannelMark channel={mode==="channels"?selectedChannelRow:null} size={48}/><div><span>{mode==="direct"?"PRIVATE CONVERSATION":selectedChannelRow?.channel_type?.toUpperCase()}</span><h2>{mode==="direct"?(conversationOther(selectedConversation)?.discord_username||"Select a conversation"):(selectedChannelRow?.name||"League Channel")}</h2><p>{mode==="direct"?"Only members of this conversation can read these messages.":selectedChannelRow?.description}</p></div></div><div className="network-stage-actions">
@@ -3707,7 +2766,7 @@ function NewsroomPlatform({discordSession,linkedDiscordUser,users=[],teams=[],as
 
 function NotificationSettings({preferences,savePreference,enablePush}) {
   const options=[["announcements","Commissioner announcements","Official league updates and deadlines"],["direct_messages","Direct messages","Private messages from league members"],["mentions","Mentions and replies","When someone specifically tags you"],["streams_live","Streams going live","RedZone alerts for active league streams"],["game_results","Final scores","GameCenter results and sportsbook grading"],["advancement","Week advancement","New week and advancement deadline alerts"],["elite_books","Elite Books","New lines, locks and settled tickets"]];
-  return <div className="network-settings"><header><span>CONTROL ROOM</span><h2>Notification & Sound Settings</h2><p>You decide what gets your attention and how the app feels.</p></header><section><div><strong>Push Notifications</strong><small>Receive alerts when the installed app is closed.</small></div><button onClick={enablePush}>{preferences?.push_enabled?"Enabled on a device":"Enable Push"}</button></section><section><div><strong>Elite Pulse</strong><small>The original three-note CFB Elite notification signature.</small></div><span className="network-setting-actions"><button onClick={()=>playEliteSound("notification",true)}>Preview</button><input type="checkbox" checked={preferences?.sound_enabled!==false} onChange={(event)=>savePreference("sound_enabled",event.target.checked)}/></span></section><section><div><strong>Menu Sounds</strong><small>Subtle navigation feedback.</small></div><span className="network-setting-actions"><button onClick={()=>playEliteSound("menu",true)}>Preview</button><input type="checkbox" checked={Boolean(preferences?.menu_sounds)} onChange={(event)=>savePreference("menu_sounds",event.target.checked)}/></span></section><section><div><strong>Team Page Sounds</strong><small>A short broadcast swell when entering a team profile.</small></div><span className="network-setting-actions"><button onClick={()=>playEliteSound("team",true)}>Preview</button><input type="checkbox" checked={Boolean(preferences?.team_sounds)} onChange={(event)=>savePreference("team_sounds",event.target.checked)}/></span></section><div className="network-setting-grid">{options.map(([key,title,description])=><label key={key}><span><strong>{title}</strong><small>{description}</small></span><input type="checkbox" checked={preferences?.[key]!==false} onChange={(event)=>savePreference(key,event.target.checked)}/></label>)}</div></div>;
+  return <div className="network-settings"><header><span>CONTROL ROOM</span><h2>Notification & Sound Settings</h2><p>You decide what gets your attention and how the app feels.</p></header><section><div><strong>Push Notifications</strong><small>Receive alerts when the installed app is closed.</small></div><button onClick={enablePush}>{preferences?.push_enabled?"Enabled on a device":"Enable Push"}</button></section><section><div><strong>Elite Pulse</strong><small>The original three-note CFB Elite notification signature.</small></div><span className="network-setting-actions"><button onClick={()=>playEliteSound("notification",true)}>Preview</button><input type="checkbox" checked={preferences?.sound_enabled!==false} onChange={(event)=>savePreference("sound_enabled",event.target.checked)}/></span></section><section><div><strong>Menu Sounds</strong><small>Subtle navigation feedback.</small></div><span className="network-setting-actions"><button onClick={()=>playEliteSound("menu",true)}>Preview</button><input type="checkbox" checked={Boolean(preferences?.menu_sounds)} onChange={(event)=>savePreference("menu_sounds",event.target.checked)}/></span></section><section><div><strong>Team Page Sounds</strong><small>A short broadcast swell when entering a team profile.</small></div><span className="network-setting-actions"><button onClick={()=>playEliteSound("team",true)}>Preview</button><input type="checkbox" checked={Boolean(preferences?.team_sounds)} onChange={(event)=>savePreference("team_sounds",event.target.checked)}/></span></section><section><div><strong>Haptic Feedback</strong><small>Subtle vibration on taps and alerts (supported phones only).</small></div><span className="network-setting-actions"><button onClick={()=>triggerHaptic("success",true)}>Preview</button><input type="checkbox" checked={preferences?.haptics_enabled!==false} onChange={(event)=>savePreference("haptics_enabled",event.target.checked)}/></span></section><div className="network-setting-grid">{options.map(([key,title,description])=><label key={key}><span><strong>{title}</strong><small>{description}</small></span><input type="checkbox" checked={preferences?.[key]!==false} onChange={(event)=>savePreference(key,event.target.checked)}/></label>)}</div></div>;
 }
 
 function streamPlayerUrl(profile,status) {
@@ -3932,38 +2991,10 @@ function EliteBooksManager({sportsbook={},users=[],teams=[],assignments=[],curre
   </main>;
 }
 
-function NetworkHomePanel({linkedDiscordUser,setActiveTab}) {
-  const [pulse,setPulse]=useState({live:0,unread:0,announcement:null});
-  useEffect(()=>{let active=true;async function load(){const [statusRes,notificationRes,channelRes]=await Promise.all([supabase.from("live_stream_status").select("profile_id").eq("is_live",true),supabase.from("app_notifications").select("id").is("read_at",null),supabase.from("league_channels").select("id").eq("slug","announcements").maybeSingle()]);let announcement=null;if(channelRes.data?.id){const messageRes=await supabase.from("league_channel_messages").select("body,created_at").eq("channel_id",channelRes.data.id).is("deleted_at",null).order("created_at",{ascending:false}).limit(1);announcement=messageRes.data?.[0]||null;}if(active)setPulse({live:statusRes.data?.length||0,unread:notificationRes.data?.length||0,announcement});}load();const timer=window.setInterval(load,NETWORK_REFRESH_MS);return()=>{active=false;window.clearInterval(timer);};},[linkedDiscordUser?.id]);
-  return <section className="network-home-panel"><button onClick={()=>setActiveTab?.("leagueHub")}><span>CFBELITE NETWORK</span><h2>{pulse.announcement?.body||"The league conversation lives here."}</h2><small>{pulse.announcement?`Latest announcement • ${new Date(pulse.announcement.created_at).toLocaleDateString()}`:"Channels, private messages, announcements and alerts"}</small><b>Enter the Hub →</b></button><button onClick={()=>setActiveTab?.("leagueHub")}><span>MY INBOX</span><strong>{pulse.unread}</strong><small>Unread notification{pulse.unread===1?"":"s"}</small></button><button className={pulse.live?"live":""} onClick={()=>setActiveTab?.("redZone")}><span>REDZONE</span><strong>{pulse.live}</strong><small>{pulse.live?"League streams live now":"Streams currently live"}</small><b>{pulse.live?"Watch Now →":"Open Control Room →"}</b></button></section>;
-}
-
 function HomeNewsroomRail({setActiveTab}) {
   const [articles,setArticles]=useState([]);const [expanded,setExpanded]=useState(null);
   useEffect(()=>{let active=true;async function load(){const {data}=await supabase.from("league_news_articles").select("id,season_year,week_label,category,headline,dek,body,published_at").eq("status","published").order("published_at",{ascending:false}).limit(3);if(active)setArticles(data||[]);}load();const channel=supabase.channel?.("home-newsroom-v35").on("postgres_changes",{event:"*",schema:"public",table:"league_news_articles"},load).subscribe();return()=>{active=false;if(channel)supabase.removeChannel?.(channel);};},[]);
   return <section className="home-newsroom-rail"><header><div><span>CFB ELITE NEWSWIRE</span><h2>From the Newsroom</h2><p>Commissioner-reviewed coverage of the league’s user-controlled programs.</p></div><button onClick={()=>setActiveTab?.("newsroom")}>Open Newsroom →</button></header>{articles.length?<div>{articles.map((article,index)=>{const open=String(expanded)===String(article.id);return <article key={article.id} className={open?"open":""}><button onClick={()=>setExpanded(open?null:article.id)}><span>{index===0?"LATEST":String(article.category||"story").toUpperCase()}</span><h3>{article.headline}</h3><small>{article.season_year} • {article.week_label}</small><i>{open?"−":"＋"}</i></button>{open&&<div><strong>{article.dek}</strong><p>{article.body}</p><button onClick={()=>setActiveTab?.("newsroom")}>Read & discuss in Newsroom</button></div>}</article>;})}</div>:<div className="home-newsroom-empty"><div><b>The wire is warming up.</b><span>Published stories will appear here automatically.</span></div><button onClick={()=>setActiveTab?.("newsroom")}>Open Newsroom →</button></div>}</section>;
-}
-
-function DataOpsHomePanel({currentYear,currentWeek,setActiveTab}){
-  const weeklyFallback=[
-    {id:"fallback-user-games",status:"pending",title:"Completed user-game result packs"},
-    {id:"fallback-scores",status:"pending",title:"Final scores entered"},
-    {id:"fallback-team-stats",status:"pending",title:"Team statistics captured"},
-    {id:"fallback-player-stats",status:"pending",title:"Player statistics captured"},
-    {id:"fallback-top25",status:"pending",title:"Dynasty Top 25 captured"},
-    {id:"fallback-schedules",status:"pending",title:"Team schedules updated"},
-    {id:"fallback-streams",status:"pending",title:"Required stream VODs confirmed"},
-    {id:"fallback-advance",status:"pending",title:"Advance readiness confirmed"},
-  ];
-  const [items,setItems]=useState(weeklyFallback);
-  useEffect(()=>{let active=true;(async()=>{
-    const ensure=await supabase.rpc("ensure_league_upload_checklist",{p_season_year:Number(currentYear),p_week_label:currentWeek||""});
-    if(ensure.error){if(active)setItems(weeklyFallback);return;}
-    const {data,error}=await supabase.from("league_upload_checklist").select("id,status,title").eq("season_year",Number(currentYear)).eq("cycle","weekly").eq("week_key",currentWeek||"").order("sort_order");
-    if(active)setItems(error||!data?.length?weeklyFallback:data);
-  })();return()=>{active=false;};},[currentYear,currentWeek]);
-  const cleared=items.filter((row)=>row.status!=="pending").length;const percent=items.length?Math.round(cleared/items.length*100):0;
-  return <section className="home-data-ops"><div><span>WEEKLY DATA CONTROL</span><h2>{currentWeek} Upload Checklist</h2><p>{cleared} of {items.length||8} requirements cleared. Approved screenshots update the archive and complete matching tasks automatically.</p></div><div className="home-data-progress"><b>{percent}%</b><span><i style={{width:`${percent}%`}}/></span></div><div><button onClick={()=>setActiveTab?.("dataIntake")}>Upload & Review</button><button onClick={()=>setActiveTab?.("dynastyData")}>Season Archive</button></div></section>;
 }
 
 function CenterCollectionV38({eyebrow,title,description,groups=[],setActiveTab}) {
@@ -4110,1007 +3141,6 @@ function DashboardV2({ teams = [], users = [], assignments = [], results = [], a
   </main>;
 }
 
-function V2Kpi({label,value,sub,tone}) {
-  return <div style={{...v2Kpi,borderTopColor:tone}}><span>{label}</span><b>{value}</b><small>{sub}</small></div>;
-}
-
-function V2LeaderTile({label,rows=[],metric,conferenceAssets=[]}) {
-  return <article style={v2LeaderTile}><div style={v2LeaderHeader}><span>{label}</span><small>{metric}</small></div><div style={v2LeaderRows}>{rows.length?rows.map((row,index)=><div key={`${label}-${row.name}-${index}`} style={v2LeaderRow}><b>{index+1}</b>{row.team?<span style={v2LeaderLogo}><TeamLogoMark team={row.team} size={26}/></span>:row.conference?<span style={v2LeaderLogo}><ConferenceLogoMark conference={row.conference} conferenceAssets={conferenceAssets} size={26}/></span>:<span style={v2LeaderMonogram}>{String(row.name||"?").slice(0,2).toUpperCase()}</span>}<span style={v2LeaderText}><strong>{row.name}</strong><small>{row.detail}</small></span><em style={v2LeaderValue}>{row.value}</em></div>):<div style={v2LeaderEmpty}>No games recorded</div>}</div></article>;
-}
-
-function PlayoffPictureV2({teams=[],users=[],assignments=[],results=[],currentYear,setActiveTab}) {
-  const seasonResults=results.filter((row)=>String(row.season_year)===String(currentYear));
-  const activeIds=new Set(assignments.filter((row)=>row.status==="Active"&&row.team_id).map((row)=>String(row.team_id)));
-  const ranked=computerRankingRows(teams.filter((team)=>!activeIds.size||activeIds.has(String(team.id))),seasonResults,assignments,users).slice(0,12);
-  const byes=ranked.slice(0,4);
-  const games=[[ranked[4],ranked[11]],[ranked[5],ranked[10]],[ranked[6],ranked[9]],[ranked[7],ranked[8]]].filter(([a,b])=>a&&b);
-  const bubble=computerRankingRows(teams.filter((team)=>!activeIds.size||activeIds.has(String(team.id))),seasonResults,assignments,users).slice(12,17);
-  return <main className="cfb-v2-page" style={v2Page}>
-    <div style={v2PageHero}><div><span style={v2Eyebrow}>POSTSEASON PROJECTION • {currentYear}</span><h1 style={v2PageTitle}>Playoff Picture</h1><p style={v2PageSub}>A live 12-team projection based on the CFBElite automatic rankings. This is a projection, not an official selection.</p></div><button style={v2PrimaryButton} onClick={()=>setActiveTab?.("dashboard")}>Back to Home</button></div>
-    <section style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>TOP FOUR</span><h2>Projected First-Round Byes</h2></div></div><div className="cfb-v2-bye-grid" style={v2ByeGrid}>{byes.map((row)=><div key={row.team.id} style={{...v2SeedCard,background:`linear-gradient(145deg,${getTeamPrimary(row.team)}aa,rgba(2,6,23,.98))`,borderColor:`${getTeamSecondary(row.team)}66`}}><b>#{row.rank}</b><TeamLogoMark team={row.team} size={74} plate/><strong>{row.teamName}</strong><span>{row.wins}-{row.losses} • {row.rating.toFixed(1)}</span><small>{assignedCoachName(row.team.id,null,users,assignments,currentYear)}</small></div>)}</div></section>
-    <section style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>FIRST ROUND</span><h2>Projected Matchups</h2></div></div><div className="cfb-v2-playoff-grid" style={v2PlayoffGrid}>{games.map(([high,low])=><div key={`${high.team.id}-${low.team.id}`} style={v2PlayoffGame}><V2MatchupTeam team={low.team} rank={low.rank} user={assignedCoachName(low.team.id,null,users,assignments,currentYear)} compact/><div style={v2PlayoffAt}>AT</div><V2MatchupTeam team={high.team} rank={high.rank} user={assignedCoachName(high.team.id,null,users,assignments,currentYear)} compact/></div>)}</div></section>
-    <section style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>ON THE BUBBLE</span><h2>First Teams Out</h2></div></div><div style={v2BubbleList}>{bubble.length?bubble.map((row)=><div key={row.team.id}><b>#{row.rank}</b><TeamLogoMark team={row.team} size={36}/><span>{row.teamName}</span><small>{row.wins}-{row.losses} • {row.rating.toFixed(1)}</small></div>):<div style={v2Empty}>The playoff picture will populate after rankings are available.</div>}</div></section>
-  </main>;
-}
-
-function MediaCenterV2({teams=[],users=[],assignments=[],results=[],weeklyMatchups=[],currentYear,currentWeek}) {
-  const [notice,setNotice]=useState("");
-  const seasonResults=results.filter((row)=>String(row.season_year)===String(currentYear));
-  const rankings=computerRankingRows(teams,seasonResults,assignments,users);
-  const rankMap=new Map(rankings.map((row)=>[String(row.team.id),row.rank]));
-  const weekRows=weeklyMatchups.filter((row)=>String(row.season_year)===String(currentYear)&&String(row.week)===String(currentWeek)).map((row)=>{
-    const team1=row.team_1||teams.find((team)=>String(team.id)===String(row.team_1_id)); const team2=row.team_2||teams.find((team)=>String(team.id)===String(row.team_2_id));
-    return {...row,team1,team2,result:scheduledResultFor(row,seasonResults,currentYear),rank1:rankMap.get(String(row.team_1_id)),rank2:rankMap.get(String(row.team_2_id)),user1:assignedCoachName(row.team_1_id,row.team_1_user_id,users,assignments,currentYear),user2:assignedCoachName(row.team_2_id,row.team_2_user_id,users,assignments,currentYear)};
-  });
-  const weeklyPost=[`🏈 CFBElite 27 • ${currentYear} ${currentWeek}`,"",...weekRows.map((row)=>row.result?`FINAL: ${row.team1?.name} ${scoreForScheduledTeam(row.result,row.team_1_id)} - ${scoreForScheduledTeam(row.result,row.team_2_id)} ${row.team2?.name}`:`UPCOMING: ${row.team1?.name} vs ${row.team2?.name}`),"","Automatic Top 5:",...rankings.slice(0,5).map((row)=>`${row.rank}. ${row.teamName} (${row.wins}-${row.losses})`)].join("\n");
-  return <main className="cfb-v2-page" style={v2Page}>
-    <div style={v2PageHero}><div><span style={v2Eyebrow}>LEAGUE CONTENT STUDIO</span><h1 style={v2PageTitle}>Media Center</h1><p style={v2PageSub}>Generate clean, Discord-ready graphics and posts directly from current league data.</p></div><div style={v2InlineActions}><button style={v2PrimaryButton} onClick={()=>downloadRankingsGraphic(rankings,currentYear,currentWeek)}>Download Top 10 Graphic</button><button style={v2GhostButton} onClick={async()=>setNotice(await copyLeagueText(weeklyPost)?"Weekly Discord recap copied.":"Copy was blocked by the browser.")}>Copy Weekly Recap</button></div></div>
-    {notice&&<div style={v2Notice}>{notice}</div>}
-    <section style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>{currentWeek}</span><h2>Matchup and Final Graphics</h2></div><span style={v2CountPill}>{weekRows.length}</span></div><div className="cfb-v2-media-grid" style={v2MediaGrid}>{weekRows.length?weekRows.map((row)=><div key={row.id} style={{...v2MediaCard,background:`linear-gradient(135deg,${getTeamPrimary(row.team1)}88,rgba(2,6,23,.98),${getTeamPrimary(row.team2)}66)`}}><div style={v2CardMatchup}><V2MatchupTeam team={row.team1} rank={row.rank1} user={row.user1} compact/><div style={v2CardScore}>{row.result?<b>{scoreForScheduledTeam(row.result,row.team_1_id)}–{scoreForScheduledTeam(row.result,row.team_2_id)}</b>:<b>VS</b>}</div><V2MatchupTeam team={row.team2} rank={row.rank2} user={row.user2} compact/></div><button style={v2PrimaryButton} onClick={()=>downloadMatchupGraphic({...row,seasonYear:currentYear,label:row.result?"FINAL SCORE":"WEEKLY MATCHUP"})}>Download {row.result?"Final Score":"Matchup"} Graphic</button></div>):<div style={v2Empty}>No matchups scheduled for {currentWeek}.</div>}</div></section>
-    <section style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>COPY AND POST</span><h2>Weekly Discord Recap</h2></div><button style={v2TextButton} onClick={async()=>setNotice(await copyLeagueText(weeklyPost)?"Weekly Discord recap copied.":"Copy was blocked by the browser.")}>Copy Text</button></div><pre style={v2RecapPreview}>{weeklyPost}</pre></section>
-  </main>;
-}
-
-function DashboardRedesign({ teams, users, assignments, results, allResults, weeklyMatchups = [], conferenceAssets = [], allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats, currentYear, currentWeek, setCurrentYear, setCurrentWeek, saveSettings, goToTeam, setActiveTab, sortState, setSortState }) {
-  const [rankingSort, setRankingSort] = useState({ key: "rating", direction: "desc" });
-  const activeAssignments = activeAssignmentsForLeague(assignments, teams);
-  const activeCoachCount = activeAssignments.length;
-  const currentSeasonResults = results.filter((r)=>String(r.season_year)===String(currentYear));
-  const rankings = computerRankingRows(teams, currentSeasonResults, assignments, users);
-  const prestigeRows = typeof dynastyPrestigeRows === "function" ? dynastyPrestigeRows(teams, assignments, allResults, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats).slice(0,5) : [];
-
-  const dashboardWeek = String(currentWeek || "Week 1");
-  const dashboardRankMap = new Map(rankings.map((item,index)=>[String(item.team?.id), index+1]));
-  const dashboardScheduleRows = (weeklyMatchups || [])
-    .filter((row)=>String(row.season_year) === "2026")
-    .map((row)=>{
-      const team1 = row.team_1 || teams.find((team)=>String(team.id)===String(row.team_1_id));
-      const team2 = row.team_2 || teams.find((team)=>String(team.id)===String(row.team_2_id));
-      const result = (allResults || []).find((game)=>
-        String(game.season_year) === "2026" &&
-        String(game.week) === String(row.week) &&
-        (
-          (String(game.team_1_id)===String(row.team_1_id) && String(game.team_2_id)===String(row.team_2_id)) ||
-          (String(game.team_1_id)===String(row.team_2_id) && String(game.team_2_id)===String(row.team_1_id))
-        )
-      );
-      return { ...row, team1, team2, result, rank1:dashboardRankMap.get(String(row.team_1_id)) || "—", rank2:dashboardRankMap.get(String(row.team_2_id)) || "—" };
-    })
-    .sort((a,b)=>Number(String(a.week).replace(/\D/g,""))-Number(String(b.week).replace(/\D/g,"")));
-  const dashboardWeeks = Array.from({length:14},(_,index)=>`Week ${index}`);
-  const dashboardCurrentWeekRows = dashboardScheduleRows.filter((row)=>String(row.week)===dashboardWeek);
-  const dashboardGameOfWeek = dashboardCurrentWeekRows.find((row)=>row.is_game_of_week) || [...dashboardCurrentWeekRows].sort((a,b)=>{
-    const aScore=(Number(a.rank1)||99)+(Number(a.rank2)||99);
-    const bScore=(Number(b.rank1)||99)+(Number(b.rank2)||99);
-    return aScore-bScore;
-  })[0] || null;
-
-  const rankingDetails = rankings.map((row, index) => {
-    const team = teams.find((team)=>team.id===row.team?.id) || row.team || teams.find((team)=>team.name===row.teamName);
-    const rec = team ? recordFromResults(team.id, currentSeasonResults) : { wins:0, losses:0, avgPf:"0.0", avgPa:"0.0" };
-    const sor = team ? strengthOfResult(team.id, teams, currentSeasonResults) : "—";
-    const top10 = team ? top10Wins(team.id, currentSeasonResults) : 0;
-    const assignment = team ? activeCoachForTeam(team.id, assignments) : null;
-    const user = assignment ? users.find((u)=>u.id===assignment.discord_user_id)?.discord_username : "CPU";
-    const rating = Number(row.rating ?? row.score ?? 0);
-    return { ...row, rank:index+1, team, record:rec, sor, top10, user, rating };
-  });
-
-  const sortGetters = {
-    rank: (row)=>row.rank,
-    team: (row)=>row.teamName || row.team?.name || "",
-    user: (row)=>row.user || "",
-    wins: (row)=>row.record.wins,
-    losses: (row)=>row.record.losses,
-    avgPf: (row)=>Number(row.record.avgPf || 0),
-    avgPa: (row)=>Number(row.record.avgPa || 0),
-    top10: (row)=>Number(row.top10 || 0),
-    sor: (row)=>row.sor === "—" ? -1 : Number(row.sor),
-    rating: (row)=>Number(row.rating || 0),
-  };
-
-  const sortedRankingDetails = [...rankingDetails].sort((a,b)=>{
-    const getter = sortGetters[rankingSort.key] || sortGetters.rating;
-    const av = getter(a);
-    const bv = getter(b);
-    if (typeof av === "string" || typeof bv === "string") {
-      const cmp = String(av).localeCompare(String(bv));
-      return rankingSort.direction === "asc" ? cmp : -cmp;
-    }
-    const cmp = Number(av || 0) - Number(bv || 0);
-    return rankingSort.direction === "asc" ? cmp : -cmp;
-  });
-
-  function toggleRankingSort(key) {
-    setRankingSort((prev)=>({ key, direction: prev.key === key && prev.direction === "desc" ? "asc" : "desc" }));
-  }
-
-  const highestSor = rankingDetails
-    .filter((row)=>row.sor !== "—" && !Number.isNaN(Number(row.sor)))
-    .sort((a,b)=>Number(b.sor)-Number(a.sor))[0];
-
-  const topSorRows = [...rankingDetails]
-    .filter((row)=>row.sor !== "—" && !Number.isNaN(Number(row.sor)))
-    .sort((a,b)=>Number(b.sor)-Number(a.sor))
-    .slice(0,3);
-
-  const topPrestigeRows = prestigeRows.slice(0,3).map((row,index)=>{
-    const assignment = activeCoachForTeam(row.team.id, assignments);
-    const userName = assignment ? users.find((u)=>u.id===assignment.discord_user_id)?.discord_username : "CPU";
-    return { ...row, rank:index+1, user:userName || "CPU" };
-  });
-
-  const topAutomaticRows = rankingDetails.slice(0,3);
-
-  const prestigeLeader = topPrestigeRows[0];
-
-  const tileData = [
-    { label:"Top 3 Automatic Rankings", value:"", sub: topAutomaticRows.length ? topAutomaticRows.map((row)=>`#${row.rank} ${row.teamName} — ${row.user} • ${Number(row.rating || 0).toFixed(1)}`) : ["No rankings yet"], team:topAutomaticRows[0]?.team },
-    { label:"Top 3 SOR", value:"", sub: topSorRows.length ? topSorRows.map((row)=>`#${row.rank} ${row.teamName} — ${row.user} • ${row.sor}`) : ["No games yet"], team:topSorRows[0]?.team },
-    { label:"Top 3 Prestige Leaders", value:"", sub: topPrestigeRows.length ? topPrestigeRows.map((row)=>`#${row.rank} ${row.team.name} — ${row.user} • ${row.score}`) : ["No prestige yet"], team:topPrestigeRows[0]?.team },
-    { label:"Active Coaches", value: activeCoachCount, sub: "of 32", team:null },
-  ];
-
-  const headerCells = [
-    ["rank","Rank"],
-    ["team","Team"],
-    ["user","User"],
-    ["wins","W"],
-    ["losses","L"],
-    ["avgPf","Avg PF"],
-    ["avgPa","Avg PA"],
-    ["top10","Top 10"],
-    ["sor","SOR"],
-    ["rating","Rating"],
-  ];
-
-  const conferenceSnapshotRows = Array.from(new Set(teams.map((team)=>normalizeDraftConference(team.conference) || cleanConference(team.conference)).filter(Boolean)))
-    .map((conference)=>{
-      const confTeams = teams.filter((team)=>(normalizeDraftConference(team.conference) || cleanConference(team.conference)) === conference);
-      const confRankingRows = rankingDetails.filter((row)=>confTeams.some((team)=>team.id === row.team?.id));
-      const confResults = confTeams.map((team)=>recordFromResults(team.id, currentSeasonResults));
-      const wins = confResults.reduce((sum,row)=>sum + Number(row.wins || 0), 0);
-      const losses = confResults.reduce((sum,row)=>sum + Number(row.losses || 0), 0);
-      const avgRating = confRankingRows.length ? confRankingRows.reduce((sum,row)=>sum + Number(row.rating || 0), 0) / confRankingRows.length : 0;
-      const avgRank = confRankingRows.length ? confRankingRows.reduce((sum,row)=>sum + Number(row.rank || 0),0) / confRankingRows.length : 0;
-      const top10 = confRankingRows.filter((row)=>Number(row.rank)<=10).length;
-      const games = wins + losses;
-      const winPct = games ? (wins / games) * 100 : 0;
-      const topTeam = [...confRankingRows].sort((a,b)=>Number(a.rank)-Number(b.rank))[0];
-      return { conference, teams:confTeams.length, wins, losses, avgRating:Number(avgRating.toFixed(1)), avgRank:Number(avgRank.toFixed(1)), top10, winPct:Number(winPct.toFixed(1)), topTeam };
-    })
-    .sort((a,b)=>b.avgRating-a.avgRating || b.wins-a.wins)
-    .slice(0,6);
-
-  const recentResultsRows = [...currentSeasonResults]
-    .filter((row)=>row.team_1_id && row.team_2_id)
-    .slice(0,6)
-    .map((row)=>{
-      const team1 = row.team_1 || teams.find((team)=>team.id===row.team_1_id);
-      const team2 = row.team_2 || teams.find((team)=>team.id===row.team_2_id);
-      const score1 = Number(row.team_1_score || 0);
-      const score2 = Number(row.team_2_score || 0);
-      const winner = score1 > score2 ? team1 : score2 > score1 ? team2 : null;
-      return { ...row, team1, team2, winner, score1, score2 };
-    });
-
-  const coachSpotlight = (() => {
-    const candidate = rankingDetails.find((row)=>row.user && row.user !== "CPU") || rankingDetails[0];
-    if (!candidate) return null;
-    const coachResults = currentSeasonResults.filter((row)=>row.team_1_id === candidate.team?.id || row.team_2_id === candidate.team?.id);
-    let streak = 0;
-    for (const row of [...coachResults].reverse()) {
-      const isTeam1 = row.team_1_id === candidate.team?.id;
-      const pf = Number(isTeam1 ? row.team_1_score : row.team_2_score);
-      const pa = Number(isTeam1 ? row.team_2_score : row.team_1_score);
-      if (pf > pa) streak += 1;
-      else break;
-    }
-    const headline = candidate.rank === 1
-      ? `${candidate.teamName || candidate.team?.name} sets the pace at #1 in the CFBElite Automatic Rankings.`
-      : `${candidate.teamName || candidate.team?.name} owns one of the league's strongest résumés entering ${currentWeek}.`;
-    return { ...candidate, streak, headline };
-  })();
-
-  const headlineRows = dynastyWireItems({ rankingDetails, results: allResults, teams, recruiting, prestigeRows, currentYear });
-
-  return (
-    <div style={dashboardProV37}>
-      <section style={dashboardHeroV37}>
-        <div>
-          <div style={dashboardKickerPro}>CFBELITE 27 • DYNASTY HQ</div>
-          <h1 style={dashboardTitleV37}>Dynasty Headquarters</h1>
-          <p style={dashboardSubPro}>Season {currentYear} • {currentWeek}</p>
-        </div>
-        <div style={dashboardControlsPro}>
-          <label style={v29ControlLabel}>Season<select style={v29Select} value={currentYear} onChange={(e)=>setCurrentYear(e.target.value)}>{YEARS.map((year)=><option key={year}>{year}</option>)}</select></label>
-          <label style={v29ControlLabel}>Week<select style={v29Select} value={currentWeek} onChange={(e)=>setCurrentWeek(e.target.value)}>{WEEKS.map((week)=><option key={week}>{week}</option>)}</select></label>
-          <button style={v29SaveButton} onClick={saveSettings}>Save</button>
-        </div>
-      </section>
-
-      <section style={dashboardKpiPro}>
-        {tileData.map((tile)=>{
-          const primary = getTeamPrimary(tile.team);
-          const secondary = getTeamSecondary(tile.team);
-          return (
-            <div key={tile.label} style={{...dashboardKpiCardPro, background: tile.team ? `linear-gradient(135deg, ${primary}aa, rgba(2,6,23,.96) 64%, ${secondary}33)` : dashboardKpiCardPro.background, borderColor: tile.team ? `${secondary}77` : "rgba(148,163,184,.16)"}}>
-              <span>{tile.label}</span>
-              {tile.value !== "" && <b>{tile.value}</b>}
-              <div style={dashboardTileLinesV47}>
-                {(Array.isArray(tile.sub) ? tile.sub : [tile.sub]).map((line, i)=><small key={i} style={dashboardTileSubV45}>{line}</small>)}
-              </div>
-            </div>
-          );
-        })}
-      </section>
-
-      <section style={dashboardRankPanelFullV37}>
-        <div style={dashboardPanelHeaderPro}>
-          <span>CFBELITE AUTOMATIC RANKINGS</span>
-          <h2>Sortable Power Table</h2>
-        </div>
-        <div style={dashboardTableHeadPro} className="cfb-dashboard-power-table-head">
-          {headerCells.map(([key,label])=>(
-            <button key={key} style={dashboardHeaderButtonPro} onClick={()=>toggleRankingSort(key)}>
-              {label}{rankingSort.key === key ? (rankingSort.direction === "asc" ? " ↑" : " ↓") : ""}
-            </button>
-          ))}
-        </div>
-        <div style={dashboardRankingListPro}>
-          {sortedRankingDetails.map((row)=>{
-            const team = row.team;
-            const primary = getTeamPrimary(team);
-            const secondary = getTeamSecondary(team);
-            return (
-              <button key={team?.id || row.teamName || row.rank} style={{...dashboardRankRowPro, background:`linear-gradient(100deg, ${primary}70, rgba(15,23,42,.92) 42%, ${secondary}28)`, borderColor:`${secondary}77`}} onClick={()=>team?.id && goToTeam(team.id)}>
-                <em style={dashboardRankNumberV47}>#{row.rank}</em>
-                <span style={dashboardTeamCellPro}><TeamBroadcastMark team={team} name={row.teamName || team?.name} size={56}/></span>
-                <span>{row.user}</span>
-                <span>{row.record.wins}</span>
-                <span>{row.record.losses}</span>
-                <span>{row.record.avgPf}</span>
-                <span>{row.record.avgPa}</span>
-                <span>{row.top10}</span>
-                <span>{row.sor}</span>
-                <b>{Number(row.rating || 0).toFixed(1)}</b>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      <section style={dashboardFeatureGridV89} className="cfb-dashboard-feature-grid-v89">
-        <div style={coachSpotlightCardV64}>
-          <div style={dashboardPanelHeaderPro}><span>COACH SPOTLIGHT</span><h2>Featured Coach</h2></div>
-          {coachSpotlight ? (
-            <div style={coachSpotlightInnerV64}>
-              <TeamLogoMark team={coachSpotlight.team} size={86} plate/>
-              <div style={coachSpotlightTextV64}>
-                <span style={coachSpotlightTeamLineV66}>{getTeamAbbreviation(coachSpotlight.team)} • {coachSpotlight.teamName || coachSpotlight.team?.name}</span>
-                <h3>{coachSpotlight.user}</h3>
-                <p>{coachSpotlight.headline}</p>
-                <div style={coachSpotlightStatsV64}>
-                  <b>#{coachSpotlight.rank}</b>
-                  <small>{coachSpotlight.record.wins}-{coachSpotlight.record.losses}</small>
-                  <small>SOR {coachSpotlight.sor}</small>
-                  <small>{coachSpotlight.top10} Top 10 Wins</small>
-                </div>
-              </div>
-            </div>
-          ) : <div style={mutedText}>No coach spotlight yet.</div>}
-        </div>
-
-        <div style={dashboardConferencePowerWideV89}>
-          <div style={dashboardPanelHeaderPro}><span>CONFERENCE POWER</span><h2>League Snapshot</h2></div>
-          <div className="cfb-conference-power-head-v89" style={dashboardConferenceHeadV89}>
-            <span>Rank</span><span>Conference</span><span>Top Team</span><span>Avg Rank</span><span>Top 10</span><span>Record</span><span>Win %</span><span>Rating</span>
-          </div>
-          <div style={dashboardConferenceRowsV89}>
-            {conferenceSnapshotRows.length ? conferenceSnapshotRows.map((row,index)=>(
-              <div key={row.conference} className="cfb-conference-power-row-v89" style={{...dashboardConferenceRowV89, background:`linear-gradient(90deg, ${getTeamPrimary(row.topTeam?.team)}44, rgba(15,23,42,.94))`, borderColor:`${getTeamSecondary(row.topTeam?.team)}55`}}>
-                <b>#{index+1}</b>
-                <span style={dashboardConferenceLogoCellV90} title={row.conference}>
-                  <ConferenceLogoMark conference={row.conference} conferenceAssets={conferenceAssets} size={34}/>
-                </span>
-                <span style={dashboardConferenceTopV66}>{row.topTeam?.team ? <><TeamLogoMark team={row.topTeam.team} size={24}/>{getTeamAbbreviation(row.topTeam.team)}</> : "—"}</span>
-                <span>{row.avgRank || "—"}</span><span>{row.top10}</span><span>{row.wins}-{row.losses}</span><span>{row.winPct}%</span><strong>{row.avgRating}</strong>
-                <div className="cfb-conference-mobile-metrics-v91" style={dashboardConferenceMobileMetricsV91}>
-                  <span><small>AVG RANK</small><b>{row.avgRank || "—"}</b></span>
-                  <span><small>TOP 10</small><b>{row.top10}</b></span>
-                  <span><small>RECORD</small><b>{row.wins}-{row.losses}</b></span>
-                  <span><small>WIN %</small><b>{row.winPct}%</b></span>
-                  <span><small>RATING</small><b>{row.avgRating}</b></span>
-                </div>
-              </div>
-            )) : <EmptyState icon="🏟️" title="No conference data yet" description="Conference metrics will populate after teams and results are available."/>}
-          </div>
-        </div>
-      </section>
-
-      <section style={dashboardWirePanelV38}>
-        <div style={dashboardPanelHeaderPro}><span>DYNASTY WIRE</span><h2>The Wire</h2></div>
-        <div style={dashboardNewsListPro}>
-          {headlineRows.length ? headlineRows.map((item,index)=>(
-            <div key={index} style={dashboardNewsRowPro}><span>{item.icon || "🏈"}</span><div style={wireTextStackV45}><b>{item.title}</b><small>{item.meta}</small></div></div>
-          )) : <div style={mutedText}>No storylines yet. Add results in League Data Center.</div>}
-        </div>
-      </section>
-
-      <section style={dashboardSchedulePanelV89}>
-        <div style={dashboardPanelHeaderPro}><span>SEASON HUB</span><h2>GAMECENTER</h2></div>
-        {dashboardGameOfWeek && (
-          <button style={{...dashboardGameOfWeekV87, background:`linear-gradient(135deg, ${getTeamPrimary(dashboardGameOfWeek.team1)}88, rgba(2,6,23,.96), ${getTeamPrimary(dashboardGameOfWeek.team2)}66)`}} onClick={()=>setActiveTab?.("schedule")}>
-            <div style={dashboardGameEyebrowV87}>★ GAME OF THE WEEK • {dashboardGameOfWeek.week}</div>
-            <div style={dashboardMatchupRowV87}>
-              <div style={dashboardMatchupTeamV87}><b>#{dashboardGameOfWeek.rank1}</b><TeamLogoMark team={dashboardGameOfWeek.team1} size={54}/><span>{getTeamAbbreviation(dashboardGameOfWeek.team1)}</span></div>
-              <strong>{dashboardGameOfWeek.result ? "FINAL" : "VS"}</strong>
-              <div style={dashboardMatchupTeamV87}><b>#{dashboardGameOfWeek.rank2}</b><TeamLogoMark team={dashboardGameOfWeek.team2} size={54}/><span>{getTeamAbbreviation(dashboardGameOfWeek.team2)}</span></div>
-            </div>
-          </button>
-        )}
-        <div className="cfb-dashboard-season-weeks-v89" style={dashboardSeasonWeeksV89}>
-          {dashboardWeeks.map((week)=>{
-            const weekRows = dashboardScheduleRows.filter((row)=>String(row.week)===week);
-            return (
-              <div key={week} style={dashboardWeekGroupV89}>
-                <div style={dashboardWeekHeaderV89}><b>{week}</b><span>{weekRows.length} game{weekRows.length===1?"":"s"}</span></div>
-                <div style={dashboardWeekGamesV89}>
-                  {weekRows.length ? weekRows.map((row)=>(
-                    <button key={row.id || `${row.week}-${row.team_1_id}-${row.team_2_id}`} style={dashboardScheduleCardV89} onClick={()=>setActiveTab?.("schedule")}>
-                      <div style={dashboardScheduleSideV90}><b>#{row.rank1}</b><TeamLogoMark team={row.team1} size={34}/><span>{getTeamAbbreviation(row.team1)}</span></div>
-                      <strong>{row.result ? "FINAL" : "VS"}</strong>
-                      <div style={dashboardScheduleSideV90}><b>#{row.rank2}</b><TeamLogoMark team={row.team2} size={34}/><span>{getTeamAbbreviation(row.team2)}</span></div>
-                    </button>
-                  )) : <small style={mutedText}>No user games.</small>}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <button style={dashboardScheduleLinkV87} onClick={()=>setActiveTab?.("schedule")}>Open Full GameCenter →</button>
-      </section>
-
-    </div>
-  );
-}
-
-function DashboardHomeHero({ teams, users, assignments, results, allResults, weeklyMatchups, currentYear, currentWeek }) {
-  const rankings = computerRankingRows(teams, results, assignments, users);
-  const topTeam = rankings[0];
-  const eloTop = userEloRows(users, assignments, allResults)[0];
-  const gotw = weeklyMatchupRows(weeklyMatchups, teams, users, assignments, results, currentYear, currentWeek)[0];
-
-  return (
-    <section style={homeHeroCard}>
-      <div>
-        <div style={eyebrow}>CFBElite Dynasty Central</div>
-        <h1 style={homeHeroTitle}>{currentYear} • {currentWeek}</h1>
-        <p style={mutedText}>League hub for rankings, ELO, weekly media, milestones, rivalries, and coach profiles.</p>
-      </div>
-      <div style={homeHeroGrid}>
-        <div style={homeHeroTile}><span>#1 Team</span><b>{topTeam?.teamName || "—"}</b></div>
-        <div style={homeHeroTile}><span>#1 User ELO</span><b>{eloTop?.discord || "—"}</b></div>
-        <div style={homeHeroTile}><span>Draft Room</span><b>{gotw ? `${gotw.team_1?.name || "Team 1"} vs ${gotw.team_2?.name || "Team 2"}` : "Open board"}</b></div>
-      </div>
-    </section>
-  );
-}
-
-function HeadlineTicker({ teams, users, assignments, results, allResults, allAmericans, awards, heismans, nationalChampions, recruiting, currentYear, currentWeek }) {
-  const lines = [];
-  const rankings = computerRankingRows(teams, results, assignments, users);
-  const top = rankings[0];
-  const eloRows = userEloRows(users, assignments, allResults);
-  const elo = eloRows[0];
-  const weekResults = results.filter((row)=>String(row.season_year) === String(currentYear) && row.week === currentWeek);
-
-  if (top) lines.push(`${top.teamName} sits #1 in the computer rankings`);
-  if (elo) lines.push(`${elo.discord} leads User ELO at ${elo.adjustedElo || elo.elo}`);
-  rankings.slice(1,5).forEach((row)=>lines.push(`#${row.rank} ${row.teamName} is chasing the top spot at ${row.score}`));
-  weekResults.slice(0,8).forEach((row)=>lines.push(`${row.team_1?.name || "Team 1"} ${row.team_1_score} - ${row.team_2_score} ${row.team_2?.name || "Team 2"}`));
-  const champ = nationalChampions.find((row)=>String(row.season_year) === String(currentYear));
-  if (champ) lines.push(`${champ.teams?.name || teamNameById(champ.team_id, teams)} is the reigning ${currentYear} national champion`);
-  heismans.filter((row)=>String(row.season_year) === String(currentYear)).slice(0,3).forEach((row)=>lines.push(`${row.player_name} is on the Heisman board for ${row.teams?.name || teamNameById(row.team_id, teams)}`));
-  awards.filter((row)=>String(row.season_year) === String(currentYear)).slice(0,5).forEach((row)=>lines.push(`${row.player_name} won ${row.award_name}`));
-  allAmericans.filter((row)=>String(row.season_year) === String(currentYear)).slice(0,5).forEach((row)=>lines.push(`${row.player_name} earned ${row.type || "All-American"} honors`));
-  recruiting.filter((row)=>String(row.season_year) === String(currentYear) && Number(row.rank)>0).sort((a,b)=>Number(a.rank)-Number(b.rank)).slice(0,5).forEach((row)=>lines.push(`${row.teams?.name || teamNameById(row.team_id, teams)} logged the #${row.rank} recruiting class`));
-  if (!lines.length) lines.push("Enter results to generate dynasty headlines");
-
-  const tickerLines = lines.concat(lines).concat(lines);
-
-  return <div style={tickerWrap}>
-    <style>{`@keyframes cfbeliteTicker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-
-      /* v43-ui-ux-polish */
-      :root {
-        --cfb-space-1: 4px;
-        --cfb-space-2: 8px;
-        --cfb-space-3: 12px;
-        --cfb-space-4: 16px;
-        --cfb-space-5: 20px;
-        --cfb-space-6: 24px;
-        --cfb-space-8: 32px;
-        --cfb-radius-sm: 10px;
-        --cfb-radius-md: 16px;
-        --cfb-radius-lg: 22px;
-        --cfb-card-bg: linear-gradient(155deg, rgba(15,21,33,.97), rgba(4,7,13,.99));
-        --cfb-card-border: rgba(255,255,255,.12);
-        --cfb-card-shadow: 0 18px 50px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.06);
-        --cfb-transition: 160ms cubic-bezier(.2,.8,.2,1);
-        --cfb-body-size: 16px;
-        --cfb-muted: rgba(226,232,240,.70);
-      }
-
-      html { scroll-behavior: smooth; }
-      body { font-size: var(--cfb-body-size); line-height: 1.55; }
-      .cfb-app-container { display:grid; gap: var(--cfb-space-4); }
-
-      h1 { font-size: clamp(44px, 7vw, 84px); line-height: .92; letter-spacing: -.055em; }
-      h2 { font-size: clamp(25px, 3vw, 36px); line-height: 1.02; letter-spacing: -.035em; }
-      h3 { font-size: clamp(18px, 2vw, 24px); line-height: 1.08; letter-spacing: -.02em; }
-      p, li, label, input, select, textarea, button { font-size: 15px; }
-      small { font-size: 12px; }
-
-      button, a, input, select, textarea {
-        transition: transform var(--cfb-transition), border-color var(--cfb-transition), background var(--cfb-transition), box-shadow var(--cfb-transition), color var(--cfb-transition), opacity var(--cfb-transition);
-      }
-
-      button { min-height: 42px; }
-      button:hover { transform: translateY(-1px); }
-      button:active { transform: translateY(0) scale(.99); }
-      button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
-        outline: 2px solid rgba(250,204,21,.85);
-        outline-offset: 2px;
-      }
-
-      .cfb-identity-bar {
-        position: sticky;
-        top: 8px;
-        z-index: 70;
-        display: grid;
-        grid-template-columns: minmax(170px,1.1fr) repeat(3,minmax(110px,.75fr)) minmax(180px,1fr) minmax(170px,1fr);
-        gap: 1px;
-        overflow: hidden;
-        border: 1px solid rgba(255,255,255,.13);
-        border-radius: 16px;
-        background: rgba(2,6,15,.92);
-        box-shadow: 0 16px 46px rgba(0,0,0,.34);
-        backdrop-filter: blur(18px);
-      }
-
-      .cfb-identity-bar button,
-      .cfb-identity-item {
-        min-width: 0;
-        min-height: 58px;
-        padding: 10px 13px;
-        border: 0;
-        border-radius: 0;
-        background: linear-gradient(145deg, rgba(15,23,42,.92), rgba(6,10,18,.96));
-        color: #fff;
-        text-align: left;
-      }
-
-      .cfb-identity-bar > * + * { border-left: 1px solid rgba(255,255,255,.08); }
-      .cfb-identity-brand { display:flex; align-items:center; gap:10px; }
-      .cfb-identity-brand > span {
-        width: 38px; height:38px; display:grid; place-items:center;
-        border-radius: 11px; background:linear-gradient(145deg,#dc2626,#7f1d1d);
-        box-shadow:0 8px 20px rgba(220,38,38,.28); font-weight:1000; font-size:12px;
-      }
-      .cfb-identity-brand b, .cfb-identity-brand small { display:block; }
-      .cfb-identity-item small, .cfb-identity-featured small, .cfb-identity-brand small {
-        display:block; color:rgba(226,232,240,.55); font-size:9px; font-weight:1000; letter-spacing:.09em; text-transform:uppercase;
-      }
-      .cfb-identity-item b, .cfb-identity-featured b { display:block; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; }
-      .cfb-identity-progress span { display:block; height:4px; margin-top:7px; overflow:hidden; border-radius:999px; background:rgba(255,255,255,.08); }
-      .cfb-identity-progress i { display:block; height:100%; border-radius:999px; background:linear-gradient(90deg,#dc2626,#facc15); }
-      .cfb-identity-featured { border-left:2px solid rgba(250,204,21,.45) !important; }
-
-      .cfb-app-skeleton {
-        display:grid; gap:14px; padding:24px; border-radius:22px; border:1px solid var(--cfb-card-border); background:var(--cfb-card-bg);
-      }
-      .cfb-skeleton-line, .cfb-skeleton-card span {
-        position:relative; overflow:hidden; border-radius:999px; background:rgba(255,255,255,.07);
-      }
-      .cfb-skeleton-line::after, .cfb-skeleton-card span::after {
-        content:""; position:absolute; inset:0; transform:translateX(-100%);
-        background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent);
-        animation:cfb-shimmer 1.35s infinite;
-      }
-      .cfb-skeleton-title { width:42%; height:34px; }
-      .cfb-skeleton-subtitle { width:26%; height:14px; }
-      .cfb-skeleton-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
-      .cfb-skeleton-card { display:grid; gap:12px; min-height:170px; padding:18px; border-radius:18px; background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.08); }
-      .cfb-skeleton-card span:nth-child(1){width:45%;height:14px}.cfb-skeleton-card span:nth-child(2){width:72%;height:28px}.cfb-skeleton-card span:nth-child(3){width:90%;height:12px}
-      @keyframes cfb-shimmer { 100% { transform:translateX(100%); } }
-
-      .cfb-empty-state {
-        display:flex; align-items:center; justify-content:center; gap:14px; min-height:150px;
-        padding:24px; border:1px dashed rgba(255,255,255,.15); border-radius:18px;
-        background:linear-gradient(145deg,rgba(15,23,42,.56),rgba(2,6,23,.75)); color:#fff; text-align:left;
-      }
-      .cfb-empty-icon { width:48px;height:48px;display:grid;place-items:center;border-radius:14px;background:rgba(255,255,255,.07);font-size:23px; }
-      .cfb-empty-state h3 { margin:0; font-size:18px; }
-      .cfb-empty-state p { margin:4px 0 0; color:var(--cfb-muted); font-size:13px; }
-      .cfb-empty-state button { margin-left:auto; padding:9px 14px; border-radius:11px; border:1px solid rgba(250,204,21,.25); background:rgba(250,204,21,.10); color:#facc15; font-weight:900; }
-
-      .cfb-team-branded-page {
-        position:relative; isolation:isolate;
-      }
-      .cfb-team-branded-page::before {
-        content:""; position:absolute; z-index:-1; inset:-14px -14px auto; height:260px; pointer-events:none;
-        background:radial-gradient(circle at 12% 20%, color-mix(in srgb, var(--team-primary) 34%, transparent), transparent 46%),
-                   radial-gradient(circle at 86% 0%, color-mix(in srgb, var(--team-secondary) 20%, transparent), transparent 40%);
-        filter:saturate(1.12);
-      }
-
-      .cfb-app section,
-      .cfb-app article {
-        scroll-margin-top: 96px;
-      }
-
-      .cfb-app table {
-        border-collapse: separate;
-        border-spacing: 0;
-        font-size: 14px;
-      }
-      .cfb-app thead th {
-        position: sticky;
-        top: 0;
-        z-index: 5;
-        background: rgba(8,12,20,.98);
-        backdrop-filter: blur(12px);
-      }
-      .cfb-app tbody tr { transition: background var(--cfb-transition), transform var(--cfb-transition); }
-      .cfb-app tbody tr:nth-child(even) { background: rgba(255,255,255,.018); }
-      .cfb-app tbody tr:hover { background: rgba(250,204,21,.045); }
-      .cfb-app td, .cfb-app th { padding: 12px 13px; }
-
-      .cfb-app [style*="borderRadius: 20"],
-      .cfb-app [style*="border-radius: 20"] {
-        box-shadow: var(--cfb-card-shadow);
-      }
-
-      @media (prefers-reduced-motion: no-preference) {
-        .cfb-app > * { animation:cfb-page-in .24s ease both; }
-        @keyframes cfb-page-in { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:none; } }
-      }
-
-      @media (max-width: 1040px) {
-        .cfb-identity-bar { grid-template-columns:1.2fr repeat(2,.8fr) 1fr; }
-        .cfb-identity-item:nth-of-type(3), .cfb-identity-featured { display:none; }
-        .cfb-skeleton-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
-      }
-
-      @media (max-width: 720px) {
-        :root { --cfb-body-size:15px; }
-        body { overflow-x:hidden; }
-        h1 { font-size:clamp(38px,13vw,62px); }
-        h2 { font-size:clamp(23px,8vw,32px); }
-        p, li, label, input, select, textarea, button { font-size:15px; }
-        small { font-size:11px; }
-
-        .cfb-app-container { gap:12px; }
-        .cfb-identity-bar {
-          position:relative; top:auto; grid-template-columns:1.1fr .75fr .75fr;
-          overflow-x:auto; border-radius:14px;
-        }
-        .cfb-identity-bar > * { min-width:118px; }
-        .cfb-identity-brand { min-width:160px !important; }
-        .cfb-identity-progress { display:none; }
-        .cfb-identity-item:nth-of-type(3), .cfb-identity-featured { display:none; }
-
-        .cfb-skeleton-grid { grid-template-columns:1fr; }
-        .cfb-skeleton-title { width:72%; }
-        .cfb-skeleton-subtitle { width:48%; }
-
-        .cfb-empty-state { display:grid; justify-items:center; text-align:center; }
-        .cfb-empty-state button { margin-left:0; width:100%; }
-
-        button, input, select, textarea { min-height:46px; }
-        .cfb-app table { min-width:720px; }
-        .cfb-app td, .cfb-app th { padding:11px 10px; }
-      }
-
-      @media (max-width: 430px) {
-        .cfb-identity-bar { grid-template-columns:1fr 1fr; }
-        .cfb-identity-brand { grid-column:1 / -1; }
-        .cfb-identity-item:nth-of-type(2) { border-left:0; }
-      }
-
-      /* v42-unified-experience */
-      :root {
-        --cfb-ui-radius: 16px;
-        --cfb-ui-radius-lg: 22px;
-        --cfb-ui-pad: 18px;
-        --cfb-ui-border: rgba(255,255,255,.12);
-        --cfb-ui-panel: linear-gradient(155deg, rgba(17,24,39,.97), rgba(4,7,13,.99));
-      }
-
-      body {
-        font-size: 16px;
-        line-height: 1.5;
-      }
-
-      button, input, select, textarea {
-        font: inherit;
-      }
-
-      button {
-        min-height: 42px;
-        transition: transform .16s ease, border-color .16s ease, background .16s ease, box-shadow .16s ease, opacity .16s ease;
-      }
-
-      button:hover {
-        transform: translateY(-1px);
-      }
-
-      h1, h2, h3 {
-        text-wrap: balance;
-      }
-
-      table {
-        font-size: 14px;
-      }
-
-      th {
-        font-size: 12px;
-        letter-spacing: .055em;
-      }
-
-      td {
-        font-size: 14px;
-      }
-
-      .cfb-v2-page,
-      .cfb-discord-shell,
-      .cfb-social-shell {
-        font-size: 15px;
-      }
-
-      .cfb-feature-fallback {
-        display: grid;
-        gap: 12px;
-        justify-items: start;
-        padding: 28px;
-        border-radius: var(--cfb-ui-radius-lg);
-        border: 1px solid rgba(248,113,113,.25);
-        background: linear-gradient(145deg, rgba(69,10,10,.45), rgba(15,23,42,.98));
-        color: #fff;
-      }
-
-      .cfb-feature-fallback > span {
-        color: #fca5a5;
-        font-size: 12px;
-        font-weight: 1000;
-        letter-spacing: .12em;
-      }
-
-      .cfb-feature-fallback h2 {
-        margin: 0;
-        font-size: clamp(26px, 4vw, 42px);
-      }
-
-      .cfb-feature-fallback p {
-        margin: 0;
-        color: rgba(226,232,240,.78);
-      }
-
-      .cfb-feature-fallback button {
-        border: 1px solid rgba(255,255,255,.16);
-        border-radius: 12px;
-        padding: 10px 16px;
-        background: rgba(255,255,255,.08);
-        color: #fff;
-        font-weight: 900;
-      }
-
-      .cfb-universal-search {
-        position: relative;
-        z-index: 80;
-        margin: 10px 0 16px;
-      }
-
-      .cfb-universal-search-input {
-        display: grid;
-        grid-template-columns: auto 1fr auto;
-        align-items: center;
-        gap: 10px;
-        min-height: 50px;
-        padding: 0 14px;
-        border-radius: 15px;
-        border: 1px solid rgba(255,255,255,.13);
-        background: linear-gradient(145deg, rgba(15,23,42,.98), rgba(3,7,18,.98));
-        box-shadow: 0 14px 36px rgba(0,0,0,.24);
-      }
-
-      .cfb-universal-search-input > span {
-        color: #facc15;
-        font-size: 24px;
-        line-height: 1;
-      }
-
-      .cfb-universal-search-input input {
-        width: 100%;
-        border: 0;
-        outline: 0;
-        background: transparent;
-        color: #fff;
-        font-size: 15px;
-        font-weight: 800;
-      }
-
-      .cfb-universal-search-input button {
-        min-height: 32px;
-        width: 32px;
-        border: 0;
-        border-radius: 9px;
-        background: rgba(255,255,255,.08);
-        color: #fff;
-      }
-
-      .cfb-universal-search-results {
-        position: absolute;
-        inset: calc(100% + 8px) 0 auto 0;
-        display: grid;
-        gap: 5px;
-        max-height: min(520px, 65vh);
-        overflow: auto;
-        padding: 10px;
-        border-radius: 16px;
-        border: 1px solid rgba(255,255,255,.14);
-        background: rgba(8,12,20,.99);
-        box-shadow: 0 24px 70px rgba(0,0,0,.55);
-      }
-
-      .cfb-universal-search-results > button {
-        display: grid;
-        grid-template-columns: 42px 1fr auto;
-        gap: 11px;
-        align-items: center;
-        width: 100%;
-        min-width: 0;
-        padding: 10px;
-        border: 1px solid transparent;
-        border-radius: 12px;
-        background: transparent;
-        color: #fff;
-        text-align: left;
-      }
-
-      .cfb-universal-search-results > button:hover {
-        border-color: rgba(250,204,21,.24);
-        background: rgba(250,204,21,.07);
-      }
-
-      .cfb-search-result-logo {
-        width: 42px;
-        height: 42px;
-        display: grid;
-        place-items: center;
-        overflow: hidden;
-        border-radius: 11px;
-        background: rgba(255,255,255,.08);
-        color: #facc15;
-        font-weight: 1000;
-      }
-
-      .cfb-search-result-logo img {
-        width: 100%;
-        height: 100%;
-        object-fit: contain;
-      }
-
-      .cfb-universal-search-results b,
-      .cfb-universal-search-results small {
-        display: block;
-      }
-
-      .cfb-universal-search-results b {
-        font-size: 14px;
-      }
-
-      .cfb-universal-search-results small {
-        margin-top: 2px;
-        color: rgba(226,232,240,.68);
-        font-size: 12px;
-      }
-
-      .cfb-universal-search-results em {
-        color: rgba(226,232,240,.52);
-        font-size: 10px;
-        font-style: normal;
-        font-weight: 1000;
-        letter-spacing: .08em;
-        text-transform: uppercase;
-      }
-
-      .cfb-search-empty {
-        padding: 18px;
-        color: rgba(226,232,240,.68);
-        text-align: center;
-      }
-
-      .cfb-game-result-insights {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 7px;
-        margin-top: 12px;
-      }
-
-      .cfb-game-result-insights span {
-        padding: 5px 8px;
-        border-radius: 999px;
-        border: 1px solid rgba(255,255,255,.12);
-        background: rgba(255,255,255,.06);
-        color: rgba(248,250,252,.88);
-        font-size: 10px;
-        font-weight: 1000;
-        letter-spacing: .05em;
-      }
-
-      .cfb-game-result-insights span[data-kind="upset"] {
-        border-color: rgba(248,113,113,.35);
-        background: rgba(248,113,113,.12);
-        color: #fecaca;
-      }
-
-      .cfb-game-result-insights span[data-kind="overtime"] {
-        border-color: rgba(250,204,21,.35);
-        background: rgba(250,204,21,.10);
-        color: #fde68a;
-      }
-
-      @media (max-width: 900px) {
-        body {
-          font-size: 15px;
-        }
-
-        .cfb-v2-page {
-          gap: 14px !important;
-        }
-
-        .cfb-v2-page h1 {
-          font-size: clamp(40px, 12vw, 68px) !important;
-        }
-
-        .cfb-v2-game-grid,
-        .cfb-v2-card-grid,
-        .cfb-dashboard-grid {
-          grid-template-columns: 1fr !important;
-        }
-
-        .cfb-discord-shell {
-          min-height: 70vh;
-        }
-
-        table {
-          min-width: 760px;
-        }
-      }
-
-      @media (max-width: 620px) {
-        body {
-          font-size: 15px;
-        }
-
-        .cfb-universal-search {
-          margin-top: 8px;
-        }
-
-        .cfb-universal-search-input {
-          min-height: 48px;
-        }
-
-        .cfb-universal-search-results {
-          position: fixed;
-          left: 10px;
-          right: 10px;
-          top: 116px;
-          max-height: calc(100vh - 136px);
-        }
-
-        .cfb-universal-search-results > button {
-          grid-template-columns: 40px minmax(0,1fr);
-        }
-
-        .cfb-universal-search-results em {
-          display: none;
-        }
-
-        .cfb-v2-featured-matchup,
-        .cfb-v2-card-matchup {
-          grid-template-columns: 1fr auto 1fr !important;
-          gap: 8px !important;
-        }
-
-        button,
-        input,
-        select,
-        textarea {
-          min-height: 44px;
-        }
-
-        td, th {
-          padding: 11px 10px !important;
-        }
-      }
-
-`}</style>
-    <div style={tickerContent}>{tickerLines.map((line,index)=><span key={index}>📰 {line}</span>)}</div>
-  </div>;
-}
-
-function QuickJump({ teams, users, setActiveTab }) {
-  const [query, setQuery] = useState("");
-  const teamMatches = teams.filter((team)=>team.name.toLowerCase().includes(query.toLowerCase())).slice(0,5);
-  const userMatches = users.filter((user)=>user.discord_username.toLowerCase().includes(query.toLowerCase())).slice(0,5);
-  return (
-    <section style={quickJumpCard}>
-      <input value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Jump to team or coach..." style={input}/>
-      {query && <div style={quickJumpResults}>
-        {teamMatches.map((team)=><button key={team.id} style={quickJumpButton} onClick={()=>setActiveTab(`team-${team.id}`)}><TeamLabel team={team}/></button>)}
-        {userMatches.map((user)=><button key={user.id} style={quickJumpButton} onClick={()=>setActiveTab(`coach-${user.id}`)}>{user.discord_username}</button>)}
-      </div>}
-    </section>
-  );
-}
-
-function RivalryBadges({ user, users, allUsers = [], results, assignments }) {
-  const games = userResultsFor(user.id, results, assignments);
-  const map = new Map();
-  const nameForUser = (id) =>
-    allUsers.find((u)=>u.id===id)?.discord_username ||
-    users.find((u)=>u.id===id)?.discord_username ||
-    assignments.find((a)=>a.discord_user_id===id)?.discord_users?.discord_username ||
-    "Unknown User";
-
-  games.forEach((result)=>{
-    const u1 = result.team_1_user_id || coachForTeamYear(result.team_1_id, result.season_year, assignments)?.discord_user_id;
-    const u2 = result.team_2_user_id || coachForTeamYear(result.team_2_id, result.season_year, assignments)?.discord_user_id;
-    const opponentId = u1 === user.id ? u2 : u1;
-    if (!opponentId) return;
-    if (!map.has(opponentId)) map.set(opponentId, { opponentId, opponentName: nameForUser(opponentId), w:0, l:0, pf:0, pa:0, games:0, last:null });
-    const row = map.get(opponentId);
-    const isTeam1 = u1 === user.id;
-    const forPts = Number(isTeam1 ? result.team_1_score : result.team_2_score) || 0;
-    const againstPts = Number(isTeam1 ? result.team_2_score : result.team_1_score) || 0;
-    const won = forPts > againstPts;
-    row.games += 1; row.pf += forPts; row.pa += againstPts;
-    if (won) row.w += 1; else if (forPts < againstPts) row.l += 1;
-    const sort = Number(result.season_year || 0) * 1000 + weekIndex(result.week);
-    if (!row.last || sort > row.last.sort) row.last = { sort, forPts, againstPts, type: won ? "W" : "L" };
-  });
-  const rows = [...map.values()].filter((r)=>r.games>=2).sort((a,b)=>b.games-a.games || b.w-a.w).slice(0,4);
-  if (!rows.length) return null;
-  return <div style={glassMiniCard}><h3 style={miniTitle}>Rivalry Badges</h3><div style={rivalryBadgeGrid}>{rows.map((r)=><div key={r.opponentId} style={rivalryBadge}><div style={leaderRow}><b>{r.opponentName}</b><span>{r.w}-{r.l}</span></div><div style={mutedText}>{r.games} meetings • Points: {r.pf}-{r.pa}</div><div style={mutedText}>Last: {r.last?.type || "—"} {r.last ? `${r.last.forPts}-${r.last.againstPts}` : ""}</div></div>)}</div></div>;
-}
-
-function CoachTimelineEvents({ user, teams, results, allAmericans, awards, heismans, nationalChampions, assignments }) {
-  const events = [
-    ...nationalChampions.filter((row)=>coachForTeamYear(row.team_id, row.season_year, assignments)?.discord_user_id === user.id).map((row)=>({year:row.season_year,text:`National Championship with ${teamNameById(row.team_id, teams)}`})),
-    ...heismans.filter((row)=>coachForTeamYear(row.team_id, row.season_year, assignments)?.discord_user_id === user.id).map((row)=>({year:row.season_year,text:`${row.player_name} won the Heisman`})),
-    ...awards.filter((row)=>coachForTeamYear(row.team_id, row.season_year, assignments)?.discord_user_id === user.id).slice(0,12).map((row)=>({year:row.season_year,text:`${row.player_name} won ${row.award_name}`})),
-    ...results.filter((row)=>row.week==="Conference Championship Week" && (coachForTeamYear(row.team_1_id, row.season_year, assignments)?.discord_user_id === user.id || coachForTeamYear(row.team_2_id, row.season_year, assignments)?.discord_user_id === user.id)).map((row)=>({year:row.season_year,text:`Conference Championship appearance`}))
-  ].sort((a,b)=>Number(b.year)-Number(a.year)).slice(0,10);
-  if (!events.length) return null;
-  return <div style={miniCard}><h3 style={miniTitle}>Coach Timeline</h3>{events.map((event,index)=><div key={index} style={miniRow}><b>{event.year}</b> — {event.text}</div>)}</div>;
-}
-
-function CommissionerCenter({ currentYear, currentWeek, setActiveTab, saveLeagueSettings, loadData, teams = [], users = [], assignments = [], results = [], awards = [], allAmericans = [], heismans = [], nationalChampions = [], recruiting = [] }) {
-  const actions = [
-    [ "Import Weekly Matchups"],
-    [ "Generate Weekly Media"],
-    ["dashboard", "Review Dashboard"],
-    ["eloRankings", "Review ELO"],
-    ["dynastyRecords", "League Records"],
-    ["assignments", "Manage Assignments"],
-  ];
-  return <section style={card}><h2 style={sectionTitle}>Commissioner Control Center</h2><p style={mutedText}>{currentYear} • {currentWeek}</p><div style={toolGrid}>{actions.map(([key,label])=><button key={key} style={toolCard} onClick={()=>setActiveTab(key)}><div style={toolTitle}>{label}</div></button>)}</div><div style={actionRow}><button style={button} onClick={loadData}>Refresh Data</button><button style={button} onClick={saveLeagueSettings}>Save League Settings</button></div><BackupExportPanel teams={teams} users={users} assignments={assignments} results={results} awards={awards} allAmericans={allAmericans} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/></section>;
-}
-
-
 function ConferencePowerRankings({ teams, users, assignments, results, allResults = [], conferenceAssets = [], allAmericans = [], awards = [], heismans = [], nationalChampions = [], recruiting = [] }) {
   const activeAssignments = assignments.filter((assignment)=>assignment.status === "Active" && assignment.team_id && assignment.discord_user_id);
   const activeTeamIds = new Set(activeAssignments.map((assignment)=>String(assignment.team_id)));
@@ -5256,27 +3286,6 @@ function BackupExportPanel({ teams, users, assignments, results, awards, allAmer
   return <div style={miniCard}><h3 style={miniTitle}>Backup / Export CSV</h3><p style={mutedText}>Commissioner-only quick exports for backup or audit purposes.</p><div style={actionRow}>{exports.map(([filename, rows])=><button key={filename} type="button" style={v2GhostButton} onClick={()=>downloadCsv(filename, rows)}>{filename}</button>)}</div></div>;
 }
 
-function DataHealthAlerts({ teams, users, assignments, results }) {
-  const alerts = [];
-  const active = assignments.filter((row)=>row.status === "Active");
-  const duplicateTeams = active.reduce((map,row)=>map.set(row.team_id,(map.get(row.team_id)||0)+1), new Map());
-  const duplicateUsers = active.reduce((map,row)=>map.set(row.discord_user_id,(map.get(row.discord_user_id)||0)+1), new Map());
-  const teamsMissingColors = teams.filter((team)=>!team.primary_color || !team.secondary_color || !team.accent_color || !team.conference);
-
-  if (teamsMissingColors.length) {
-    alerts.push(`${teamsMissingColors.length} team${teamsMissingColors.length===1?"":"s"} missing colors/conference: ${teamsMissingColors.slice(0,6).map((team)=>team.name).join(", ")}${teamsMissingColors.length > 6 ? "..." : ""}`);
-  }
-  if ([...duplicateTeams.values()].some((count)=>count>1)) alerts.push("Duplicate active team assignments detected");
-  if ([...duplicateUsers.values()].some((count)=>count>1)) alerts.push("Duplicate active user assignments detected");
-  if (results.some((row)=>!row.team_1_id || !row.team_2_id)) alerts.push("Some results are missing team IDs");
-  if (results.some((row)=>row.team_1_score === null || row.team_2_score === null)) alerts.push("Some results are missing scores");
-
-  if (!alerts.length) return <section style={healthGood}>✓ Data health looks good</section>;
-  return <section style={healthWarn}><b>Data Health Alerts</b>{alerts.map((alert,index)=><div key={index}>⚠ {alert}</div>)}</section>;
-}
-
-
-
 function normalizeDraftConference(conference) {
   const value = String(conference || "").trim();
   const upper = value.toUpperCase();
@@ -5287,153 +3296,6 @@ function normalizeDraftConference(conference) {
   if (upper === "AMERICAN" || upper === "AAC") return "American";
   if (upper === "MAC") return "MAC";
   return value;
-}
-
-
-const CFB27_APPROVED_DRAFT_TEAMS = new Set([
-  "Army Black Knights","Charlotte 49ers","East Carolina Pirates","Florida Atlantic Owls","Memphis Tigers","Navy Midshipmen","North Texas Mean Green","Rice Owls","South Florida Bulls","USF Bulls","Temple Owls","Tulane Green Wave","Tulsa Golden Hurricane","Tulsa Golden Hurricanes","UAB Blazers","UTSA Roadrunners","UConn Huskies","UCONN Huskies",
-  "Delaware Fightin’ Blue Hens","FIU Panthers","Jacksonville State Gamecocks","Kennesaw State Owls","Liberty Flames","Middle Tennessee Blue Raiders","Missouri State Bears","New Mexico State Aggies","Sam Houston Bearkats","Western Kentucky Hilltoppers",
-  "Akron Zips","Ball State Cardinals","Bowling Green Falcons","Buffalo Bulls","Central Michigan Chippewas","Eastern Michigan Eagles","Kent State Golden Flashes","Miami (OH) RedHawks","Ohio Bobcats","Sacramento State Hornets","Sacremento State","Toledo Rockets","UMass Minutemen","Western Michigan Broncos",
-  "Air Force Falcons","Hawaii Rainbow Warriors","Nevada Wolf Pack","New Mexico Lobos","North Dakota State","North Dakota State Bison","Northern Illinois Huskies","San Jose State Spartans","UNLV Rebels","UTEP Miners","Wyoming Cowboys",
-  "Boise State Broncos","Colorado State Rams","Fresno State Bulldogs","Oregon State Beavers","San Diego State Aztecs","Texas State Bobcats","Utah State Aggies","Washington State Cougars",
-  "Appalachian State Mountaineers","Arkansas State Red Wolves","Coastal Carolina Chanticleers","Georgia Southern Eagles","Georgia State Panthers","James Madison Dukes","Louisiana Ragin’ Cajuns","Louisiana Tech Bulldogs","Louisiana-Monroe Warhawks","Marshall Thundering Herd","Old Dominion Monarchs","South Alabama Jaguars","Southern Miss Golden Eagles","Troy Trojans"
-]);
-
-function isDraftEligibleTeam(team) {
-  return CFB27_APPROVED_DRAFT_TEAMS.has(team?.name);
-}
-
-const CFB27_DRAFT_CONFERENCES = new Set(["American", "CUSA", "MAC", "Mountain West", "PAC 12", "Pac-12", "Sun Belt"]);
-
-function draftPickCaption(pick, team) {
-  if (!pick || !team) return "";
-  return `🚨 THE PICK IS IN 🚨\n\nWith Pick #${String(pick.pick_number).padStart(2, "0")} in the CFBElite 27 Team Draft...\n\n${pick.discord_username || pick.discord_users?.discord_username} selects the ${team.name}!\n\nWelcome to ${normalizeDraftConference(team.conference) || "CFBElite"}.`;
-}
-
-function downloadDraftPickGraphic(pick, team) {
-  if (!pick || !team) return;
-  const canvas = document.createElement("canvas");
-  canvas.width = 1200;
-  canvas.height = 675;
-  const ctx = canvas.getContext("2d");
-  const primary = team.primary_color || "#20114f";
-  const secondary = team.secondary_color || "#facc15";
-  const accent = team.accent_color || "#ffffff";
-
-  const grad = ctx.createLinearGradient(0,0,1200,675);
-  grad.addColorStop(0, primary);
-  grad.addColorStop(.52, "#050510");
-  grad.addColorStop(1, secondary);
-  ctx.fillStyle = grad;
-  ctx.fillRect(0,0,1200,675);
-
-  ctx.globalAlpha = .22;
-  ctx.fillStyle = "#ffffff";
-  for (let i=0;i<80;i++) ctx.fillRect(Math.random()*1200, Math.random()*675, 3, 3);
-  ctx.globalAlpha = 1;
-
-  ctx.strokeStyle = secondary;
-  ctx.lineWidth = 4;
-  ctx.strokeRect(34,34,1132,607);
-
-  ctx.fillStyle = "rgba(0,0,0,.40)";
-  ctx.fillRect(70,120,290,390);
-  ctx.strokeStyle = "rgba(255,255,255,.22)";
-  ctx.strokeRect(70,120,290,390);
-
-  ctx.fillStyle = "#fff";
-  ctx.font = "900 42px Inter, Arial";
-  ctx.fillText("CFBELITE 27 TEAM DRAFT", 72, 82);
-
-  ctx.fillStyle = accent;
-  ctx.font = "900 46px Inter, Arial";
-  ctx.fillText("THE PICK IS IN", 430, 150);
-
-  ctx.fillStyle = "#fff";
-  ctx.font = "900 52px Inter, Arial";
-  ctx.fillText((pick.discord_username || pick.discord_users?.discord_username || "USER").toUpperCase(), 430, 235);
-
-  ctx.fillStyle = accent;
-  ctx.font = "900 34px Inter, Arial";
-  ctx.fillText("SELECTS", 430, 292);
-
-  ctx.fillStyle = "#fff";
-  ctx.font = "900 86px Inter, Arial";
-  ctx.fillText(team.name.toUpperCase().replace(" ", " "), 430, 390);
-
-  ctx.fillStyle = "#fff";
-  ctx.font = "900 64px Inter, Arial";
-  ctx.fillText("PICK", 110, 185);
-  ctx.font = "1000 170px Inter, Arial";
-  ctx.fillText(String(pick.pick_number).padStart(2, "0"), 105, 390);
-
-  ctx.fillStyle = secondary;
-  ctx.font = "900 40px Inter, Arial";
-  ctx.fillText(normalizeDraftConference(team.conference) || "CFBElite", 430, 475);
-
-  ctx.fillStyle = "#fff";
-  ctx.font = "900 32px Inter, Arial";
-  ctx.fillText("#CFBELITE27", 72, 610);
-
-  const link = document.createElement("a");
-  link.download = `cfbelite27-pick-${String(pick.pick_number).padStart(2, "0")}.png`;
-  link.href = canvas.toDataURL("image/png");
-  link.click();
-}
-
-function DraftCountdown({ pick, settings }) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
-  if (settings?.paused) return <span>PAUSED</span>;
-  if (!pick?.timer_started_at) return <span>Clock not started</span>;
-  const minutes = Number(pick.timer_minutes || settings?.timer_minutes || 10);
-  const end = new Date(pick.timer_started_at).getTime() + minutes * 60 * 1000;
-  const remaining = Math.max(0, end - now);
-  const m = Math.floor(remaining / 60000);
-  const s = Math.floor((remaining % 60000) / 1000);
-  return <span>{String(m).padStart(2,"0")}:{String(s).padStart(2,"0")}</span>;
-}
-
-
-function draftConferenceCounts(picks, teams) {
-  const counts = {};
-  picks.forEach((pick) => {
-    if (!pick.team_id || pick.status !== "picked") return;
-    const team = teams.find((item)=>String(item.id) === String(pick.team_id)) || pick.teams;
-    const conference = normalizeDraftConference(team?.conference);
-    if (!conference) return;
-    counts[conference] = (counts[conference] || 0) + 1;
-  });
-  return counts;
-}
-
-function lockedDraftConferences(picks, teams) {
-  const counts = draftConferenceCounts(picks, teams);
-  const conferencesAtSix = Object.entries(counts)
-    .filter(([, count]) => count >= 6)
-    .map(([conference]) => conference);
-
-  const locked = new Set();
-
-  // First two conferences to reach six users are capped at six.
-  conferencesAtSix.slice(0, 2).forEach((conference) => locked.add(conference));
-
-  // After two conferences have reached six, all other conferences cap at five.
-  if (conferencesAtSix.length >= 2) {
-    Object.entries(counts)
-      .filter(([conference, count]) => !locked.has(conference) && count >= 5)
-      .forEach(([conference]) => locked.add(conference));
-  }
-
-  return locked;
-}
-
-function draftConferenceLimitFor(conference, lockedConferences, counts) {
-  if (lockedConferences.has(conference)) return counts[conference] >= 6 ? 6 : 5;
-  return null;
 }
 
 
@@ -5841,6 +3703,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
         : pick
     ));
 
+    triggerHaptic("select",true);
     if (announcePick) announcePick(currentPick?.pick_number, selectedTeamId);
   }
 
@@ -5856,6 +3719,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
 
     setManualPickNumber(nextPick);
     setLocalClock({ pick_number: nextPick, timer_started_at: now, timer_minutes: Number(timerMinutes) || 10 });
+    triggerHaptic("success",true);
     if (revealPick) revealPick(pickNumber);
   }
 
@@ -5883,7 +3747,7 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
     const ctx = canvas.getContext("2d");
 
     const primary = team.primary_color || "#2d0b6e";
-    const secondary = team.secondary_color || "#facc15";
+    const secondary = team.secondary_color || "var(--cfb-gold)";
     const accent = team.accent_color || "#ffffff";
     const user = String(pick.discord_username || pick.discord_users?.discord_username || "CFBElite User").toUpperCase();
     const teamName = String(team.name || "Selected Team").toUpperCase();
@@ -6130,22 +3994,22 @@ function DraftRoom({ teams = [], users = [], picks = [], settings = {}, conferen
   const S = {
     page: { display: "grid", gap: 18 },
     panel: { background: "rgba(15,23,42,.78)", border: "1px solid rgba(255,255,255,.14)", borderRadius: 22, padding: 18, boxShadow: "0 20px 60px rgba(0,0,0,.30)" },
-    hero: { background: "linear-gradient(135deg, rgba(49,46,129,.92), rgba(15,23,42,.88))", border: "1px solid rgba(250,204,21,.28)", borderRadius: 26, padding: 22, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 18, alignItems: "center" },
+    hero: { background: "linear-gradient(135deg, rgba(49,46,129,.92), rgba(15,23,42,.88))", border: "1px solid rgba(201,208,217,.28)", borderRadius: 26, padding: 22, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 18, alignItems: "center" },
     title: { margin: 0, color: "#fff", fontSize: "clamp(38px, 8vw, 78px)", lineHeight: .9, letterSpacing: "-.055em", fontWeight: 1000 },
-    eyebrow: { color: "#facc15", textTransform: "uppercase", letterSpacing: ".16em", fontSize: 12, fontWeight: 1000 },
+    eyebrow: { color: "var(--cfb-gold)", textTransform: "uppercase", letterSpacing: ".16em", fontSize: 12, fontWeight: 1000 },
     muted: { color: "rgba(255,255,255,.72)", lineHeight: 1.45 },
-    clock: { color: "#facc15", fontSize: "clamp(42px, 10vw, 88px)", fontWeight: 1000, lineHeight: .9 },
+    clock: { color: "var(--cfb-gold)", fontSize: "clamp(42px, 10vw, 88px)", fontWeight: 1000, lineHeight: .9 },
     grid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 },
     availableConferenceStack: { display: "grid", gap: 14, marginTop: 14 },
     availableConferenceGroup: { display: "grid", gap: 10 },
     availableConferenceHeader: { border: "1px solid rgba(255,255,255,.18)", borderRadius: 14, padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, color: "#ffffff", fontWeight: 1000, fontSize: 13, textTransform: "uppercase", letterSpacing: ".08em" },
     availableTeamGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 },
     input: { width: "100%", border: "1px solid rgba(255,255,255,.16)", background: "rgba(255,255,255,.08)", color: "#fff", borderRadius: 14, padding: "12px 14px", fontWeight: 800 },
-    button: { border: "1px solid rgba(250,204,21,.32)", background: "linear-gradient(135deg, #facc15, #b45309)", color: "#111827", borderRadius: 14, padding: "12px 14px", fontWeight: 1000, cursor: "pointer", minHeight: 46 },
+    button: { border: "1px solid rgba(201,208,217,.32)", background: "linear-gradient(135deg, var(--cfb-gold), #b45309)", color: "#111827", borderRadius: 14, padding: "12px 14px", fontWeight: 1000, cursor: "pointer", minHeight: 46 },
     ghost: { border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.08)", color: "#fff", borderRadius: 14, padding: "12px 14px", fontWeight: 900, cursor: "pointer", minHeight: 46 },
     pickTile: { background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.12)", borderRadius: 16, padding: 12, display: "grid", gap: 7 },
-    activePickRow: { marginTop: 14, border: "1px solid rgba(250,204,21,.38)", background: "rgba(250,204,21,.08)", borderRadius: 16, padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" },
-    activePickTeam: { color: "#facc15", fontSize: "clamp(20px, 5vw, 30px)", fontWeight: 1000, lineHeight: 1.05 },
+    activePickRow: { marginTop: 14, border: "1px solid rgba(201,208,217,.38)", background: "rgba(201,208,217,.08)", borderRadius: 16, padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" },
+    activePickTeam: { color: "var(--cfb-gold)", fontSize: "clamp(20px, 5vw, 30px)", fontWeight: 1000, lineHeight: 1.05 },
     activePickMeta: { color: "rgba(255,255,255,.78)", fontWeight: 900, whiteSpace: "nowrap" },
     twoCol: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 },
   };
@@ -6406,137 +4270,10 @@ function AdminLocked({ adminCodeInput, setAdminCodeInput, unlockAdmin }) {
   );
 }
 
-function Watchlist({ teams, users, assignments, results, currentWeek }) {
-  const rankings = computerRankingRows(teams, results, assignments, users);
-  const undefeated = rankings.filter((row)=>row.wins > 0 && row.losses === 0).slice(0,5);
-  const winless = rankings.filter((row)=>row.games > 0 && row.wins === 0).slice(0,5);
-  const highRisk = rankings.filter((row)=>row.games && row.sor >= 7).slice(0,5);
-  return (
-    <section style={card}>
-      <h2 style={sectionTitle}>League Watchlist</h2>
-      <div style={threeCol}>
-        <LeaderboardCard title="Undefeated Watch" rows={undefeated.map((r)=>({team:r.teamName,total:`${r.wins}-${r.losses}`}))}/>
-        <LeaderboardCard title="Struggle Watch" rows={winless.map((r)=>({team:r.teamName,total:`${r.wins}-${r.losses}`}))}/>
-        <LeaderboardCard title="Tough Road Watch" rows={highRisk.map((r)=>({team:r.teamName,total:r.sor.toFixed(1)}))}/>
-      </div>
-    </section>
-  );
-}
-
-function weeklyRankingsPost(teams, results, assignments, users) {
-  const rows = computerRankingRows(teams, results, assignments, users).slice(0,25);
-  return ["📊 CFBElite Computer Rankings", "", ...rows.map((row)=>`${row.rank}. ${row.teamName} (${row.wins}-${row.losses}) — ${row.score.toFixed(1)}`)].join("\\n");
-}
-
-function weeklyGotwPost(teams, users, assignments, results, weeklyMatchups, currentYear, currentWeek) {
-  const game = weeklyMatchupRows(weeklyMatchups, teams, users, assignments, results, currentYear, currentWeek)[0];
-  if (!game) return `🔥 CFBElite Draft Room\\n\\nNo matchup entered for ${currentYear} ${currentWeek}.`;
-  return [`🔥 CFBElite Draft Room`, "", `${game.team_1?.name || "Team 1"} vs ${game.team_2?.name || "Team 2"}`, `Game Score: ${game.game.score}`, `Why: ${game.game.reasons.join(" • ")}`].join("\\n");
-}
-
-function weeklyEloPost(users, assignments, results) {
-  const rows = userEloRows(users, assignments, results).slice(0,10);
-  return ["⚡ CFBElite User ELO Top 10", "", ...rows.map((row,index)=>`${index+1}. ${row.discord} — ${row.elo}`)].join("\\n");
-}
-
 function EloRankings({ users, teams, assignments, results }) {
   const rows = userEloRows(users, assignments, results);
   const activeTeamByUser = new Map(assignments.filter((row)=>row.status === "Active").map((row)=>[row.discord_user_id, teams.find((team)=>team.id===row.team_id)]));
   return <section style={card}><h2 style={sectionTitle}>User ELO Rankings</h2><p style={mutedText}>ELO is rebuilt automatically from every recorded result in chronological order. Everyone starts at 1500. Upsets and margin of victory affect movement.</p><Table headers={["#", "Discord User", "Current Team", "Adjusted ELO", "Current ELO", "Peak ELO", "Tier", "Record"]}>{rows.map((row,index)=>{ const team = activeTeamByUser.get(row.user.id); const tier = userTierFromElo(row.elo, index + 1); return <tr key={row.user.id} style={trStyle}><td style={rankCell}>#{index + 1}</td><td style={teamCell}>{row.discord}</td><td style={teamCell}>{team ? <TeamLabel team={team}/> : "—"}</td><td style={scoreCell}>{row.adjustedElo}</td><td style={td}>{row.elo}</td><td style={td}>{row.peakElo}</td><td style={td}>{tier.label}</td><td style={td}>{row.wins}-{row.losses}</td></tr>; })}</Table></section>;
-}
-
-function WeeklyMatchups({ rows, newMatchup, setNewMatchup, teams, users, assignments, results, currentYear, currentWeek, addMatchup, deleteRow, matchupImportText, setMatchupImportText, importWeeklyMatchups }) {
-  const currentRows = weeklyMatchupRows(rows, teams, users, assignments, results, currentYear, currentWeek);
-  return <section style={card}><div style={sectionTop}><div><h2 style={sectionTitle}>Weekly Matchups</h2><p style={mutedText}>Enter scheduled user games for the week. Draft Room is selected automatically by score.</p></div><button style={button} onClick={addMatchup}>Add Matchup</button></div>
-    <div style={filterGrid}>
-      <select style={input} value={newMatchup.season_year} onChange={(e)=>setNewMatchup({...newMatchup, season_year:e.target.value})}>{YEARS.map((year)=><option key={year}>{year}</option>)}</select>
-      <select style={input} value={newMatchup.week} onChange={(e)=>setNewMatchup({...newMatchup, week:e.target.value})}>{WEEKS.map((week)=><option key={week}>{week}</option>)}</select>
-      <select style={input} value={newMatchup.team_1_id} onChange={(e)=>setNewMatchup({...newMatchup, team_1_id:e.target.value})}><option value="">Team 1</option>{teams.map((team)=><option key={team.id} value={team.id}>{team.name}</option>)}</select>
-      <select style={input} value={newMatchup.team_2_id} onChange={(e)=>setNewMatchup({...newMatchup, team_2_id:e.target.value})}><option value="">Team 2</option>{teams.map((team)=><option key={team.id} value={team.id}>{team.name}</option>)}</select>
-      <select style={input} value={newMatchup.team_1_user_id} onChange={(e)=>setNewMatchup({...newMatchup, team_1_user_id:e.target.value})}><option value="">User 1 optional</option>{users.map((user)=><option key={user.id} value={user.id}>{user.discord_username}</option>)}</select>
-      <select style={input} value={newMatchup.team_2_user_id} onChange={(e)=>setNewMatchup({...newMatchup, team_2_user_id:e.target.value})}><option value="">User 2 optional</option>{users.map((user)=><option key={user.id} value={user.id}>{user.discord_username}</option>)}</select>
-    </div>
-    <div style={miniCard}>
-      <h3 style={miniTitle}>Paste Schedule Import</h3>
-      <p style={mutedText}>One matchup per line. Example: Alabama Crimson Tide vs Clemson Tigers. Usernames can be included but are optional.</p>
-      <textarea value={matchupImportText} onChange={(e)=>setMatchupImportText(e.target.value)} style={recapBox} placeholder={"Alabama Crimson Tide vs Clemson Tigers\nOhio State Buckeyes vs Michigan Wolverines"} />
-      <button style={button} onClick={importWeeklyMatchups}>Import Matchups</button>
-    </div>
-    <Table headers={["Game Score", "Team 1", "Team 2", "Why", "Delete"]}>{currentRows.map((row)=><tr key={row.id} style={trStyle}><td style={scoreCell}>{row.game.score}</td><td style={teamCell}><TeamLabel team={row.team_1}/><div style={mutedText}>{row.user_1?.discord_username || matchupUserLabel(row.team_1_user_id, users)}</div></td><td style={teamCell}><TeamLabel team={row.team_2}/><div style={mutedText}>{row.user_2?.discord_username || matchupUserLabel(row.team_2_user_id, users)}</div></td><td style={td}>{row.game.reasons.join(" • ")}</td><td style={td}><button style={dangerButton} onClick={()=>{ if(window.confirm("Delete this scheduled matchup?")) deleteRow("weekly_matchups", row.id); }}>Delete</button></td></tr>)}</Table>
-  </section>;
-}
-
-function RankingsMovementReport({ teams, results, currentWeek, assignments = [], users = [] }) {
-  const current = computerRankingRows(teams, results, assignments, users);
-  const previous = computerRankingRows(teams, results.filter((result)=>weekIndex(result.week) < weekIndex(currentWeek)), assignments, users);
-  const prevMap = new Map(previous.map((row)=>[row.team.id, row.rank]));
-  const movers = current.map((row)=>({ ...row, previousRank: prevMap.get(row.team.id), movement: prevMap.get(row.team.id) ? prevMap.get(row.team.id) - row.rank : null }));
-  const risers = movers.filter((row)=>row.movement > 0).sort((a,b)=>b.movement-a.movement).slice(0,5);
-  const fallers = movers.filter((row)=>row.movement < 0).sort((a,b)=>a.movement-b.movement).slice(0,5);
-  const news = movers.filter((row)=>row.previousRank == null).slice(0,5);
-  return <section style={card}><h2 style={sectionTitle}>Rankings Movement Report</h2><div style={threeCol}><LeaderboardCard title="Biggest Risers" rows={risers.map((r)=>({team:r.teamName,total:`▲ ${r.movement}`}))}/><LeaderboardCard title="Biggest Fallers" rows={fallers.map((r)=>({team:r.teamName,total:`▼ ${Math.abs(r.movement)}`}))}/><LeaderboardCard title="New This Week" rows={news.map((r)=>({team:r.teamName,total:"NEW"}))}/></div></section>;
-}
-
-function weeklyRecapText({ teams, users, assignments, results, weeklyMatchups, currentYear, currentWeek }) {
-  const weekResults = results.filter((row)=>String(row.season_year) === String(currentYear) && row.week === currentWeek);
-  const gotw = weeklyMatchupRows(weeklyMatchups, teams, users, assignments, results, currentYear, currentWeek)[0];
-  const rankings = computerRankingRows(teams, results, assignments, users).slice(0,10);
-  const eloTop = userEloRows(users, assignments, results).slice(0,5);
-  const lines = [`🏈 CFBElite ${currentYear} ${currentWeek} Recap`, ""];
-  if (gotw) lines.push(`🔥 Draft Room: ${gotw.team_1?.name || "Team 1"} vs ${gotw.team_2?.name || "Team 2"} (${gotw.game.score} score)`, "");
-  if (weekResults.length) {
-    lines.push("Finals:");
-    weekResults.slice(0,12).forEach((r)=>lines.push(`• ${r.team_1?.name || "Team 1"} ${r.team_1_score} - ${r.team_2_score} ${r.team_2?.name || "Team 2"}`));
-    lines.push("");
-  } else {
-    lines.push("No results recorded yet for this week.", "");
-  }
-  lines.push("Top 10 Computer Rankings:");
-  rankings.forEach((r)=>lines.push(`${r.rank}. ${r.teamName} (${r.wins}-${r.losses}) — ${r.score.toFixed(1)}`));
-  lines.push("", "Top 5 User ELO:");
-  eloTop.forEach((r, index)=>lines.push(`${index + 1}. ${r.discord} — ${r.elo}`));
-  return lines.join("\\n");
-}
-
-
-
-function CommissionerCenterSafe({ setActiveTab, loadData }) {
-  const tools = [
-    ["assignments", "User Assignments", "Manage active/former team assignments"],
-    ["resultsManager", "Results Manager", "Edit or delete game results"],
-    ["recruitingRankings", "Recruiting Manager", "Edit recruiting classes"],
-    ["awards", "Awards Manager", "Manage award winners"],
-    ["allAmericans", "All-Americans", "Manage All-American records"],
-    ["heismans", "Heisman Winners", "Manage Heisman history"],
-    ["nationalChampions", "National Champions", "Manage national title records"],
-    ["logoManager", "Logo Manager", "Add team logos, helmets, and colors"],
-  ];
-
-  return (
-    <section style={broadcastCard}>
-      <h2 style={sectionTitle}>Commissioner Command Center</h2>
-      <p style={mutedText}>A single control room for league data, cleanup, records, logos, stats, recruiting, and history.</p>
-      <div style={commishGrid}>
-        {tools.map(([key, title, desc])=>(
-          <button key={key} style={commishToolCard} onClick={() => setActiveTab(key)}>
-            <b>{title}</b>
-            <span>{desc}</span>
-          </button>
-        ))}
-        <button style={commishToolCard} onClick={loadData}>
-          <b>Refresh Data</b>
-          <span>Reload all Supabase data</span>
-        </button>
-      </div>
-      <div style={miniCard}>
-        <h3 style={miniTitle}>Data Integrity Checklist</h3>
-        <div style={miniRow}>Confirm every active user has one active team.</div>
-        <div style={miniRow}>Confirm team logos and helmets are filled in Logo Manager.</div>
-        <div style={miniRow}>Confirm every season has recruiting ranks and team stats recorded.</div>
-        <div style={miniRow}>Use Results Manager to clean duplicate or incorrect game results.</div>
-      </div>
-    </section>
-  );
 }
 
 function UserManagerV2({users=[],assignments=[],teams=[],linkedDiscordUser,addDiscordUser,renameDiscordUser,setDiscordUserActive,setDiscordUserBan,setDiscordCommissionerStatus}) {
@@ -6992,7 +4729,7 @@ function LeagueDataCenter({ teams, users, assignments, results = [], currentYear
     <section style={broadcastPageCard}>
       <h2 style={sectionTitle}>League Data Center</h2>
       <p style={mutedText}>One clean hub for league data entry. Discord users auto-populate from active team assignments. Unassigned opponents are treated as CPU.</p>
-      <div style={dataCenterTabs}>{tabs.map(([key,label])=><button key={key} style={{...dataCenterTab, borderColor: activeForm===key ? "#facc15" : "rgba(255,255,255,.16)"}} onClick={()=>setActiveForm(key)}>{label}</button>)}</div>
+      <div style={dataCenterTabs}>{tabs.map(([key,label])=><button key={key} style={{...dataCenterTab, borderColor: activeForm===key ? "var(--cfb-gold)" : "rgba(255,255,255,.16)"}} onClick={()=>setActiveForm(key)}>{label}</button>)}</div>
 
       {activeForm === "results" && <div style={entryPanel}><h3 style={miniTitle}>Results</h3><div style={entryGrid}>
         <select style={input} value={result.season_year} onChange={(e)=>{ const nextYear=e.target.value; const yearResults=(results || []).filter((row)=>String(row.season_year)===String(nextYear)); const userTeamIds=new Set(assignments.filter((a)=>a.status==="Active" && a.discord_user_id && a.team_id).map((a)=>String(a.team_id))); const rankRows=computerRankingRows(teams, yearResults, assignments, users).filter((row)=>userTeamIds.has(String(row.team?.id))).map((row,index)=>({...row, rank:index+1})); const rankMap=new Map(rankRows.map((row)=>[String(row.team?.id), row.rank])); setResult({...result, season_year:nextYear, team_1_rank: userTeamIds.has(String(result.team_1_id)) ? (rankMap.get(String(result.team_1_id)) || "") : "", team_2_rank: userTeamIds.has(String(result.team_2_id)) ? (rankMap.get(String(result.team_2_id)) || "") : ""}); }}>{YEARS.map((year)=><option key={year}>{year}</option>)}</select>
@@ -7269,10 +5006,6 @@ function userEloRows(users, assignments, results) {
     .sort((a, b) => b.adjustedElo - a.adjustedElo || b.elo - a.elo || b.wins - a.wins || a.discord.localeCompare(b.discord));
 }
 
-function userEloMap(users, assignments, results) {
-  return new Map(userEloRows(users, assignments, results).map((row) => [row.user.id, row.elo]));
-}
-
 function userTierFromElo(elo, rank = 32) {
   if (rank <= 8 || elo >= 1600) return { label: "Tier 1", score: 100 };
   if (rank <= 16 || elo >= 1500) return { label: "Tier 2", score: 75 };
@@ -7362,121 +5095,6 @@ function computerRankingRows(teams, results, assignments = [], users = []) {
     .map((row,index)=>({...row, rank:index+1}));
 }
 
-function LeaguePulse({ teams, results, allAmericans = [], awards = [], currentYear, assignments = [], users = [] }) {
-  const rows = computerRankingRows(teams, results, assignments, users);
-  const bestOffense = [...rows].sort((a,b)=>b.avgPf-a.avgPf)[0];
-  const bestDefense = [...rows].filter((r)=>r.games).sort((a,b)=>a.avgPa-b.avgPa)[0];
-  const qwLeader = [...rows].sort((a,b)=>b.qw-a.qw)[0];
-  const toughest = [...rows].sort((a,b)=>b.sor-a.sor)[0];
-  const worstDefense = [...rows].filter((r)=>r.games).sort((a,b)=>b.avgPa-a.avgPa)[0];
-  const leastAvgPf = [...rows].filter((r)=>r.games).sort((a,b)=>a.avgPf-b.avgPf)[0];
-  const easiestRoad = [...rows].filter((r)=>r.games).sort((a,b)=>a.sor-b.sor)[0];
-  const worstResume = [...rows].filter((r)=>r.games).sort((a,b)=>a.score-b.score)[0];
-  const yearAA = allAmericans.filter((row)=>String(row.season_year) === String(currentYear));
-  const yearAwards = awards.filter((row)=>String(row.season_year) === String(currentYear));
-  const aaLeader = rankingRows(teams, yearAA)[0];
-  const awardLeader = rankingRows(teams, yearAwards)[0];
-
-  return <div style={pulseGrid}>
-    <PulseCard title="#1 Computer Rank" value={rows[0]?.teamName || "—"} sub={rows[0] ? `${rows[0].wins}-${rows[0].losses} · ${rows[0].score} score` : "No games yet"}/>
-    <PulseCard title="Best Offense" value={bestOffense?.teamName || "—"} sub={bestOffense ? `${bestOffense.avgPf.toFixed(1)} Avg PF` : "—"}/>
-    <PulseCard title="Best Defense" value={bestDefense?.teamName || "—"} sub={bestDefense ? `${bestDefense.avgPa.toFixed(1)} Avg PA` : "—"}/>
-    <PulseCard title="Best Resume" value={qwLeader?.teamName || "—"} sub={qwLeader ? `${qwLeader.qw} quality wins` : "—"}/>
-    <PulseCard title="Toughest Road" value={toughest?.teamName || "—"} sub={toughest ? `${toughest.sor.toFixed(1)} SOR` : "—"}/>
-    <PulseCard title="Worst Defense" value={worstDefense?.teamName || "—"} sub={worstDefense ? `${worstDefense.avgPa.toFixed(1)} Avg PA allowed` : "—"}/>
-    <PulseCard title="Least Avg PF" value={leastAvgPf?.teamName || "—"} sub={leastAvgPf ? `${leastAvgPf.avgPf.toFixed(1)} Avg PF` : "—"}/>
-    <PulseCard title="Easiest Road" value={easiestRoad?.teamName || "—"} sub={easiestRoad ? `${easiestRoad.sor.toFixed(1)} SOR` : "—"}/>
-    <PulseCard title="Worst Resume" value={worstResume?.teamName || "—"} sub={worstResume ? `${worstResume.score.toFixed(1)} computer score` : "—"}/>
-    <PulseCard title="Most All-Americans" value={aaLeader?.team || "—"} sub={aaLeader ? `${aaLeader.total} in ${currentYear}` : `0 in ${currentYear}`}/>
-    <PulseCard title="Most Awards Won" value={awardLeader?.team || "—"} sub={awardLeader ? `${awardLeader.total} in ${currentYear}` : `0 in ${currentYear}`}/>
-  </div>;
-}
-
-function PulseCard({ title, value, sub }) { return <div style={pulseCard}><div style={statTitle}>{title}</div><div style={pulseValue}>{value}</div><div style={mutedText}>{sub}</div></div>; }
-
-function rankingMovement(currentRank, previousRank) {
-  if (!previousRank || !currentRank) return { label: "NEW", style: movementNeutral };
-  const change = previousRank - currentRank;
-  if (change > 0) return { label: `▲ ${change}`, style: movementUp };
-  if (change < 0) return { label: `▼ ${Math.abs(change)}`, style: movementDown };
-  return { label: "—", style: movementNeutral };
-}
-
-function MovementBadge({ currentRank, previousRank }) {
-  const movement = rankingMovement(currentRank, previousRank);
-  return <span style={movement.style}>{movement.label}</span>;
-}
-
-function ComputerRankings({ teams, results, currentWeek, sortState, setSortState, assignments = [], users = [] }) {
-  const baseRows = computerRankingRows(teams, results, assignments, users);
-  const previousResults = results.filter((result) => weekIndex(result.week) < weekIndex(currentWeek));
-  const previousRows = computerRankingRows(teams, previousResults, assignments, users);
-  const previousRankMap = new Map(previousRows.map((row) => [row.team.id, row.rank]));
-  const activeSort = sortState?.key ? sortState : { key: "score", direction: "desc" };
-  const rows = [...baseRows].sort((a,b)=>compareForSort(a,b,activeSort.key,activeSort.direction));
-  return <section style={card}><div style={sectionTop}><div><h2 style={sectionTitle}>CFBElite Computer Rankings</h2><p style={mutedText}>Automated 32-user ranking. Formula: record, SOR, quality wins, scoring margin, wins, and opponent user ELO tier strength. Movement compares current rank to the rank through the previous league week.</p></div></div><Table headers={["#","Move",<SortButton label="Team" sortKey="teamName" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="Record" sortKey="record" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="QW" sortKey="qw" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="Avg PF" sortKey="avgPf" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="Avg PA" sortKey="avgPa" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="SOR" sortKey="sor" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="Score" sortKey="score" sortState={activeSort} setSortState={setSortState}/>]}>{rows.map((row)=><tr key={row.team.id} style={trStyle}><td style={rankCell}>#{row.rank}</td><td style={td}><MovementBadge currentRank={row.rank} previousRank={previousRankMap.get(row.team.id)}/></td><td style={teamCell}><TeamLabel team={row.team}/></td><td style={td}>{row.wins}-{row.losses}</td><td style={td}>{row.qw}</td><td style={td}>{row.avgPf.toFixed(1)}</td><td style={td}>{row.avgPa.toFixed(1)}</td><td style={td}>{row.sor.toFixed(1)}</td><td style={scoreCell}>{row.score.toFixed(1)}</td></tr>)}</Table></section>;
-}
-
-function DashboardRecognition({ allAmericanRows, awardRows }) {
-  const cleanAA = allAmericanRows.filter((r)=>r.total>0).slice(0,10);
-  const cleanAwards = awardRows.filter((r)=>r.total>0).slice(0,10);
-  return <section style={card}><h2 style={sectionTitle}>Recognition Leaders</h2><div style={twoCol}><LeaderboardCard title="All-American Rankings" rows={cleanAA}/><LeaderboardCard title="Awards Rankings" rows={cleanAwards}/></div></section>;
-}
-function LeaderboardCard({ title, rows }) { return <div style={miniCard}><h3 style={miniTitle}>{title}</h3>{rows.length ? rows.map((r,i)=><div key={r.team} style={leaderRow}><span>#{i+1} {r.team}</span><b>{r.total}</b></div>) : <div style={miniRow}>No entries yet.</div>}</div>; }
-
-function RecentActivity({ results, allAmericans, awards, heismans, champions }) {
-  const items = [
-    ...results.map((r)=>({time:r.created_at, text:`Result: ${r.team_1?.name || "Team 1"} ${r.team_1_score}-${r.team_2_score} ${r.team_2?.name || "Team 2"}`})),
-    ...allAmericans.map((r)=>({time:r.created_at, text:`All-American: ${r.player_name} (${r.teams?.name || "Team"})`})),
-    ...awards.map((r)=>({time:r.created_at, text:`Award: ${r.player_name} won ${r.award_name}`})),
-    ...heismans.map((r)=>({time:r.created_at, text:`Heisman: ${r.player_name} (${r.teams?.name || "Team"})`})),
-    ...champions.map((r)=>({time:r.created_at, text:`National Champion: ${r.teams?.name || "Team"} (${r.season_year})`})),
-  ].sort((a,b)=>new Date(b.time||0)-new Date(a.time||0)).slice(0,12);
-  return <section style={card}><h2 style={sectionTitle}>Recent Activity</h2><div style={activityList}>{items.length ? items.map((item,i)=><div key={i} style={activityItem}>{item.text}</div>) : <div style={miniRow}>No recent activity yet.</div>}</div></section>;
-}
-
-function allTimeUserRankingRows(users, teams, assignments, results) {
-  const rows = users.map((user) => {
-    const userResults = results.filter((result) => {
-      const team1UserId = result.team_1_user_id || coachForTeamYear(result.team_1_id, result.season_year, assignments)?.discord_user_id;
-      const team2UserId = result.team_2_user_id || coachForTeamYear(result.team_2_id, result.season_year, assignments)?.discord_user_id;
-      return team1UserId === user.id || team2UserId === user.id;
-    });
-    let wins = 0, losses = 0, pf = 0, pa = 0, qw = 0;
-    userResults.forEach((result) => {
-      const team1UserId = result.team_1_user_id || coachForTeamYear(result.team_1_id, result.season_year, assignments)?.discord_user_id;
-      const isUserTeam1 = team1UserId === user.id;
-      const forPts = Number(isUserTeam1 ? result.team_1_score : result.team_2_score) || 0;
-      const againstPts = Number(isUserTeam1 ? result.team_2_score : result.team_1_score) || 0;
-      const oppRank = Number(isUserTeam1 ? result.team_2_rank : result.team_1_rank);
-      pf += forPts;
-      pa += againstPts;
-      if (forPts > againstPts) {
-        wins += 1;
-        if (oppRank >= 1 && oppRank <= 25) qw += 1;
-      } else if (forPts < againstPts) {
-        losses += 1;
-      }
-    });
-    const games = wins + losses;
-  const activeAssignment = assignments.find((assignment) => assignment.discord_user_id === user.id && assignment.status === "Active");
-    const currentTeam = teams.find((team) => team.id === activeAssignment?.team_id);
-    const avgPf = games ? pf / games : 0;
-    const avgPa = games ? pa / games : 0;
-    const winPct = games ? wins / games : 0;
-    const score = (winPct * 60) + (qw * 4) + ((avgPf - avgPa) * 0.5) + (wins * 1.25);
-    return { user, discord: user.discord_username, currentTeam, teamName: user.discord_username, wins, losses, games, avgPf, avgPa, qw, score: Number(score.toFixed(1)) };
-  });
-  return rows.sort((a,b)=>b.score-a.score || b.wins-a.wins || a.losses-b.losses || a.discord.localeCompare(b.discord));
-}
-
-function AllTimeUserStandings({ users, teams, assignments, results, sortState, setSortState }) {
-  const baseRows = allTimeUserRankingRows(users, teams, assignments, results);
-  const activeSort = sortState?.key && sortState.key !== "manual" ? sortState : { key: "score", direction: "desc" };
-  const rows = [...baseRows].sort((a,b)=>compareForSort(a,b,activeSort.key,activeSort.direction));
-  return <section style={card}><h2 style={sectionTitle}>All-Time User Standings</h2><p style={mutedText}>All recorded user games across every season, grouped by Discord user. Current team is listed for context.</p><Table headers={["#",<SortButton label="Discord User" sortKey="discord" sortState={activeSort} setSortState={setSortState}/>,"Current Team",<SortButton label="Record" sortKey="record" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="QW" sortKey="qw" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="Avg PF" sortKey="avgPf" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="Avg PA" sortKey="avgPa" sortState={activeSort} setSortState={setSortState}/>,<SortButton label="Score" sortKey="score" sortState={activeSort} setSortState={setSortState}/>]}>{rows.map((row,index)=><tr key={row.user.id} style={trStyle}><td style={rankCell}>#{index + 1}</td><td style={teamCell}>{row.discord}</td><td style={td}>{row.currentTeam ? <TeamLabel team={row.currentTeam}/> : "—"}</td><td style={td}>{row.wins}-{row.losses}</td><td style={td}>{row.qw}</td><td style={td}>{row.avgPf.toFixed(1)}</td><td style={td}>{row.avgPa.toFixed(1)}</td><td style={scoreCell}>{row.score.toFixed(1)}</td></tr>)}</Table></section>;
-}
-
 function rowsForCoachUser(rows, user, assignments) {
   return rows.filter((row) => {
     const assignment = coachForTeamYear(row.team_id, row.season_year, assignments);
@@ -7537,135 +5155,6 @@ function CoachTimelineTable({ timeline, teams, results, allAmericans, awards, he
   return <div style={miniCard}><h3 style={miniTitle}>Career Timeline</h3><Table headers={["Years", "School", "Record", "All-Americans", "Awards", "Conf Titles", "Heismans", "Nattys"]}>{rows.length ? rows.map((row)=><tr key={row.assignment.id} style={trStyle}><td style={td}>{assignmentYears(row.assignment)}</td><td style={teamCell}>{row.team ? <TeamLabel team={row.team}/> : teamNameById(row.assignment.team_id, teams)}</td><td style={td}>{row.rec.wins}-{row.rec.losses}</td><td style={td}>{row.allAmericans}</td><td style={td}>{row.awards}</td><td style={td}>{row.confTitles}</td><td style={td}>{row.heismans}</td><td style={td}>{row.nattys}</td></tr>) : <tr style={trStyle}><td style={td} colSpan={8}>No team history assigned.</td></tr>}</Table></div>;
 }
 
-function top25RecruitingClassesForCoach(user, recruiting, assignments) {
-  return recruiting.filter((row) => {
-    if (!(Number(row.rank) >= 1 && Number(row.rank) <= 25)) return false;
-    const coach = coachForTeamYear(row.team_id, row.season_year, assignments);
-    return coach?.discord_user_id === user.id;
-  }).length;
-}
-
-
-function coachSuperlatives(user, users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting) {
-  const rows = getCoachStats(users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting);
-  const current = rows.find((row)=>row.userId === user.id);
-  if (!current) return [];
-
-  const sortedBy = (key) => [...rows].filter((row)=>Number(row[key]||0)>0).sort((a,b)=>Number(b[key]||0)-Number(a[key]||0));
-  const badges = [];
-
-  if (current.nattys >= 3) badges.push("🏆 Dynasty Legend");
-  else if (current.nattys >= 1) badges.push("🏆 National Champion");
-
-  if (sortedBy("top10Wins")[0]?.userId === user.id) badges.push("🎯 Big Game Hunter");
-  if (sortedBy("confTitles")[0]?.userId === user.id) badges.push("👑 Conference King");
-  if (sortedBy("top25Classes")[0]?.userId === user.id) badges.push("🧲 Elite Recruiter");
-  if (sortedBy("allAmericans")[0]?.userId === user.id) badges.push("⭐ Talent Developer");
-  if (sortedBy("awards")[0]?.userId === user.id) badges.push("🏅 Trophy Collector");
-  if (sortedBy("heismans")[0]?.userId === user.id) badges.push("🎖 Heisman Coach");
-
-  if (!badges.length && current.wins > 0) badges.push("📈 Program Builder");
-  return badges.slice(0, 6);
-}
-
-function CoachRings({ stats, superlatives }) {
-  const rings = [
-    { label: "National Championships", icon: "🏆", value: stats?.nattys || 0 },
-    { label: "Conference Championships", icon: "💍", value: stats?.confTitles || 0 },
-    { label: "Heisman Winners", icon: "🎖️", value: stats?.heismans || 0 },
-    { label: "Top 10 Wins", icon: "🎯", value: stats?.top10Wins || 0 },
-  ];
-
-  return (
-    <div style={coachRingsPanel}>
-      <div style={coachRingGrid}>
-        {rings.map((ring)=>(
-          <div key={ring.label} style={coachRingTile}>
-            <div style={coachRingIcons}>{ring.value > 0 ? Array.from({length: Math.min(Number(ring.value), 6)}, (_,i)=><span key={i}>{ring.icon}</span>) : <span>—</span>}</div>
-            <div style={coachRingValue}>{ring.value}</div>
-            <div style={statTitle}>{ring.label}</div>
-          </div>
-        ))}
-      </div>
-      <div style={superlativeRow}>
-        {(superlatives?.length ? superlatives : ["Building résumé"]).map((badge)=>(
-          <span key={badge} style={superlativePill}>{badge}</span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-
-
-const fullTable = {
-  width: "max-content",
-  minWidth: 920,
-  borderCollapse: "separate",
-  borderSpacing: 0,
-  color: "#f8fafc",
-};
-
-function SortableStatsTable({ title, rows = [], columns = [], emptyText = "No records yet." }) {
-  const [sortConfig, setSortConfig] = useState({ key: columns[0]?.key || "", direction: "desc" });
-
-  const sortedRows = [...rows].sort((a,b)=>{
-    const av = a?.[sortConfig.key];
-    const bv = b?.[sortConfig.key];
-    const an = Number(av);
-    const bn = Number(bv);
-    if (!Number.isNaN(an) && !Number.isNaN(bn)) {
-      return sortConfig.direction === "asc" ? an - bn : bn - an;
-    }
-    const cmp = String(av ?? "").localeCompare(String(bv ?? ""));
-    return sortConfig.direction === "asc" ? cmp : -cmp;
-  });
-
-  function toggleSort(key) {
-    setSortConfig((prev)=>({ key, direction: prev.key === key && prev.direction === "desc" ? "asc" : "desc" }));
-  }
-
-  return (
-    <section style={coachFullWidthTableV41} className="cfb-scroll-card">
-      <div style={sectionTop}>
-        <h3 style={miniTitle}>{title}</h3>
-        <span style={mutedText}>{rows.length} records</span>
-      </div>
-
-      {!sortedRows.length ? (
-        <div style={coachMobileEmptyStateV56}>
-          <b>{emptyText}</b>
-          <small>Use League Data Center to record this data.</small>
-        </div>
-      ) : (
-        <div style={coachStatsTableWrapV41} className="cfb-table-scroll">
-          <table style={fullTable}>
-            <thead>
-              <tr>
-                {columns.map((column)=>(
-                  <th key={column.key}>
-                    <button type="button" style={tableSortButtonV41} onClick={()=>toggleSort(column.key)}>
-                      {column.label}{sortConfig.key === column.key ? (sortConfig.direction === "asc" ? " ↑" : " ↓") : ""}
-                    </button>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {sortedRows.map((row, index)=>(
-                <tr key={row.id || `${title}-${index}`}>
-                  {columns.map((column)=><td key={column.key}>{row[column.key] ?? "—"}</td>)}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
-  );
-}
-
-
 function AutomaticRankingHistory({rows=[],teams=[],users=[],setActiveTab}){
   const years=[...new Set(rows.map((row)=>Number(row.season_year)))].sort((a,b)=>b-a);
   const [selectedYear,setSelectedYear]=useState(years[0]||"");
@@ -7683,7 +5172,7 @@ function CoachRankingHistoryChart({rows=[]}){
   const x=(index)=>sorted.length===1?width/2:padX+(index*(width-padX*2)/(sorted.length-1));
   const y=(rank)=>padTop+((Math.max(1,Number(rank))-1)/(maxRank-1))*(height-padTop-padBottom);
   const points=sorted.map((row,index)=>`${x(index)},${y(row.final_rank)}`).join(" ");
-  return <section className="coach-ranking-chart"><div className="elite-section-head"><div><span>AUTOMATIC RANKINGS</span><h2>Year-by-Year Finish</h2></div><small>Higher finishes rise toward the top</small></div><div><svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Final automatic ranking by season"><defs><linearGradient id="coachRankLine" x1="0" x2="1"><stop offset="0" stopColor="#38bdf8"/><stop offset="1" stopColor="#facc15"/></linearGradient></defs>{[1,8,16,24,32].map((rank)=><g key={rank}><line x1={padX} x2={width-padX} y1={y(rank)} y2={y(rank)} stroke="rgba(148,163,184,.13)"/><text x={18} y={y(rank)+4} fill="#64748b" fontSize="11">#{rank}</text></g>)}<polyline points={points} fill="none" stroke="url(#coachRankLine)" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/>{sorted.map((row,index)=><g key={`${row.season_year}-${row.team_id}`}><circle cx={x(index)} cy={y(row.final_rank)} r="8" fill="#07111f" stroke="#facc15" strokeWidth="4"/><text x={x(index)} y={y(row.final_rank)-15} textAnchor="middle" fill="#fff" fontSize="13" fontWeight="900">#{row.final_rank}</text><text x={x(index)} y={height-18} textAnchor="middle" fill="#94a3b8" fontSize="12" fontWeight="800">{row.season_year}</text></g>)}</svg></div></section>;
+  return <section className="coach-ranking-chart"><div className="elite-section-head"><div><span>AUTOMATIC RANKINGS</span><h2>Year-by-Year Finish</h2></div><small>Higher finishes rise toward the top</small></div><div><svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Final automatic ranking by season"><defs><linearGradient id="coachRankLine" x1="0" x2="1"><stop offset="0" stopColor="#4f8fa8"/><stop offset="1" stopColor="var(--cfb-gold)"/></linearGradient></defs>{[1,8,16,24,32].map((rank)=><g key={rank}><line x1={padX} x2={width-padX} y1={y(rank)} y2={y(rank)} stroke="rgba(148,163,184,.13)"/><text x={18} y={y(rank)+4} fill="#64748b" fontSize="11">#{rank}</text></g>)}<polyline points={points} fill="none" stroke="url(#coachRankLine)" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/>{sorted.map((row,index)=><g key={`${row.season_year}-${row.team_id}`}><circle cx={x(index)} cy={y(row.final_rank)} r="8" fill="#07111f" stroke="var(--cfb-gold)" strokeWidth="4"/><text x={x(index)} y={y(row.final_rank)-15} textAnchor="middle" fill="#fff" fontSize="13" fontWeight="900">#{row.final_rank}</text><text x={x(index)} y={height-18} textAnchor="middle" fill="var(--cfb-muted)" fontSize="12" fontWeight="800">{row.season_year}</text></g>)}</svg></div></section>;
 }
 
 function CoachProfile({ user, users = [], teams, assignments, results, weeklyMatchups = [], currentYear, currentWeek, rankingSnapshots = [], rankingHistory = [], allAmericans, awards, heismans, nationalChampions, recruiting, seasonPlayerStats = [], teamSeasonStats = [], sportsbook = {} }) {
@@ -7929,21 +5418,6 @@ function CoachHallOfFame({ users, teams, assignments, results, allAmericans, awa
 }
 
 
-function hofProbability(score, type = "coach") {
-  const lock = type === "coach" ? 95 : 80;
-  const likely = type === "coach" ? 70 : 55;
-  const fringe = type === "coach" ? 45 : 35;
-  if (score >= lock) return { label: "LOCK", style: hofLock };
-  if (score >= likely) return { label: "LIKELY", style: hofLikely };
-  if (score >= fringe) return { label: "FRINGE", style: hofFringe };
-  return { label: "WATCH", style: hofWatch };
-}
-
-function HofProbabilityBadge({ score, type }) {
-  const row = hofProbability(score, type);
-  return <span style={row.style}>{row.label}</span>;
-}
-
 function coachHofPointBreakdown(row) {
   return [
     { label: "National Titles", count: row.nattys, points: row.nattys * 30 },
@@ -8006,8 +5480,6 @@ function CoachHofCard({ row, teams, assignments }) {
   );
 }
 function Chip({ label, value }) { return <div style={chip}><b>{value}</b><span>{label}</span></div>; }
-function HofTeamIcon({ team }) { const url = getHelmetUrl(team); return url ? <img src={url} alt="" style={hofTeamImg}/> : <span style={hofIcon}>🏈</span>; }
-
 function playerHallRows(teams, assignments, results, allAmericans, awards, heismans, nationalChampions) {
   const map = new Map();
   const keyFor = (name, teamId) => `${name || "Unknown"}-${teamId || "none"}`;
@@ -8149,14 +5621,6 @@ function CapturedSchedulesPage({currentYear,teams=[],assignments=[],setActiveTab
   const visible=rows.filter((row)=>String(row.season_year)===year&&(teamId==="all"||String(row.team_id)===teamId));
   const groups=[...new Map(visible.map((row)=>[String(row.team_id),{teamId:String(row.team_id),teamName:row.team_name}])).values()];
   return <main className="captured-data-page cfb-v2-page"><section className="captured-data-hero schedules"><div><span>FULL PROGRAM SLATES</span><h1>Team Schedules</h1><p>User-v-user and user-v-CPU games captured from schedule screens and final box scores.</p></div><div><b>{visible.length}</b><span>CAPTURED GAMES</span></div></section><section className="captured-data-controls"><label>Season<select value={year} onChange={(event)=>setYear(event.target.value)}>{years.map((item)=><option key={item}>{item}</option>)}</select></label><label>Program<select value={teamId} onChange={(event)=>setTeamId(event.target.value)}><option value="all">All active programs</option>{teamChoices.map((team)=><option key={team.id} value={team.id}>{team.name}</option>)}</select></label><button onClick={load}>Refresh</button><button onClick={()=>setActiveTab?.("dataIntake")}>Upload Schedule</button></section>{message&&<div className="data-local-message">{message}</div>}<div className="captured-schedule-grid">{groups.length?groups.map((group)=>{const team=teams.find((item)=>String(item.id)===group.teamId);return <section key={group.teamId} className="captured-program-schedule"><header><TeamLogoMark team={team} size={62}/><div><span>{year} PROGRAM SCHEDULE</span><h2>{group.teamName}</h2></div></header><CapturedTeamScheduleCard rows={visible.filter((row)=>String(row.team_id)===group.teamId)} teams={teams} title="Season Slate" compact/></section>}):<div className="data-empty">No approved schedule captures match this selection yet.</div>}</div></main>;
-}
-
-function DynastyCaptureHomePanel({currentYear,currentWeek,teams=[],setActiveTab}){
-  const [pollRows,setPollRows]=useState([]);const [scheduleRows,setScheduleRows]=useState([]);
-  useEffect(()=>{let active=true;Promise.all([supabase.from("dynasty_top_25").select("*").eq("season_year",Number(currentYear)).order("approved_at",{ascending:false}).order("rank").limit(100),supabase.from("dynasty_team_schedules").select("*").eq("season_year",Number(currentYear)).order("week_index").limit(500)]).then(([pollRes,scheduleRes])=>{if(!active)return;if(!pollRes.error){const source=pollRes.data?.[0]?.source_import_id;const poll=pollRes.data?.[0]?.poll_name;setPollRows((pollRes.data||[]).filter((row)=>String(row.source_import_id)===String(source)&&row.poll_name===poll).slice(0,5));}if(!scheduleRes.error)setScheduleRows(scheduleRes.data||[]);});return()=>{active=false;};},[currentYear,currentWeek]);
-  const teamFor=(row)=>teams.find((team)=>String(team.id)===String(row.team_id))||teams.find((team)=>String(team.name).toLowerCase()===String(row.team_name||"").toLowerCase());
-  const currentSchedule=scheduleRows.filter((row)=>String(row.week_label)===String(currentWeek));
-  return <section className="home-capture-panel"><header><div><span>DYNASTY DATA FEED</span><h2>From Console to Dashboard</h2><p>Commissioner-approved screenshots stay visible across every season.</p></div><button onClick={()=>setActiveTab?.("dynastyData")}>Open Full Archive →</button></header><div className="home-capture-grid"><button className="home-capture-feature" onClick={()=>setActiveTab?.("gameTop25")}><span>IN-GAME TOP 25</span><strong>{pollRows.length?pollRows[0]?.week_label||"Latest Poll":"Awaiting capture"}</strong><div>{pollRows.length?pollRows.map((row)=><i key={row.id}><b>#{row.rank}</b><TeamLogoMark team={teamFor(row)} size={26}/><em>{row.team_name}</em></i>):<small>Upload the current Top 25 after advancement.</small>}</div></button><button className="home-capture-feature" onClick={()=>setActiveTab?.("teamSchedules")}><span>{String(currentWeek).toUpperCase()} SCHEDULES</span><strong>{currentSchedule.length} program game{currentSchedule.length===1?"":"s"} captured</strong><div className="home-schedule-counts"><b>{scheduleRows.filter((row)=>row.status==="final").length}<small>Finals</small></b><b>{scheduleRows.filter((row)=>row.status!=="final").length}<small>Upcoming</small></b><b>{new Set(scheduleRows.map((row)=>row.team_id)).size}<small>Programs</small></b></div></button><button className="home-capture-feature archive" onClick={()=>setActiveTab?.("dynastyData")}><span>SEASON VAULT</span><strong>Stats • Rosters • Recruiting</strong><p>Player totals, team stats, standings, portal moves, awards, All-Americans and playoff captures remain searchable forever.</p></button></div></section>;
 }
 
 function LeagueDataIntakeCenter({discordSession,linkedDiscordUser,currentYear,currentWeek,adminUnlocked,setError}) {
@@ -8304,18 +5768,22 @@ function GlobalStyle() {
   return (
     <style>{`
       :root {
-        --cfb-font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
-        --cfb-display: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
-        --cfb-red: #dc2626;
-        --cfb-red-dark: #7f1d1d;
-        --cfb-gold: #facc15;
-        --cfb-green: #35d07f;
-        --cfb-ink: #05070c;
-        --cfb-panel: #0b1019;
-        --cfb-line: rgba(255,255,255,.12);
-        --glass-bg: linear-gradient(155deg, rgba(15,21,33,.97), rgba(4,7,13,.99));
+        --cfb-font: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        --cfb-display: "Inter", ui-sans-serif, system-ui, sans-serif;
+        --cfb-red: #3e7fc1;
+        --cfb-red-dark: #274d73;
+        --cfb-gold: #c9d0d9;
+        --cfb-green: #2fb673;
+        --cfb-danger: #e5484d;
+        --cfb-ink: #0a0d13;
+        --cfb-panel: #12161f;
+        --cfb-panel-2: #171c28;
+        --cfb-text: #eef1f6;
+        --cfb-muted: #8b93a5;
+        --cfb-line: rgba(255,255,255,.10);
+        --glass-bg: linear-gradient(155deg, rgba(23,28,40,.97), rgba(10,13,19,.99));
         --glass-border: rgba(255,255,255,.12);
-        --glass-shadow: 0 22px 60px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.07);
+        --glass-shadow: 0 22px 60px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.07);
       }
 
       * {
@@ -8332,20 +5800,20 @@ function GlobalStyle() {
 
       body {
         background:
-          linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(255,255,255,.014) 1px, transparent 1px),
-          radial-gradient(circle at 12% 0%, rgba(220,38,38,.18), transparent 30%),
-          radial-gradient(circle at 88% 8%, rgba(53,208,127,.08), transparent 26%),
-          linear-gradient(180deg,#05070c,#070b12 55%,#020409);
+          linear-gradient(rgba(255,255,255,.016) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255,255,255,.012) 1px, transparent 1px),
+          radial-gradient(circle at 12% 0%, rgba(62,127,193,.14), transparent 30%),
+          radial-gradient(circle at 88% 8%, rgba(47,182,115,.06), transparent 26%),
+          linear-gradient(180deg,var(--cfb-ink),var(--cfb-panel) 55%,#060810);
         background-size: 40px 40px,40px 40px,auto,auto,auto;
-        color:#f8fafc;
+        color:var(--cfb-text);
       }
 
-      ::selection { background:rgba(220,38,38,.75); color:#fff; }
-      * { scrollbar-color:rgba(220,38,38,.72) rgba(255,255,255,.055); scrollbar-width:thin; }
+      ::selection { background:rgba(62,127,193,.78); color:#fff; }
+      * { scrollbar-color:rgba(62,127,193,.68) rgba(255,255,255,.055); scrollbar-width:thin; }
       *::-webkit-scrollbar { width:8px; height:8px; }
       *::-webkit-scrollbar-track { background:rgba(255,255,255,.045); }
-      *::-webkit-scrollbar-thumb { background:linear-gradient(180deg,#dc2626,#7f1d1d); border-radius:999px; }
+      *::-webkit-scrollbar-thumb { background:linear-gradient(180deg,var(--cfb-red),var(--cfb-red-dark)); border-radius:999px; }
 
       button, input, select, textarea {
         font-family: var(--cfb-font);
@@ -8370,18 +5838,18 @@ function GlobalStyle() {
       }
 
       .cfb-table-scroll { border:1px solid rgba(255,255,255,.10); border-radius:10px; background:rgba(2,6,12,.52); box-shadow:0 14px 36px rgba(0,0,0,.22); }
-      .cfb-table-scroll table thead { position:sticky; top:0; z-index:2; background:#070a10; }
+      .cfb-table-scroll table thead { position:sticky; top:0; z-index:2; background:var(--cfb-panel-2); }
       .cfb-table-scroll tbody tr { transition:background .16s ease; }
       .cfb-table-scroll tbody tr:hover { background:rgba(220,38,38,.065); }
       .cfb-v2-page h1,.cfb-v2-page h2,.cfb-v2-page h3 { font-family:var(--cfb-display); }
       .cfb-v2-page h2 { letter-spacing:-.035em; }
       .cfb-v2-page input,.cfb-v2-page select,.cfb-v2-page textarea {
-        background:#070b12 !important;
-        border-color:rgba(148,163,184,.28) !important;
+        background:var(--cfb-panel) !important;
+        border-color:rgba(139,147,165,.28) !important;
         box-shadow:inset 0 1px rgba(255,255,255,.035);
       }
-      .cfb-v2-page input:hover,.cfb-v2-page select:hover,.cfb-v2-page textarea:hover { border-color:rgba(248,113,113,.44) !important; }
-      .cfb-v2-page input:focus,.cfb-v2-page select:focus,.cfb-v2-page textarea:focus { border-color:#ef4444 !important; box-shadow:0 0 0 3px rgba(220,38,38,.12); }
+      .cfb-v2-page input:hover,.cfb-v2-page select:hover,.cfb-v2-page textarea:hover { border-color:rgba(62,127,193,.5) !important; }
+      .cfb-v2-page input:focus,.cfb-v2-page select:focus,.cfb-v2-page textarea:focus { border-color:var(--cfb-red) !important; box-shadow:0 0 0 3px rgba(62,127,193,.16); }
       .cfb-v2-page > section { transition:border-color .18s ease, box-shadow .18s ease, transform .18s ease; }
       .cfb-v2-page > section:hover { border-color:rgba(255,255,255,.16) !important; }
 
@@ -8542,11 +6010,11 @@ function GlobalStyle() {
       /* v44-polish */
       th {
         text-align: left;
-        color: #c4b5fd;
+        color: #9a8fd1;
         font-size: 12px;
         letter-spacing: .08em;
         text-transform: uppercase;
-        border-bottom: 1px solid rgba(250,204,21,.18);
+        border-bottom: 1px solid rgba(201,208,217,.18);
         padding: 12px 10px;
         white-space: nowrap;
       }
@@ -8562,12 +6030,12 @@ function GlobalStyle() {
       }
 
       ::selection {
-        background: rgba(96,165,250,.35);
+        background: rgba(79,143,168,.35);
       }
 
       @media (max-width: 760px) {
         body {
-          background: #020617 !important;
+          background: var(--cfb-ink) !important;
         }
 
         th,
@@ -8605,37 +6073,20 @@ function GlobalStyle() {
 
       /* v46-cfp-theme */
       body {
-        background: #020617 !important;
+        background: var(--cfb-ink) !important;
       }
 
-      :root {
-        --cfb-gold: #d4af37;
-        --cfb-panel: #0f172a;
-        --cfb-bg: #020617;
-        --cfb-border: rgba(255,255,255,.08);
-        --cfb-text: #f8fafc;
-      }
-
-      /* v47-hard-theme */
       html,
       body,
       #root {
-        background: #020617 !important;
-        color: #f8fafc !important;
+        background: var(--cfb-ink) !important;
+        color: var(--cfb-text) !important;
       }
 
       body {
         background:
-          radial-gradient(circle at 50% -20%, rgba(212,175,55,.08), transparent 28%),
-          #020617 !important;
-      }
-
-      :root {
-        --cfb-gold: #d4af37;
-        --cfb-panel: #0f172a;
-        --cfb-bg: #020617;
-        --cfb-border: rgba(255,255,255,.08);
-        --cfb-text: #f8fafc;
+          radial-gradient(circle at 50% -20%, rgba(62,127,193,.08), transparent 28%),
+          var(--cfb-ink) !important;
       }
 
       /* v54-assets-mobile */
@@ -8689,7 +6140,7 @@ function GlobalStyle() {
         }
 
         .cfb-coach-page .cfb-table-scroll::-webkit-scrollbar-thumb {
-          background: rgba(212,175,55,.5);
+          background: rgba(201,208,217,.5);
           border-radius: 999px;
         }
       }
@@ -9019,7 +6470,7 @@ function GlobalStyle() {
       * { box-sizing: border-box; }
       button, input, select, textarea { font: inherit; }
       button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible {
-        outline: 3px solid rgba(250,204,21,.72) !important;
+        outline: 3px solid rgba(201,208,217,.72) !important;
         outline-offset: 2px;
       }
       .cfb-v2-page { animation: cfbV2Fade .28s ease both; }
@@ -9080,7 +6531,7 @@ function GlobalStyle() {
           box-shadow:12px 0 14px -12px rgba(0,0,0,.95);
         }
         .cfb-v2-ranking-head > :nth-child(1),
-        .cfb-v2-ranking-head > :nth-child(2) { z-index:6; background:#05070c; }
+        .cfb-v2-ranking-head > :nth-child(2) { z-index:6; background:var(--cfb-ink); }
         .cfb-v2-ranking-row > :nth-child(2) { display:grid; }
         .cfb-v2-ranking-row > :nth-child(2) strong,
         .cfb-v2-ranking-row > :nth-child(2) small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -9106,7 +6557,7 @@ function GlobalStyle() {
           box-shadow:12px 0 14px -12px rgba(0,0,0,.95);
         }
         .cfb-v2-conference-head > :nth-child(1),
-        .cfb-v2-conference-head > :nth-child(2) { z-index:6; background:#05070c; }
+        .cfb-v2-conference-head > :nth-child(2) { z-index:6; background:var(--cfb-ink); }
         .cfb-v2-conference-row > :nth-child(2) strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       }
       @media (max-width: 520px) {
@@ -9128,7 +6579,7 @@ function GlobalStyle() {
         z-index:-1;
         inset:0 0 auto;
         height:1px;
-        background:linear-gradient(90deg,rgba(239,68,68,.65),rgba(250,204,21,.22),transparent 72%);
+        background:linear-gradient(90deg,rgba(239,68,68,.65),rgba(201,208,217,.22),transparent 72%);
         pointer-events:none;
       }
       .cfb-v2-game-grid > article,
@@ -9174,11 +6625,11 @@ function GlobalStyle() {
       }
 
       /* Elite Books broadcast system */
-      .elite-books-page { --book-green:#35d07f; --book-dark:#07110d; --book-panel:#0b1312; color:#f8fafc; }
+      .elite-books-page { --book-green:var(--cfb-green); --book-dark:#07110d; --book-panel:#0b1312; color:var(--cfb-text); }
       .elite-books-hero { position:relative; overflow:hidden; display:grid; grid-template-columns:minmax(0,1.5fr) minmax(280px,.55fr); gap:24px; padding:clamp(24px,4vw,48px); border:1px solid rgba(53,208,127,.34); border-radius:26px; background:radial-gradient(circle at 75% 0%,rgba(53,208,127,.19),transparent 34%),linear-gradient(125deg,#07110d,#101917 62%,#07110d); box-shadow:0 28px 70px rgba(0,0,0,.38),inset 0 1px rgba(255,255,255,.07); }
       .elite-books-hero::after { content:"EB"; position:absolute; right:30%; bottom:-55px; font-size:210px; line-height:1; font-weight:1000; font-style:italic; color:rgba(255,255,255,.025); transform:skew(-8deg); pointer-events:none; }
       .elite-books-hero > div:first-child { position:relative; z-index:1; }
-      .elite-books-hero > div:first-child > span,.elite-history-hero span,.elite-myteam-login > span,.elite-myteam-hero > div > span { color:var(--book-green,#35d07f); font-size:11px; font-weight:1000; letter-spacing:.18em; }
+      .elite-books-hero > div:first-child > span,.elite-history-hero span,.elite-myteam-login > span,.elite-myteam-hero > div > span { color:var(--book-green,var(--cfb-green)); font-size:11px; font-weight:1000; letter-spacing:.18em; }
       .elite-books-hero h1 { margin:7px 0 4px; font-size:clamp(52px,8vw,98px); line-height:.82; letter-spacing:-.07em; font-weight:1000; font-style:italic; }
       .elite-books-hero h1 i { color:var(--book-green); }
       .elite-books-hero p { margin:16px 0; color:#cbd5e1; font-size:clamp(16px,2vw,21px); font-weight:800; }
@@ -9187,87 +6638,87 @@ function GlobalStyle() {
       .elite-auth-card { position:relative; z-index:2; align-self:stretch; display:flex; flex-direction:column; justify-content:center; gap:6px; padding:22px; border:1px solid rgba(255,255,255,.13); border-top:3px solid var(--book-green); border-radius:18px; background:rgba(0,0,0,.34); box-shadow:0 18px 40px rgba(0,0,0,.25); }
       .elite-auth-card span { color:var(--book-green); font-size:10px; font-weight:1000; letter-spacing:.14em; }
       .elite-auth-card strong { font-size:21px; }
-      .elite-auth-card small { color:#94a3b8; line-height:1.4; }
-      .elite-auth-card button,.elite-history-hero button,.elite-myteam-login button,.elite-myteam-hero button,.elite-myteam-grid button { margin-top:10px; border:0; border-radius:9px; padding:11px 14px; color:#03100a; background:var(--book-green,#35d07f); font-weight:1000; cursor:pointer; }
-      .elite-ticker { min-width:0; display:grid; grid-template-columns:116px minmax(0,1fr); overflow:hidden; border:1px solid rgba(148,163,184,.18); border-radius:14px; background:#070b12; box-shadow:0 16px 35px rgba(0,0,0,.22); }
+      .elite-auth-card small { color:var(--cfb-muted); line-height:1.4; }
+      .elite-auth-card button,.elite-history-hero button,.elite-myteam-login button,.elite-myteam-hero button,.elite-myteam-grid button { margin-top:10px; border:0; border-radius:9px; padding:11px 14px; color:#03100a; background:var(--book-green,var(--cfb-green)); font-weight:1000; cursor:pointer; }
+      .elite-ticker { min-width:0; display:grid; grid-template-columns:116px minmax(0,1fr); overflow:hidden; border:1px solid rgba(148,163,184,.18); border-radius:14px; background:var(--cfb-panel); box-shadow:0 16px 35px rgba(0,0,0,.22); }
       .elite-ticker-label { display:flex; flex-direction:column; justify-content:center; align-items:flex-start; padding:12px 15px; border:0; color:white; background:linear-gradient(135deg,#b91c1c,#701414); cursor:pointer; }
       .elite-ticker-label span { font-size:9px; letter-spacing:.18em; font-weight:1000; }
       .elite-ticker-label b { font-size:17px; }
       .elite-ticker-label small { opacity:.74; }
       .elite-ticker-viewport { min-width:0; overflow:hidden; position:relative; }
-      .elite-ticker-viewport::after { content:""; position:absolute; inset:0 0 0 auto; width:34px; pointer-events:none; background:linear-gradient(90deg,transparent,#070b12); }
+      .elite-ticker-viewport::after { content:""; position:absolute; inset:0 0 0 auto; width:34px; pointer-events:none; background:linear-gradient(90deg,transparent,var(--cfb-panel)); }
       .elite-ticker-track { display:flex; width:max-content; min-width:100%; gap:0; will-change:transform; backface-visibility:hidden; animation:eliteTickerLoop var(--elite-ticker-duration,42s) linear infinite; }
       .elite-ticker-group { display:flex; flex:0 0 auto; gap:0; min-width:0; }
       .elite-ticker-viewport:hover .elite-ticker-track,.elite-ticker-viewport:focus-within .elite-ticker-track { animation-play-state:paused; }
       @keyframes eliteTickerLoop { from { transform:translate3d(0,0,0); } to { transform:translate3d(-50%,0,0); } }
-      .elite-ticker-game { flex:0 0 260px; width:260px; min-width:260px; max-width:260px; display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center; gap:8px; padding:10px 15px; overflow:hidden; contain:layout paint; border:0; border-right:1px solid rgba(148,163,184,.14); color:#e2e8f0; background:#070b12; cursor:pointer; }
+      .elite-ticker-game { flex:0 0 260px; width:260px; min-width:260px; max-width:260px; display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center; gap:8px; padding:10px 15px; overflow:hidden; contain:layout paint; border:0; border-right:1px solid rgba(148,163,184,.14); color:#e2e8f0; background:var(--cfb-panel); cursor:pointer; }
       .elite-ticker-game > span { min-width:0; overflow:hidden; display:flex; align-items:center; gap:5px; font-size:12px; }
       .elite-ticker-game > span > * { flex:0 0 auto; }
       .elite-ticker-game > span > b { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       .elite-ticker-game > span:nth-of-type(2){justify-content:flex-end;}
       .elite-ticker-game > strong { color:white; font-size:12px; }
-      .elite-ticker-game > em { grid-column:1/-1; color:#94a3b8; font-size:8px; font-style:normal; font-weight:900; letter-spacing:.12em; }
-      .elite-ticker-empty { padding:22px; color:#94a3b8; }
+      .elite-ticker-game > em { grid-column:1/-1; color:var(--cfb-muted); font-size:8px; font-style:normal; font-weight:900; letter-spacing:.12em; }
+      .elite-ticker-empty { padding:22px; color:var(--cfb-muted); }
       @media (prefers-reduced-motion:reduce) { .elite-ticker-viewport { overflow-x:auto; scrollbar-width:none; } .elite-ticker-viewport::-webkit-scrollbar { display:none; } .elite-ticker-track { animation:none; } .elite-ticker-group[aria-hidden="true"] { display:none; } }
       .elite-books-scorebar { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); border:1px solid rgba(53,208,127,.18); border-radius:14px; background:#09100f; overflow:hidden; }
       .elite-books-scorebar > div { display:flex; flex-direction:column; gap:4px; padding:14px 18px; border-right:1px solid rgba(255,255,255,.08); }
       .elite-books-scorebar span { color:#64748b; font-size:9px; font-weight:1000; letter-spacing:.15em; }
       .elite-books-scorebar b { font-size:13px; overflow-wrap:anywhere; }
-      .elite-status { color:#facc15; font-size:10px !important; letter-spacing:.09em; }
-      .elite-status-open { color:#35d07f; } .elite-status-settled { color:#60a5fa; } .elite-status-locked { color:#fb923c; }
+      .elite-status { color:var(--cfb-gold); font-size:10px !important; letter-spacing:.09em; }
+      .elite-status-open { color:var(--cfb-green); } .elite-status-settled { color:#4f8fa8; } .elite-status-locked { color:#fb923c; }
       .elite-books-layout { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:18px; align-items:start; }
       .elite-books-main,.elite-books-sidebar,.elite-futures,.elite-history-table,.elite-champions,.elite-badge-gallery,.coach-elite-books-card { border:1px solid rgba(148,163,184,.17); border-radius:20px; padding:20px; background:linear-gradient(145deg,rgba(15,23,42,.93),rgba(5,12,12,.96)); box-shadow:0 18px 48px rgba(0,0,0,.25); }
       .elite-section-head { display:flex; justify-content:space-between; gap:12px; align-items:end; margin-bottom:16px; }
-      .elite-section-head span { color:#35d07f; font-size:9px; font-weight:1000; letter-spacing:.16em; }
+      .elite-section-head span { color:var(--cfb-green); font-size:9px; font-weight:1000; letter-spacing:.16em; }
       .elite-section-head h2 { margin:3px 0 0; font-size:22px; letter-spacing:-.03em; }
       .elite-section-head > small { max-width:390px; color:#64748b; text-align:right; line-height:1.35; }
-      .elite-section-head button { border:0; color:#35d07f; background:transparent; font-size:11px; font-weight:1000; cursor:pointer; }
+      .elite-section-head button { border:0; color:var(--cfb-green); background:transparent; font-size:11px; font-weight:1000; cursor:pointer; }
       .elite-lines-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
       .elite-line-card { position:relative; overflow:hidden; border:1px solid rgba(148,163,184,.18); border-radius:16px; background:linear-gradient(120deg,color-mix(in srgb,var(--team-one) 25%,#090f16),#090f16 48%,color-mix(in srgb,var(--team-two) 25%,#090f16)); }
       .elite-line-card::before { content:""; position:absolute; inset:0; background:linear-gradient(110deg,transparent 46%,rgba(255,255,255,.025) 46% 54%,transparent 54%); pointer-events:none; }
       .elite-line-card > header,.elite-line-card > footer { position:relative; display:flex; align-items:center; justify-content:space-between; padding:10px 13px; border-bottom:1px solid rgba(255,255,255,.08); font-size:9px; font-weight:1000; letter-spacing:.12em; }
-      .elite-line-card > header b { color:#35d07f; }
+      .elite-line-card > header b { color:var(--cfb-green); }
       .elite-line-card.betting-closed { border-color:rgba(248,113,113,.5); }
       .elite-line-card.betting-closed > header b { color:#f87171; }
       .elite-line-matchup { position:relative; display:grid; grid-template-columns:1fr 38px 1fr; align-items:start; gap:4px; padding:16px 10px; }
       .elite-line-matchup > div { min-width:0; display:flex; flex-direction:column; align-items:center; gap:4px; text-align:center; }
-      .elite-line-matchup > div > b { color:#94a3b8; font-size:11px; }
+      .elite-line-matchup > div > b { color:var(--cfb-muted); font-size:11px; }
       .elite-line-matchup > div > strong { min-height:32px; font-size:12px; line-height:1.25; }
-      .elite-line-matchup > span { align-self:center; color:#35d07f; font-size:15px; font-weight:1000; font-style:italic; }
+      .elite-line-matchup > span { align-self:center; color:var(--cfb-green); font-size:15px; font-weight:1000; font-style:italic; }
       .elite-final-score { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; text-align:center; padding:8px 15px; background:rgba(0,0,0,.35); }
-      .elite-final-score b { font-size:25px; } .elite-final-score span { color:#35d07f; font-size:9px; font-weight:1000; }
+      .elite-final-score b { font-size:25px; } .elite-final-score span { color:var(--cfb-green); font-size:9px; font-weight:1000; }
       .elite-betting-closed { display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 12px;border-block:1px solid rgba(248,113,113,.22);color:#fecaca;background:rgba(127,29,29,.24);font-size:9px; } .elite-betting-closed b { color:#f87171;letter-spacing:.1em; }
       .elite-market { position:relative; display:grid; grid-template-columns:70px 1fr 1fr; gap:7px; align-items:stretch; padding:7px 10px; }
       .elite-market > label { align-self:center; color:#64748b; font-size:8px; font-weight:1000; letter-spacing:.12em; }
-      .elite-pick-button { min-width:0; display:grid; grid-template-columns:1fr auto; gap:2px 7px; padding:8px; border:1px solid rgba(148,163,184,.2); border-radius:8px; color:#f8fafc; background:rgba(2,6,23,.72); cursor:pointer; }
+      .elite-pick-button { min-width:0; display:grid; grid-template-columns:1fr auto; gap:2px 7px; padding:8px; border:1px solid rgba(148,163,184,.2); border-radius:8px; color:var(--cfb-text); background:rgba(2,6,23,.72); cursor:pointer; }
       .elite-pick-button span { min-width:0; overflow:hidden; text-overflow:ellipsis; font-size:10px; font-weight:1000; }
       .elite-pick-button b { color:#fff; font-size:16px; line-height:1; font-weight:1000; letter-spacing:-.02em; }
-      .elite-pick-button em { grid-column:1/-1; color:#94a3b8; font-size:9px; line-height:1; font-style:normal; font-weight:900; text-align:right; }
-      .elite-pick-button small { grid-column:1/-1; color:#35d07f; font-size:9px; line-height:1; font-weight:1000; text-align:right; letter-spacing:.06em; }
-      .elite-pick-button.selected { border-color:#35d07f; background:rgba(53,208,127,.17); box-shadow:inset 0 0 0 1px rgba(53,208,127,.26); }
+      .elite-pick-button em { grid-column:1/-1; color:var(--cfb-muted); font-size:9px; line-height:1; font-style:normal; font-weight:900; text-align:right; }
+      .elite-pick-button small { grid-column:1/-1; color:var(--cfb-green); font-size:9px; line-height:1; font-weight:1000; text-align:right; letter-spacing:.06em; }
+      .elite-pick-button.selected { border-color:var(--cfb-green); background:rgba(53,208,127,.17); box-shadow:inset 0 0 0 1px rgba(53,208,127,.26); }
       .elite-pick-button:disabled { cursor:not-allowed; opacity:.62; }
       .elite-total-market { margin-top:2px; padding-top:9px; border-top:1px dashed rgba(148,163,184,.16); }
       .elite-ticket-submit { position:relative; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:center; margin:7px 10px 10px; padding:10px 11px; border:1px solid rgba(148,163,184,.16); border-radius:10px; background:rgba(2,6,23,.68); }
       .elite-ticket-submit.has-draft { border-color:rgba(53,208,127,.55); background:rgba(53,208,127,.08); }
-      .elite-ticket-submit span { color:#94a3b8; font-size:10px; line-height:1.35; font-weight:800; }
+      .elite-ticket-submit span { color:var(--cfb-muted); font-size:10px; line-height:1.35; font-weight:800; }
       .elite-ticket-submit.has-draft span { color:#d1fae5; }
-      .elite-ticket-submit button { min-width:112px; padding:10px 13px; border:1px solid #35d07f; border-radius:8px; color:#02130b; background:#35d07f; font-size:10px; font-weight:1000; letter-spacing:.08em; cursor:pointer; }
+      .elite-ticket-submit button { min-width:112px; padding:10px 13px; border:1px solid var(--cfb-green); border-radius:8px; color:#02130b; background:var(--cfb-green); font-size:10px; font-weight:1000; letter-spacing:.08em; cursor:pointer; }
       .elite-ticket-submit button:disabled { border-color:rgba(148,163,184,.18); color:#64748b; background:rgba(15,23,42,.75); cursor:not-allowed; }
       .elite-line-card > footer { border-top:1px solid rgba(255,255,255,.08); border-bottom:0; color:#64748b; letter-spacing:0; font-weight:700; }
       .elite-leaderboard { display:grid; gap:7px; }
       .elite-leaderboard > div,.elite-history-table > div:not(.elite-section-head):not(.elite-history-ledger-scroll):not(.elite-empty-small) { display:grid; grid-template-columns:32px minmax(0,1fr) auto; gap:9px; align-items:center; padding:10px; border:1px solid rgba(148,163,184,.12); border-radius:10px; background:rgba(2,6,23,.44); }
       .elite-leaderboard > div.me { border-color:rgba(53,208,127,.5); background:rgba(53,208,127,.09); }
-      .elite-leaderboard > div > b,.elite-history-table > div > b { color:#35d07f; }
+      .elite-leaderboard > div > b,.elite-history-table > div > b { color:var(--cfb-green); }
       .elite-leaderboard span,.elite-history-table span { min-width:0; display:flex; flex-direction:column; }
       .elite-leaderboard strong,.elite-history-table strong { overflow:hidden; text-overflow:ellipsis; }
       .elite-leaderboard small,.elite-history-table small { color:#64748b; font-size:9px; }
       .elite-leaderboard em,.elite-history-table em { color:#fff; font-size:11px; font-style:normal; font-weight:1000; }
       .elite-badge-rail { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; padding-top:15px; border-top:1px solid rgba(148,163,184,.13); }
       .elite-badge-rail > div { flex-basis:100%; display:flex; justify-content:space-between; }
-      .elite-badge-rail > div span { color:#35d07f; font-size:8px; font-weight:1000; letter-spacing:.12em; }
+      .elite-badge-rail > div span { color:var(--cfb-green); font-size:8px; font-weight:1000; letter-spacing:.12em; }
       .elite-badge-rail > div b { font-size:11px; }
-      .elite-badge-rail > span { display:flex; align-items:center; gap:5px; padding:6px 8px; border:1px solid rgba(250,204,21,.2); border-radius:999px; background:rgba(250,204,21,.07); }
-      .elite-badge-mark { width:38px; height:38px; display:grid; place-items:center; flex:0 0 auto; border:1px solid rgba(53,208,127,.42); border-radius:50%; color:#35d07f; background:linear-gradient(145deg,rgba(53,208,127,.15),rgba(2,6,23,.9)); font-size:10px!important; line-height:1; font-style:normal; font-weight:1000; letter-spacing:-.04em; }
+      .elite-badge-rail > span { display:flex; align-items:center; gap:5px; padding:6px 8px; border:1px solid rgba(201,208,217,.2); border-radius:999px; background:rgba(201,208,217,.07); }
+      .elite-badge-mark { width:38px; height:38px; display:grid; place-items:center; flex:0 0 auto; border:1px solid rgba(53,208,127,.42); border-radius:50%; color:var(--cfb-green); background:linear-gradient(145deg,rgba(53,208,127,.15),rgba(2,6,23,.9)); font-size:10px!important; line-height:1; font-style:normal; font-weight:1000; letter-spacing:-.04em; }
       .elite-badge-rail > span .elite-badge-mark { width:24px;height:24px;font-size:7px!important; } .elite-badge-rail > span strong { font-size:8px; }
       .elite-badge-rail > small { color:#64748b; line-height:1.4; }
       .elite-futures-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
@@ -9275,135 +6726,134 @@ function GlobalStyle() {
       .elite-future-card > header { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:13px; border-bottom:1px solid rgba(148,163,184,.13); background:linear-gradient(90deg,rgba(53,208,127,.1),transparent); }
       .elite-future-card > header > div { display:flex; align-items:center; gap:9px; }
       .elite-future-card > header span { display:flex; flex-direction:column; }
-      .elite-future-card > header small { color:#35d07f; font-size:8px; font-weight:1000; text-transform:uppercase; }
+      .elite-future-card > header small { color:var(--cfb-green); font-size:8px; font-weight:1000; text-transform:uppercase; }
       .elite-future-card > header strong { font-size:13px; }
-      .elite-future-card > header > b { color:#35d07f; font-size:8px; letter-spacing:.1em; }
+      .elite-future-card > header > b { color:var(--cfb-green); font-size:8px; letter-spacing:.1em; }
       .elite-future-options { max-height:340px; overflow-y:auto; padding:7px; }
-      .elite-future-options button { width:100%; display:grid; grid-template-columns:38px minmax(0,1fr) auto; align-items:center; gap:8px; margin:4px 0; padding:8px; border:1px solid transparent; border-radius:8px; color:#f8fafc; text-align:left; background:rgba(255,255,255,.025); cursor:pointer; }
+      .elite-future-options button { width:100%; display:grid; grid-template-columns:38px minmax(0,1fr) auto; align-items:center; gap:8px; margin:4px 0; padding:8px; border:1px solid transparent; border-radius:8px; color:var(--cfb-text); text-align:left; background:rgba(255,255,255,.025); cursor:pointer; }
       .elite-future-options button:hover { background:rgba(255,255,255,.06); }
-      .elite-future-options button.selected { border-color:#35d07f; background:rgba(53,208,127,.12); }
+      .elite-future-options button.selected { border-color:var(--cfb-green); background:rgba(53,208,127,.12); }
       .elite-future-options button:disabled { cursor:not-allowed; }
       .elite-future-options button > span:nth-child(2) { min-width:0; display:flex; flex-direction:column; }
       .elite-future-options button strong { overflow:hidden; text-overflow:ellipsis; font-size:10px; }
       .elite-future-options button small { color:#e2e8f0; font-size:13px; font-weight:1000; }
-      .elite-future-options button em { color:#35d07f; font-size:11px; font-style:normal; font-weight:1000; }
-      .elite-coach-avatar { width:32px; height:32px; display:grid; place-items:center; border:1px solid rgba(53,208,127,.4); border-radius:50%; color:#35d07f; background:rgba(53,208,127,.1); font-weight:1000; }
+      .elite-future-options button em { color:var(--cfb-green); font-size:11px; font-style:normal; font-weight:1000; }
+      .elite-coach-avatar { width:32px; height:32px; display:grid; place-items:center; border:1px solid rgba(53,208,127,.4); border-radius:50%; color:var(--cfb-green); background:rgba(53,208,127,.1); font-weight:1000; }
       .elite-empty,.elite-empty-small { display:flex; flex-direction:column; gap:6px; padding:30px; border:1px dashed rgba(148,163,184,.25); border-radius:12px; color:#64748b; text-align:center; }
       .elite-empty b { color:#cbd5e1; letter-spacing:.08em; }
       .elite-books-home { display:grid; grid-template-columns:minmax(290px,1.35fr) repeat(3,minmax(170px,.65fr)); overflow:hidden; border:1px solid rgba(53,208,127,.25); border-radius:18px; background:linear-gradient(125deg,#07110d,#0c1714); box-shadow:0 18px 50px rgba(0,0,0,.27); }
       .elite-books-home > div { min-width:0; padding:22px; border-right:1px solid rgba(255,255,255,.08); }
       .elite-books-home-brand { background:radial-gradient(circle at 100% 0%,rgba(53,208,127,.2),transparent 46%); }
-      .elite-books-home-brand > span,.elite-books-home-board span,.elite-books-home-leaders > span,.elite-books-home-me > span { color:#35d07f; font-size:10px; font-weight:1000; letter-spacing:.15em; }
-      .elite-books-home-brand h2 { margin:4px 0; font-size:34px; line-height:1; font-style:italic; letter-spacing:-.05em; } .elite-books-home-brand h2 i { color:#35d07f; }
+      .elite-books-home-brand > span,.elite-books-home-board span,.elite-books-home-leaders > span,.elite-books-home-me > span { color:var(--cfb-green); font-size:10px; font-weight:1000; letter-spacing:.15em; }
+      .elite-books-home-brand h2 { margin:4px 0; font-size:34px; line-height:1; font-style:italic; letter-spacing:-.05em; } .elite-books-home-brand h2 i { color:var(--cfb-green); }
       .elite-books-home-brand p { margin:7px 0 13px; color:#a8b3c4; font-size:12px; line-height:1.4; }
-      .elite-books-home button { border:0; padding:0; color:#35d07f; background:transparent; font-size:11px; font-weight:1000; cursor:pointer; }
+      .elite-books-home button { border:0; padding:0; color:var(--cfb-green); background:transparent; font-size:11px; font-weight:1000; cursor:pointer; }
       .elite-books-home-board,.elite-books-home-me { display:flex; flex-direction:column; gap:7px; }
       .elite-books-home-board > div { display:flex; justify-content:space-between; gap:5px; }
       .elite-books-home-board > strong,.elite-books-home-me > strong { margin-top:auto; font-size:31px; line-height:1; }
       .elite-books-home-board small,.elite-books-home-me small,.elite-books-home-leaders > small { color:#7f8da3; font-size:11px; line-height:1.35; }
       .elite-books-home-leaders { display:flex; flex-direction:column; gap:8px; }
       .elite-books-home-leaders > div { display:grid; grid-template-columns:26px minmax(0,1fr) auto; gap:7px; font-size:11px; align-items:center; }
-      .elite-books-home-leaders > div b { color:#35d07f; } .elite-books-home-leaders > div strong { overflow:hidden;text-overflow:ellipsis; } .elite-books-home-leaders > div em { font-style:normal; color:#94a3b8; }
+      .elite-books-home-leaders > div b { color:var(--cfb-green); } .elite-books-home-leaders > div strong { overflow:hidden;text-overflow:ellipsis; } .elite-books-home-leaders > div em { font-style:normal; color:var(--cfb-muted); }
       .elite-history-hero { display:flex; justify-content:space-between; align-items:end; gap:20px; padding:30px; border-radius:22px; background:linear-gradient(135deg,#07110d,#14251e); border:1px solid rgba(53,208,127,.25); }
       .elite-history-hero h1 { margin:4px 0; font-size:clamp(40px,6vw,72px); letter-spacing:-.06em; }
-      .elite-history-hero p { color:#94a3b8; }
+      .elite-history-hero p { color:var(--cfb-muted); }
       .elite-history-grid { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(260px,.5fr); gap:16px; }
       .elite-history-table { display:grid; gap:7px; }
       .elite-history-ledger { min-width:0; }
       .elite-history-ledger-scroll { min-width:0; overflow-x:auto; border:1px solid rgba(148,163,184,.16); border-radius:11px; background:rgba(2,6,23,.38); }
       .elite-history-ledger-head,.elite-history-ledger-row { display:grid; grid-template-columns:48px minmax(180px,1.5fr) 88px 72px 90px 82px 76px 72px 78px; gap:10px; align-items:center; min-width:860px; padding:11px 13px; }
-      .elite-history-ledger-head { position:sticky; top:0; z-index:5; border-bottom:2px solid #35d07f; color:#94a3b8; background:#070b12; font-size:10px; font-weight:1000; letter-spacing:.08em; text-transform:uppercase; }
+      .elite-history-ledger-head { position:sticky; top:0; z-index:5; border-bottom:2px solid var(--cfb-green); color:var(--cfb-muted); background:var(--cfb-panel); font-size:10px; font-weight:1000; letter-spacing:.08em; text-transform:uppercase; }
       .elite-history-ledger-row { min-height:62px; border-bottom:1px solid rgba(148,163,184,.12); color:#e5e7eb; background:rgba(15,23,42,.38); font-size:13px; font-weight:750; }
       .elite-history-ledger-row:last-child { border-bottom:0; }
-      .elite-history-ledger-row > b { color:#35d07f; font-size:14px; }
+      .elite-history-ledger-row > b { color:var(--cfb-green); font-size:14px; }
       .elite-history-ledger-row > span:nth-child(2) { min-width:0; display:grid; gap:3px; }
       .elite-history-ledger-row > span:nth-child(2) strong { overflow:hidden; color:#fff; font-size:14px; line-height:1.15; text-overflow:ellipsis; white-space:nowrap; }
-      .elite-history-ledger-row > span:nth-child(2) small { color:#94a3b8; font-size:10px; font-weight:650; }
+      .elite-history-ledger-row > span:nth-child(2) small { color:var(--cfb-muted); font-size:10px; font-weight:650; }
       .elite-history-ledger-row > em { color:#fff; font-size:14px; font-style:normal; font-weight:1000; text-align:right; }
       @media (max-width:760px) {
         .elite-history-ledger-head,.elite-history-ledger-row { grid-template-columns:44px 150px 78px 66px 82px 76px 70px 66px 72px; min-width:750px; gap:6px; padding-inline:8px; }
         .elite-history-ledger-head > :nth-child(1),.elite-history-ledger-row > :nth-child(1) { position:sticky; left:0; z-index:6; align-self:stretch; display:flex; align-items:center; background:#0d1522; }
         .elite-history-ledger-head > :nth-child(2),.elite-history-ledger-row > :nth-child(2) { position:sticky; left:50px; z-index:6; align-self:stretch; background:#0d1522; box-shadow:12px 0 14px -12px rgba(0,0,0,.95); }
-        .elite-history-ledger-head > :nth-child(1),.elite-history-ledger-head > :nth-child(2) { z-index:8; background:#070b12; }
+        .elite-history-ledger-head > :nth-child(1),.elite-history-ledger-head > :nth-child(2) { z-index:8; background:var(--cfb-panel); }
       }
       .elite-champions > div:not(.elite-section-head) { display:grid; gap:4px; padding:12px; border-bottom:1px solid rgba(148,163,184,.13); }
-      .elite-champions > div > b { color:#35d07f; } .elite-champions > div > span,.elite-champions p { color:#64748b; }
+      .elite-champions > div > b { color:var(--cfb-green); } .elite-champions > div > span,.elite-champions p { color:#64748b; }
       .elite-badge-gallery > div:last-child { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
       .elite-badge-gallery article { display:flex; flex-direction:column; gap:5px; padding:14px; border:1px solid rgba(148,163,184,.13); border-radius:10px; background:rgba(2,6,23,.4); }
       .elite-badge-gallery article small { color:#64748b; line-height:1.35; }
       .coach-elite-books-card > div:nth-child(2) { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
       .coach-elite-books-card article { display:grid; grid-template-columns:46px minmax(0,1fr) auto; gap:9px; align-items:center; padding:11px; border:1px solid rgba(53,208,127,.18); border-radius:10px; background:rgba(53,208,127,.05); }
-      .coach-elite-books-card article > span { display:flex; flex-direction:column; min-width:0; } .coach-elite-books-card article small { color:#35d07f; font-size:8px; } .coach-elite-books-card article strong { overflow:hidden;text-overflow:ellipsis; }
+      .coach-elite-books-card article > span { display:flex; flex-direction:column; min-width:0; } .coach-elite-books-card article small { color:var(--cfb-green); font-size:8px; } .coach-elite-books-card article strong { overflow:hidden;text-overflow:ellipsis; }
       .coach-elite-books-card article em { font-size:9px; font-style:normal; font-weight:900; }
-      .coach-elite-books-card article > b { grid-column:2/-1; color:#94a3b8; font-size:8px; text-align:right; }
-      .elite-pick-won { color:#35d07f !important; } .elite-pick-lost { color:#f87171 !important; }
+      .coach-elite-books-card article > b { grid-column:2/-1; color:var(--cfb-muted); font-size:8px; text-align:right; }
+      .elite-pick-won { color:var(--cfb-green) !important; } .elite-pick-lost { color:#f87171 !important; }
       .elite-myteam-login { max-width:760px; margin:40px auto; padding:50px; border:1px solid rgba(53,208,127,.24); border-radius:24px; text-align:center; background:linear-gradient(145deg,#07110d,#111827); }
-      .elite-myteam-login h1 { margin:5px; font-size:60px; } .elite-myteam-login p { color:#94a3b8; }
-      .elite-myteam-hero { display:grid; grid-template-columns:130px minmax(0,1fr) auto; align-items:center; gap:20px; padding:28px; border:1px solid color-mix(in srgb,var(--my-secondary) 50%,transparent); border-radius:22px; background:linear-gradient(125deg,color-mix(in srgb,var(--my-primary) 70%,#020617),#071018); }
+      .elite-myteam-login h1 { margin:5px; font-size:60px; } .elite-myteam-login p { color:var(--cfb-muted); }
+      .elite-myteam-hero { display:grid; grid-template-columns:130px minmax(0,1fr) auto; align-items:center; gap:20px; padding:28px; border:1px solid color-mix(in srgb,var(--my-secondary) 50%,transparent); border-radius:22px; background:linear-gradient(125deg,color-mix(in srgb,var(--my-primary) 70%,var(--cfb-ink)),#071018); }
       .elite-myteam-hero h1 { margin:4px 0; font-size:clamp(34px,5vw,66px); letter-spacing:-.06em; } .elite-myteam-hero p { margin:0;color:#cbd5e1; }
       .elite-myteam-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
       .elite-myteam-grid article { display:flex; flex-direction:column; gap:10px; padding:20px; border:1px solid rgba(148,163,184,.15); border-radius:16px; background:linear-gradient(145deg,rgba(15,23,42,.92),rgba(5,12,12,.96)); }
-      .elite-myteam-grid article > span { color:#35d07f; font-size:9px;font-weight:1000;letter-spacing:.14em; } .elite-myteam-grid article > div { display:flex; align-items:center;gap:10px; } .elite-myteam-grid article > small { color:#64748b; }
+      .elite-myteam-grid article > span { color:var(--cfb-green); font-size:9px;font-weight:1000;letter-spacing:.14em; } .elite-myteam-grid article > div { display:flex; align-items:center;gap:10px; } .elite-myteam-grid article > small { color:#64748b; }
       .elite-myteam-points { font-size:34px; }
       .elite-manager-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
       .elite-manager-grid article { display:flex; flex-direction:column; gap:8px; padding:22px; border:1px solid rgba(53,208,127,.2); border-radius:16px; background:linear-gradient(145deg,#07110d,#111827); }
-      .elite-manager-grid article > span { color:#35d07f;font-size:9px;font-weight:1000;letter-spacing:.15em; } .elite-manager-grid article h2 { margin:0; } .elite-manager-grid article p,.elite-manager-grid article small { color:#94a3b8; }
-      .elite-manager-grid button,.elite-manager-markets button { border:0;border-radius:8px;padding:10px;color:#03100a;background:#35d07f;font-weight:1000;cursor:pointer; }
-      .elite-manager-markets { display:grid;gap:8px; } .elite-manager-markets > div { display:grid;grid-template-columns:minmax(180px,1fr) minmax(200px,1fr) 90px;gap:10px;align-items:center;padding:10px;border:1px solid rgba(148,163,184,.12);border-radius:10px; } .elite-manager-markets span { display:flex;flex-direction:column; } .elite-manager-markets small { color:#64748b; } .elite-manager-markets select { width:100%;padding:9px;border:1px solid rgba(148,163,184,.2);border-radius:8px;color:#fff;background:#0f172a; }
-      .elite-matchup-locks { display:grid;gap:8px; } .elite-matchup-locks > div { display:grid;grid-template-columns:minmax(100px,1fr) 26px minmax(100px,1fr) minmax(120px,.7fr) minmax(220px,.9fr);gap:10px;align-items:center;padding:10px 12px;border:1px solid rgba(53,208,127,.18);border-radius:10px;background:rgba(53,208,127,.04); } .elite-matchup-locks > div.locked { border-color:rgba(248,113,113,.34);background:rgba(127,29,29,.13); } .elite-matchup-locks > div.voided { border-color:rgba(148,163,184,.28);background:rgba(71,85,105,.13); } .elite-matchup-locks > div > span { display:flex;align-items:center;gap:7px; } .elite-matchup-locks > div > b { color:#64748b;text-align:center;font-size:10px; } .elite-matchup-locks > div > em { color:#35d07f;font-size:9px;font-style:normal;font-weight:1000;letter-spacing:.08em; } .elite-matchup-locks > div.locked > em { color:#f87171; } .elite-matchup-actions { display:grid;grid-template-columns:1fr 1fr;gap:7px; } .elite-matchup-locks button { border:1px solid rgba(248,113,113,.35);border-radius:8px;padding:9px;color:#fecaca;background:rgba(127,29,29,.22);font-size:9px;font-weight:1000;cursor:pointer; } .elite-matchup-locks > div.locked button { border-color:rgba(53,208,127,.35);color:#d1fae5;background:rgba(53,208,127,.12); } .elite-matchup-locks button.void-matchup { border-color:rgba(148,163,184,.32);color:#e2e8f0;background:rgba(51,65,85,.32); } .elite-matchup-locks button:disabled { opacity:.45;cursor:not-allowed; }
-      .elite-seed-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px; } .elite-seed-grid > article { min-width:0;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px;border:1px solid rgba(148,163,184,.13);border-radius:11px;background:rgba(2,6,23,.42); } .elite-seed-grid > article > div { grid-column:1/-1;min-width:0;display:flex;align-items:center;gap:9px; } .elite-seed-grid > article > div > span { min-width:0;display:flex;flex-direction:column; } .elite-seed-grid > article strong,.elite-seed-grid > article small { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; } .elite-seed-grid > article small { color:#64748b;font-size:8px; } .elite-seed-grid label { display:flex;flex-direction:column;gap:4px;padding:7px;border:1px solid rgba(148,163,184,.1);border-radius:8px;background:rgba(255,255,255,.025); } .elite-seed-grid label span { overflow:hidden;text-overflow:ellipsis;font-size:8px;font-weight:1000;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em; } .elite-seed-grid input { width:100%;padding:8px;border:1px solid rgba(53,208,127,.25);border-radius:7px;color:#fff;background:#07110d;text-align:center;font-weight:1000; } .elite-seed-grid > article > p { grid-column:1/-1;margin:2px 0 0;padding-top:8px;border-top:1px solid rgba(148,163,184,.1);color:#94a3b8;font-size:9px;line-height:1.4; }
+      .elite-manager-grid article > span { color:var(--cfb-green);font-size:9px;font-weight:1000;letter-spacing:.15em; } .elite-manager-grid article h2 { margin:0; } .elite-manager-grid article p,.elite-manager-grid article small { color:var(--cfb-muted); }
+      .elite-manager-grid button,.elite-manager-markets button { border:0;border-radius:8px;padding:10px;color:#03100a;background:var(--cfb-green);font-weight:1000;cursor:pointer; }
+      .elite-manager-markets { display:grid;gap:8px; } .elite-manager-markets > div { display:grid;grid-template-columns:minmax(180px,1fr) minmax(200px,1fr) 90px;gap:10px;align-items:center;padding:10px;border:1px solid rgba(148,163,184,.12);border-radius:10px; } .elite-manager-markets span { display:flex;flex-direction:column; } .elite-manager-markets small { color:#64748b; } .elite-manager-markets select { width:100%;padding:9px;border:1px solid rgba(148,163,184,.2);border-radius:8px;color:#fff;background:var(--cfb-panel); }
+      .elite-matchup-locks { display:grid;gap:8px; } .elite-matchup-locks > div { display:grid;grid-template-columns:minmax(100px,1fr) 26px minmax(100px,1fr) minmax(120px,.7fr) minmax(220px,.9fr);gap:10px;align-items:center;padding:10px 12px;border:1px solid rgba(53,208,127,.18);border-radius:10px;background:rgba(53,208,127,.04); } .elite-matchup-locks > div.locked { border-color:rgba(248,113,113,.34);background:rgba(127,29,29,.13); } .elite-matchup-locks > div.voided { border-color:rgba(148,163,184,.28);background:rgba(71,85,105,.13); } .elite-matchup-locks > div > span { display:flex;align-items:center;gap:7px; } .elite-matchup-locks > div > b { color:#64748b;text-align:center;font-size:10px; } .elite-matchup-locks > div > em { color:var(--cfb-green);font-size:9px;font-style:normal;font-weight:1000;letter-spacing:.08em; } .elite-matchup-locks > div.locked > em { color:#f87171; } .elite-matchup-actions { display:grid;grid-template-columns:1fr 1fr;gap:7px; } .elite-matchup-locks button { border:1px solid rgba(248,113,113,.35);border-radius:8px;padding:9px;color:#fecaca;background:rgba(127,29,29,.22);font-size:9px;font-weight:1000;cursor:pointer; } .elite-matchup-locks > div.locked button { border-color:rgba(53,208,127,.35);color:#d1fae5;background:rgba(53,208,127,.12); } .elite-matchup-locks button.void-matchup { border-color:rgba(148,163,184,.32);color:#e2e8f0;background:rgba(51,65,85,.32); } .elite-matchup-locks button:disabled { opacity:.45;cursor:not-allowed; }
+      .elite-seed-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px; } .elite-seed-grid > article { min-width:0;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px;border:1px solid rgba(148,163,184,.13);border-radius:11px;background:rgba(2,6,23,.42); } .elite-seed-grid > article > div { grid-column:1/-1;min-width:0;display:flex;align-items:center;gap:9px; } .elite-seed-grid > article > div > span { min-width:0;display:flex;flex-direction:column; } .elite-seed-grid > article strong,.elite-seed-grid > article small { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; } .elite-seed-grid > article small { color:#64748b;font-size:8px; } .elite-seed-grid label { display:flex;flex-direction:column;gap:4px;padding:7px;border:1px solid rgba(148,163,184,.1);border-radius:8px;background:rgba(255,255,255,.025); } .elite-seed-grid label span { overflow:hidden;text-overflow:ellipsis;font-size:8px;font-weight:1000;color:var(--cfb-muted);text-transform:uppercase;letter-spacing:.08em; } .elite-seed-grid input { width:100%;padding:8px;border:1px solid rgba(53,208,127,.25);border-radius:7px;color:#fff;background:#07110d;text-align:center;font-weight:1000; } .elite-seed-grid > article > p { grid-column:1/-1;margin:2px 0 0;padding-top:8px;border-top:1px solid rgba(148,163,184,.1);color:var(--cfb-muted);font-size:9px;line-height:1.4; }
       .elite-discord-drawer { display:flex;align-items:center;justify-content:space-between;gap:10px;margin:12px 0;padding:12px;border:1px solid rgba(88,101,242,.35);border-radius:12px;background:rgba(88,101,242,.1); }
       .elite-discord-drawer > div { min-width:0;display:flex;flex-direction:column; } .elite-discord-drawer span { color:#a5b4fc;font-size:8px;font-weight:1000;letter-spacing:.12em; } .elite-discord-drawer strong { overflow:hidden;text-overflow:ellipsis; } .elite-discord-drawer button { flex:0 0 auto;border:0;border-radius:7px;padding:8px 10px;color:#fff;background:#5865f2;font-size:9px;font-weight:1000;cursor:pointer; }
-      .elite-commissioner-access { display:flex;justify-content:space-between;align-items:center;gap:18px;padding:20px;border:1px solid rgba(167,139,250,.32);border-radius:16px;background:linear-gradient(135deg,rgba(76,29,149,.22),rgba(15,23,42,.92)); } .elite-commissioner-access span { color:#c4b5fd;font-size:9px;font-weight:1000;letter-spacing:.15em; } .elite-commissioner-access h2 { margin:4px 0;font-size:22px; } .elite-commissioner-access p { max-width:780px;margin:0;color:#94a3b8;line-height:1.45; } .elite-commissioner-access > strong { flex:0 0 auto;padding:10px 13px;border:1px solid rgba(167,139,250,.32);border-radius:999px;color:#ddd6fe;background:rgba(139,92,246,.12);font-size:11px; }
+      .elite-commissioner-access { display:flex;justify-content:space-between;align-items:center;gap:18px;padding:20px;border:1px solid rgba(167,139,250,.32);border-radius:16px;background:linear-gradient(135deg,rgba(76,29,149,.22),rgba(15,23,42,.92)); } .elite-commissioner-access span { color:#9a8fd1;font-size:9px;font-weight:1000;letter-spacing:.15em; } .elite-commissioner-access h2 { margin:4px 0;font-size:22px; } .elite-commissioner-access p { max-width:780px;margin:0;color:var(--cfb-muted);line-height:1.45; } .elite-commissioner-access > strong { flex:0 0 auto;padding:10px 13px;border:1px solid rgba(167,139,250,.32);border-radius:999px;color:#ddd6fe;background:rgba(139,92,246,.12);font-size:11px; }
       .elite-user-statuses { display:flex;flex-direction:column;align-items:flex-end;gap:5px; } .elite-commissioner-badge { padding:5px 7px;border:1px solid rgba(167,139,250,.38);border-radius:999px;color:#ddd6fe;background:rgba(139,92,246,.13);font-size:7px;font-weight:1000;letter-spacing:.08em; }
       .elite-commissioner-toggle { width:100%;margin-top:10px;padding:9px;border-radius:8px;font-size:9px;font-weight:1000;cursor:pointer; } .elite-commissioner-toggle.grant { border:1px solid rgba(167,139,250,.34);color:#ddd6fe;background:rgba(139,92,246,.12); } .elite-commissioner-toggle.revoke { border:1px solid rgba(248,113,113,.3);color:#fecaca;background:rgba(127,29,29,.16); } .elite-commissioner-toggle:disabled { opacity:.45;cursor:not-allowed; }
-      .league-login-shell { min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 20% 10%,rgba(37,99,235,.22),transparent 35%),radial-gradient(circle at 85% 80%,rgba(220,38,38,.22),transparent 38%),#020617;color:#fff; }
-      .league-login-card { width:min(920px,100%);overflow:hidden;display:grid;grid-template-columns:230px minmax(0,1fr);gap:30px;align-items:center;padding:44px;border:1px solid rgba(96,165,250,.25);border-top:4px solid #dc2626;border-radius:26px;background:linear-gradient(135deg,rgba(5,12,26,.98),rgba(15,23,42,.96));box-shadow:0 40px 120px rgba(0,0,0,.55); }
-      .league-login-mark { width:210px;height:210px;display:grid;place-content:center;text-align:center;border:3px solid #facc15;border-radius:50%;background:radial-gradient(circle,#172554,#030712 70%);box-shadow:inset 0 0 0 8px #dc2626,0 0 60px rgba(37,99,235,.28);transform:rotate(-4deg); }
-      .league-login-mark span { font-size:25px;font-weight:1000;letter-spacing:.12em; }.league-login-mark strong { color:#facc15;font-size:49px;line-height:.86;font-style:italic;letter-spacing:-.07em; }.league-login-mark b { color:#60a5fa;font-size:46px;line-height:.95; }
-      .league-login-kicker { color:#facc15;font-size:10px;font-weight:1000;letter-spacing:.2em; }.league-login-card h1 { margin:8px 0;font-size:clamp(36px,6vw,70px);line-height:.94;letter-spacing:-.06em; }.league-login-card p { max-width:580px;color:#a8b3c7;font-size:16px;line-height:1.55; }.league-login-actions { grid-column:2;display:flex;gap:10px; }.league-login-actions button { min-height:48px;padding:0 22px;border:0;border-radius:10px;color:#fff;background:#5865f2;font-weight:1000;cursor:pointer; }.league-login-actions button.secondary { border:1px solid rgba(148,163,184,.25);background:#0f172a; }.league-login-loader { color:#60a5fa;font-size:11px;font-weight:1000;letter-spacing:.16em;animation:networkPulse 1.2s infinite; }.league-login-error { grid-column:2;padding:11px;border:1px solid rgba(248,113,113,.35);border-radius:9px;color:#fecaca;background:rgba(127,29,29,.2); }.league-login-card footer { grid-column:1/-1;display:flex;justify-content:space-between;padding-top:20px;border-top:1px solid rgba(148,163,184,.15);color:#64748b;font-size:8px;font-weight:1000;letter-spacing:.12em; }
+      .league-login-shell { min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 20% 10%,rgba(201,208,217,.14),transparent 35%),radial-gradient(circle at 85% 80%,rgba(62,127,193,.22),transparent 38%),var(--cfb-ink);color:#fff; }
+      .league-login-card { width:min(920px,100%);overflow:hidden;display:grid;grid-template-columns:230px minmax(0,1fr);gap:30px;align-items:center;padding:44px;border:1px solid rgba(201,208,217,.22);border-top:4px solid var(--cfb-red);border-radius:26px;background:linear-gradient(135deg,rgba(10,13,19,.98),rgba(23,28,40,.96));box-shadow:0 40px 120px rgba(0,0,0,.55); }
+      .league-login-mark { width:190px;height:190px;object-fit:contain;filter:drop-shadow(0 18px 40px rgba(0,0,0,.5)); }
+      .league-login-kicker { color:var(--cfb-gold);font-size:10px;font-weight:700;letter-spacing:.18em; }.league-login-card h1 { margin:10px 0;font-family:var(--cfb-display);font-weight:700;font-size:clamp(26px,3.4vw,40px);line-height:1.15;letter-spacing:-.015em; }.league-login-card p { max-width:520px;color:#a8b3c7;font-size:15px;line-height:1.6; }.league-login-actions { grid-column:2;display:flex;gap:10px; }.league-login-actions button { min-height:48px;padding:0 22px;border:0;border-radius:10px;color:#fff;background:#5865f2;font-weight:1000;cursor:pointer; }.league-login-actions button.secondary { border:1px solid rgba(148,163,184,.25);background:var(--cfb-panel); }.league-login-loader { color:var(--cfb-gold);font-size:11px;font-weight:1000;letter-spacing:.16em;animation:networkPulse 1.2s infinite; }.league-login-error { grid-column:2;padding:11px;border:1px solid rgba(229,72,77,.35);border-radius:9px;color:#fecaca;background:rgba(39,77,115,.2); }.league-login-card footer { grid-column:1/-1;display:flex;justify-content:space-between;padding-top:20px;border-top:1px solid rgba(148,163,184,.15);color:var(--cfb-muted);font-size:8px;font-weight:1000;letter-spacing:.12em; }
       @keyframes networkPulse { 50% { opacity:.35; } }
       .network-page,.redzone-page { font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; }
-      .network-home-panel { display:grid;grid-template-columns:minmax(0,1.7fr) minmax(170px,.55fr) minmax(210px,.7fr);overflow:hidden;border:1px solid rgba(56,189,248,.22);border-radius:17px;background:linear-gradient(125deg,#06131f,#0b1420);box-shadow:0 18px 50px rgba(0,0,0,.22); }.network-home-panel > button { min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:5px;padding:20px;border:0;border-right:1px solid rgba(255,255,255,.08);color:#fff;text-align:left;background:transparent;cursor:pointer; }.network-home-panel > button:first-child { background:radial-gradient(circle at 90% 0%,rgba(56,189,248,.15),transparent 42%); }.network-home-panel > button:last-child { border-right:0; }.network-home-panel span { color:#38bdf8;font-size:8px;font-weight:1000;letter-spacing:.16em; }.network-home-panel h2 { max-width:760px;margin:2px 0;overflow:hidden;font-size:18px;line-height:1.3;text-overflow:ellipsis;white-space:nowrap; }.network-home-panel strong { margin-top:auto;font-size:34px;line-height:1; }.network-home-panel small { color:#64748b;font-size:9px; }.network-home-panel b { margin-top:auto;color:#7dd3fc;font-size:9px; }.network-home-panel button.live { background:radial-gradient(circle at 100% 0%,rgba(220,38,38,.25),transparent 55%); }.network-home-panel button.live span,.network-home-panel button.live b { color:#f87171; }
-      .network-hero,.redzone-hero { position:relative;overflow:hidden;display:flex;align-items:end;justify-content:space-between;gap:20px;padding:32px;border:1px solid rgba(56,189,248,.25);border-radius:22px;background:radial-gradient(circle at 85% 10%,rgba(14,165,233,.18),transparent 35%),linear-gradient(130deg,#06121f,#0f172a);box-shadow:0 24px 70px rgba(0,0,0,.25); }
-      .network-hero::before,.redzone-hero::before { content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 45%,rgba(255,255,255,.03) 45% 55%,transparent 55%);pointer-events:none; }.network-hero > div,.redzone-hero > div { position:relative; }.network-hero > div:first-child > span,.redzone-hero > div:first-child > span { color:#38bdf8;font-size:10px;font-weight:1000;letter-spacing:.2em; }.network-hero h1,.redzone-hero h1 { margin:4px 0;font-size:clamp(50px,8vw,90px);line-height:.88;letter-spacing:-.07em; }.network-hero p,.redzone-hero p { margin:12px 0 0;color:#94a3b8;font-size:15px; }.network-live-presence,.redzone-hero > div:last-child { min-width:160px;display:grid;grid-template-columns:12px 1fr;align-items:center;gap:2px 9px;padding:15px 18px;border:1px solid rgba(56,189,248,.25);border-radius:14px;background:rgba(2,6,23,.55); }.network-live-presence i,.redzone-hero i { width:10px;height:10px;border-radius:50%;background:#22c55e;box-shadow:0 0 18px #22c55e;animation:networkPulse 1.5s infinite; }.network-live-presence strong,.redzone-hero strong { font-size:30px;line-height:1; }.network-live-presence span,.redzone-hero > div:last-child span { grid-column:2;color:#7dd3fc;font-size:8px;font-weight:1000;letter-spacing:.12em; }
-      .network-layout { min-height:680px;display:grid;grid-template-columns:290px minmax(0,1fr);overflow:hidden;border:1px solid rgba(148,163,184,.16);border-radius:20px;background:#070d17; }.network-sidebar { border-right:1px solid rgba(148,163,184,.15);background:linear-gradient(180deg,#091321,#070b12); }.network-sidebar > nav { display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:12px;border-bottom:1px solid rgba(148,163,184,.12); }.network-sidebar > nav button { position:relative;padding:10px 6px;border:1px solid transparent;border-radius:8px;color:#718096;background:transparent;font-size:10px;font-weight:1000;cursor:pointer; }.network-sidebar > nav button.active { border-color:rgba(56,189,248,.3);color:#e0f2fe;background:rgba(14,165,233,.12); }.network-sidebar > nav button b { position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;display:grid;place-items:center;border-radius:999px;color:#fff;background:#dc2626;font-size:8px; }
-      .network-channel-list,.network-conversation-list,.network-member-results { display:grid;gap:4px;padding:9px; }.network-channel-list > button { min-width:0;display:grid;grid-template-columns:34px minmax(0,1fr);gap:9px;align-items:center;padding:10px;border:1px solid transparent;border-radius:10px;color:#cbd5e1;text-align:left;background:transparent;cursor:pointer; }.network-channel-list > button > b { width:32px;height:32px;display:grid;place-items:center;border-radius:8px;color:#38bdf8;background:rgba(14,165,233,.11);font-size:9px; }.network-channel-list > button > span { min-width:0;display:grid;gap:2px; }.network-channel-list strong { font-size:12px; }.network-channel-list small { overflow:hidden;color:#64748b;font-size:8px;text-overflow:ellipsis;white-space:nowrap; }.network-channel-list > button.active { border-color:rgba(56,189,248,.25);background:rgba(14,165,233,.1); }.network-member-search { display:grid;gap:6px;padding:12px; }.network-member-search span { color:#38bdf8;font-size:8px;font-weight:1000;letter-spacing:.14em; }.network-member-search input,.redzone-profile-form input,.redzone-profile-form select { min-width:0;padding:11px;border:1px solid rgba(148,163,184,.2);border-radius:9px;color:#fff;background:#080f1b; }.network-member-results { max-height:250px;overflow-y:auto;border-block:1px solid rgba(148,163,184,.12); }.network-member-results button,.network-conversation-list button { display:flex;align-items:center;justify-content:space-between;gap:7px;padding:9px;border:1px solid transparent;border-radius:9px;color:#fff;text-align:left;background:transparent;cursor:pointer; }.network-conversation-list button.active { border-color:rgba(56,189,248,.25);background:rgba(14,165,233,.1); }.network-conversation-list button > small { color:#64748b;font-size:7px; }
+      .network-home-panel { display:grid;grid-template-columns:minmax(0,1.7fr) minmax(170px,.55fr) minmax(210px,.7fr);overflow:hidden;border:1px solid rgba(79,143,168,.22);border-radius:17px;background:linear-gradient(125deg,#06131f,#0b1420);box-shadow:0 18px 50px rgba(0,0,0,.22); }.network-home-panel > button { min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:5px;padding:20px;border:0;border-right:1px solid rgba(255,255,255,.08);color:#fff;text-align:left;background:transparent;cursor:pointer; }.network-home-panel > button:first-child { background:radial-gradient(circle at 90% 0%,rgba(79,143,168,.15),transparent 42%); }.network-home-panel > button:last-child { border-right:0; }.network-home-panel span { color:#4f8fa8;font-size:8px;font-weight:1000;letter-spacing:.16em; }.network-home-panel h2 { max-width:760px;margin:2px 0;overflow:hidden;font-size:18px;line-height:1.3;text-overflow:ellipsis;white-space:nowrap; }.network-home-panel strong { margin-top:auto;font-size:34px;line-height:1; }.network-home-panel small { color:#64748b;font-size:9px; }.network-home-panel b { margin-top:auto;color:#9cc3d1;font-size:9px; }.network-home-panel button.live { background:radial-gradient(circle at 100% 0%,rgba(220,38,38,.25),transparent 55%); }.network-home-panel button.live span,.network-home-panel button.live b { color:#f87171; }
+      .network-hero,.redzone-hero { position:relative;overflow:hidden;display:flex;align-items:end;justify-content:space-between;gap:20px;padding:32px;border:1px solid rgba(79,143,168,.25);border-radius:22px;background:radial-gradient(circle at 85% 10%,rgba(58,112,134,.18),transparent 35%),linear-gradient(130deg,#06121f,var(--cfb-panel));box-shadow:0 24px 70px rgba(0,0,0,.25); }
+      .network-hero::before,.redzone-hero::before { content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 45%,rgba(255,255,255,.03) 45% 55%,transparent 55%);pointer-events:none; }.network-hero > div,.redzone-hero > div { position:relative; }.network-hero > div:first-child > span,.redzone-hero > div:first-child > span { color:#4f8fa8;font-size:10px;font-weight:1000;letter-spacing:.2em; }.network-hero h1,.redzone-hero h1 { margin:4px 0;font-size:clamp(50px,8vw,90px);line-height:.88;letter-spacing:-.07em; }.network-hero p,.redzone-hero p { margin:12px 0 0;color:var(--cfb-muted);font-size:15px; }.network-live-presence,.redzone-hero > div:last-child { min-width:160px;display:grid;grid-template-columns:12px 1fr;align-items:center;gap:2px 9px;padding:15px 18px;border:1px solid rgba(79,143,168,.25);border-radius:14px;background:rgba(2,6,23,.55); }.network-live-presence i,.redzone-hero i { width:10px;height:10px;border-radius:50%;background:var(--cfb-green);box-shadow:0 0 18px var(--cfb-green);animation:networkPulse 1.5s infinite; }.network-live-presence strong,.redzone-hero strong { font-size:30px;line-height:1; }.network-live-presence span,.redzone-hero > div:last-child span { grid-column:2;color:#9cc3d1;font-size:8px;font-weight:1000;letter-spacing:.12em; }
+      .network-layout { min-height:680px;display:grid;grid-template-columns:290px minmax(0,1fr);overflow:hidden;border:1px solid rgba(148,163,184,.16);border-radius:20px;background:#070d17; }.network-sidebar { border-right:1px solid rgba(148,163,184,.15);background:linear-gradient(180deg,#091321,var(--cfb-panel)); }.network-sidebar > nav { display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:12px;border-bottom:1px solid rgba(148,163,184,.12); }.network-sidebar > nav button { position:relative;padding:10px 6px;border:1px solid transparent;border-radius:8px;color:#718096;background:transparent;font-size:10px;font-weight:1000;cursor:pointer; }.network-sidebar > nav button.active { border-color:rgba(79,143,168,.3);color:#e0f2fe;background:rgba(58,112,134,.12); }.network-sidebar > nav button b { position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;display:grid;place-items:center;border-radius:999px;color:#fff;background:var(--cfb-red);font-size:8px; }
+      .network-channel-list,.network-conversation-list,.network-member-results { display:grid;gap:4px;padding:9px; }.network-channel-list > button { min-width:0;display:grid;grid-template-columns:34px minmax(0,1fr);gap:9px;align-items:center;padding:10px;border:1px solid transparent;border-radius:10px;color:#cbd5e1;text-align:left;background:transparent;cursor:pointer; }.network-channel-list > button > b { width:32px;height:32px;display:grid;place-items:center;border-radius:8px;color:#4f8fa8;background:rgba(58,112,134,.11);font-size:9px; }.network-channel-list > button > span { min-width:0;display:grid;gap:2px; }.network-channel-list strong { font-size:12px; }.network-channel-list small { overflow:hidden;color:#64748b;font-size:8px;text-overflow:ellipsis;white-space:nowrap; }.network-channel-list > button.active { border-color:rgba(79,143,168,.25);background:rgba(58,112,134,.1); }.network-member-search { display:grid;gap:6px;padding:12px; }.network-member-search span { color:#4f8fa8;font-size:8px;font-weight:1000;letter-spacing:.14em; }.network-member-search input,.redzone-profile-form input,.redzone-profile-form select { min-width:0;padding:11px;border:1px solid rgba(148,163,184,.2);border-radius:9px;color:#fff;background:#080f1b; }.network-member-results { max-height:250px;overflow-y:auto;border-block:1px solid rgba(148,163,184,.12); }.network-member-results button,.network-conversation-list button { display:flex;align-items:center;justify-content:space-between;gap:7px;padding:9px;border:1px solid transparent;border-radius:9px;color:#fff;text-align:left;background:transparent;cursor:pointer; }.network-conversation-list button.active { border-color:rgba(79,143,168,.25);background:rgba(58,112,134,.1); }.network-conversation-list button > small { color:#64748b;font-size:7px; }
       .network-identity { min-width:0;display:flex!important;align-items:center!important;flex-direction:row!important;gap:9px!important;text-align:left; }.network-identity > span { min-width:0;display:grid;gap:1px; }.network-identity strong { overflow:hidden;font-size:11px;text-overflow:ellipsis;white-space:nowrap; }.network-identity small { overflow:hidden;color:#64748b;font-size:8px;text-overflow:ellipsis;white-space:nowrap; }.network-identity.compact strong { font-size:10px; }
-      .network-stage { min-width:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;background:radial-gradient(circle at 90% 0%,rgba(14,165,233,.05),transparent 35%); }.network-stage-header,.network-notifications > header,.network-settings > header,.redzone-directory > header { display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 22px;border-bottom:1px solid rgba(148,163,184,.14); }.network-stage-header span,.network-notifications header span,.network-settings header span,.redzone-directory header span { color:#38bdf8;font-size:8px;font-weight:1000;letter-spacing:.16em; }.network-stage-header h2,.network-notifications h2,.network-settings h2,.redzone-directory h2 { margin:3px 0;font-size:24px; }.network-stage-header p,.network-settings header p { margin:0;color:#64748b;font-size:10px; }.network-stage-header button,.network-notifications header button,.redzone-directory header button { border:1px solid rgba(56,189,248,.3);border-radius:8px;padding:9px 12px;color:#bae6fd;background:rgba(14,165,233,.1);font-size:9px;font-weight:1000;cursor:pointer; }
-      .network-message-feed { min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:18px; }.network-message-feed article { position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;padding:11px 13px;border:1px solid rgba(148,163,184,.11);border-radius:12px;background:rgba(15,23,42,.55); }.network-message-feed article.mine { border-color:rgba(56,189,248,.18);background:rgba(14,165,233,.07); }.network-message-feed article p { grid-column:1/-1;margin:0;color:#e2e8f0;font-size:13px;line-height:1.5;white-space:pre-wrap; }.network-message-feed article time { color:#64748b;font-size:8px; }.network-empty,.redzone-empty { min-height:260px;display:grid;place-content:center;gap:6px;color:#64748b;text-align:center; }.network-empty b,.redzone-empty b { color:#cbd5e1;font-size:18px; }.network-composer { display:grid;grid-template-columns:minmax(0,1fr) 100px;gap:8px;padding:14px;border-top:1px solid rgba(148,163,184,.14);background:#080f19; }.network-composer textarea { min-height:52px;max-height:130px;resize:vertical;padding:12px;border:1px solid rgba(148,163,184,.2);border-radius:10px;color:#fff;background:#050b13;font:inherit; }.network-composer button { border:0;border-radius:9px;color:#04131c;background:#38bdf8;font-weight:1000;cursor:pointer; }.network-composer small { grid-column:1/-1;color:#475569;font-size:8px; }
-      .network-notifications,.network-settings { min-height:0;overflow-y:auto; }.network-notifications > button { width:calc(100% - 28px);display:grid;grid-template-columns:10px minmax(0,1fr);gap:10px;margin:7px 14px;padding:13px;border:1px solid rgba(148,163,184,.12);border-radius:10px;color:#fff;text-align:left;background:rgba(15,23,42,.45);cursor:pointer; }.network-notifications > button.unread { border-color:rgba(56,189,248,.35);background:rgba(14,165,233,.1); }.network-notifications > button i { width:8px;height:8px;margin-top:5px;border-radius:50%;background:#334155; }.network-notifications > button.unread i { background:#38bdf8;box-shadow:0 0 10px #38bdf8; }.network-notifications > button span { display:grid;gap:3px; }.network-notifications p { margin:0;color:#94a3b8;font-size:11px; }.network-notifications small { color:#475569;font-size:8px; }.network-settings > section { display:flex;align-items:center;justify-content:space-between;gap:20px;margin:10px 16px;padding:14px;border:1px solid rgba(56,189,248,.15);border-radius:12px;background:rgba(14,165,233,.05); }.network-settings > section > div,.network-setting-grid label span { display:grid;gap:3px; }.network-settings small,.network-setting-grid small { color:#64748b;font-size:9px; }.network-settings button { border:1px solid rgba(56,189,248,.28);border-radius:8px;padding:8px 11px;color:#bae6fd;background:rgba(14,165,233,.1);font-size:9px;font-weight:1000;cursor:pointer; }.network-setting-actions { display:flex;align-items:center;gap:10px; }.network-settings input[type="checkbox"] { width:20px;height:20px;accent-color:#38bdf8; }.network-setting-grid { display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 16px 20px; }.network-setting-grid label { display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px;border:1px solid rgba(148,163,184,.12);border-radius:10px;background:rgba(15,23,42,.4); }
-      .redzone-hero { border-color:rgba(239,68,68,.35);background:radial-gradient(circle at 85% 10%,rgba(220,38,38,.23),transparent 35%),linear-gradient(130deg,#1c0608,#0f172a); }.redzone-hero > div:first-child > span,.redzone-hero > div:last-child span { color:#f87171; }.redzone-hero i { background:#ef4444;box-shadow:0 0 18px #ef4444; }.redzone-hero > div:last-child { border-color:rgba(239,68,68,.32); }.redzone-multiview { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:8px;border:1px solid rgba(239,68,68,.28);border-radius:16px;background:#020409; }.redzone-multiview.streams-1 { grid-template-columns:1fr; }.redzone-multiview article { min-width:0;overflow:hidden;border:1px solid rgba(148,163,184,.2);border-radius:10px;background:#000; }.redzone-multiview article header { display:flex;align-items:center;justify-content:space-between;padding:7px 9px;background:#090f18; }.redzone-multiview article header button { border:0;color:#fff;background:transparent;font-size:20px;cursor:pointer; }.redzone-multiview iframe { width:100%;aspect-ratio:16/9;display:block;border:0;background:#000; }.redzone-player-fallback { aspect-ratio:16/9;display:grid;place-content:center;gap:10px;padding:20px;color:#94a3b8;text-align:center; }.redzone-player-fallback a { color:#f87171; }.redzone-directory { overflow:hidden;border:1px solid rgba(148,163,184,.15);border-radius:18px;background:#070c14; }.redzone-directory header span { color:#f87171; }.redzone-directory header button { border-color:rgba(239,68,68,.35);color:#fecaca;background:rgba(127,29,29,.2); }.redzone-profile-form { display:grid;grid-template-columns:130px 1fr 1.2fr 1fr auto;gap:8px;padding:13px;border-bottom:1px solid rgba(148,163,184,.14);background:rgba(127,29,29,.08); }.redzone-profile-form button { border:0;border-radius:9px;padding:0 14px;color:#fff;background:#dc2626;font-weight:1000; }.redzone-profile-form small { grid-column:1/-1;color:#64748b; }.redzone-stream-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:14px; }.redzone-stream-grid > article { min-width:0;overflow:hidden;display:grid;grid-template-rows:auto 1fr auto;border:1px solid rgba(148,163,184,.14);border-radius:14px;background:linear-gradient(145deg,color-mix(in srgb,var(--stream-team) 22%,#080e17),#080e17 58%); }.redzone-stream-grid > article.live { border-color:rgba(239,68,68,.55);box-shadow:0 0 0 1px rgba(239,68,68,.12),0 18px 45px rgba(127,29,29,.18); }.redzone-thumb { position:relative;aspect-ratio:16/9;display:grid;place-items:center;overflow:hidden;background:#020617; }.redzone-thumb > img { width:100%;height:100%;object-fit:cover; }.redzone-thumb.team-standby { isolation:isolate;background:radial-gradient(circle at 50% 43%,color-mix(in srgb,var(--stream-team-secondary) 34%,transparent),transparent 42%),linear-gradient(145deg,color-mix(in srgb,var(--stream-team) 88%,#020617),color-mix(in srgb,var(--stream-team-secondary) 24%,#020617)); }.redzone-thumb.team-standby::before { content:"";position:absolute;inset:-35%;z-index:-1;background:repeating-linear-gradient(118deg,transparent 0 32px,rgba(255,255,255,.035) 32px 34px);transform:rotate(-5deg); }.redzone-standby-brand { display:grid;place-items:center;gap:16px;padding:26px;min-width:0;color:#fff;text-align:center; }.redzone-standby-brand > span { filter:drop-shadow(0 12px 24px rgba(0,0,0,.62)); }.redzone-standby-brand small { max-width:90%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#fff;font-size:11px;font-weight:1000;letter-spacing:.13em;text-transform:uppercase;text-shadow:0 2px 10px rgba(0,0,0,.8); }.redzone-thumb > b,.redzone-thumb > span { position:absolute;top:9px;padding:5px 7px;border-radius:6px;font-size:8px;font-weight:1000;letter-spacing:.1em; }.redzone-thumb > b { left:9px;color:#fff;background:#475569; }.redzone-stream-grid article.live .redzone-thumb > b { background:#dc2626; }.redzone-thumb > span { right:9px;color:#cbd5e1;background:rgba(2,6,23,.78); }.redzone-stream-grid article > div:nth-child(2) { display:grid;gap:8px;padding:13px; }.redzone-stream-grid h3 { margin:0;font-size:15px; }.redzone-stream-grid p { margin:0;color:#64748b;font-size:10px;line-height:1.45; }.redzone-stream-grid footer { display:grid;grid-template-columns:1fr auto;gap:7px;padding:11px;border-top:1px solid rgba(148,163,184,.12); }.redzone-stream-grid footer button,.redzone-stream-grid footer a { display:grid;place-items:center;min-height:36px;border:1px solid rgba(239,68,68,.3);border-radius:8px;color:#fecaca;background:rgba(127,29,29,.15);font-size:8px;font-weight:1000;text-decoration:none;cursor:pointer; }.redzone-stream-grid footer button.selected { color:#fff;background:#dc2626; }.redzone-stream-grid footer button:disabled { opacity:.38;cursor:not-allowed; }.redzone-stream-grid footer a { padding:0 9px;border-color:rgba(148,163,184,.2);color:#cbd5e1;background:#0f172a; }
+      .network-stage { min-width:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;background:radial-gradient(circle at 90% 0%,rgba(58,112,134,.05),transparent 35%); }.network-stage-header,.network-notifications > header,.network-settings > header,.redzone-directory > header { display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 22px;border-bottom:1px solid rgba(148,163,184,.14); }.network-stage-header span,.network-notifications header span,.network-settings header span,.redzone-directory header span { color:#4f8fa8;font-size:8px;font-weight:1000;letter-spacing:.16em; }.network-stage-header h2,.network-notifications h2,.network-settings h2,.redzone-directory h2 { margin:3px 0;font-size:24px; }.network-stage-header p,.network-settings header p { margin:0;color:#64748b;font-size:10px; }.network-stage-header button,.network-notifications header button,.redzone-directory header button { border:1px solid rgba(79,143,168,.3);border-radius:8px;padding:9px 12px;color:#9cc3d1;background:rgba(58,112,134,.1);font-size:9px;font-weight:1000;cursor:pointer; }
+      .network-message-feed { min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:18px; }.network-message-feed article { position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;padding:11px 13px;border:1px solid rgba(148,163,184,.11);border-radius:12px;background:rgba(15,23,42,.55); }.network-message-feed article.mine { border-color:rgba(79,143,168,.18);background:rgba(58,112,134,.07); }.network-message-feed article p { grid-column:1/-1;margin:0;color:#e2e8f0;font-size:13px;line-height:1.5;white-space:pre-wrap; }.network-message-feed article time { color:#64748b;font-size:8px; }.network-empty,.redzone-empty { min-height:260px;display:grid;place-content:center;gap:6px;color:#64748b;text-align:center; }.network-empty b,.redzone-empty b { color:#cbd5e1;font-size:18px; }.network-composer { display:grid;grid-template-columns:minmax(0,1fr) 100px;gap:8px;padding:14px;border-top:1px solid rgba(148,163,184,.14);background:#080f19; }.network-composer textarea { min-height:52px;max-height:130px;resize:vertical;padding:12px;border:1px solid rgba(148,163,184,.2);border-radius:10px;color:#fff;background:#050b13;font:inherit; }.network-composer button { border:0;border-radius:9px;color:#04131c;background:#4f8fa8;font-weight:1000;cursor:pointer; }.network-composer small { grid-column:1/-1;color:#475569;font-size:8px; }
+      .network-notifications,.network-settings { min-height:0;overflow-y:auto; }.network-notifications > button { width:calc(100% - 28px);display:grid;grid-template-columns:10px minmax(0,1fr);gap:10px;margin:7px 14px;padding:13px;border:1px solid rgba(148,163,184,.12);border-radius:10px;color:#fff;text-align:left;background:rgba(15,23,42,.45);cursor:pointer; }.network-notifications > button.unread { border-color:rgba(79,143,168,.35);background:rgba(58,112,134,.1); }.network-notifications > button i { width:8px;height:8px;margin-top:5px;border-radius:50%;background:#334155; }.network-notifications > button.unread i { background:#4f8fa8;box-shadow:0 0 10px #4f8fa8; }.network-notifications > button span { display:grid;gap:3px; }.network-notifications p { margin:0;color:var(--cfb-muted);font-size:11px; }.network-notifications small { color:#475569;font-size:8px; }.network-settings > section { display:flex;align-items:center;justify-content:space-between;gap:20px;margin:10px 16px;padding:14px;border:1px solid rgba(79,143,168,.15);border-radius:12px;background:rgba(58,112,134,.05); }.network-settings > section > div,.network-setting-grid label span { display:grid;gap:3px; }.network-settings small,.network-setting-grid small { color:#64748b;font-size:9px; }.network-settings button { border:1px solid rgba(79,143,168,.28);border-radius:8px;padding:8px 11px;color:#9cc3d1;background:rgba(58,112,134,.1);font-size:9px;font-weight:1000;cursor:pointer; }.network-setting-actions { display:flex;align-items:center;gap:10px; }.network-settings input[type="checkbox"] { width:20px;height:20px;accent-color:#4f8fa8; }.network-setting-grid { display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 16px 20px; }.network-setting-grid label { display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px;border:1px solid rgba(148,163,184,.12);border-radius:10px;background:rgba(15,23,42,.4); }
+      .redzone-hero { border-color:rgba(239,68,68,.35);background:radial-gradient(circle at 85% 10%,rgba(220,38,38,.23),transparent 35%),linear-gradient(130deg,#1c0608,var(--cfb-panel)); }.redzone-hero > div:first-child > span,.redzone-hero > div:last-child span { color:#f87171; }.redzone-hero i { background:var(--cfb-danger);box-shadow:0 0 18px var(--cfb-danger); }.redzone-hero > div:last-child { border-color:rgba(239,68,68,.32); }.redzone-multiview { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:8px;border:1px solid rgba(239,68,68,.28);border-radius:16px;background:#020409; }.redzone-multiview.streams-1 { grid-template-columns:1fr; }.redzone-multiview article { min-width:0;overflow:hidden;border:1px solid rgba(148,163,184,.2);border-radius:10px;background:#000; }.redzone-multiview article header { display:flex;align-items:center;justify-content:space-between;padding:7px 9px;background:#090f18; }.redzone-multiview article header button { border:0;color:#fff;background:transparent;font-size:20px;cursor:pointer; }.redzone-multiview iframe { width:100%;aspect-ratio:16/9;display:block;border:0;background:#000; }.redzone-player-fallback { aspect-ratio:16/9;display:grid;place-content:center;gap:10px;padding:20px;color:var(--cfb-muted);text-align:center; }.redzone-player-fallback a { color:#f87171; }.redzone-directory { overflow:hidden;border:1px solid rgba(148,163,184,.15);border-radius:18px;background:#070c14; }.redzone-directory header span { color:#f87171; }.redzone-directory header button { border-color:rgba(239,68,68,.35);color:#fecaca;background:rgba(127,29,29,.2); }.redzone-profile-form { display:grid;grid-template-columns:130px 1fr 1.2fr 1fr auto;gap:8px;padding:13px;border-bottom:1px solid rgba(148,163,184,.14);background:rgba(127,29,29,.08); }.redzone-profile-form button { border:0;border-radius:9px;padding:0 14px;color:#fff;background:var(--cfb-red);font-weight:1000; }.redzone-profile-form small { grid-column:1/-1;color:#64748b; }.redzone-stream-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:14px; }.redzone-stream-grid > article { min-width:0;overflow:hidden;display:grid;grid-template-rows:auto 1fr auto;border:1px solid rgba(148,163,184,.14);border-radius:14px;background:linear-gradient(145deg,color-mix(in srgb,var(--stream-team) 22%,#080e17),#080e17 58%); }.redzone-stream-grid > article.live { border-color:rgba(239,68,68,.55);box-shadow:0 0 0 1px rgba(239,68,68,.12),0 18px 45px rgba(127,29,29,.18); }.redzone-thumb { position:relative;aspect-ratio:16/9;display:grid;place-items:center;overflow:hidden;background:var(--cfb-ink); }.redzone-thumb > img { width:100%;height:100%;object-fit:cover; }.redzone-thumb.team-standby { isolation:isolate;background:radial-gradient(circle at 50% 43%,color-mix(in srgb,var(--stream-team-secondary) 34%,transparent),transparent 42%),linear-gradient(145deg,color-mix(in srgb,var(--stream-team) 88%,var(--cfb-ink)),color-mix(in srgb,var(--stream-team-secondary) 24%,var(--cfb-ink))); }.redzone-thumb.team-standby::before { content:"";position:absolute;inset:-35%;z-index:-1;background:repeating-linear-gradient(118deg,transparent 0 32px,rgba(255,255,255,.035) 32px 34px);transform:rotate(-5deg); }.redzone-standby-brand { display:grid;place-items:center;gap:16px;padding:26px;min-width:0;color:#fff;text-align:center; }.redzone-standby-brand > span { filter:drop-shadow(0 12px 24px rgba(0,0,0,.62)); }.redzone-standby-brand small { max-width:90%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#fff;font-size:11px;font-weight:1000;letter-spacing:.13em;text-transform:uppercase;text-shadow:0 2px 10px rgba(0,0,0,.8); }.redzone-thumb > b,.redzone-thumb > span { position:absolute;top:9px;padding:5px 7px;border-radius:6px;font-size:8px;font-weight:1000;letter-spacing:.1em; }.redzone-thumb > b { left:9px;color:#fff;background:#475569; }.redzone-stream-grid article.live .redzone-thumb > b { background:var(--cfb-red); }.redzone-thumb > span { right:9px;color:#cbd5e1;background:rgba(2,6,23,.78); }.redzone-stream-grid article > div:nth-child(2) { display:grid;gap:8px;padding:13px; }.redzone-stream-grid h3 { margin:0;font-size:15px; }.redzone-stream-grid p { margin:0;color:#64748b;font-size:10px;line-height:1.45; }.redzone-stream-grid footer { display:grid;grid-template-columns:1fr auto;gap:7px;padding:11px;border-top:1px solid rgba(148,163,184,.12); }.redzone-stream-grid footer button,.redzone-stream-grid footer a { display:grid;place-items:center;min-height:36px;border:1px solid rgba(239,68,68,.3);border-radius:8px;color:#fecaca;background:rgba(127,29,29,.15);font-size:8px;font-weight:1000;text-decoration:none;cursor:pointer; }.redzone-stream-grid footer button.selected { color:#fff;background:var(--cfb-red); }.redzone-stream-grid footer button:disabled { opacity:.38;cursor:not-allowed; }.redzone-stream-grid footer a { padding:0 9px;border-color:rgba(148,163,184,.2);color:#cbd5e1;background:var(--cfb-panel); }
       .elite-pick-consensus { grid-column:1/-1;color:#d1fae5!important;font-size:9px!important;font-style:normal;font-weight:1000;letter-spacing:.08em;text-align:right; }
-      .elite-future-vote-leaders { margin:9px 0;padding:10px;border:1px solid rgba(53,208,127,.17);border-radius:10px;background:rgba(2,6,23,.45); }.elite-future-vote-leaders > span { color:#35d07f;font-size:8px;font-weight:1000;letter-spacing:.13em; }.elite-future-vote-leaders > div { display:grid;gap:5px;margin-top:7px; }.elite-future-vote-leaders article { display:grid;grid-template-columns:24px 32px minmax(0,1fr) auto;align-items:center;gap:7px;padding:5px;border-radius:7px;background:rgba(255,255,255,.03); }.elite-future-vote-leaders article b { color:#35d07f; }.elite-future-vote-leaders article strong { overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px; }.elite-future-vote-leaders article em { color:#fff;font-size:12px;font-style:normal;font-weight:1000; }
-      .elite-team-betting { overflow:hidden;border:1px solid rgba(53,208,127,.18);border-radius:20px;padding:20px;background:linear-gradient(145deg,rgba(15,23,42,.94),rgba(5,12,12,.97)); }.elite-team-betting-table { overflow-x:auto;border:1px solid rgba(148,163,184,.13);border-radius:12px; }.elite-team-betting-table > div { min-width:760px;display:grid;grid-template-columns:44px minmax(210px,1.5fr) 90px 90px 140px 90px;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid rgba(148,163,184,.1); }.elite-team-betting-table > div:last-child { border-bottom:0; }.elite-team-betting-table .head { position:sticky;top:0;color:#94a3b8;background:#070b12;font-size:9px;font-weight:1000;letter-spacing:.1em; }.elite-team-betting-table > div > b,.elite-team-betting-table > div > strong { color:#35d07f; }.elite-team-betting-table > div > span:nth-child(2) { min-width:0;display:flex;align-items:center;gap:8px; }.elite-team-betting-table > div > span:nth-child(2) strong { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
-      .ranking-history-hero { display:flex;align-items:end;justify-content:space-between;gap:20px;padding:28px;border:1px solid rgba(250,204,21,.24);border-radius:22px;background:radial-gradient(circle at 85% 0%,rgba(250,204,21,.16),transparent 30%),linear-gradient(135deg,#111827,#070b12); }.ranking-history-hero span { color:#facc15;font-size:10px;font-weight:1000;letter-spacing:.17em; }.ranking-history-hero h1 { margin:5px 0;font-size:clamp(34px,5vw,64px);letter-spacing:-.06em; }.ranking-history-hero p { margin:0;color:#94a3b8; }.ranking-history-hero > div:last-child { display:flex;gap:8px; }.ranking-history-hero select,.ranking-history-hero button { padding:11px 13px;border:1px solid rgba(250,204,21,.25);border-radius:9px;color:#fff;background:#111827;font-weight:900; }.ranking-history-table { overflow-x:auto;border:1px solid rgba(148,163,184,.16);border-radius:18px;background:#0a101b; }.ranking-history-table > div,.ranking-history-table > article { min-width:900px;display:grid;grid-template-columns:64px minmax(240px,1.5fr) 80px 80px 90px 80px 80px 70px;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid rgba(148,163,184,.11); }.ranking-history-table .head { color:#94a3b8;background:#070b12;font-size:9px;font-weight:1000;letter-spacing:.11em; }.ranking-history-table article > b,.ranking-history-table article > strong { color:#facc15;font-size:17px; }.ranking-history-table article > span:nth-child(2) { min-width:0;display:flex;align-items:center;gap:10px; }.ranking-history-table article > span:nth-child(2) > span { min-width:0;display:grid; }.ranking-history-table article > span:nth-child(2) strong,.ranking-history-table article > span:nth-child(2) small { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }.ranking-history-table article > span:nth-child(2) small { color:#64748b; }.ranking-history-empty { min-height:170px;display:grid;place-content:center;gap:5px;padding:24px;color:#64748b;text-align:center; }.ranking-history-empty b { color:#cbd5e1;font-size:18px; }.coach-ranking-chart { overflow:hidden;border:1px solid rgba(250,204,21,.18);border-radius:18px;padding:20px;background:linear-gradient(145deg,rgba(15,23,42,.94),rgba(20,15,5,.78)); }.coach-ranking-chart svg { width:100%;height:auto;display:block;overflow:visible; }.coach-ranking-chart text { fill:#94a3b8;font-size:12px;font-weight:900; }.coach-ranking-chart .line { fill:none;stroke:#facc15;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 5px rgba(250,204,21,.35)); }.coach-ranking-chart circle { fill:#071018;stroke:#facc15;stroke-width:4; }
+      .elite-future-vote-leaders { margin:9px 0;padding:10px;border:1px solid rgba(53,208,127,.17);border-radius:10px;background:rgba(2,6,23,.45); }.elite-future-vote-leaders > span { color:var(--cfb-green);font-size:8px;font-weight:1000;letter-spacing:.13em; }.elite-future-vote-leaders > div { display:grid;gap:5px;margin-top:7px; }.elite-future-vote-leaders article { display:grid;grid-template-columns:24px 32px minmax(0,1fr) auto;align-items:center;gap:7px;padding:5px;border-radius:7px;background:rgba(255,255,255,.03); }.elite-future-vote-leaders article b { color:var(--cfb-green); }.elite-future-vote-leaders article strong { overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px; }.elite-future-vote-leaders article em { color:#fff;font-size:12px;font-style:normal;font-weight:1000; }
+      .elite-team-betting { overflow:hidden;border:1px solid rgba(53,208,127,.18);border-radius:20px;padding:20px;background:linear-gradient(145deg,rgba(15,23,42,.94),rgba(5,12,12,.97)); }.elite-team-betting-table { overflow-x:auto;border:1px solid rgba(148,163,184,.13);border-radius:12px; }.elite-team-betting-table > div { min-width:760px;display:grid;grid-template-columns:44px minmax(210px,1.5fr) 90px 90px 140px 90px;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid rgba(148,163,184,.1); }.elite-team-betting-table > div:last-child { border-bottom:0; }.elite-team-betting-table .head { position:sticky;top:0;color:var(--cfb-muted);background:var(--cfb-panel);font-size:9px;font-weight:1000;letter-spacing:.1em; }.elite-team-betting-table > div > b,.elite-team-betting-table > div > strong { color:var(--cfb-green); }.elite-team-betting-table > div > span:nth-child(2) { min-width:0;display:flex;align-items:center;gap:8px; }.elite-team-betting-table > div > span:nth-child(2) strong { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+      .ranking-history-hero { display:flex;align-items:end;justify-content:space-between;gap:20px;padding:28px;border:1px solid rgba(201,208,217,.24);border-radius:22px;background:radial-gradient(circle at 85% 0%,rgba(201,208,217,.16),transparent 30%),linear-gradient(135deg,#111827,var(--cfb-panel)); }.ranking-history-hero span { color:var(--cfb-gold);font-size:10px;font-weight:1000;letter-spacing:.17em; }.ranking-history-hero h1 { margin:5px 0;font-size:clamp(34px,5vw,64px);letter-spacing:-.06em; }.ranking-history-hero p { margin:0;color:var(--cfb-muted); }.ranking-history-hero > div:last-child { display:flex;gap:8px; }.ranking-history-hero select,.ranking-history-hero button { padding:11px 13px;border:1px solid rgba(201,208,217,.25);border-radius:9px;color:#fff;background:#111827;font-weight:900; }.ranking-history-table { overflow-x:auto;border:1px solid rgba(148,163,184,.16);border-radius:18px;background:#0a101b; }.ranking-history-table > div,.ranking-history-table > article { min-width:900px;display:grid;grid-template-columns:64px minmax(240px,1.5fr) 80px 80px 90px 80px 80px 70px;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid rgba(148,163,184,.11); }.ranking-history-table .head { color:var(--cfb-muted);background:var(--cfb-panel);font-size:9px;font-weight:1000;letter-spacing:.11em; }.ranking-history-table article > b,.ranking-history-table article > strong { color:var(--cfb-gold);font-size:17px; }.ranking-history-table article > span:nth-child(2) { min-width:0;display:flex;align-items:center;gap:10px; }.ranking-history-table article > span:nth-child(2) > span { min-width:0;display:grid; }.ranking-history-table article > span:nth-child(2) strong,.ranking-history-table article > span:nth-child(2) small { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }.ranking-history-table article > span:nth-child(2) small { color:#64748b; }.ranking-history-empty { min-height:170px;display:grid;place-content:center;gap:5px;padding:24px;color:#64748b;text-align:center; }.ranking-history-empty b { color:#cbd5e1;font-size:18px; }.coach-ranking-chart { overflow:hidden;border:1px solid rgba(201,208,217,.18);border-radius:18px;padding:20px;background:linear-gradient(145deg,rgba(15,23,42,.94),rgba(20,15,5,.78)); }.coach-ranking-chart svg { width:100%;height:auto;display:block;overflow:visible; }.coach-ranking-chart text { fill:var(--cfb-muted);font-size:12px;font-weight:900; }.coach-ranking-chart .line { fill:none;stroke:var(--cfb-gold);stroke-width:5;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 5px rgba(201,208,217,.35)); }.coach-ranking-chart circle { fill:#071018;stroke:var(--cfb-gold);stroke-width:4; }
       .redzone-stream-grid footer { grid-template-columns:minmax(120px,1fr) auto auto; }.redzone-stream-grid footer .redzone-remove-stream { border-color:rgba(248,113,113,.45);color:#fecaca;background:rgba(127,29,29,.3);padding-inline:10px; }
       /* League Network v28: bigger conversation UI, custom emoji and more broadcast flavor. */
-      .network-hero { position:relative;overflow:hidden;border-color:rgba(56,189,248,.28);background:radial-gradient(circle at 74% 10%,rgba(239,68,68,.18),transparent 23%),radial-gradient(circle at 88% 80%,rgba(14,165,233,.22),transparent 28%),linear-gradient(125deg,#08111f,#101827); }.network-hero::after { content:"";position:absolute;inset:auto -8% -65% 36%;height:170px;transform:rotate(-7deg);background:linear-gradient(90deg,rgba(239,68,68,.22),rgba(250,204,21,.12),rgba(14,165,233,.16));filter:blur(28px);pointer-events:none; }.network-hero > * { position:relative;z-index:1; }.network-hero-badges { display:flex;flex-wrap:wrap;justify-content:center;gap:7px; }.network-hero-badges b { padding:7px 9px;border:1px solid rgba(125,211,252,.18);border-radius:999px;color:#bae6fd;background:rgba(14,165,233,.07);font-size:8px;letter-spacing:.09em; }
+      .network-hero { position:relative;overflow:hidden;border-color:rgba(79,143,168,.28);background:radial-gradient(circle at 74% 10%,rgba(239,68,68,.18),transparent 23%),radial-gradient(circle at 88% 80%,rgba(58,112,134,.22),transparent 28%),linear-gradient(125deg,#08111f,#101827); }.network-hero::after { content:"";position:absolute;inset:auto -8% -65% 36%;height:170px;transform:rotate(-7deg);background:linear-gradient(90deg,rgba(239,68,68,.22),rgba(201,208,217,.12),rgba(58,112,134,.16));filter:blur(28px);pointer-events:none; }.network-hero > * { position:relative;z-index:1; }.network-hero-badges { display:flex;flex-wrap:wrap;justify-content:center;gap:7px; }.network-hero-badges b { padding:7px 9px;border:1px solid rgba(156,195,209,.18);border-radius:999px;color:#9cc3d1;background:rgba(58,112,134,.07);font-size:8px;letter-spacing:.09em; }
       .network-sidebar > nav { grid-template-columns:1fr 1fr; }
       .network-message-feed article p { font-size:16px;line-height:1.62; }.network-identity strong,.network-identity.compact strong { font-size:14px; }.network-identity small { font-size:11px; }.network-channel-list strong { font-size:15px; }.network-channel-list small { font-size:11px;line-height:1.35; }.network-stage-header p,.network-settings header p { font-size:14px; }.network-compose-box textarea { font-size:16px; }.network-notifications p { font-size:14px; }.network-settings small,.network-setting-grid small { font-size:12px; }
-      .cfb-v2-coach-strip > div { min-width:0;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px 12px;padding:15px 16px;border:1px solid rgba(148,163,184,.16);border-radius:13px;background:linear-gradient(145deg,rgba(15,23,42,.88),rgba(2,6,23,.72)); }.cfb-v2-coach-strip > div > span:first-child { grid-column:1/-1;color:#94a3b8;font-size:10px;font-weight:1000;letter-spacing:.11em;text-transform:uppercase; }.cfb-v2-coach-strip > div > b { min-width:0;color:#fff;font-size:24px;line-height:1.1; }.cfb-v2-coach-strip > div > b + span { justify-self:end;padding:4px 7px;border-radius:999px;background:rgba(148,163,184,.09);font-size:9px!important;letter-spacing:.06em; }.cfb-v2-coach-strip > div > small { grid-column:1/-1;color:#94a3b8;font-size:11px;line-height:1.3; }.cfb-v2-coach-strip > div:nth-child(4) > b { font-size:18px; }
+      .cfb-v2-coach-strip > div { min-width:0;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px 12px;padding:15px 16px;border:1px solid rgba(148,163,184,.16);border-radius:13px;background:linear-gradient(145deg,rgba(15,23,42,.88),rgba(2,6,23,.72)); }.cfb-v2-coach-strip > div > span:first-child { grid-column:1/-1;color:var(--cfb-muted);font-size:10px;font-weight:1000;letter-spacing:.11em;text-transform:uppercase; }.cfb-v2-coach-strip > div > b { min-width:0;color:#fff;font-size:24px;line-height:1.1; }.cfb-v2-coach-strip > div > b + span { justify-self:end;padding:4px 7px;border-radius:999px;background:rgba(148,163,184,.09);font-size:9px!important;letter-spacing:.06em; }.cfb-v2-coach-strip > div > small { grid-column:1/-1;color:var(--cfb-muted);font-size:11px;line-height:1.3; }.cfb-v2-coach-strip > div:nth-child(4) > b { font-size:18px; }
       .elite-badge-rail { gap:11px; }.elite-badge-rail > div span { font-size:10px; }.elite-badge-rail > div b { font-size:14px; }.elite-badge-rail > span { gap:9px;padding:9px 12px; }.elite-badge-rail > span .elite-badge-mark { width:38px;height:38px;font-size:10px!important; }.elite-badge-rail > span strong { font-size:12px;line-height:1.2; }.elite-badge-gallery article { gap:9px;padding:18px; }.elite-badge-gallery article strong { font-size:15px; }.elite-badge-gallery article small { font-size:11px; }
-      .network-inline-emoji { width:1.55em;height:1.55em;display:inline-block;object-fit:contain;vertical-align:-.38em; }.network-quick-react img,.network-reaction-row > button img { width:20px;height:20px;object-fit:contain;vertical-align:middle; }.network-emoji-picker img { width:25px;height:25px;object-fit:contain; }.network-emoji-library { min-height:0;overflow-y:auto;padding:22px;background:radial-gradient(circle at 100% 0%,rgba(250,204,21,.08),transparent 30%); }.network-emoji-library > header { display:flex;align-items:center;justify-content:space-between;gap:20px;padding-bottom:18px;border-bottom:1px solid rgba(148,163,184,.14); }.network-emoji-library header span { color:#facc15;font-size:10px;font-weight:1000;letter-spacing:.16em; }.network-emoji-library h2 { margin:4px 0;font-size:30px; }.network-emoji-library header p { margin:0;color:#94a3b8;font-size:13px; }.network-emoji-library header > b { color:#facc15; }.network-emoji-uploader { display:grid;grid-template-columns:1fr 1.4fr auto;gap:10px;align-items:end;margin:18px 0;padding:15px;border:1px solid rgba(250,204,21,.18);border-radius:12px;background:rgba(250,204,21,.04); }.network-emoji-uploader label { display:grid;gap:6px; }.network-emoji-uploader span { color:#94a3b8;font-size:10px;font-weight:900; }.network-emoji-uploader input { min-width:0;padding:11px;border:1px solid rgba(148,163,184,.22);border-radius:8px;color:#fff;background:#070d17; }.network-emoji-uploader button,.network-emoji-gallery article button { min-height:40px;padding:0 13px;border:0;border-radius:8px;color:#171000;background:#facc15;font-weight:1000;cursor:pointer; }.network-emoji-gallery { display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:10px; }.network-emoji-gallery article { display:grid;place-items:center;gap:8px;padding:16px;border:1px solid rgba(148,163,184,.13);border-radius:12px;background:rgba(15,23,42,.55); }.network-emoji-gallery article img { width:62px;height:62px;object-fit:contain; }.network-emoji-gallery article strong { font-size:11px; }.network-emoji-gallery article button { min-height:30px;color:#fecaca;background:rgba(127,29,29,.35);font-size:9px; }
-      .network-home-panel span { font-size:10px; }.network-home-panel h2 { font-size:21px; }.network-home-panel small { color:#94a3b8;font-size:12px; }.network-home-panel b { font-size:11px; }
-      .network-sidebar > nav button { min-height:42px;font-size:12px; }.network-sidebar-label { display:flex;align-items:center;justify-content:space-between;padding:13px 13px 3px;color:#64748b;font-size:10px;font-weight:1000;letter-spacing:.14em; }.network-sidebar-label button { border:0;color:#7dd3fc;background:transparent;font-size:11px;font-weight:1000;cursor:pointer; }
-      .network-channel-list > button { position:relative;grid-template-columns:40px minmax(0,1fr);gap:11px;padding:12px; }.network-channel-mark { flex:none;display:grid;place-items:center;overflow:hidden;border:1px solid rgba(56,189,248,.16);border-radius:10px;color:#38bdf8;background:rgba(14,165,233,.11);font-size:10px;font-weight:1000; }.network-channel-mark.image { background:#020617; }.network-channel-mark img { width:100%;height:100%;object-fit:cover; }.network-channel-list strong { font-size:14px; }.network-channel-list small { color:#8290a5;font-size:10px; }.network-channel-list em { position:absolute;top:6px;right:7px;color:#fbbf24;font-size:7px;font-style:normal;font-weight:1000;letter-spacing:.08em; }
-      .network-online-roster { margin:12px;border-top:1px solid rgba(148,163,184,.13);padding-top:12px; }.network-online-roster header { display:flex;align-items:center;gap:7px;margin-bottom:7px;color:#86efac;font-size:9px;font-weight:1000;letter-spacing:.13em; }.network-online-roster header i,.network-presence-dot { width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 9px rgba(34,197,94,.8); }.network-online-roster header b { margin-left:auto;color:#fff; }.network-online-roster > div { display:flex;align-items:center;gap:8px;padding:7px 3px; }.network-online-roster > small { color:#64748b;font-size:10px; }
+      .network-inline-emoji { width:1.55em;height:1.55em;display:inline-block;object-fit:contain;vertical-align:-.38em; }.network-quick-react img,.network-reaction-row > button img { width:20px;height:20px;object-fit:contain;vertical-align:middle; }.network-emoji-picker img { width:25px;height:25px;object-fit:contain; }.network-emoji-library { min-height:0;overflow-y:auto;padding:22px;background:radial-gradient(circle at 100% 0%,rgba(201,208,217,.08),transparent 30%); }.network-emoji-library > header { display:flex;align-items:center;justify-content:space-between;gap:20px;padding-bottom:18px;border-bottom:1px solid rgba(148,163,184,.14); }.network-emoji-library header span { color:var(--cfb-gold);font-size:10px;font-weight:1000;letter-spacing:.16em; }.network-emoji-library h2 { margin:4px 0;font-size:30px; }.network-emoji-library header p { margin:0;color:var(--cfb-muted);font-size:13px; }.network-emoji-library header > b { color:var(--cfb-gold); }.network-emoji-uploader { display:grid;grid-template-columns:1fr 1.4fr auto;gap:10px;align-items:end;margin:18px 0;padding:15px;border:1px solid rgba(201,208,217,.18);border-radius:12px;background:rgba(201,208,217,.04); }.network-emoji-uploader label { display:grid;gap:6px; }.network-emoji-uploader span { color:var(--cfb-muted);font-size:10px;font-weight:900; }.network-emoji-uploader input { min-width:0;padding:11px;border:1px solid rgba(148,163,184,.22);border-radius:8px;color:#fff;background:#070d17; }.network-emoji-uploader button,.network-emoji-gallery article button { min-height:40px;padding:0 13px;border:0;border-radius:8px;color:#171000;background:var(--cfb-gold);font-weight:1000;cursor:pointer; }.network-emoji-gallery { display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:10px; }.network-emoji-gallery article { display:grid;place-items:center;gap:8px;padding:16px;border:1px solid rgba(148,163,184,.13);border-radius:12px;background:rgba(15,23,42,.55); }.network-emoji-gallery article img { width:62px;height:62px;object-fit:contain; }.network-emoji-gallery article strong { font-size:11px; }.network-emoji-gallery article button { min-height:30px;color:#fecaca;background:rgba(127,29,29,.35);font-size:9px; }
+      .network-home-panel span { font-size:10px; }.network-home-panel h2 { font-size:21px; }.network-home-panel small { color:var(--cfb-muted);font-size:12px; }.network-home-panel b { font-size:11px; }
+      .network-sidebar > nav button { min-height:42px;font-size:12px; }.network-sidebar-label { display:flex;align-items:center;justify-content:space-between;padding:13px 13px 3px;color:#64748b;font-size:10px;font-weight:1000;letter-spacing:.14em; }.network-sidebar-label button { border:0;color:#9cc3d1;background:transparent;font-size:11px;font-weight:1000;cursor:pointer; }
+      .network-channel-list > button { position:relative;grid-template-columns:40px minmax(0,1fr);gap:11px;padding:12px; }.network-channel-mark { flex:none;display:grid;place-items:center;overflow:hidden;border:1px solid rgba(79,143,168,.16);border-radius:10px;color:#4f8fa8;background:rgba(58,112,134,.11);font-size:10px;font-weight:1000; }.network-channel-mark.image { background:var(--cfb-ink); }.network-channel-mark img { width:100%;height:100%;object-fit:cover; }.network-channel-list strong { font-size:14px; }.network-channel-list small { color:#8290a5;font-size:10px; }.network-channel-list em { position:absolute;top:6px;right:7px;color:#fbbf24;font-size:7px;font-style:normal;font-weight:1000;letter-spacing:.08em; }
+      .network-online-roster { margin:12px;border-top:1px solid rgba(148,163,184,.13);padding-top:12px; }.network-online-roster header { display:flex;align-items:center;gap:7px;margin-bottom:7px;color:#86efac;font-size:9px;font-weight:1000;letter-spacing:.13em; }.network-online-roster header i,.network-presence-dot { width:8px;height:8px;border-radius:50%;background:var(--cfb-green);box-shadow:0 0 9px rgba(34,197,94,.8); }.network-online-roster header b { margin-left:auto;color:#fff; }.network-online-roster > div { display:flex;align-items:center;gap:8px;padding:7px 3px; }.network-online-roster > small { color:#64748b;font-size:10px; }
       .network-identity strong,.network-identity.compact strong { font-size:13px; }.network-identity small { color:#8290a5;font-size:10px; }.network-conversation-list button > small { font-size:9px; }.network-member-search span { font-size:10px; }
       .network-stage-header span,.network-notifications header span,.network-settings header span,.redzone-directory header span { font-size:10px; }.network-stage-header h2,.network-notifications h2,.network-settings h2,.redzone-directory h2 { font-size:28px; }.network-stage-header p,.network-settings header p { color:#8290a5;font-size:13px; }.network-stage-channel { min-width:0;display:flex;align-items:center;gap:13px; }.network-stage-channel > div { min-width:0; }.network-stage-actions,.redzone-header-actions { display:flex;flex-wrap:wrap;gap:8px; }
-      .network-message-feed { gap:10px;padding:20px; }.network-message-feed article { display:block;padding:14px 16px;scroll-margin-top:100px; }.network-message-head { display:flex;align-items:center;justify-content:space-between;gap:12px; }.network-message-feed article p { margin:10px 0 7px;color:#f1f5f9;font-size:15px;line-height:1.58; }.network-message-feed article time { font-size:10px; }.network-reply-context { width:100%;display:flex;align-items:center;gap:8px;margin:0 0 10px;padding:8px 10px;overflow:hidden;border:0;border-left:3px solid #38bdf8;border-radius:5px;color:#94a3b8;text-align:left;background:rgba(14,165,233,.08);cursor:pointer; }.network-reply-context b { flex:none;color:#7dd3fc;font-size:10px; }.network-reply-context span { overflow:hidden;font-size:11px;text-overflow:ellipsis;white-space:nowrap; }
-      .network-message-toolbar { display:flex;gap:9px;opacity:.25;transition:opacity .16s ease; }.network-message-feed article:hover .network-message-toolbar,.network-message-feed article:focus-within .network-message-toolbar { opacity:1; }.network-message-toolbar button { padding:3px 0;border:0;color:#7dd3fc;background:transparent;font-size:10px;font-weight:900;cursor:pointer; }.network-message-toolbar button.danger { color:#f87171; }.network-reaction-row { display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-top:8px; }.network-reaction-row > button { padding:4px 8px;border:1px solid rgba(148,163,184,.18);border-radius:999px;color:#e2e8f0;background:#0b1320;cursor:pointer; }.network-reaction-row > button.mine { border-color:#38bdf8;background:rgba(14,165,233,.16); }.network-quick-react { display:flex;gap:2px;opacity:0;transition:opacity .16s ease; }.network-message-feed article:hover .network-quick-react,.network-message-feed article:focus-within .network-quick-react { opacity:1; }.network-quick-react button { padding:2px;border:0;background:transparent;cursor:pointer; }
-      .network-composer { grid-template-columns:minmax(0,1fr) 112px;padding:16px; }.network-replying { grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 11px;border-left:3px solid #38bdf8;border-radius:7px;background:rgba(14,165,233,.09); }.network-replying span { min-width:0;display:grid;gap:2px; }.network-replying b { color:#7dd3fc;font-size:11px; }.network-replying small { max-width:700px;overflow:hidden;color:#94a3b8;font-size:11px!important;text-overflow:ellipsis;white-space:nowrap; }.network-replying button { width:30px;height:30px;color:#fff;background:transparent; }.network-compose-box { position:relative; }.network-compose-box textarea { width:100%;padding-right:48px;font-size:15px;line-height:1.45; }.network-emoji-toggle { position:absolute;right:8px;bottom:8px;width:34px;height:34px;color:#facc15!important;background:rgba(15,23,42,.92)!important;font-size:20px; }.network-emoji-picker { position:absolute;right:0;bottom:48px;z-index:20;width:236px;display:grid;grid-template-columns:repeat(6,1fr);gap:4px;padding:8px;border:1px solid rgba(148,163,184,.2);border-radius:11px;background:#0b1320;box-shadow:0 18px 55px rgba(0,0,0,.5); }.network-emoji-picker button { min-height:34px;color:#fff;background:#111c2c;font-size:18px; }.network-send { font-size:13px; }.network-composer > small { color:#64748b;font-size:10px; }
+      .network-message-feed { gap:10px;padding:20px; }.network-message-feed article { display:block;padding:14px 16px;scroll-margin-top:100px; }.network-message-head { display:flex;align-items:center;justify-content:space-between;gap:12px; }.network-message-feed article p { margin:10px 0 7px;color:#f1f5f9;font-size:15px;line-height:1.58; }.network-message-feed article time { font-size:10px; }.network-reply-context { width:100%;display:flex;align-items:center;gap:8px;margin:0 0 10px;padding:8px 10px;overflow:hidden;border:0;border-left:3px solid #4f8fa8;border-radius:5px;color:var(--cfb-muted);text-align:left;background:rgba(58,112,134,.08);cursor:pointer; }.network-reply-context b { flex:none;color:#9cc3d1;font-size:10px; }.network-reply-context span { overflow:hidden;font-size:11px;text-overflow:ellipsis;white-space:nowrap; }
+      .network-message-toolbar { display:flex;gap:9px;opacity:.25;transition:opacity .16s ease; }.network-message-feed article:hover .network-message-toolbar,.network-message-feed article:focus-within .network-message-toolbar { opacity:1; }.network-message-toolbar button { padding:3px 0;border:0;color:#9cc3d1;background:transparent;font-size:10px;font-weight:900;cursor:pointer; }.network-message-toolbar button.danger { color:#f87171; }.network-reaction-row { display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-top:8px; }.network-reaction-row > button { padding:4px 8px;border:1px solid rgba(148,163,184,.18);border-radius:999px;color:#e2e8f0;background:#0b1320;cursor:pointer; }.network-reaction-row > button.mine { border-color:#4f8fa8;background:rgba(58,112,134,.16); }.network-quick-react { display:flex;gap:2px;opacity:0;transition:opacity .16s ease; }.network-message-feed article:hover .network-quick-react,.network-message-feed article:focus-within .network-quick-react { opacity:1; }.network-quick-react button { padding:2px;border:0;background:transparent;cursor:pointer; }
+      .network-composer { grid-template-columns:minmax(0,1fr) 112px;padding:16px; }.network-replying { grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 11px;border-left:3px solid #4f8fa8;border-radius:7px;background:rgba(58,112,134,.09); }.network-replying span { min-width:0;display:grid;gap:2px; }.network-replying b { color:#9cc3d1;font-size:11px; }.network-replying small { max-width:700px;overflow:hidden;color:var(--cfb-muted);font-size:11px!important;text-overflow:ellipsis;white-space:nowrap; }.network-replying button { width:30px;height:30px;color:#fff;background:transparent; }.network-compose-box { position:relative; }.network-compose-box textarea { width:100%;padding-right:48px;font-size:15px;line-height:1.45; }.network-emoji-toggle { position:absolute;right:8px;bottom:8px;width:34px;height:34px;color:var(--cfb-gold)!important;background:rgba(15,23,42,.92)!important;font-size:20px; }.network-emoji-picker { position:absolute;right:0;bottom:48px;z-index:20;width:236px;display:grid;grid-template-columns:repeat(6,1fr);gap:4px;padding:8px;border:1px solid rgba(148,163,184,.2);border-radius:11px;background:#0b1320;box-shadow:0 18px 55px rgba(0,0,0,.5); }.network-emoji-picker button { min-height:34px;color:#fff;background:#111c2c;font-size:18px; }.network-send { font-size:13px; }.network-composer > small { color:#64748b;font-size:10px; }
       .network-notifications p { font-size:13px; }.network-notifications small,.network-settings small,.network-setting-grid small { font-size:11px; }.network-settings button { font-size:11px; }
-      .network-channel-manager { min-height:0;overflow-y:auto;padding-bottom:24px; }.network-channel-manager > header,.network-permission-panel > header { display:flex;align-items:center;justify-content:space-between;gap:20px;padding:22px;border-bottom:1px solid rgba(148,163,184,.14); }.network-channel-manager header span,.network-permission-panel header span { color:#38bdf8;font-size:10px;font-weight:1000;letter-spacing:.16em; }.network-channel-manager h2 { margin:3px 0;font-size:28px; }.network-channel-manager h3 { margin:3px 0;font-size:20px; }.network-channel-manager header p { margin:4px 0 0;color:#94a3b8;font-size:12px; }.network-channel-manager header button { padding:9px 13px;border:1px solid rgba(148,163,184,.2);border-radius:8px;color:#fff;background:#111827;cursor:pointer; }.network-channel-form { display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:22px; }.network-channel-form label,.network-permission-panel label { display:grid;gap:6px; }.network-channel-form label.wide { grid-column:1/-1; }.network-channel-form label > span,.network-permission-panel label > span { color:#94a3b8;font-size:10px;font-weight:900;letter-spacing:.08em; }.network-channel-form input,.network-channel-form select,.network-permission-panel input,.network-permission-panel select { min-width:0;padding:12px;border:1px solid rgba(148,163,184,.22);border-radius:9px;color:#fff;background:#070d17; }.network-lock-toggle { grid-column:1/-1;display:flex!important;align-items:center;grid-template-columns:auto 1fr!important; }.network-lock-toggle input { width:20px;height:20px;accent-color:#38bdf8; }.network-manager-actions { grid-column:1/-1;display:flex;gap:9px; }.network-manager-actions button,.network-permission-panel button { min-height:42px;padding:0 16px;border:0;border-radius:9px;color:#04131c;background:#38bdf8;font-weight:1000;cursor:pointer; }.network-manager-actions button.danger { color:#fff;background:#b91c1c; }.network-permission-panel { margin:0 22px;border:1px solid rgba(56,189,248,.18);border-radius:14px;background:rgba(14,165,233,.04); }.network-permission-panel > div:last-child { display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:16px; }.network-permission-panel > div:last-child > button { align-self:end; }
+      .network-channel-manager { min-height:0;overflow-y:auto;padding-bottom:24px; }.network-channel-manager > header,.network-permission-panel > header { display:flex;align-items:center;justify-content:space-between;gap:20px;padding:22px;border-bottom:1px solid rgba(148,163,184,.14); }.network-channel-manager header span,.network-permission-panel header span { color:#4f8fa8;font-size:10px;font-weight:1000;letter-spacing:.16em; }.network-channel-manager h2 { margin:3px 0;font-size:28px; }.network-channel-manager h3 { margin:3px 0;font-size:20px; }.network-channel-manager header p { margin:4px 0 0;color:var(--cfb-muted);font-size:12px; }.network-channel-manager header button { padding:9px 13px;border:1px solid rgba(148,163,184,.2);border-radius:8px;color:#fff;background:#111827;cursor:pointer; }.network-channel-form { display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:22px; }.network-channel-form label,.network-permission-panel label { display:grid;gap:6px; }.network-channel-form label.wide { grid-column:1/-1; }.network-channel-form label > span,.network-permission-panel label > span { color:var(--cfb-muted);font-size:10px;font-weight:900;letter-spacing:.08em; }.network-channel-form input,.network-channel-form select,.network-permission-panel input,.network-permission-panel select { min-width:0;padding:12px;border:1px solid rgba(148,163,184,.22);border-radius:9px;color:#fff;background:#070d17; }.network-lock-toggle { grid-column:1/-1;display:flex!important;align-items:center;grid-template-columns:auto 1fr!important; }.network-lock-toggle input { width:20px;height:20px;accent-color:#4f8fa8; }.network-manager-actions { grid-column:1/-1;display:flex;gap:9px; }.network-manager-actions button,.network-permission-panel button { min-height:42px;padding:0 16px;border:0;border-radius:9px;color:#04131c;background:#4f8fa8;font-weight:1000;cursor:pointer; }.network-manager-actions button.danger { color:#fff;background:#b91c1c; }.network-permission-panel { margin:0 22px;border:1px solid rgba(79,143,168,.18);border-radius:14px;background:rgba(58,112,134,.04); }.network-permission-panel > div:last-child { display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:16px; }.network-permission-panel > div:last-child > button { align-self:end; }
       .elite-member-control-row { display:grid;grid-template-columns:1fr 1fr;gap:8px; }.elite-ban-toggle { min-height:42px;border:1px solid rgba(239,68,68,.4);border-radius:10px;color:#fecaca;background:rgba(127,29,29,.22);font-weight:1000;cursor:pointer; }.elite-ban-toggle.restore { border-color:rgba(34,197,94,.4);color:#bbf7d0;background:rgba(20,83,45,.25); }.elite-ban-reason { color:#fca5a5!important;font-size:10px!important; }
       .redzone-header-actions button { min-height:40px; }.redzone-status-error,.redzone-last-check { display:block;color:#fca5a5;font-size:10px;line-height:1.35; }.redzone-last-check { color:#64748b; }.redzone-stream-grid p { font-size:12px; }
       /* League Hub v29 roles, member rail, emoji feedback and organized navigation. */
       .network-emoji-uploader small { color:#64748b;font-size:10px; }.network-emoji-uploader button:disabled { opacity:.65;cursor:wait; }
-      .network-layout { grid-template-columns:280px minmax(0,1fr) 230px;box-shadow:0 28px 80px rgba(0,0,0,.32); }.network-member-rail { min-width:0;border-left:1px solid rgba(148,163,184,.13);background:linear-gradient(180deg,#08111d,#060a11); }.network-member-rail > header { display:flex;justify-content:space-between;gap:8px;padding:16px 13px;border-bottom:1px solid rgba(148,163,184,.12);color:#94a3b8;font-size:9px;font-weight:1000;letter-spacing:.1em; }.network-member-rail > header b { color:#86efac; }.network-member-rail > div { max-height:720px;overflow-y:auto;padding:8px; }.network-member-rail button { position:relative;width:100%;display:grid;grid-template-columns:9px minmax(0,1fr);gap:7px;padding:9px 7px;border:1px solid transparent;border-radius:9px;color:#fff;text-align:left;background:transparent;cursor:pointer; }.network-member-rail button:hover { border-color:rgba(56,189,248,.18);background:rgba(14,165,233,.07); }.network-member-rail button > i { width:8px;height:8px;margin-top:13px;border-radius:50%;background:#334155; }.network-member-rail button > i.online { background:#22c55e;box-shadow:0 0 8px #22c55e; }.network-member-rail button > em { grid-column:2;overflow:hidden;font-size:8px;font-style:normal;font-weight:1000;text-overflow:ellipsis;white-space:nowrap; }
-      .network-role-manager { min-height:0;overflow-y:auto;padding:22px;background:radial-gradient(circle at 85% 0%,rgba(139,92,246,.12),transparent 28%); }.network-role-manager > header { display:flex;align-items:center;justify-content:space-between;gap:20px;padding-bottom:18px;border-bottom:1px solid rgba(148,163,184,.14); }.network-role-manager header span { color:#c4b5fd;font-size:10px;font-weight:1000;letter-spacing:.15em; }.network-role-manager h2 { margin:4px 0;font-size:30px; }.network-role-manager header p { margin:0;color:#94a3b8;font-size:13px; }.network-role-manager > header > b { color:#c4b5fd; }.network-role-layout { display:grid;grid-template-columns:220px minmax(0,1fr);gap:14px;margin-top:16px; }.network-role-layout > aside { display:grid;align-content:start;gap:6px; }.network-role-layout > aside button { min-width:0;display:flex;align-items:center;gap:8px;padding:10px;border:1px solid rgba(148,163,184,.12);border-radius:9px;color:#fff;text-align:left;background:#0b1320;cursor:pointer; }.network-role-layout > aside button.active { border-color:#a78bfa;background:rgba(139,92,246,.12); }.network-role-layout > aside button > i { width:12px;height:12px;flex:none;border-radius:50%; }.network-role-layout > aside button > span { min-width:0;display:grid; }.network-role-layout > aside strong,.network-role-layout > aside small { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }.network-role-layout > aside small { color:#64748b;font-size:9px; }.network-role-layout > aside em { margin-left:auto;color:#94a3b8;font-size:7px;font-style:normal; }.network-role-layout > section { min-width:0;border:1px solid rgba(148,163,184,.13);border-radius:13px;background:rgba(2,6,23,.5); }.network-role-form { display:grid;grid-template-columns:1.4fr 100px 110px;gap:10px;padding:15px; }.network-role-form > label { display:grid;gap:5px; }.network-role-form label > span { color:#94a3b8;font-size:9px;font-weight:900; }.network-role-form input { min-width:0;padding:10px;border:1px solid rgba(148,163,184,.2);border-radius:8px;color:#fff;background:#070d17; }.network-role-form input[type=color] { width:100%;height:40px;padding:4px; }.network-role-preview { grid-column:1/-1;display:flex;align-items:center;gap:8px;padding:10px;border:1px solid color-mix(in srgb,var(--role-color) 40%,transparent);border-radius:9px;background:color-mix(in srgb,var(--role-color) 9%,transparent); }.network-role-preview i { width:11px;height:11px;border-radius:50%;background:var(--role-color);box-shadow:0 0 10px var(--role-color); }.network-role-permissions { grid-column:1/-1;display:grid;gap:7px;padding:12px;border:1px solid rgba(148,163,184,.12);border-radius:9px; }.network-role-permissions > span { color:#c4b5fd;font-size:9px;font-weight:1000;letter-spacing:.12em; }.network-role-permissions label { display:flex;align-items:center;gap:8px; }.network-role-permissions input { width:18px;height:18px;accent-color:#8b5cf6; }.network-role-actions { grid-column:1/-1;display:flex;gap:8px; }.network-role-actions button { min-height:40px;padding:0 14px;border:0;border-radius:8px;color:#0f0920;background:#a78bfa;font-weight:1000;cursor:pointer; }.network-role-actions button.danger { color:#fecaca;background:rgba(127,29,29,.4); }.network-role-members { border-top:1px solid rgba(148,163,184,.13);padding:15px; }.network-role-members > header { display:flex;justify-content:space-between;color:#94a3b8;font-size:9px; }.network-role-members > div { display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:9px; }.network-role-members > div > label { display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px;border:1px solid rgba(148,163,184,.1);border-radius:8px;background:rgba(15,23,42,.4); }.network-role-members input { width:18px;height:18px;accent-color:#8b5cf6; }
-      .drawer-menu-search { display:grid;gap:6px;margin:14px;padding:12px;border:1px solid rgba(56,189,248,.18);border-radius:12px;background:rgba(14,165,233,.05); }.drawer-menu-search span { color:#7dd3fc;font-size:9px;font-weight:1000;letter-spacing:.13em; }.drawer-menu-search input { padding:11px;border:1px solid rgba(148,163,184,.18);border-radius:8px;color:#fff;background:#050a12; }.drawer-menu-grid { display:grid;grid-template-columns:1fr 1fr;gap:8px; }.drawer-nav-tile { min-height:72px!important;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease,filter .18s ease; }.drawer-nav-tile:hover { transform:translateY(-3px) scale(1.01);filter:brightness(1.14);box-shadow:0 16px 34px rgba(0,0,0,.34)!important; }.drawer-nav-tile:active { transform:translateY(0) scale(.985); }.drawer-nav-tile.active { animation:drawerActivePulse 2.4s ease-in-out infinite; }.drawer-nav-icon { width:34px;height:34px;display:grid;place-items:center;flex:none;border:1px solid;border-radius:10px;background:rgba(2,6,23,.38);font-size:11px; }.drawer-nav-copy { min-width:0;display:grid;gap:3px; }.drawer-nav-copy strong { overflow:hidden;font-size:13px;text-overflow:ellipsis;white-space:nowrap; }.drawer-nav-copy small { overflow:hidden;color:#94a3b8;font-size:9px;text-overflow:ellipsis;white-space:nowrap; }.drawer-menu-group { padding:11px;border:1px solid rgba(148,163,184,.1);border-radius:14px;background:rgba(255,255,255,.018); } @keyframes drawerActivePulse { 0%,100%{filter:brightness(1)} 50%{filter:brightness(1.13)} }
+      .network-layout { grid-template-columns:280px minmax(0,1fr) 230px;box-shadow:0 28px 80px rgba(0,0,0,.32); }.network-member-rail { min-width:0;border-left:1px solid rgba(148,163,184,.13);background:linear-gradient(180deg,#08111d,#060a11); }.network-member-rail > header { display:flex;justify-content:space-between;gap:8px;padding:16px 13px;border-bottom:1px solid rgba(148,163,184,.12);color:var(--cfb-muted);font-size:9px;font-weight:1000;letter-spacing:.1em; }.network-member-rail > header b { color:#86efac; }.network-member-rail > div { max-height:720px;overflow-y:auto;padding:8px; }.network-member-rail button { position:relative;width:100%;display:grid;grid-template-columns:9px minmax(0,1fr);gap:7px;padding:9px 7px;border:1px solid transparent;border-radius:9px;color:#fff;text-align:left;background:transparent;cursor:pointer; }.network-member-rail button:hover { border-color:rgba(79,143,168,.18);background:rgba(58,112,134,.07); }.network-member-rail button > i { width:8px;height:8px;margin-top:13px;border-radius:50%;background:#334155; }.network-member-rail button > i.online { background:var(--cfb-green);box-shadow:0 0 8px var(--cfb-green); }.network-member-rail button > em { grid-column:2;overflow:hidden;font-size:8px;font-style:normal;font-weight:1000;text-overflow:ellipsis;white-space:nowrap; }
+      .network-role-manager { min-height:0;overflow-y:auto;padding:22px;background:radial-gradient(circle at 85% 0%,rgba(139,92,246,.12),transparent 28%); }.network-role-manager > header { display:flex;align-items:center;justify-content:space-between;gap:20px;padding-bottom:18px;border-bottom:1px solid rgba(148,163,184,.14); }.network-role-manager header span { color:#9a8fd1;font-size:10px;font-weight:1000;letter-spacing:.15em; }.network-role-manager h2 { margin:4px 0;font-size:30px; }.network-role-manager header p { margin:0;color:var(--cfb-muted);font-size:13px; }.network-role-manager > header > b { color:#9a8fd1; }.network-role-layout { display:grid;grid-template-columns:220px minmax(0,1fr);gap:14px;margin-top:16px; }.network-role-layout > aside { display:grid;align-content:start;gap:6px; }.network-role-layout > aside button { min-width:0;display:flex;align-items:center;gap:8px;padding:10px;border:1px solid rgba(148,163,184,.12);border-radius:9px;color:#fff;text-align:left;background:#0b1320;cursor:pointer; }.network-role-layout > aside button.active { border-color:#a78bfa;background:rgba(139,92,246,.12); }.network-role-layout > aside button > i { width:12px;height:12px;flex:none;border-radius:50%; }.network-role-layout > aside button > span { min-width:0;display:grid; }.network-role-layout > aside strong,.network-role-layout > aside small { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }.network-role-layout > aside small { color:#64748b;font-size:9px; }.network-role-layout > aside em { margin-left:auto;color:var(--cfb-muted);font-size:7px;font-style:normal; }.network-role-layout > section { min-width:0;border:1px solid rgba(148,163,184,.13);border-radius:13px;background:rgba(2,6,23,.5); }.network-role-form { display:grid;grid-template-columns:1.4fr 100px 110px;gap:10px;padding:15px; }.network-role-form > label { display:grid;gap:5px; }.network-role-form label > span { color:var(--cfb-muted);font-size:9px;font-weight:900; }.network-role-form input { min-width:0;padding:10px;border:1px solid rgba(148,163,184,.2);border-radius:8px;color:#fff;background:#070d17; }.network-role-form input[type=color] { width:100%;height:40px;padding:4px; }.network-role-preview { grid-column:1/-1;display:flex;align-items:center;gap:8px;padding:10px;border:1px solid color-mix(in srgb,var(--role-color) 40%,transparent);border-radius:9px;background:color-mix(in srgb,var(--role-color) 9%,transparent); }.network-role-preview i { width:11px;height:11px;border-radius:50%;background:var(--role-color);box-shadow:0 0 10px var(--role-color); }.network-role-permissions { grid-column:1/-1;display:grid;gap:7px;padding:12px;border:1px solid rgba(148,163,184,.12);border-radius:9px; }.network-role-permissions > span { color:#9a8fd1;font-size:9px;font-weight:1000;letter-spacing:.12em; }.network-role-permissions label { display:flex;align-items:center;gap:8px; }.network-role-permissions input { width:18px;height:18px;accent-color:#8b5cf6; }.network-role-actions { grid-column:1/-1;display:flex;gap:8px; }.network-role-actions button { min-height:40px;padding:0 14px;border:0;border-radius:8px;color:#0f0920;background:#a78bfa;font-weight:1000;cursor:pointer; }.network-role-actions button.danger { color:#fecaca;background:rgba(127,29,29,.4); }.network-role-members { border-top:1px solid rgba(148,163,184,.13);padding:15px; }.network-role-members > header { display:flex;justify-content:space-between;color:var(--cfb-muted);font-size:9px; }.network-role-members > div { display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:9px; }.network-role-members > div > label { display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px;border:1px solid rgba(148,163,184,.1);border-radius:8px;background:rgba(15,23,42,.4); }.network-role-members input { width:18px;height:18px;accent-color:#8b5cf6; }
+      .drawer-menu-search { display:grid;gap:6px;margin:14px;padding:12px;border:1px solid rgba(79,143,168,.18);border-radius:12px;background:rgba(58,112,134,.05); }.drawer-menu-search span { color:#9cc3d1;font-size:9px;font-weight:1000;letter-spacing:.13em; }.drawer-menu-search input { padding:11px;border:1px solid rgba(148,163,184,.18);border-radius:8px;color:#fff;background:#050a12; }.drawer-menu-grid { display:grid;grid-template-columns:1fr 1fr;gap:8px; }.drawer-nav-tile { min-height:72px!important;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease,filter .18s ease; }.drawer-nav-tile:hover { transform:translateY(-3px) scale(1.01);filter:brightness(1.14);box-shadow:0 16px 34px rgba(0,0,0,.34)!important; }.drawer-nav-tile:active { transform:translateY(0) scale(.985); }.drawer-nav-tile.active { animation:drawerActivePulse 2.4s ease-in-out infinite; }.drawer-nav-icon { width:34px;height:34px;display:grid;place-items:center;flex:none;border:1px solid;border-radius:10px;background:rgba(2,6,23,.38);font-size:11px; }.drawer-nav-copy { min-width:0;display:grid;gap:3px; }.drawer-nav-copy strong { overflow:hidden;font-size:13px;text-overflow:ellipsis;white-space:nowrap; }.drawer-nav-copy small { overflow:hidden;color:var(--cfb-muted);font-size:9px;text-overflow:ellipsis;white-space:nowrap; }.drawer-menu-group { padding:11px;border:1px solid rgba(148,163,184,.1);border-radius:14px;background:rgba(255,255,255,.018); } @keyframes drawerActivePulse { 0%,100%{filter:brightness(1)} 50%{filter:brightness(1.13)} }
       @media (max-width:1250px) { .network-layout { grid-template-columns:270px minmax(0,1fr); }.network-member-rail { display:none; } }
       @media (max-width:760px) { .network-role-layout { grid-template-columns:1fr; }.network-role-layout > aside { grid-template-columns:repeat(2,minmax(0,1fr)); }.network-role-form { grid-template-columns:1fr 80px; }.network-role-form > label:nth-child(3) { grid-column:1/-1; }.network-role-members > div { grid-template-columns:1fr; } }
       @media (max-width:520px) { .drawer-menu-grid { grid-template-columns:1fr; }.drawer-nav-tile { min-height:66px!important; } }
@@ -9451,7 +6901,7 @@ function GlobalStyle() {
         .elite-badge-gallery > div:last-child { grid-template-columns:1fr; }
         .elite-myteam-login { margin:10px;padding:25px 18px; }
         .elite-seed-grid { grid-template-columns:1fr; }
-        .league-login-shell { padding:10px; }.league-login-card { padding:25px 18px;border-radius:18px; }.league-login-mark { width:150px;height:150px; }.league-login-mark strong { font-size:36px; }.league-login-mark b { font-size:34px; }.league-login-card footer { align-items:center;flex-direction:column;gap:7px; }.network-hero,.redzone-hero { align-items:flex-start;flex-direction:column;padding:22px; }.network-live-presence,.redzone-hero > div:last-child { min-width:0; }.network-channel-list,.network-conversation-list { grid-template-columns:1fr; }.network-stage-header { align-items:flex-start;flex-direction:column; }.network-composer { grid-template-columns:1fr; }.network-composer button { min-height:44px; }.network-settings > section { align-items:flex-start;flex-direction:column; }.redzone-directory > header { align-items:flex-start;flex-direction:column; }
+        .league-login-shell { padding:10px; }.league-login-card { padding:25px 18px;border-radius:18px; }.league-login-mark { width:150px;height:150px; }.league-login-card footer { align-items:center;flex-direction:column;gap:7px; }.network-hero,.redzone-hero { align-items:flex-start;flex-direction:column;padding:22px; }.network-live-presence,.redzone-hero > div:last-child { min-width:0; }.network-channel-list,.network-conversation-list { grid-template-columns:1fr; }.network-stage-header { align-items:flex-start;flex-direction:column; }.network-composer { grid-template-columns:1fr; }.network-composer button { min-height:44px; }.network-settings > section { align-items:flex-start;flex-direction:column; }.redzone-directory > header { align-items:flex-start;flex-direction:column; }
         .network-home-panel { grid-template-columns:1fr; }.network-home-panel > button:first-child { grid-column:1; }.network-home-panel > button { border-right:0;border-bottom:1px solid rgba(255,255,255,.08); }.network-home-panel h2 { white-space:normal; }.network-message-toolbar,.network-quick-react { opacity:1; }.network-quick-react { width:100%;margin-top:3px; }.network-message-feed { padding:10px; }.network-stage-channel { align-items:flex-start; }.network-channel-manager > header { align-items:flex-start;flex-direction:column; }.network-permission-panel { margin:0 12px; }.network-composer > small { display:none; }
       }
 
@@ -9541,7 +6991,7 @@ function GlobalStyle() {
         .cfb-coach-hero-identity-v68 p { font-size:12px!important; }
         .cfb-coach-hero-metrics-v68 { gap:8px!important; }
         .cfb-coach-hero-metrics-v68 > div { min-height:94px;padding:12px 8px!important;border-radius:12px!important;align-content:center; }
-        .cfb-coach-hero-metrics-v68 > div > span { color:#94a3b8;font-size:11px!important;font-weight:850; }
+        .cfb-coach-hero-metrics-v68 > div > span { color:var(--cfb-muted);font-size:11px!important;font-weight:850; }
         .cfb-coach-hero-metrics-v68 > div > b { font-size:23px!important;line-height:1; }
         .cfb-coach-hero-metrics-v68 > div > small { font-size:10px!important;line-height:1.25; }
 
@@ -9551,7 +7001,7 @@ function GlobalStyle() {
         .network-mobile-hub-header > button { width:42px;height:42px;display:grid;place-items:center;border:0;border-radius:50%;color:#e5e7eb;background:#292b34;font-size:30px;line-height:1;cursor:pointer; }
         .network-mobile-hub-header > button:first-child { color:#cbd5e1; }
         .network-mobile-hub-header > div { min-width:0;display:grid;gap:2px; }
-        .network-mobile-hub-header strong { overflow:hidden;color:#f8fafc;font-size:17px;text-overflow:ellipsis;white-space:nowrap; }
+        .network-mobile-hub-header strong { overflow:hidden;color:var(--cfb-text);font-size:17px;text-overflow:ellipsis;white-space:nowrap; }
         .network-mobile-hub-header small { overflow:hidden;color:#8b92a5;font-size:11px;text-overflow:ellipsis;white-space:nowrap; }
         .network-mobile-hub-header > i { width:10px;height:10px;justify-self:center;border-radius:50%;background:#23c55e;box-shadow:0 0 10px rgba(35,197,94,.65); }
         .network-mobile-channel-actions { font-size:15px!important;letter-spacing:.05em; }
@@ -9561,7 +7011,7 @@ function GlobalStyle() {
         .network-mobile-directory .network-sidebar { display:block!important;min-height:calc(100dvh - 165px);background:#17181f!important; }
         .network-mobile-chat .network-stage,.network-mobile-panel .network-stage { display:grid!important;min-height:calc(100dvh - 165px)!important;background:#111218!important; }
         .network-mobile-directory-title { display:grid;gap:3px;padding:16px 15px 12px;border-bottom:1px solid rgba(148,163,184,.1); }
-        .network-mobile-directory-title strong { color:#f8fafc;font-size:17px; }
+        .network-mobile-directory-title strong { color:var(--cfb-text);font-size:17px; }
         .network-mobile-directory-title span { color:#7e8494;font-size:11px; }
         .network-sidebar > nav { display:flex!important;gap:7px!important;padding:10px 12px!important;overflow-x:auto!important;border-bottom:1px solid rgba(148,163,184,.1)!important;scrollbar-width:none; }
         .network-sidebar > nav::-webkit-scrollbar { display:none; }
@@ -9572,7 +7022,7 @@ function GlobalStyle() {
         .network-channel-category { padding:15px 8px 7px!important;color:#8b92a5;font-size:10px; }
         .network-channel-list > button { width:100%!important;max-width:none!important;min-width:0!important;min-height:48px;display:grid!important;grid-template-columns:28px minmax(0,1fr) auto!important;gap:7px!important;margin:1px 0;padding:8px 10px!important;border:0!important;border-radius:8px!important;color:#aeb3c0!important;background:transparent!important;scroll-snap-align:none!important; }
         .network-channel-list > button::before { content:"#";display:block;color:#8b92a5;font-size:25px;font-weight:450;line-height:1;text-align:center; }
-        .network-channel-list > button.matchup::before { content:"VS";color:#7dd3fc;font-size:10px;font-weight:1000;letter-spacing:.03em; }
+        .network-channel-list > button.matchup::before { content:"VS";color:#9cc3d1;font-size:10px;font-weight:1000;letter-spacing:.03em; }
         .network-channel-list > button.active { color:#fff!important;background:#30323b!important; }
         .network-channel-list .network-channel-mark { display:none!important; }
         .network-channel-list > button > span { min-width:0!important;display:grid!important;gap:1px!important; }
@@ -9591,7 +7041,7 @@ function GlobalStyle() {
         .network-message-feed article.mine { background:transparent!important; }
         .network-message-head { display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:8px!important; }
         .network-message-head .network-identity { flex:0 1 auto; }
-        .network-message-head .network-identity > span > strong { color:#60a5fa;font-size:14px!important; }
+        .network-message-head .network-identity > span > strong { color:#4f8fa8;font-size:14px!important; }
         .network-message-head .network-identity > span > small { display:none; }
         .network-message-head time { color:#737989!important;font-size:9px!important; }
         .network-message-feed article > p { margin:4px 0 2px 47px!important;color:#d8d9df!important;font-size:14px!important;line-height:1.45!important; }
@@ -9613,98 +7063,98 @@ function GlobalStyle() {
       }
 
       /* League Hub v32 — CFB broadcast navy, signal blue, championship gold. */
-      .network-page { --hub-canvas:#070b13;--hub-sidebar:#0b1320;--hub-panel:#0d1726;--hub-raised:#132238;--hub-blue:#38bdf8;--hub-gold:#f4c430;--hub-red:#ef4444;--hub-text:#f8fafc;--hub-muted:#8fa0b7; }
-      .network-page .network-layout { border-color:rgba(56,189,248,.16);background:var(--hub-canvas); }
+      .network-page { --hub-canvas:#070b13;--hub-sidebar:#0b1320;--hub-panel:#0d1726;--hub-raised:#132238;--hub-blue:#4f8fa8;--hub-gold:#f4c430;--hub-red:var(--cfb-danger);--hub-text:var(--cfb-text);--hub-muted:#8fa0b7; }
+      .network-page .network-layout { border-color:rgba(79,143,168,.16);background:var(--hub-canvas); }
       .network-page .network-sidebar,.network-page .network-member-rail { background:linear-gradient(180deg,#0d1828,#080e18); }
       .network-page .network-stage,.network-page .network-message-feed { background:linear-gradient(145deg,#0a111d,#08101a); }
-      .network-page .network-sidebar > nav button.active { border-color:rgba(56,189,248,.5);color:#e0f2fe;background:linear-gradient(135deg,rgba(14,165,233,.3),rgba(37,99,235,.22));box-shadow:inset 0 0 0 1px rgba(255,255,255,.03); }
+      .network-page .network-sidebar > nav button.active { border-color:rgba(79,143,168,.5);color:#e0f2fe;background:linear-gradient(135deg,rgba(58,112,134,.3),rgba(37,99,235,.22));box-shadow:inset 0 0 0 1px rgba(255,255,255,.03); }
       .network-sidebar-tools { display:flex;align-items:center;gap:8px; }
       .network-sidebar-tools button { padding:3px 0!important; }
       .network-channel-category { display:flex;align-items:center;gap:7px;padding:15px 10px 6px;color:#8fa0b7;font-size:9px;font-weight:1000;letter-spacing:.14em; }
-      .network-channel-category > i { width:4px;height:13px;border-radius:999px;background:var(--category-color,#38bdf8);box-shadow:0 0 12px color-mix(in srgb,var(--category-color,#38bdf8) 60%,transparent); }
+      .network-channel-category > i { width:4px;height:13px;border-radius:999px;background:var(--category-color,#4f8fa8);box-shadow:0 0 12px color-mix(in srgb,var(--category-color,#4f8fa8) 60%,transparent); }
       .network-channel-category > b { margin-left:auto;color:#5f7189;font-size:8px; }
       .network-channel-mark { border:0;border-radius:0;color:#8192a9;background:transparent;font-size:25px;font-weight:500; }
       .network-channel-mark.image { overflow:visible;border-radius:50%;background:transparent; }
       .network-channel-mark.image img { object-fit:contain; }
       .network-channel-list > button { border-radius:9px;transition:transform .16s ease,background .16s ease,color .16s ease; }
-      .network-channel-list > button:hover { transform:translateX(2px);color:#f8fafc;background:rgba(56,189,248,.08); }
-      .network-channel-list > button.active { border-color:rgba(56,189,248,.25);background:linear-gradient(90deg,rgba(14,165,233,.2),rgba(30,64,175,.12));box-shadow:inset 3px 0 #38bdf8; }
+      .network-channel-list > button:hover { transform:translateX(2px);color:var(--cfb-text);background:rgba(79,143,168,.08); }
+      .network-channel-list > button.active { border-color:rgba(79,143,168,.25);background:linear-gradient(90deg,rgba(58,112,134,.2),rgba(30,64,175,.12));box-shadow:inset 3px 0 #4f8fa8; }
       .network-matchup-logos { width:82px;display:flex!important;align-items:center;justify-content:center;gap:6px;overflow:visible!important; }
       .network-matchup-logos > b { color:#f4c430;font-size:8px;letter-spacing:.08em; }
       .network-channel-list > button.matchup { grid-template-columns:82px minmax(0,1fr) auto; }
       .network-channel-list > button.matchup > em { color:#f4c430; }
       .network-category-manager { padding:22px;background:linear-gradient(145deg,#0b1422,#08101b); }
       .network-category-manager > header { display:flex;align-items:flex-start;justify-content:space-between;gap:15px;padding-bottom:18px;border-bottom:1px solid rgba(148,163,184,.13); }
-      .network-category-manager > header span,.network-category-layout label > span { color:#38bdf8;font-size:9px;font-weight:1000;letter-spacing:.13em; }
-      .network-category-manager h2 { margin:4px 0;color:#f8fafc;font-size:28px; }
+      .network-category-manager > header span,.network-category-layout label > span { color:#4f8fa8;font-size:9px;font-weight:1000;letter-spacing:.13em; }
+      .network-category-manager h2 { margin:4px 0;color:var(--cfb-text);font-size:28px; }
       .network-category-manager p { margin:0;color:#8fa0b7; }
       .network-category-manager > header > b { padding:7px 10px;border:1px solid rgba(244,196,48,.25);border-radius:999px;color:#f4c430;background:rgba(244,196,48,.08);font-size:9px; }
       .network-category-layout { display:grid;grid-template-columns:minmax(220px,280px) minmax(0,1fr);gap:18px;padding-top:18px; }
       .network-category-layout > aside { display:grid;align-content:start;gap:7px; }
       .network-category-layout > aside > button { display:grid;grid-template-columns:8px minmax(0,1fr) auto;align-items:center;gap:10px;padding:12px;border:1px solid rgba(148,163,184,.13);border-radius:10px;color:#dbe7f5;text-align:left;background:#0b1422;cursor:pointer; }
-      .network-category-layout > aside > button:first-child { grid-template-columns:1fr;color:#7dd3fc;text-align:center; }
-      .network-category-layout > aside > button.active { border-color:rgba(56,189,248,.42);background:#132238; }
+      .network-category-layout > aside > button:first-child { grid-template-columns:1fr;color:#9cc3d1;text-align:center; }
+      .network-category-layout > aside > button.active { border-color:rgba(79,143,168,.42);background:#132238; }
       .network-category-layout > aside i { width:6px;height:28px;border-radius:999px; }
       .network-category-layout > aside span { min-width:0;display:grid;gap:2px; }.network-category-layout > aside small { color:#71839b;font-size:9px; }.network-category-layout > aside em { color:#f4c430;font-size:8px;font-style:normal; }
-      .network-category-layout > section { display:grid;grid-template-columns:1fr 130px;align-content:start;gap:13px;padding:18px;border:1px solid rgba(56,189,248,.13);border-radius:14px;background:#0d1726; }
+      .network-category-layout > section { display:grid;grid-template-columns:1fr 130px;align-content:start;gap:13px;padding:18px;border:1px solid rgba(79,143,168,.13);border-radius:14px;background:#0d1726; }
       .network-category-layout label { display:grid;gap:6px; }.network-category-layout label:nth-child(3),.network-category-preview,.network-category-layout .network-manager-actions { grid-column:1/-1; }
-      .network-category-layout input { min-width:0;padding:12px;border:1px solid rgba(148,163,184,.18);border-radius:9px;color:#f8fafc;background:#07101c; }
+      .network-category-layout input { min-width:0;padding:12px;border:1px solid rgba(148,163,184,.18);border-radius:9px;color:var(--cfb-text);background:#07101c; }
       .network-category-layout input[type="color"] { width:100%;height:43px;padding:4px; }
-      .network-category-preview { display:flex;align-items:center;gap:9px;padding:13px;border-radius:10px;color:#f8fafc;background:#09111d;font-size:13px;letter-spacing:.08em;text-transform:uppercase; }
+      .network-category-preview { display:flex;align-items:center;gap:9px;padding:13px;border-radius:10px;color:var(--cfb-text);background:#09111d;font-size:13px;letter-spacing:.08em;text-transform:uppercase; }
       .network-category-preview i { width:5px;height:22px;border-radius:999px;background:var(--category-color);box-shadow:0 0 14px var(--category-color); }
 
       /* v36 AI Data Intake and permanent season archive. */
-      .home-data-ops { display:grid;grid-template-columns:minmax(0,1fr) 210px auto;align-items:center;gap:22px;padding:20px 22px;border:1px solid rgba(45,212,191,.24);border-left:5px solid #2dd4bf;border-radius:15px;background:linear-gradient(115deg,#07110f,#0e1724 70%,#0f1821);box-shadow:0 15px 42px rgba(0,0,0,.24); }.home-data-ops > div:first-child span { color:#5eead4;font-size:8px;font-weight:1000;letter-spacing:.16em; }.home-data-ops h2 { margin:4px 0;font-size:23px; }.home-data-ops p { margin:0;color:#8fa0b5;font-size:11px;line-height:1.45; }.home-data-progress { display:grid;grid-template-columns:auto 1fr;align-items:center;gap:10px; }.home-data-progress b { font-size:26px; }.home-data-progress > span { overflow:hidden;height:8px;border-radius:999px;background:#172231; }.home-data-progress i { display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#14b8a6,#5eead4); }.home-data-ops > div:last-child { display:flex;gap:8px; }.home-data-ops button { padding:10px 12px;border:1px solid rgba(45,212,191,.3);border-radius:8px;color:#c7fff7;background:rgba(45,212,191,.07);font-size:9px;font-weight:1000;cursor:pointer; }
+      .home-data-ops { display:grid;grid-template-columns:minmax(0,1fr) 210px auto;align-items:center;gap:22px;padding:20px 22px;border:1px solid rgba(63,174,158,.24);border-left:5px solid #3fae9e;border-radius:15px;background:linear-gradient(115deg,#07110f,#0e1724 70%,#0f1821);box-shadow:0 15px 42px rgba(0,0,0,.24); }.home-data-ops > div:first-child span { color:#5eead4;font-size:8px;font-weight:1000;letter-spacing:.16em; }.home-data-ops h2 { margin:4px 0;font-size:23px; }.home-data-ops p { margin:0;color:#8fa0b5;font-size:11px;line-height:1.45; }.home-data-progress { display:grid;grid-template-columns:auto 1fr;align-items:center;gap:10px; }.home-data-progress b { font-size:26px; }.home-data-progress > span { overflow:hidden;height:8px;border-radius:999px;background:#172231; }.home-data-progress i { display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#14b8a6,#5eead4); }.home-data-ops > div:last-child { display:flex;gap:8px; }.home-data-ops button { padding:10px 12px;border:1px solid rgba(63,174,158,.3);border-radius:8px;color:#c7fff7;background:rgba(63,174,158,.07);font-size:9px;font-weight:1000;cursor:pointer; }
       .data-intake-page,.dynasty-archive-page { display:grid;gap:16px;padding-bottom:28px; }
-      .data-intake-hero,.archive-hero { display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:22px;padding:31px;border:1px solid rgba(45,212,191,.24);border-top:5px solid #2dd4bf;border-radius:19px;background:radial-gradient(circle at 82% 0%,rgba(45,212,191,.17),transparent 32%),linear-gradient(120deg,#07100f,#101827 64%,#101424);box-shadow:0 24px 65px rgba(0,0,0,.32); }
+      .data-intake-hero,.archive-hero { display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:22px;padding:31px;border:1px solid rgba(63,174,158,.24);border-top:5px solid #3fae9e;border-radius:19px;background:radial-gradient(circle at 82% 0%,rgba(63,174,158,.17),transparent 32%),linear-gradient(120deg,#07100f,#101827 64%,#101424);box-shadow:0 24px 65px rgba(0,0,0,.32); }
       .data-intake-hero span,.archive-hero span,.data-section-head > span,.data-review-head > div > span { color:#5eead4;font-size:9px;font-weight:1000;letter-spacing:.17em; }
       .data-intake-hero h1,.archive-hero h1 { margin:5px 0 7px;font-size:clamp(42px,6vw,80px);line-height:.92;letter-spacing:-.06em; }.data-intake-hero p,.archive-hero p { max-width:800px;margin:0;color:#a9b6c8;font-size:14px;line-height:1.55; }
-      .data-intake-hero > div:last-child,.archive-hero > div:last-child { display:grid;min-width:170px;padding:17px;border:1px solid rgba(45,212,191,.3);border-radius:13px;background:#061211; }.data-intake-hero > div:last-child b,.archive-hero > div:last-child b { font-size:38px; }.data-intake-hero > div:last-child span,.archive-hero > div:last-child span { font-size:8px; }
+      .data-intake-hero > div:last-child,.archive-hero > div:last-child { display:grid;min-width:170px;padding:17px;border:1px solid rgba(63,174,158,.3);border-radius:13px;background:#061211; }.data-intake-hero > div:last-child b,.archive-hero > div:last-child b { font-size:38px; }.data-intake-hero > div:last-child span,.archive-hero > div:last-child span { font-size:8px; }
       .data-intake-grid { display:grid;grid-template-columns:minmax(0,1.18fr) minmax(330px,.82fr);gap:16px; }
       .data-upload-card,.data-queue-card,.data-review-card,.data-checklist-card,.archive-filter,.archive-grid > article { border:1px solid rgba(148,163,184,.17);border-radius:17px;background:linear-gradient(145deg,#0d1420,#080d15);box-shadow:0 16px 42px rgba(0,0,0,.24); }
       .data-upload-card,.data-queue-card,.data-review-card,.data-checklist-card { padding:21px; }.data-section-head { margin-bottom:16px; }.data-section-head h2 { margin:4px 0;font-size:25px; }.data-section-head p { max-width:850px;margin:5px 0;color:#91a0b4;line-height:1.5; }
-      .data-policy-strip { display:grid;gap:4px;margin-bottom:15px;padding:12px 14px;border:1px solid rgba(45,212,191,.2);border-left:4px solid #2dd4bf;border-radius:9px;background:rgba(45,212,191,.055); }.data-policy-strip b { color:#99f6e4; }.data-policy-strip span { color:#9baabe;font-size:11px;line-height:1.45; }
-      .data-upload-card form { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px; }.data-upload-card label,.archive-filter label { display:grid;gap:6px;color:#93a4b8;font-size:9px;font-weight:1000;letter-spacing:.11em;text-transform:uppercase; }.data-upload-card select,.data-upload-card textarea,.archive-filter select { width:100%;padding:11px;border:1px solid rgba(148,163,184,.22);border-radius:9px;color:#f8fafc;background:#060a11;font-size:12px; }.data-upload-card textarea { min-height:82px;resize:vertical; }.data-upload-wide { grid-column:1/-1; }
-      .data-file-drop { position:relative;display:grid!important;place-items:center;min-height:112px;padding:18px;border:1px dashed rgba(45,212,191,.42);border-radius:12px;text-align:center;background:rgba(45,212,191,.045);cursor:pointer; }.data-file-drop input { position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer; }.data-file-drop b { color:#e6fffb;font-size:15px; }.data-file-drop span { color:#7f91a7;font-size:10px; }
-      .data-primary-button,.data-review-actions button:first-child { padding:13px 16px;border:1px solid #2dd4bf;border-radius:9px;color:#031513;background:linear-gradient(135deg,#5eead4,#14b8a6);font-weight:1000;cursor:pointer; }.data-primary-button:disabled { opacity:.58;cursor:not-allowed; }.data-local-message { padding:13px 15px;border:1px solid rgba(45,212,191,.26);border-radius:10px;color:#bffcf3;background:rgba(13,148,136,.1);font-weight:800;line-height:1.4; }
-      .data-import-list { display:grid;gap:7px;max-height:590px;overflow:auto;padding-right:3px; }.data-import-list > button { display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 9px;padding:12px;border:1px solid rgba(148,163,184,.14);border-radius:10px;color:#fff;text-align:left;background:#090f18;cursor:pointer; }.data-import-list > button.selected { border-color:#2dd4bf;background:rgba(45,212,191,.075);box-shadow:inset 3px 0 #2dd4bf; }.data-import-list strong { align-self:center; }.data-import-list small,.data-import-list em { grid-column:2;color:#7f90a6;font-size:9px;font-style:normal; }.data-import-list em { color:#fca5a5; }
+      .data-policy-strip { display:grid;gap:4px;margin-bottom:15px;padding:12px 14px;border:1px solid rgba(63,174,158,.2);border-left:4px solid #3fae9e;border-radius:9px;background:rgba(63,174,158,.055); }.data-policy-strip b { color:#99f6e4; }.data-policy-strip span { color:#9baabe;font-size:11px;line-height:1.45; }
+      .data-upload-card form { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px; }.data-upload-card label,.archive-filter label { display:grid;gap:6px;color:#93a4b8;font-size:9px;font-weight:1000;letter-spacing:.11em;text-transform:uppercase; }.data-upload-card select,.data-upload-card textarea,.archive-filter select { width:100%;padding:11px;border:1px solid rgba(148,163,184,.22);border-radius:9px;color:var(--cfb-text);background:#060a11;font-size:12px; }.data-upload-card textarea { min-height:82px;resize:vertical; }.data-upload-wide { grid-column:1/-1; }
+      .data-file-drop { position:relative;display:grid!important;place-items:center;min-height:112px;padding:18px;border:1px dashed rgba(63,174,158,.42);border-radius:12px;text-align:center;background:rgba(63,174,158,.045);cursor:pointer; }.data-file-drop input { position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer; }.data-file-drop b { color:#e6fffb;font-size:15px; }.data-file-drop span { color:#7f91a7;font-size:10px; }
+      .data-primary-button,.data-review-actions button:first-child { padding:13px 16px;border:1px solid #3fae9e;border-radius:9px;color:#031513;background:linear-gradient(135deg,#5eead4,#14b8a6);font-weight:1000;cursor:pointer; }.data-primary-button:disabled { opacity:.58;cursor:not-allowed; }.data-local-message { padding:13px 15px;border:1px solid rgba(63,174,158,.26);border-radius:10px;color:#bffcf3;background:rgba(13,148,136,.1);font-weight:800;line-height:1.4; }
+      .data-import-list { display:grid;gap:7px;max-height:590px;overflow:auto;padding-right:3px; }.data-import-list > button { display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 9px;padding:12px;border:1px solid rgba(148,163,184,.14);border-radius:10px;color:#fff;text-align:left;background:#090f18;cursor:pointer; }.data-import-list > button.selected { border-color:#3fae9e;background:rgba(63,174,158,.075);box-shadow:inset 3px 0 #3fae9e; }.data-import-list strong { align-self:center; }.data-import-list small,.data-import-list em { grid-column:2;color:#7f90a6;font-size:9px;font-style:normal; }.data-import-list em { color:#fca5a5; }
       .data-status { align-self:start;padding:4px 6px;border-radius:999px;color:#9ca3af;background:#1f2937;font-size:7px;font-weight:1000;letter-spacing:.1em;text-transform:uppercase; }.data-status-review { color:#fde68a;background:rgba(245,158,11,.13); }.data-status-approved { color:#99f6e4;background:rgba(20,184,166,.13); }.data-status-failed,.data-status-rejected { color:#fecaca;background:rgba(220,38,38,.13); }.data-status-processing,.data-status-uploaded { color:#bfdbfe;background:rgba(37,99,235,.14); }
-      .data-review-head { display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:13px; }.data-review-head h2 { margin:4px 0; }.data-review-head > div:last-child { display:flex;flex-wrap:wrap;gap:6px; }.data-review-head button { padding:8px 10px;border:1px solid rgba(45,212,191,.28);border-radius:7px;color:#99f6e4;background:rgba(45,212,191,.07);font-size:9px;font-weight:900;cursor:pointer; }
+      .data-review-head { display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:13px; }.data-review-head h2 { margin:4px 0; }.data-review-head > div:last-child { display:flex;flex-wrap:wrap;gap:6px; }.data-review-head button { padding:8px 10px;border:1px solid rgba(63,174,158,.28);border-radius:7px;color:#99f6e4;background:rgba(63,174,158,.07);font-size:9px;font-weight:900;cursor:pointer; }
       .data-warning-list { display:grid;gap:5px;margin-bottom:12px;padding:12px;border:1px solid rgba(245,158,11,.28);border-radius:9px;background:rgba(245,158,11,.07); }.data-warning-list b { color:#fde68a; }.data-warning-list span { color:#fcd9a2;font-size:10px; }.data-review-note { color:#a6b4c6;line-height:1.5; }.data-json-review,.data-json-preview,.archive-card-body pre { width:100%;max-height:520px;overflow:auto;padding:15px;border:1px solid rgba(148,163,184,.18);border-radius:10px;color:#c7f9f2;background:#03070c;font:11px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap; }.data-json-review { min-height:420px;resize:vertical; }.data-review-actions { display:flex;gap:9px;margin-top:11px; }.data-review-actions button:last-child { padding:13px 16px;border:1px solid rgba(248,113,113,.35);border-radius:9px;color:#fecaca;background:rgba(127,29,29,.18);font-weight:1000;cursor:pointer; }
-      .data-checklist-progress { display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:12px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.055); }.data-checklist-progress b { font-size:25px; }.data-checklist-progress span { color:#9dadc1; }.data-phase-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px; }.data-phase-grid article { overflow:hidden;border:1px solid rgba(148,163,184,.14);border-radius:11px;background:#080e17; }.data-phase-grid article > header { display:flex;justify-content:space-between;padding:11px 13px;border-bottom:1px solid rgba(45,212,191,.17);color:#e6fffb;background:rgba(45,212,191,.045);font-weight:1000; }.data-phase-grid article > header b { color:#5eead4; }.data-check-item { display:grid;grid-template-columns:24px minmax(0,1fr) auto;align-items:center;gap:8px;padding:11px;border-bottom:1px solid rgba(148,163,184,.1); }.data-check-item:last-child { border-bottom:0; }.data-check-item > span { display:grid;place-items:center;width:23px;height:23px;border:1px solid rgba(148,163,184,.25);border-radius:50%;color:#718096; }.data-check-item.complete > span { border-color:#2dd4bf;color:#04110f;background:#2dd4bf; }.data-check-item.not_applicable { opacity:.64; }.data-check-item > div { min-width:0;display:grid;gap:3px; }.data-check-item strong { font-size:11px; }.data-check-item small { color:#7f90a6;font-size:9px;line-height:1.4; }.data-check-item select { max-width:90px;padding:7px;border:1px solid rgba(148,163,184,.18);border-radius:7px;color:#e2e8f0;background:#050911;font-size:9px; }
-      .archive-hero { border-color:rgba(196,181,253,.25);border-top-color:#c4b5fd;background:radial-gradient(circle at 82% 0%,rgba(139,92,246,.16),transparent 32%),linear-gradient(120deg,#0d0a16,#101827 65%,#170f24); }.archive-hero span { color:#c4b5fd; }.archive-hero > div:last-child { border-color:rgba(196,181,253,.28);background:#100b1b; }
-      .archive-hero-links { grid-template-columns:1fr 1fr!important;gap:7px!important; }.archive-hero-links > b,.archive-hero-links > span { grid-column:1/-1; }.archive-hero-links button { padding:8px;border:1px solid rgba(196,181,253,.28);border-radius:7px;color:#ddd6fe;background:rgba(139,92,246,.08);font-size:8px;font-weight:1000;cursor:pointer; }
-      .archive-filter { display:flex;align-items:end;flex-wrap:wrap;gap:12px;padding:16px; }.archive-filter label { min-width:200px; }.archive-filter button { margin-left:auto;padding:11px 14px;border:1px solid rgba(196,181,253,.35);border-radius:8px;color:#ddd6fe;background:rgba(139,92,246,.09);font-weight:900;cursor:pointer; }
-      .archive-grid { display:grid;gap:10px; }.archive-grid > article.open { border-color:rgba(196,181,253,.38); }.archive-card-head { width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto 24px;align-items:center;gap:12px;padding:17px;border:0;color:#fff;text-align:left;background:transparent;cursor:pointer; }.archive-card-head span { display:grid;gap:3px; }.archive-card-head small { color:#c4b5fd;font-size:8px;font-weight:1000;letter-spacing:.13em;text-transform:uppercase; }.archive-card-head strong { font-size:19px; }.archive-card-head b { color:#94a3b8;font-size:9px;letter-spacing:.1em; }.archive-card-head em { color:#c4b5fd;font-size:23px;font-style:normal; }.archive-card-body { padding:0 17px 17px; }.archive-record-list { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-bottom:13px; }.archive-record-list > div { display:grid;grid-template-columns:36px minmax(0,1fr);gap:2px 8px;padding:10px;border:1px solid rgba(148,163,184,.12);border-radius:8px;background:#070c14; }.archive-record-list > div > span { grid-row:1/4;align-self:center;color:#c4b5fd;font-weight:1000;text-align:center; }.archive-record-list strong { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }.archive-record-list small { color:#7f8da2; }.archive-record-list em { overflow:hidden;color:#aab6c6;font-size:9px;font-style:normal;text-overflow:ellipsis;white-space:nowrap; }.archive-card-body details summary { color:#c4b5fd;font-size:10px;font-weight:900;cursor:pointer; }
+      .data-checklist-progress { display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:12px;border-left:4px solid #3fae9e;background:rgba(63,174,158,.055); }.data-checklist-progress b { font-size:25px; }.data-checklist-progress span { color:#9dadc1; }.data-phase-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px; }.data-phase-grid article { overflow:hidden;border:1px solid rgba(148,163,184,.14);border-radius:11px;background:#080e17; }.data-phase-grid article > header { display:flex;justify-content:space-between;padding:11px 13px;border-bottom:1px solid rgba(63,174,158,.17);color:#e6fffb;background:rgba(63,174,158,.045);font-weight:1000; }.data-phase-grid article > header b { color:#5eead4; }.data-check-item { display:grid;grid-template-columns:24px minmax(0,1fr) auto;align-items:center;gap:8px;padding:11px;border-bottom:1px solid rgba(148,163,184,.1); }.data-check-item:last-child { border-bottom:0; }.data-check-item > span { display:grid;place-items:center;width:23px;height:23px;border:1px solid rgba(148,163,184,.25);border-radius:50%;color:#718096; }.data-check-item.complete > span { border-color:#3fae9e;color:#04110f;background:#3fae9e; }.data-check-item.not_applicable { opacity:.64; }.data-check-item > div { min-width:0;display:grid;gap:3px; }.data-check-item strong { font-size:11px; }.data-check-item small { color:#7f90a6;font-size:9px;line-height:1.4; }.data-check-item select { max-width:90px;padding:7px;border:1px solid rgba(148,163,184,.18);border-radius:7px;color:#e2e8f0;background:#050911;font-size:9px; }
+      .archive-hero { border-color:rgba(154,143,209,.25);border-top-color:#9a8fd1;background:radial-gradient(circle at 82% 0%,rgba(139,92,246,.16),transparent 32%),linear-gradient(120deg,#0d0a16,#101827 65%,#170f24); }.archive-hero span { color:#9a8fd1; }.archive-hero > div:last-child { border-color:rgba(154,143,209,.28);background:#100b1b; }
+      .archive-hero-links { grid-template-columns:1fr 1fr!important;gap:7px!important; }.archive-hero-links > b,.archive-hero-links > span { grid-column:1/-1; }.archive-hero-links button { padding:8px;border:1px solid rgba(154,143,209,.28);border-radius:7px;color:#ddd6fe;background:rgba(139,92,246,.08);font-size:8px;font-weight:1000;cursor:pointer; }
+      .archive-filter { display:flex;align-items:end;flex-wrap:wrap;gap:12px;padding:16px; }.archive-filter label { min-width:200px; }.archive-filter button { margin-left:auto;padding:11px 14px;border:1px solid rgba(154,143,209,.35);border-radius:8px;color:#ddd6fe;background:rgba(139,92,246,.09);font-weight:900;cursor:pointer; }
+      .archive-grid { display:grid;gap:10px; }.archive-grid > article.open { border-color:rgba(154,143,209,.38); }.archive-card-head { width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto 24px;align-items:center;gap:12px;padding:17px;border:0;color:#fff;text-align:left;background:transparent;cursor:pointer; }.archive-card-head span { display:grid;gap:3px; }.archive-card-head small { color:#9a8fd1;font-size:8px;font-weight:1000;letter-spacing:.13em;text-transform:uppercase; }.archive-card-head strong { font-size:19px; }.archive-card-head b { color:var(--cfb-muted);font-size:9px;letter-spacing:.1em; }.archive-card-head em { color:#9a8fd1;font-size:23px;font-style:normal; }.archive-card-body { padding:0 17px 17px; }.archive-record-list { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-bottom:13px; }.archive-record-list > div { display:grid;grid-template-columns:36px minmax(0,1fr);gap:2px 8px;padding:10px;border:1px solid rgba(148,163,184,.12);border-radius:8px;background:#070c14; }.archive-record-list > div > span { grid-row:1/4;align-self:center;color:#9a8fd1;font-weight:1000;text-align:center; }.archive-record-list strong { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }.archive-record-list small { color:#7f8da2; }.archive-record-list em { overflow:hidden;color:#aab6c6;font-size:9px;font-style:normal;text-overflow:ellipsis;white-space:nowrap; }.archive-card-body details summary { color:#9a8fd1;font-size:10px;font-weight:900;cursor:pointer; }
       .data-empty { padding:34px;border:1px dashed rgba(148,163,184,.22);border-radius:10px;color:#7f90a6;text-align:center; }
       /* v37 — screenshot data becomes a first-class visual product. */
-      .home-capture-panel { overflow:hidden;border:1px solid rgba(96,165,250,.23);border-top:4px solid #f5c542;border-radius:15px;background:radial-gradient(circle at 88% 0%,rgba(245,197,66,.11),transparent 32%),linear-gradient(125deg,#0a111c,#0d1726 68%,#11130d);box-shadow:0 18px 48px rgba(0,0,0,.28); }
-      .home-capture-panel > header { display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 22px;border-bottom:1px solid rgba(245,197,66,.14); }.home-capture-panel > header span,.home-capture-feature > span,.captured-data-hero span,.captured-top25-board > header span,.captured-schedule-card > header span,.captured-program-schedule > header span { color:#f5c542;font-size:8px;font-weight:1000;letter-spacing:.16em; }.home-capture-panel h2 { margin:4px 0 3px;font-size:25px; }.home-capture-panel p { margin:0;color:#94a3b8;font-size:11px;line-height:1.5; }.home-capture-panel > header button { padding:10px 12px;border:1px solid rgba(245,197,66,.3);border-radius:8px;color:#fde68a;background:rgba(245,197,66,.07);font-size:9px;font-weight:1000;cursor:pointer; }
-      .home-capture-grid { display:grid;grid-template-columns:1.1fr .9fr 1fr; }.home-capture-feature { min-width:0;min-height:190px;display:grid;align-content:start;gap:8px;padding:19px;border:0;border-right:1px solid rgba(148,163,184,.13);color:#f8fafc;text-align:left;background:transparent;cursor:pointer; }.home-capture-feature:last-child { border-right:0; }.home-capture-feature:hover { background:rgba(96,165,250,.055); }.home-capture-feature > strong { font-size:20px;letter-spacing:-.025em; }.home-capture-feature > div { display:grid;gap:5px;margin-top:3px; }.home-capture-feature i { display:grid;grid-template-columns:30px 30px minmax(0,1fr);align-items:center;gap:6px;padding:5px 7px;border-radius:7px;background:rgba(255,255,255,.035);font-style:normal; }.home-capture-feature i > b { color:#f5c542;font-size:10px; }.home-capture-feature i > em { overflow:hidden;color:#dce5f1;font-size:10px;font-style:normal;text-overflow:ellipsis;white-space:nowrap; }.home-capture-feature.archive { align-content:center;background:linear-gradient(145deg,rgba(139,92,246,.08),transparent); }.home-capture-feature.archive p { font-size:12px; }.home-schedule-counts { grid-template-columns:repeat(3,1fr)!important;gap:7px!important;margin-top:15px!important; }.home-schedule-counts > b { display:grid;gap:3px;padding:12px;border:1px solid rgba(96,165,250,.16);border-radius:9px;color:#fff;text-align:center;background:#09121e;font-size:23px; }.home-schedule-counts small { color:#7f91a8;font-size:7px;text-transform:uppercase;letter-spacing:.1em; }
-      .captured-data-page { display:grid;gap:15px;padding-bottom:30px; }.captured-data-hero { display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:24px;padding:32px;border:1px solid rgba(245,197,66,.25);border-top:5px solid #f5c542;border-radius:18px;background:radial-gradient(circle at 85% 0%,rgba(245,197,66,.16),transparent 32%),linear-gradient(120deg,#100d06,#101827 65%,#161107);box-shadow:0 24px 65px rgba(0,0,0,.34); }.captured-data-hero.schedules { border-color:rgba(96,165,250,.26);border-top-color:#60a5fa;background:radial-gradient(circle at 85% 0%,rgba(59,130,246,.16),transparent 32%),linear-gradient(120deg,#07101e,#101827 65%,#08152a); }.captured-data-hero.schedules span { color:#93c5fd; }.captured-data-hero h1 { margin:6px 0;font-size:clamp(45px,6vw,82px);line-height:.92;letter-spacing:-.065em; }.captured-data-hero p { max-width:820px;margin:0;color:#a6b2c3;line-height:1.55; }.captured-data-hero > div:last-child { display:grid;min-width:170px;padding:17px;border:1px solid rgba(245,197,66,.28);border-radius:13px;background:#110e07; }.captured-data-hero.schedules > div:last-child { border-color:rgba(96,165,250,.28);background:#071222; }.captured-data-hero > div:last-child b { font-size:38px; }.captured-data-hero > div:last-child span { font-size:8px; }
-      .captured-data-controls { display:flex;align-items:end;flex-wrap:wrap;gap:11px;padding:16px;border:1px solid rgba(148,163,184,.16);border-radius:13px;background:#0a111c; }.captured-data-controls label { min-width:180px;display:grid;gap:5px;color:#8fa0b5;font-size:8px;font-weight:1000;letter-spacing:.11em;text-transform:uppercase; }.captured-data-controls select { padding:11px;border:1px solid rgba(148,163,184,.22);border-radius:8px;color:#fff;background:#060b13; }.captured-data-controls button { padding:11px 14px;border:1px solid rgba(96,165,250,.28);border-radius:8px;color:#dbeafe;background:rgba(37,99,235,.09);font-weight:900;cursor:pointer; }
+      .home-capture-panel { overflow:hidden;border:1px solid rgba(79,143,168,.23);border-top:4px solid #f5c542;border-radius:15px;background:radial-gradient(circle at 88% 0%,rgba(245,197,66,.11),transparent 32%),linear-gradient(125deg,#0a111c,#0d1726 68%,#11130d);box-shadow:0 18px 48px rgba(0,0,0,.28); }
+      .home-capture-panel > header { display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 22px;border-bottom:1px solid rgba(245,197,66,.14); }.home-capture-panel > header span,.home-capture-feature > span,.captured-data-hero span,.captured-top25-board > header span,.captured-schedule-card > header span,.captured-program-schedule > header span { color:#f5c542;font-size:8px;font-weight:1000;letter-spacing:.16em; }.home-capture-panel h2 { margin:4px 0 3px;font-size:25px; }.home-capture-panel p { margin:0;color:var(--cfb-muted);font-size:11px;line-height:1.5; }.home-capture-panel > header button { padding:10px 12px;border:1px solid rgba(245,197,66,.3);border-radius:8px;color:#fde68a;background:rgba(245,197,66,.07);font-size:9px;font-weight:1000;cursor:pointer; }
+      .home-capture-grid { display:grid;grid-template-columns:1.1fr .9fr 1fr; }.home-capture-feature { min-width:0;min-height:190px;display:grid;align-content:start;gap:8px;padding:19px;border:0;border-right:1px solid rgba(148,163,184,.13);color:var(--cfb-text);text-align:left;background:transparent;cursor:pointer; }.home-capture-feature:last-child { border-right:0; }.home-capture-feature:hover { background:rgba(79,143,168,.055); }.home-capture-feature > strong { font-size:20px;letter-spacing:-.025em; }.home-capture-feature > div { display:grid;gap:5px;margin-top:3px; }.home-capture-feature i { display:grid;grid-template-columns:30px 30px minmax(0,1fr);align-items:center;gap:6px;padding:5px 7px;border-radius:7px;background:rgba(255,255,255,.035);font-style:normal; }.home-capture-feature i > b { color:#f5c542;font-size:10px; }.home-capture-feature i > em { overflow:hidden;color:#dce5f1;font-size:10px;font-style:normal;text-overflow:ellipsis;white-space:nowrap; }.home-capture-feature.archive { align-content:center;background:linear-gradient(145deg,rgba(139,92,246,.08),transparent); }.home-capture-feature.archive p { font-size:12px; }.home-schedule-counts { grid-template-columns:repeat(3,1fr)!important;gap:7px!important;margin-top:15px!important; }.home-schedule-counts > b { display:grid;gap:3px;padding:12px;border:1px solid rgba(79,143,168,.16);border-radius:9px;color:#fff;text-align:center;background:#09121e;font-size:23px; }.home-schedule-counts small { color:#7f91a8;font-size:7px;text-transform:uppercase;letter-spacing:.1em; }
+      .captured-data-page { display:grid;gap:15px;padding-bottom:30px; }.captured-data-hero { display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:24px;padding:32px;border:1px solid rgba(245,197,66,.25);border-top:5px solid #f5c542;border-radius:18px;background:radial-gradient(circle at 85% 0%,rgba(245,197,66,.16),transparent 32%),linear-gradient(120deg,#100d06,#101827 65%,#161107);box-shadow:0 24px 65px rgba(0,0,0,.34); }.captured-data-hero.schedules { border-color:rgba(79,143,168,.26);border-top-color:#4f8fa8;background:radial-gradient(circle at 85% 0%,rgba(59,130,246,.16),transparent 32%),linear-gradient(120deg,#07101e,#101827 65%,#08152a); }.captured-data-hero.schedules span { color:#9cc3d1; }.captured-data-hero h1 { margin:6px 0;font-size:clamp(45px,6vw,82px);line-height:.92;letter-spacing:-.065em; }.captured-data-hero p { max-width:820px;margin:0;color:#a6b2c3;line-height:1.55; }.captured-data-hero > div:last-child { display:grid;min-width:170px;padding:17px;border:1px solid rgba(245,197,66,.28);border-radius:13px;background:#110e07; }.captured-data-hero.schedules > div:last-child { border-color:rgba(79,143,168,.28);background:#071222; }.captured-data-hero > div:last-child b { font-size:38px; }.captured-data-hero > div:last-child span { font-size:8px; }
+      .captured-data-controls { display:flex;align-items:end;flex-wrap:wrap;gap:11px;padding:16px;border:1px solid rgba(148,163,184,.16);border-radius:13px;background:#0a111c; }.captured-data-controls label { min-width:180px;display:grid;gap:5px;color:#8fa0b5;font-size:8px;font-weight:1000;letter-spacing:.11em;text-transform:uppercase; }.captured-data-controls select { padding:11px;border:1px solid rgba(148,163,184,.22);border-radius:8px;color:#fff;background:#060b13; }.captured-data-controls button { padding:11px 14px;border:1px solid rgba(79,143,168,.28);border-radius:8px;color:#dbeafe;background:rgba(37,99,235,.09);font-weight:900;cursor:pointer; }
       .captured-top25-board { overflow:hidden;border:1px solid rgba(245,197,66,.22);border-radius:15px;background:linear-gradient(145deg,#0e131d,#080c13); }.captured-top25-board > header { display:flex;align-items:center;justify-content:space-between;gap:15px;padding:20px 22px;border-bottom:2px solid rgba(245,197,66,.26);background:linear-gradient(90deg,rgba(245,197,66,.07),transparent); }.captured-top25-board > header h2 { margin:4px 0;font-size:28px; }.captured-top25-board > header small { color:#8998ad; }.captured-top25-board > div { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:rgba(148,163,184,.1); }.captured-top25-board article { min-width:0;display:grid;grid-template-columns:52px 54px minmax(0,1fr) auto;align-items:center;gap:10px;padding:14px 17px;background:#0a1019; }.captured-top25-board article.user-team { background:linear-gradient(90deg,rgba(245,197,66,.08),#0a1019 45%);box-shadow:inset 3px 0 #f5c542; }.captured-top25-board article > b { color:#f5c542;font-size:20px; }.captured-top25-board article > div { min-width:0;display:grid;gap:3px; }.captured-top25-board article strong { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }.captured-top25-board article small,.captured-top25-board article > span { color:#8493a8;font-size:9px; }
-      .captured-schedule-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px; }.captured-program-schedule { overflow:hidden;border:1px solid rgba(96,165,250,.18);border-radius:15px;background:linear-gradient(145deg,#0c1522,#070c14); }.captured-program-schedule > header { display:flex;align-items:center;gap:13px;padding:18px 20px;border-bottom:1px solid rgba(96,165,250,.17);background:linear-gradient(90deg,rgba(59,130,246,.08),transparent); }.captured-program-schedule > header h2 { margin:4px 0;font-size:22px; }.captured-program-schedule .captured-schedule-card { border:0;border-radius:0;box-shadow:none; }
-      .captured-schedule-card { overflow:hidden;margin:15px 0;border:1px solid rgba(96,165,250,.18);border-radius:13px;background:linear-gradient(145deg,#0b1420,#070c14);box-shadow:0 16px 42px rgba(0,0,0,.24); }.captured-schedule-card > header { display:flex;align-items:center;justify-content:space-between;gap:14px;padding:15px 17px;border-bottom:1px solid rgba(96,165,250,.16); }.captured-schedule-card > header span { color:#93c5fd; }.captured-schedule-card > header h3 { margin:3px 0;font-size:21px; }.captured-schedule-card > header > b { color:#7f91a8;font-size:8px;letter-spacing:.1em; }.captured-schedule-list { display:grid; }.captured-schedule-list article { min-width:0;display:grid;grid-template-columns:70px 48px minmax(0,1fr) auto;align-items:center;gap:10px;padding:12px 15px;border-bottom:1px solid rgba(148,163,184,.1); }.captured-schedule-list article:last-child { border-bottom:0; }.captured-schedule-list article.final { background:rgba(255,255,255,.016); }.captured-schedule-week { display:grid;gap:2px; }.captured-schedule-week small { color:#dbeafe;font-weight:900; }.captured-schedule-week strong { color:#64748b;font-size:7px;letter-spacing:.1em; }.captured-schedule-opponent { min-width:0;display:grid;gap:3px; }.captured-schedule-opponent strong { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }.captured-schedule-opponent small { color:#7e8da2;font-size:9px;text-transform:capitalize; }.captured-schedule-result { display:grid;gap:2px;text-align:right; }.captured-schedule-result > b { color:#93c5fd;font-size:8px;letter-spacing:.08em; }.captured-schedule-result > b.win { color:#86efac; }.captured-schedule-result > b.loss { color:#fca5a5; }.captured-schedule-result > strong { font-size:17px; }
+      .captured-schedule-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px; }.captured-program-schedule { overflow:hidden;border:1px solid rgba(79,143,168,.18);border-radius:15px;background:linear-gradient(145deg,#0c1522,#070c14); }.captured-program-schedule > header { display:flex;align-items:center;gap:13px;padding:18px 20px;border-bottom:1px solid rgba(79,143,168,.17);background:linear-gradient(90deg,rgba(59,130,246,.08),transparent); }.captured-program-schedule > header h2 { margin:4px 0;font-size:22px; }.captured-program-schedule .captured-schedule-card { border:0;border-radius:0;box-shadow:none; }
+      .captured-schedule-card { overflow:hidden;margin:15px 0;border:1px solid rgba(79,143,168,.18);border-radius:13px;background:linear-gradient(145deg,#0b1420,#070c14);box-shadow:0 16px 42px rgba(0,0,0,.24); }.captured-schedule-card > header { display:flex;align-items:center;justify-content:space-between;gap:14px;padding:15px 17px;border-bottom:1px solid rgba(79,143,168,.16); }.captured-schedule-card > header span { color:#9cc3d1; }.captured-schedule-card > header h3 { margin:3px 0;font-size:21px; }.captured-schedule-card > header > b { color:#7f91a8;font-size:8px;letter-spacing:.1em; }.captured-schedule-list { display:grid; }.captured-schedule-list article { min-width:0;display:grid;grid-template-columns:70px 48px minmax(0,1fr) auto;align-items:center;gap:10px;padding:12px 15px;border-bottom:1px solid rgba(148,163,184,.1); }.captured-schedule-list article:last-child { border-bottom:0; }.captured-schedule-list article.final { background:rgba(255,255,255,.016); }.captured-schedule-week { display:grid;gap:2px; }.captured-schedule-week small { color:#dbeafe;font-weight:900; }.captured-schedule-week strong { color:#64748b;font-size:7px;letter-spacing:.1em; }.captured-schedule-opponent { min-width:0;display:grid;gap:3px; }.captured-schedule-opponent strong { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }.captured-schedule-opponent small { color:#7e8da2;font-size:9px;text-transform:capitalize; }.captured-schedule-result { display:grid;gap:2px;text-align:right; }.captured-schedule-result > b { color:#9cc3d1;font-size:8px;letter-spacing:.08em; }.captured-schedule-result > b.win { color:#86efac; }.captured-schedule-result > b.loss { color:#fca5a5; }.captured-schedule-result > strong { font-size:17px; }
       @media (max-width:900px) { .home-data-ops { grid-template-columns:1fr; }.home-data-ops > div:last-child button { flex:1; }.data-intake-grid,.data-phase-grid { grid-template-columns:1fr; }.archive-record-list { grid-template-columns:1fr; } }
       @media (max-width:720px) {
         .data-intake-page,.dynasty-archive-page,.captured-data-page { padding:0!important;gap:10px; }.data-intake-hero,.archive-hero,.captured-data-hero { grid-template-columns:1fr;padding:23px 17px;border-radius:0; }.data-intake-hero h1,.archive-hero h1,.captured-data-hero h1 { font-size:46px; }.data-intake-hero > div:last-child,.archive-hero > div:last-child,.captured-data-hero > div:last-child { min-width:0; }.data-upload-card,.data-queue-card,.data-review-card,.data-checklist-card { padding:15px;border-radius:11px; }.data-upload-card form { grid-template-columns:1fr; }.data-upload-wide { grid-column:1; }.data-import-list { max-height:none; }.data-review-head { align-items:flex-start;flex-direction:column; }.data-json-review { min-height:340px;font-size:10px; }.data-review-actions { display:grid;grid-template-columns:1fr 1fr; }.data-check-item { grid-template-columns:24px minmax(0,1fr); }.data-check-item select { grid-column:2;width:100%;max-width:none; }.archive-filter { align-items:stretch;flex-direction:column;margin:0 10px; }.archive-filter label { min-width:0; }.archive-filter button { width:100%;margin:0; }.archive-grid { padding:0 10px; }.archive-card-head { grid-template-columns:minmax(0,1fr) 24px; }.archive-card-head > b { display:none; }.archive-record-list { grid-template-columns:1fr; }
         .home-capture-panel { border-radius:10px; }.home-capture-panel > header { align-items:flex-start;flex-direction:column;padding:16px; }.home-capture-panel > header button { width:100%; }.home-capture-grid { grid-template-columns:1fr; }.home-capture-feature { min-height:0;border-right:0;border-bottom:1px solid rgba(148,163,184,.12);padding:16px; }.home-capture-feature:last-child { border-bottom:0; }.captured-data-controls { align-items:stretch;flex-direction:column;margin:0 10px; }.captured-data-controls label,.captured-data-controls button { width:100%;min-width:0; }.captured-top25-board { margin:0 10px; }.captured-top25-board > header { align-items:flex-start;flex-direction:column; }.captured-top25-board > div { grid-template-columns:1fr; }.captured-top25-board article { grid-template-columns:42px 44px minmax(0,1fr);padding:12px 10px; }.captured-top25-board article > span { grid-column:3; }.captured-schedule-grid { grid-template-columns:1fr;padding:0 10px; }.captured-program-schedule > header { padding:15px; }.captured-schedule-card { border-radius:10px; }.captured-schedule-list article { grid-template-columns:62px 40px minmax(0,1fr);gap:8px;padding:11px 10px; }.captured-schedule-result { grid-column:3;display:flex;justify-content:space-between;text-align:left; }.cfb-coach-page > .captured-schedule-card { margin:12px 0; }
       }
       @media (max-width:720px) {
-        .network-mobile-hub-header { border-color:rgba(56,189,248,.2)!important;background:rgba(8,15,26,.98)!important; }
+        .network-mobile-hub-header { border-color:rgba(79,143,168,.2)!important;background:rgba(8,15,26,.98)!important; }
         .network-mobile-hub-header > button { color:#d9e7f5!important;background:#132238!important; }
         .network-layout,.network-mobile-directory .network-sidebar,.network-mobile-chat .network-stage,.network-mobile-panel .network-stage { background:#08101b!important; }
         .network-sidebar > nav button { color:#9aa9bc!important;background:#111d2d!important; }
-        .network-sidebar > nav button.active { border-color:rgba(56,189,248,.5)!important;color:#e0f2fe!important;background:linear-gradient(135deg,#075985,#1d4ed8)!important; }
+        .network-sidebar > nav button.active { border-color:rgba(79,143,168,.5)!important;color:#e0f2fe!important;background:linear-gradient(135deg,#075985,#1d4ed8)!important; }
         .network-channel-list > button { grid-template-columns:32px minmax(0,1fr) auto!important;color:#aab8ca!important; }
         .network-channel-list > button::before,.network-channel-list > button.matchup::before { content:none!important;display:none!important; }
         .network-channel-list .network-channel-mark { width:32px!important;height:32px!important;display:grid!important;border:0!important;background:transparent!important; }
         .network-channel-list > button.matchup { grid-template-columns:82px minmax(0,1fr) auto!important; }
-        .network-channel-list > button.active { color:#fff!important;background:linear-gradient(90deg,rgba(14,165,233,.25),rgba(30,64,175,.13))!important;box-shadow:inset 3px 0 #38bdf8; }
+        .network-channel-list > button.active { color:#fff!important;background:linear-gradient(90deg,rgba(58,112,134,.25),rgba(30,64,175,.13))!important;box-shadow:inset 3px 0 #4f8fa8; }
         .network-channel-category { padding:15px 8px 7px!important;color:#8fa0b7!important; }
         .network-message-feed,.network-empty { background:#08101b!important; }
-        .network-composer { background:#0d1726!important; }.network-compose-box textarea { background:#152238!important; }.network-send { background:linear-gradient(135deg,#0ea5e9,#2563eb)!important; }
+        .network-composer { background:#0d1726!important; }.network-compose-box textarea { background:#152238!important; }.network-send { background:linear-gradient(135deg,#3a7086,#2563eb)!important; }
         .network-category-manager { padding:15px; }.network-category-layout { grid-template-columns:1fr; }.network-category-layout > section { grid-template-columns:1fr; }.network-category-layout label,.network-category-preview,.network-category-layout .network-manager-actions { grid-column:1!important; }
       }
       @media (max-width:430px) {
@@ -9724,7 +7174,7 @@ function GlobalStyle() {
       .network-page .network-sidebar { border-right:1px solid rgba(39,151,255,.2);background:linear-gradient(180deg,#111722,#0a0f17 70%,#111016); }
       .network-page .network-member-rail { border-left:1px solid rgba(227,38,46,.28);background:linear-gradient(180deg,#101620,#090e15); }
       .network-page .network-member-rail > header { border-bottom:2px solid rgba(245,197,66,.42);background:#090d14; }
-      .network-page .network-stage,.network-page .network-message-feed { background:radial-gradient(circle at 85% 0%,rgba(39,151,255,.08),transparent 28%),linear-gradient(145deg,#0a0f17,#070a10); }
+      .network-page .network-stage,.network-page .network-message-feed { background:radial-gradient(circle at 85% 0%,rgba(39,151,255,.08),transparent 28%),linear-gradient(145deg,#0a0f17,var(--cfb-panel-2)); }
       .network-page .network-sidebar > nav { border-bottom:2px solid rgba(227,38,46,.46);background:#080c12; }
       .network-page .network-sidebar > nav button { color:#aeb8c7;background:transparent; }
       .network-page .network-sidebar > nav button:hover { color:#fff;background:rgba(39,151,255,.1); }
@@ -9739,24 +7189,24 @@ function GlobalStyle() {
       .newsroom-page-bar { display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;padding:13px 18px;border:1px solid rgba(245,197,66,.22);border-top:3px solid #e3262e;border-radius:14px 14px 0 0;background:#0b1018; }
       .newsroom-page-bar button { justify-self:start;border:1px solid rgba(39,151,255,.32);border-radius:9px;padding:10px 13px;color:#dbeafe;background:rgba(39,151,255,.1);font-weight:900;cursor:pointer; }
       .newsroom-page-bar div { display:grid;text-align:center; }.newsroom-page-bar span { color:#f5c542;font-size:9px;font-weight:1000;letter-spacing:.16em; }.newsroom-page-bar strong { color:#fff;font-size:17px; }.newsroom-page-bar > b { justify-self:end;color:#4ade80;font-size:10px;letter-spacing:.12em; }
-      .league-newsroom { min-height:calc(100vh - 110px);color:#f7f8fb;background:#070a10; }
+      .league-newsroom { min-height:calc(100vh - 110px);color:#f7f8fb;background:var(--cfb-panel-2); }
       .league-newsroom-hero { display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:24px;padding:32px;border-bottom:1px solid rgba(245,197,66,.22);background:radial-gradient(circle at 76% 40%,rgba(227,38,46,.18),transparent 28%),linear-gradient(115deg,#0b1018,#101827 64%,#1c0c11); }
       .league-newsroom-hero span,.league-newsroom-section > header span,.league-newsroom-desk > div > span { color:#f5c542;font-size:9px;font-weight:1000;letter-spacing:.17em; }
       .league-newsroom-hero h2 { margin:5px 0 7px;font-size:clamp(34px,5vw,70px);line-height:.95;letter-spacing:-.055em; }.league-newsroom-hero p { max-width:760px;margin:0;color:#aeb8c7;font-size:14px;line-height:1.55; }
       .league-newsroom-hero > button { border:1px solid rgba(245,197,66,.4);border-radius:10px;padding:13px 17px;color:#171208;background:linear-gradient(135deg,#ffd95e,#e9b72f);font-size:11px;font-weight:1000;cursor:pointer; }
-      .league-newsroom-stats { display:grid;grid-template-columns:auto auto;align-items:center;gap:4px 10px;padding:14px 17px;border:1px solid rgba(39,151,255,.25);border-radius:12px;background:#07101d; }.league-newsroom-stats b { color:#fff;font-size:24px; }.league-newsroom-stats span { color:#7dd3fc;font-size:8px;letter-spacing:.12em; }
+      .league-newsroom-stats { display:grid;grid-template-columns:auto auto;align-items:center;gap:4px 10px;padding:14px 17px;border:1px solid rgba(39,151,255,.25);border-radius:12px;background:#07101d; }.league-newsroom-stats b { color:#fff;font-size:24px; }.league-newsroom-stats span { color:#9cc3d1;font-size:8px;letter-spacing:.12em; }
       .league-newsroom-desk { display:flex;align-items:center;justify-content:space-between;gap:20px;padding:14px 28px;border-bottom:2px solid rgba(227,38,46,.38);background:#101620; }.league-newsroom-desk > div { display:grid;gap:3px; }.league-newsroom-desk strong { font-size:14px; }.league-newsroom-desk small { color:#98a4b5; }
       .league-newsroom-section { padding:26px 28px; }.league-newsroom-section + .league-newsroom-section { border-top:1px solid rgba(39,151,255,.16); }.league-newsroom-section > header h3 { margin:4px 0 18px;font-size:26px; }
       .league-newsroom-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px; }.league-newsroom-grid.published article:first-child { grid-column:1/-1; }
       .newsroom-story { min-width:0;padding:20px;border:1px solid rgba(148,163,184,.17);border-radius:14px;background:linear-gradient(145deg,#121924,#0b1018);box-shadow:0 12px 30px rgba(0,0,0,.25); }.newsroom-story.draft { border-top:3px solid #f5c542; }.newsroom-story.published { border-top:3px solid #e3262e; }
-      .newsroom-story-meta { display:flex;align-items:center;gap:9px;color:#8f9caf;font-size:9px;text-transform:uppercase;letter-spacing:.1em; }.newsroom-story-meta b { color:#7dd3fc; }.newsroom-story-meta em { margin-left:auto;padding:4px 6px;border-radius:999px;color:#f5c542;background:rgba(245,197,66,.08);font-style:normal;font-weight:1000; }
+      .newsroom-story-meta { display:flex;align-items:center;gap:9px;color:#8f9caf;font-size:9px;text-transform:uppercase;letter-spacing:.1em; }.newsroom-story-meta b { color:#9cc3d1; }.newsroom-story-meta em { margin-left:auto;padding:4px 6px;border-radius:999px;color:#f5c542;background:rgba(245,197,66,.08);font-style:normal;font-weight:1000; }
       .newsroom-story h4 { margin:12px 0 7px;color:#fff;font-size:clamp(22px,2.5vw,38px);line-height:1.05;letter-spacing:-.035em; }.newsroom-story > strong { display:block;color:#c8d2df;font-size:14px;line-height:1.4; }.newsroom-story > p { color:#aeb8c7;font-size:14px;line-height:1.7;white-space:pre-wrap; }
       .newsroom-story input,.newsroom-story textarea { width:100%;margin-top:9px;padding:11px;border:1px solid rgba(39,151,255,.24);border-radius:8px;color:#fff;background:#060a10;font:inherit; }.newsroom-story textarea { min-height:240px;line-height:1.6;resize:vertical; }
       .newsroom-story footer { display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:13px;border-top:1px solid rgba(148,163,184,.13); }.newsroom-story footer button { border:1px solid rgba(39,151,255,.32);border-radius:8px;padding:9px 12px;color:#dbeafe;background:rgba(39,151,255,.1);font-size:9px;font-weight:1000;cursor:pointer; }.newsroom-story footer button.publish { border-color:rgba(74,222,128,.35);color:#bbf7d0;background:rgba(34,197,94,.1); }.newsroom-story footer button.reject { border-color:rgba(227,38,46,.35);color:#fecaca;background:rgba(227,38,46,.1); }.newsroom-story footer time { color:#7f8b9d;font-size:10px; }
       .league-newsroom-empty { display:grid;place-items:center;min-height:230px;border:1px dashed rgba(39,151,255,.25);border-radius:14px;background:#0a0f17; }.league-newsroom-empty b { font-size:20px; }.league-newsroom-empty span { color:#8f9caf; }
-      .weekly-newsroom-feed { display:grid;gap:12px;margin:16px 0; }.weekly-newsroom-feed article { padding:18px;border:1px solid rgba(255,203,5,.2);border-left:4px solid #e11d2e;border-radius:10px;background:#0b111c; }.weekly-newsroom-feed span { color:#facc15;font-size:10px;font-weight:900;text-transform:uppercase; }.weekly-newsroom-feed h3 { margin:8px 0;color:#fff;font-size:24px; }.weekly-newsroom-feed strong { color:#cbd5e1; }.weekly-newsroom-feed p { color:#94a3b8;line-height:1.65;white-space:pre-wrap; }.weekly-newsroom-feed time { color:#64748b;font-size:10px; }
-      .home-newsroom-rail { overflow:hidden;border:1px solid rgba(245,197,66,.22);border-top:4px solid #e3262e;border-radius:17px;color:#f8fafc;background:linear-gradient(125deg,#090d14,#101722 62%,#211014);box-shadow:0 18px 50px rgba(0,0,0,.25); }.home-newsroom-rail > header { display:flex;align-items:center;justify-content:space-between;gap:18px;padding:20px 22px;border-bottom:1px solid rgba(245,197,66,.14); }.home-newsroom-rail > header span,.newsroom-platform-hero span,.newsroom-platform-feed > header span,.newsroom-platform-desk span { color:#f5c542;font-size:9px;font-weight:1000;letter-spacing:.17em; }.home-newsroom-rail > header h2 { margin:4px 0;font-size:25px; }.home-newsroom-rail > header p { margin:0;color:#94a3b8;font-size:12px; }.home-newsroom-rail > header button,.newsroom-platform-feed > header button { border:1px solid rgba(245,197,66,.3);border-radius:9px;padding:10px 13px;color:#f5c542;background:rgba(245,197,66,.08);font-weight:900;cursor:pointer; }.home-newsroom-rail > div { display:grid;grid-template-columns:repeat(4,minmax(0,1fr)); }.home-newsroom-rail article { min-width:0;border-right:1px solid rgba(148,163,184,.13); }.home-newsroom-rail article:last-child { border-right:0; }.home-newsroom-rail article > button { position:relative;width:100%;min-height:142px;padding:18px;border:0;color:#fff;text-align:left;background:transparent;cursor:pointer; }.home-newsroom-rail article > button span { color:#7dd3fc;font-size:8px;font-weight:1000;letter-spacing:.13em; }.home-newsroom-rail article > button h3 { margin:8px 25px 13px 0;font-size:18px;line-height:1.15; }.home-newsroom-rail article > button small { color:#7f8b9d; }.home-newsroom-rail article > button i { position:absolute;right:15px;top:16px;color:#f5c542;font-size:20px;font-style:normal; }.home-newsroom-rail article.open { grid-column:span 2;background:rgba(245,197,66,.04); }.home-newsroom-rail article.open > div { padding:0 18px 18px;color:#b8c2d0; }.home-newsroom-rail article.open > div strong { display:block;color:#e2e8f0; }.home-newsroom-rail article.open > div p { line-height:1.65;white-space:pre-wrap; }.home-newsroom-rail article.open > div button { border:0;color:#f5c542;background:transparent;font-weight:900;cursor:pointer; }
-      .newsroom-platform-page { min-height:80vh;color:#f8fafc;background:radial-gradient(circle at 80% 0%,rgba(227,38,46,.12),transparent 30%),#060910!important; }.newsroom-platform-hero { display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:25px;padding:36px 32px;border:1px solid rgba(245,197,66,.22);border-top:5px solid #e3262e;border-radius:18px;background:linear-gradient(110deg,#080c13,#111827 65%,#251015);box-shadow:0 26px 70px rgba(0,0,0,.35); }.newsroom-platform-hero h1 { margin:5px 0 8px;font-size:clamp(48px,7vw,96px);line-height:.9;letter-spacing:-.065em; }.newsroom-platform-hero p { max-width:720px;margin:0;color:#aeb8c7;font-size:15px; }.newsroom-platform-hero > button { padding:14px 18px;border:1px solid rgba(245,197,66,.5);border-radius:10px;color:#161006;background:linear-gradient(135deg,#ffdd69,#e8b72f);font-weight:1000;cursor:pointer; }.newsroom-platform-score { display:grid;min-width:170px;padding:17px;border:1px solid rgba(39,151,255,.25);border-radius:13px;background:#07101d; }.newsroom-platform-score b { font-size:36px; }.newsroom-platform-score span { color:#7dd3fc;font-size:8px;font-weight:1000;letter-spacing:.12em; }.newsroom-platform-score small { margin-top:6px;color:#7f8b9d; }.newsroom-platform-desk { display:flex;align-items:center;justify-content:space-between;gap:20px;margin-top:13px;padding:15px 20px;border:1px solid rgba(245,197,66,.16);border-left:4px solid #f5c542;border-radius:10px;background:#101620; }.newsroom-platform-desk div { display:grid;gap:3px; }.newsroom-platform-desk small { color:#93a0b2; }.newsroom-review { margin-top:14px;border:1px solid rgba(245,197,66,.14);border-radius:14px;background:#080c13; }.newsroom-platform-feed { margin-top:16px;overflow:hidden;border:1px solid rgba(39,151,255,.14);border-radius:17px;background:#080c13; }.newsroom-platform-feed > header { display:flex;align-items:center;justify-content:space-between;padding:22px 25px;border-bottom:2px solid rgba(227,38,46,.36);background:#0d131d; }.newsroom-platform-feed > header h2 { margin:4px 0 0;font-size:30px; }.newsroom-platform-list { display:grid; }.newsroom-platform-story { border-bottom:1px solid rgba(148,163,184,.12); }.newsroom-platform-story:last-child { border-bottom:0; }.newsroom-platform-story-head { position:relative;width:100%;padding:23px 62px 23px 25px;border:0;color:#fff;text-align:left;background:linear-gradient(90deg,rgba(255,255,255,.02),transparent);cursor:pointer; }.newsroom-platform-story-head:hover { background:linear-gradient(90deg,rgba(39,151,255,.08),transparent); }.newsroom-platform-story-head h3 { margin:10px 0 7px;font-size:clamp(25px,3vw,42px);line-height:1.05;letter-spacing:-.035em; }.newsroom-platform-story-head > strong { display:block;color:#c5cfdb;font-size:14px; }.newsroom-platform-story-head > small { display:block;margin-top:10px;color:#748197; }.newsroom-platform-story-head > i { position:absolute;right:26px;top:50%;transform:translateY(-50%);color:#f5c542;font-size:30px;font-style:normal; }.newsroom-platform-story.open { background:radial-gradient(circle at 90% 0%,rgba(227,38,46,.08),transparent 30%); }.newsroom-platform-story-body { padding:0 25px 27px; }.newsroom-platform-story-body > p { max-width:980px;color:#b6c1cf;font-size:15px;line-height:1.8;white-space:pre-wrap; }.newsroom-article-reactions { display:flex;align-items:center;flex-wrap:wrap;gap:7px;padding:13px 0;border-top:1px solid rgba(148,163,184,.12);border-bottom:1px solid rgba(148,163,184,.12); }.newsroom-article-reactions > button,.newsroom-article-reactions > span button { min-width:36px;height:34px;border:1px solid rgba(148,163,184,.16);border-radius:999px;color:#fff;background:#111925;cursor:pointer; }.newsroom-article-reactions > button.mine { border-color:#f5c542;background:rgba(245,197,66,.1); }.newsroom-article-reactions > span { display:flex;gap:4px;margin-left:4px; }.newsroom-article-reactions img { width:20px;height:20px;object-fit:contain; }.newsroom-comments { max-width:980px;margin-top:20px; }.newsroom-comments > header { display:flex;justify-content:space-between;padding-bottom:10px;color:#e2e8f0; }.newsroom-comments > header span { color:#7f8b9d; }.newsroom-comment { padding:14px 0;border-top:1px solid rgba(148,163,184,.12); }.newsroom-comment > small { display:block;margin-bottom:7px;color:#7dd3fc; }.newsroom-comment > div { display:flex;align-items:center;justify-content:space-between;gap:10px; }.newsroom-comment time { color:#718096;font-size:9px; }.newsroom-comment > p { margin:8px 0;color:#cbd5e1;line-height:1.55; }.newsroom-comment footer { display:flex;gap:8px; }.newsroom-comment footer button { padding:0;border:0;color:#7dd3fc;background:transparent;font-size:9px;font-weight:900;cursor:pointer; }.newsroom-comment-composer { display:grid;gap:9px;margin-top:16px;padding:14px;border:1px solid rgba(39,151,255,.15);border-radius:12px;background:#0c131e; }.newsroom-comment-composer > div { display:flex;justify-content:space-between;color:#7dd3fc; }.newsroom-comment-composer textarea { min-height:80px;padding:12px;border:1px solid rgba(148,163,184,.18);border-radius:9px;color:#fff;background:#060a10;resize:vertical; }.newsroom-comment-composer > button { justify-self:end;padding:10px 14px;border:0;border-radius:8px;color:#161006;background:#f5c542;font-weight:1000;cursor:pointer; }
+      .weekly-newsroom-feed { display:grid;gap:12px;margin:16px 0; }.weekly-newsroom-feed article { padding:18px;border:1px solid rgba(255,203,5,.2);border-left:4px solid #e11d2e;border-radius:10px;background:#0b111c; }.weekly-newsroom-feed span { color:var(--cfb-gold);font-size:10px;font-weight:900;text-transform:uppercase; }.weekly-newsroom-feed h3 { margin:8px 0;color:#fff;font-size:24px; }.weekly-newsroom-feed strong { color:#cbd5e1; }.weekly-newsroom-feed p { color:var(--cfb-muted);line-height:1.65;white-space:pre-wrap; }.weekly-newsroom-feed time { color:#64748b;font-size:10px; }
+      .home-newsroom-rail { overflow:hidden;border:1px solid rgba(245,197,66,.22);border-top:4px solid #e3262e;border-radius:17px;color:var(--cfb-text);background:linear-gradient(125deg,#090d14,#101722 62%,#211014);box-shadow:0 18px 50px rgba(0,0,0,.25); }.home-newsroom-rail > header { display:flex;align-items:center;justify-content:space-between;gap:18px;padding:20px 22px;border-bottom:1px solid rgba(245,197,66,.14); }.home-newsroom-rail > header span,.newsroom-platform-hero span,.newsroom-platform-feed > header span,.newsroom-platform-desk span { color:#f5c542;font-size:9px;font-weight:1000;letter-spacing:.17em; }.home-newsroom-rail > header h2 { margin:4px 0;font-size:25px; }.home-newsroom-rail > header p { margin:0;color:var(--cfb-muted);font-size:12px; }.home-newsroom-rail > header button,.newsroom-platform-feed > header button { border:1px solid rgba(245,197,66,.3);border-radius:9px;padding:10px 13px;color:#f5c542;background:rgba(245,197,66,.08);font-weight:900;cursor:pointer; }.home-newsroom-rail > div { display:grid;grid-template-columns:repeat(4,minmax(0,1fr)); }.home-newsroom-rail article { min-width:0;border-right:1px solid rgba(148,163,184,.13); }.home-newsroom-rail article:last-child { border-right:0; }.home-newsroom-rail article > button { position:relative;width:100%;min-height:142px;padding:18px;border:0;color:#fff;text-align:left;background:transparent;cursor:pointer; }.home-newsroom-rail article > button span { color:#9cc3d1;font-size:8px;font-weight:1000;letter-spacing:.13em; }.home-newsroom-rail article > button h3 { margin:8px 25px 13px 0;font-size:18px;line-height:1.15; }.home-newsroom-rail article > button small { color:#7f8b9d; }.home-newsroom-rail article > button i { position:absolute;right:15px;top:16px;color:#f5c542;font-size:20px;font-style:normal; }.home-newsroom-rail article.open { grid-column:span 2;background:rgba(245,197,66,.04); }.home-newsroom-rail article.open > div { padding:0 18px 18px;color:#b8c2d0; }.home-newsroom-rail article.open > div strong { display:block;color:#e2e8f0; }.home-newsroom-rail article.open > div p { line-height:1.65;white-space:pre-wrap; }.home-newsroom-rail article.open > div button { border:0;color:#f5c542;background:transparent;font-weight:900;cursor:pointer; }
+      .newsroom-platform-page { min-height:80vh;color:var(--cfb-text);background:radial-gradient(circle at 80% 0%,rgba(227,38,46,.12),transparent 30%),#060910!important; }.newsroom-platform-hero { display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:25px;padding:36px 32px;border:1px solid rgba(245,197,66,.22);border-top:5px solid #e3262e;border-radius:18px;background:linear-gradient(110deg,#080c13,#111827 65%,#251015);box-shadow:0 26px 70px rgba(0,0,0,.35); }.newsroom-platform-hero h1 { margin:5px 0 8px;font-size:clamp(48px,7vw,96px);line-height:.9;letter-spacing:-.065em; }.newsroom-platform-hero p { max-width:720px;margin:0;color:#aeb8c7;font-size:15px; }.newsroom-platform-hero > button { padding:14px 18px;border:1px solid rgba(245,197,66,.5);border-radius:10px;color:#161006;background:linear-gradient(135deg,#ffdd69,#e8b72f);font-weight:1000;cursor:pointer; }.newsroom-platform-score { display:grid;min-width:170px;padding:17px;border:1px solid rgba(39,151,255,.25);border-radius:13px;background:#07101d; }.newsroom-platform-score b { font-size:36px; }.newsroom-platform-score span { color:#9cc3d1;font-size:8px;font-weight:1000;letter-spacing:.12em; }.newsroom-platform-score small { margin-top:6px;color:#7f8b9d; }.newsroom-platform-desk { display:flex;align-items:center;justify-content:space-between;gap:20px;margin-top:13px;padding:15px 20px;border:1px solid rgba(245,197,66,.16);border-left:4px solid #f5c542;border-radius:10px;background:#101620; }.newsroom-platform-desk div { display:grid;gap:3px; }.newsroom-platform-desk small { color:#93a0b2; }.newsroom-review { margin-top:14px;border:1px solid rgba(245,197,66,.14);border-radius:14px;background:#080c13; }.newsroom-platform-feed { margin-top:16px;overflow:hidden;border:1px solid rgba(39,151,255,.14);border-radius:17px;background:#080c13; }.newsroom-platform-feed > header { display:flex;align-items:center;justify-content:space-between;padding:22px 25px;border-bottom:2px solid rgba(227,38,46,.36);background:#0d131d; }.newsroom-platform-feed > header h2 { margin:4px 0 0;font-size:30px; }.newsroom-platform-list { display:grid; }.newsroom-platform-story { border-bottom:1px solid rgba(148,163,184,.12); }.newsroom-platform-story:last-child { border-bottom:0; }.newsroom-platform-story-head { position:relative;width:100%;padding:23px 62px 23px 25px;border:0;color:#fff;text-align:left;background:linear-gradient(90deg,rgba(255,255,255,.02),transparent);cursor:pointer; }.newsroom-platform-story-head:hover { background:linear-gradient(90deg,rgba(39,151,255,.08),transparent); }.newsroom-platform-story-head h3 { margin:10px 0 7px;font-size:clamp(25px,3vw,42px);line-height:1.05;letter-spacing:-.035em; }.newsroom-platform-story-head > strong { display:block;color:#c5cfdb;font-size:14px; }.newsroom-platform-story-head > small { display:block;margin-top:10px;color:#748197; }.newsroom-platform-story-head > i { position:absolute;right:26px;top:50%;transform:translateY(-50%);color:#f5c542;font-size:30px;font-style:normal; }.newsroom-platform-story.open { background:radial-gradient(circle at 90% 0%,rgba(227,38,46,.08),transparent 30%); }.newsroom-platform-story-body { padding:0 25px 27px; }.newsroom-platform-story-body > p { max-width:980px;color:#b6c1cf;font-size:15px;line-height:1.8;white-space:pre-wrap; }.newsroom-article-reactions { display:flex;align-items:center;flex-wrap:wrap;gap:7px;padding:13px 0;border-top:1px solid rgba(148,163,184,.12);border-bottom:1px solid rgba(148,163,184,.12); }.newsroom-article-reactions > button,.newsroom-article-reactions > span button { min-width:36px;height:34px;border:1px solid rgba(148,163,184,.16);border-radius:999px;color:#fff;background:#111925;cursor:pointer; }.newsroom-article-reactions > button.mine { border-color:#f5c542;background:rgba(245,197,66,.1); }.newsroom-article-reactions > span { display:flex;gap:4px;margin-left:4px; }.newsroom-article-reactions img { width:20px;height:20px;object-fit:contain; }.newsroom-comments { max-width:980px;margin-top:20px; }.newsroom-comments > header { display:flex;justify-content:space-between;padding-bottom:10px;color:#e2e8f0; }.newsroom-comments > header span { color:#7f8b9d; }.newsroom-comment { padding:14px 0;border-top:1px solid rgba(148,163,184,.12); }.newsroom-comment > small { display:block;margin-bottom:7px;color:#9cc3d1; }.newsroom-comment > div { display:flex;align-items:center;justify-content:space-between;gap:10px; }.newsroom-comment time { color:#718096;font-size:9px; }.newsroom-comment > p { margin:8px 0;color:#cbd5e1;line-height:1.55; }.newsroom-comment footer { display:flex;gap:8px; }.newsroom-comment footer button { padding:0;border:0;color:#9cc3d1;background:transparent;font-size:9px;font-weight:900;cursor:pointer; }.newsroom-comment-composer { display:grid;gap:9px;margin-top:16px;padding:14px;border:1px solid rgba(39,151,255,.15);border-radius:12px;background:#0c131e; }.newsroom-comment-composer > div { display:flex;justify-content:space-between;color:#9cc3d1; }.newsroom-comment-composer textarea { min-height:80px;padding:12px;border:1px solid rgba(148,163,184,.18);border-radius:9px;color:#fff;background:#060a10;resize:vertical; }.newsroom-comment-composer > button { justify-self:end;padding:10px 14px;border:0;border-radius:8px;color:#161006;background:#f5c542;font-weight:1000;cursor:pointer; }
       @media (max-width:720px) {
         .network-page .network-sidebar > nav button.active { border-color:rgba(245,197,66,.55)!important;color:#171208!important;background:linear-gradient(135deg,#ffd95e,#e9b72f)!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)!important; }
         .network-page .network-channel-list > button.active { color:#fff!important;background:linear-gradient(90deg,rgba(227,38,46,.28),rgba(39,151,255,.1))!important;box-shadow:inset 4px 0 #e3262e!important; }
@@ -9845,12 +7295,12 @@ function GlobalStyle() {
       .drawer-nav-copy strong { font-size:13px!important; }.drawer-nav-copy small { font-size:9px!important; }
       .drawer-nav-arrow { font-size:18px!important; }
       .home-pulse-v38,.home-matchup-v38,.home-rankings-v38,.cfb-center-hero-v38,.cfb-center-group-v38 { border:1px solid rgba(148,163,184,.16);border-radius:16px;background:linear-gradient(145deg,#0b121d,#080d15);box-shadow:0 16px 42px rgba(0,0,0,.22); }
-      .home-pulse-v38 { overflow:hidden; }.home-pulse-v38 > header,.home-rankings-v38 > header { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:17px 20px;border-bottom:1px solid rgba(148,163,184,.12); }.home-pulse-v38 > header span,.home-rankings-v38 > header span,.home-matchup-v38 > div:first-child > span,.cfb-center-hero-v38 span,.cfb-center-group-v38 header > span { color:#f5c542;font-size:8px;font-weight:1000;letter-spacing:.16em; }.home-pulse-v38 h2,.home-rankings-v38 h2 { margin:4px 0 0;font-size:23px; }.home-pulse-v38 > header small { padding:5px 8px;border-radius:999px;color:#cbd5e1;background:#121c29;font-weight:900; }.home-pulse-v38 > div { display:grid;grid-template-columns:repeat(3,minmax(0,1fr)); }.home-pulse-v38 > div > button { min-width:0;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:18px;border:0;border-right:1px solid rgba(148,163,184,.12);color:#f8fafc;text-align:left;background:transparent;cursor:pointer; }.home-pulse-v38 > div > button:last-child { border-right:0; }.home-pulse-v38 > div > button:hover { background:rgba(56,189,248,.045); }.home-pulse-v38 button > span { color:#7dd3fc;font-size:8px;font-weight:1000;letter-spacing:.13em; }.home-pulse-v38 button > strong { grid-row:1/3;grid-column:2;align-self:center;font-size:26px; }.home-pulse-v38 button > small { color:#8fa0b5;font-size:9px; }.home-pulse-v38 button > p { grid-column:1/-1;margin:7px 0 0;overflow:hidden;color:#b1bdcc;font-size:11px;line-height:1.4;text-overflow:ellipsis;white-space:nowrap; }.home-pulse-v38 button.live { background:radial-gradient(circle at 100% 0%,rgba(220,38,38,.18),transparent 55%); }.home-pulse-v38 button.live > span { color:#f87171; }
+      .home-pulse-v38 { overflow:hidden; }.home-pulse-v38 > header,.home-rankings-v38 > header { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:17px 20px;border-bottom:1px solid rgba(148,163,184,.12); }.home-pulse-v38 > header span,.home-rankings-v38 > header span,.home-matchup-v38 > div:first-child > span,.cfb-center-hero-v38 span,.cfb-center-group-v38 header > span { color:#f5c542;font-size:8px;font-weight:1000;letter-spacing:.16em; }.home-pulse-v38 h2,.home-rankings-v38 h2 { margin:4px 0 0;font-size:23px; }.home-pulse-v38 > header small { padding:5px 8px;border-radius:999px;color:#cbd5e1;background:#121c29;font-weight:900; }.home-pulse-v38 > div { display:grid;grid-template-columns:repeat(3,minmax(0,1fr)); }.home-pulse-v38 > div > button { min-width:0;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:18px;border:0;border-right:1px solid rgba(148,163,184,.12);color:var(--cfb-text);text-align:left;background:transparent;cursor:pointer; }.home-pulse-v38 > div > button:last-child { border-right:0; }.home-pulse-v38 > div > button:hover { background:rgba(79,143,168,.045); }.home-pulse-v38 button > span { color:#9cc3d1;font-size:8px;font-weight:1000;letter-spacing:.13em; }.home-pulse-v38 button > strong { grid-row:1/3;grid-column:2;align-self:center;font-size:26px; }.home-pulse-v38 button > small { color:#8fa0b5;font-size:9px; }.home-pulse-v38 button > p { grid-column:1/-1;margin:7px 0 0;overflow:hidden;color:#b1bdcc;font-size:11px;line-height:1.4;text-overflow:ellipsis;white-space:nowrap; }.home-pulse-v38 button.live { background:radial-gradient(circle at 100% 0%,rgba(220,38,38,.18),transparent 55%); }.home-pulse-v38 button.live > span { color:#f87171; }
       .home-matchup-v38 { display:grid;grid-template-columns:minmax(160px,.45fr) minmax(0,1.3fr) auto;align-items:center;gap:18px;padding:18px 20px;border-left:4px solid #f5c542; }.home-matchup-v38 h2 { margin:4px 0;font-size:25px; }.home-matchup-v38 small { color:#8fa0b5; }.home-matchup-teams-v38 { min-width:0;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:14px; }.home-matchup-teams-v38 > span { min-width:0;display:flex;align-items:center;gap:10px; }.home-matchup-teams-v38 > span:last-child { justify-content:flex-end;text-align:right; }.home-matchup-teams-v38 strong { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }.home-matchup-teams-v38 > b { color:#f5c542;font-size:11px; }.home-matchup-v38 > button,.home-rankings-v38 > header > button,.cfb-center-hero-v38 > button { padding:10px 13px;border:1px solid rgba(245,197,66,.3);border-radius:9px;color:#f8d96a;background:rgba(245,197,66,.07);font-size:10px;font-weight:1000;cursor:pointer; }
       .home-newsroom-rail > div { grid-template-columns:1.4fr 1fr 1fr!important; }.home-newsroom-rail article.open { grid-column:1/-1!important; }
-      .home-rankings-v38 { overflow:hidden; }.home-rankings-v38 > header p { margin:3px 0 0;color:#8fa0b5;font-size:11px; }.home-rankings-v38 > div { display:grid; }.home-rankings-v38 > div > button { display:grid;grid-template-columns:45px 42px minmax(0,1fr) 70px 70px;align-items:center;gap:10px;padding:11px 18px;border:0;border-bottom:1px solid rgba(148,163,184,.1);color:#f8fafc;text-align:left;background:transparent;cursor:pointer; }.home-rankings-v38 > div > button:last-child { border-bottom:0; }.home-rankings-v38 > div > button:hover { background:rgba(56,189,248,.045); }.home-rankings-v38 > div > button > b { color:#f5c542;font-size:16px; }.home-rankings-v38 > div > button > span { min-width:0;display:grid;gap:2px; }.home-rankings-v38 > div > button strong,.home-rankings-v38 > div > button small { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }.home-rankings-v38 > div > button small { color:#8090a4;font-size:9px; }.home-rankings-v38 > div > button > em { color:#cbd5e1;font-style:normal;text-align:center; }.home-rankings-v38 > div > button > i { color:#7dd3fc;font-size:15px;font-style:normal;font-weight:1000;text-align:right; }
-      .cfb-center-v38 { display:grid;gap:15px; }.cfb-center-hero-v38 { display:flex;align-items:center;justify-content:space-between;gap:24px;padding:28px;border-top:4px solid #f5c542;background:radial-gradient(circle at 82% 0%,rgba(56,189,248,.11),transparent 34%),linear-gradient(125deg,#0a1019,#111827); }.cfb-center-hero-v38 h1 { margin:6px 0;font-size:clamp(40px,5vw,68px);line-height:.95;letter-spacing:-.055em; }.cfb-center-hero-v38 p { max-width:780px;margin:0;color:#9eabba;font-size:14px;line-height:1.5; }.cfb-center-groups-v38 { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start; }.cfb-center-group-v38 { overflow:hidden; }.cfb-center-group-v38 > header { padding:18px 19px;border-bottom:1px solid rgba(148,163,184,.12); }.cfb-center-group-v38 h2 { margin:5px 0 3px;font-size:22px; }.cfb-center-group-v38 header p { margin:0;color:#8493a6;font-size:11px;line-height:1.45; }.cfb-center-group-v38 > div { display:grid; }.cfb-center-group-v38 > div > button { display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 18px;border:0;border-bottom:1px solid rgba(148,163,184,.1);color:#f8fafc;text-align:left;background:transparent;cursor:pointer; }.cfb-center-group-v38 > div > button:last-child { border-bottom:0; }.cfb-center-group-v38 > div > button:hover { background:rgba(56,189,248,.05); }.cfb-center-group-v38 > div > button span { min-width:0;display:grid;gap:3px; }.cfb-center-group-v38 > div > button strong { font-size:14px; }.cfb-center-group-v38 > div > button small { color:#8493a6;font-size:10px; }.cfb-center-group-v38 > div > button b { color:#7dd3fc;font-size:24px; }
-      .cfb-coach-finder-v38 { padding-bottom:18px; }.cfb-coach-finder-v38 > label { display:grid;gap:6px;margin:18px 18px 10px;color:#8fa0b5;font-size:9px;font-weight:1000;letter-spacing:.1em;text-transform:uppercase; }.cfb-coach-finder-v38 select { min-width:0;width:100%;padding:12px;border:1px solid rgba(96,165,250,.25);border-radius:9px;color:#fff;background:#070c14; }.cfb-coach-finder-v38 > button { width:calc(100% - 36px);margin:0 18px;padding:12px;border:1px solid rgba(96,165,250,.3);border-radius:9px;color:#dbeafe;background:rgba(59,130,246,.1);font-weight:1000;cursor:pointer; }.cfb-coach-finder-v38 > button:disabled { opacity:.45;cursor:not-allowed; }.cfb-coach-finder-v38 > small { display:block;margin:10px 18px 0;color:#718096; }
+      .home-rankings-v38 { overflow:hidden; }.home-rankings-v38 > header p { margin:3px 0 0;color:#8fa0b5;font-size:11px; }.home-rankings-v38 > div { display:grid; }.home-rankings-v38 > div > button { display:grid;grid-template-columns:45px 42px minmax(0,1fr) 70px 70px;align-items:center;gap:10px;padding:11px 18px;border:0;border-bottom:1px solid rgba(148,163,184,.1);color:var(--cfb-text);text-align:left;background:transparent;cursor:pointer; }.home-rankings-v38 > div > button:last-child { border-bottom:0; }.home-rankings-v38 > div > button:hover { background:rgba(79,143,168,.045); }.home-rankings-v38 > div > button > b { color:#f5c542;font-size:16px; }.home-rankings-v38 > div > button > span { min-width:0;display:grid;gap:2px; }.home-rankings-v38 > div > button strong,.home-rankings-v38 > div > button small { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }.home-rankings-v38 > div > button small { color:#8090a4;font-size:9px; }.home-rankings-v38 > div > button > em { color:#cbd5e1;font-style:normal;text-align:center; }.home-rankings-v38 > div > button > i { color:#9cc3d1;font-size:15px;font-style:normal;font-weight:1000;text-align:right; }
+      .cfb-center-v38 { display:grid;gap:15px; }.cfb-center-hero-v38 { display:flex;align-items:center;justify-content:space-between;gap:24px;padding:28px;border-top:4px solid #f5c542;background:radial-gradient(circle at 82% 0%,rgba(79,143,168,.11),transparent 34%),linear-gradient(125deg,#0a1019,#111827); }.cfb-center-hero-v38 h1 { margin:6px 0;font-size:clamp(40px,5vw,68px);line-height:.95;letter-spacing:-.055em; }.cfb-center-hero-v38 p { max-width:780px;margin:0;color:#9eabba;font-size:14px;line-height:1.5; }.cfb-center-groups-v38 { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start; }.cfb-center-group-v38 { overflow:hidden; }.cfb-center-group-v38 > header { padding:18px 19px;border-bottom:1px solid rgba(148,163,184,.12); }.cfb-center-group-v38 h2 { margin:5px 0 3px;font-size:22px; }.cfb-center-group-v38 header p { margin:0;color:#8493a6;font-size:11px;line-height:1.45; }.cfb-center-group-v38 > div { display:grid; }.cfb-center-group-v38 > div > button { display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 18px;border:0;border-bottom:1px solid rgba(148,163,184,.1);color:var(--cfb-text);text-align:left;background:transparent;cursor:pointer; }.cfb-center-group-v38 > div > button:last-child { border-bottom:0; }.cfb-center-group-v38 > div > button:hover { background:rgba(79,143,168,.05); }.cfb-center-group-v38 > div > button span { min-width:0;display:grid;gap:3px; }.cfb-center-group-v38 > div > button strong { font-size:14px; }.cfb-center-group-v38 > div > button small { color:#8493a6;font-size:10px; }.cfb-center-group-v38 > div > button b { color:#9cc3d1;font-size:24px; }
+      .cfb-coach-finder-v38 { padding-bottom:18px; }.cfb-coach-finder-v38 > label { display:grid;gap:6px;margin:18px 18px 10px;color:#8fa0b5;font-size:9px;font-weight:1000;letter-spacing:.1em;text-transform:uppercase; }.cfb-coach-finder-v38 select { min-width:0;width:100%;padding:12px;border:1px solid rgba(79,143,168,.25);border-radius:9px;color:#fff;background:#070c14; }.cfb-coach-finder-v38 > button { width:calc(100% - 36px);margin:0 18px;padding:12px;border:1px solid rgba(79,143,168,.3);border-radius:9px;color:#dbeafe;background:rgba(59,130,246,.1);font-weight:1000;cursor:pointer; }.cfb-coach-finder-v38 > button:disabled { opacity:.45;cursor:not-allowed; }.cfb-coach-finder-v38 > small { display:block;margin:10px 18px 0;color:#718096; }
       @media (max-width:720px) {
         .drawer-primary-group { display:none!important; }
         .drawer-menu-grid { grid-template-columns:1fr!important; }
@@ -9864,25 +7314,14 @@ function GlobalStyle() {
 
       /* v39 CFBElite Network */
       .network-channel-utilities{display:flex;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(148,163,184,.12);background:rgba(2,6,23,.72)}
-      .network-channel-utilities label{min-width:0;flex:1;display:flex;align-items:center;gap:8px;padding:9px 12px;border:1px solid rgba(148,163,184,.16);border-radius:999px;background:#111827}.network-channel-utilities input{min-width:0;width:100%;border:0;outline:0;color:#fff;background:transparent}.network-channel-utilities button{padding:9px 12px;border:1px solid rgba(148,163,184,.16);border-radius:999px;color:#cbd5e1;background:#111827}.network-channel-utilities button.active{border-color:#facc15;color:#facc15;background:rgba(250,204,21,.08)}
-      .network-message-media{display:block;max-width:min(460px,100%);max-height:360px;margin-top:8px;border-radius:14px;object-fit:contain;background:#020617}.network-message-link{color:#60a5fa;text-decoration:underline;overflow-wrap:anywhere}.network-media-link{display:block}
-      .network-message-toolbar button.pinned{color:#facc15}.network-gif-toggle{position:absolute;right:46px;bottom:7px;height:34px;padding:0 8px;border:0;border-radius:9px;color:#fff;font-size:10px;font-weight:1000;background:#31343d}.network-compose-box textarea{padding-right:92px!important}
-      .network-reporting-card{display:grid;gap:14px;margin:14px;padding:18px;border:1px solid rgba(248,113,113,.22);border-radius:18px;background:linear-gradient(135deg,rgba(127,29,29,.18),rgba(15,23,42,.94))}.network-reporting-card span,.network-poll-builder header span{color:#facc15;font-size:9px;font-weight:1000;letter-spacing:.14em}.network-reporting-card h3,.network-poll-builder h3{margin:4px 0;color:#fff}.network-reporting-card p{margin:0;color:#94a3b8}.network-reporting-card>a{justify-self:start;padding:11px 16px;border-radius:10px;color:#07111f;font-weight:1000;text-decoration:none;background:#facc15}.network-reporting-card>div:last-child{display:flex;gap:8px}.network-reporting-card input{min-width:0;flex:1;padding:10px;border:1px solid rgba(148,163,184,.18);border-radius:9px;color:#fff;background:#050a12}
-      .network-poll-zone{display:grid;gap:14px;padding:14px;border-bottom:1px solid rgba(148,163,184,.12)}.network-poll-builder{display:grid;gap:10px;padding:16px;border:1px solid rgba(56,189,248,.2);border-radius:16px;background:rgba(14,165,233,.05)}.network-poll-builder>input,.network-poll-builder>textarea,.network-poll-builder>div>input,.network-poll-options input[type=datetime-local]{padding:10px;border:1px solid rgba(148,163,184,.18);border-radius:9px;color:#fff;background:#050a12}.network-poll-builder>div:not(.network-poll-options){display:flex;gap:6px}.network-poll-builder>div>input{min-width:0;flex:1}.network-poll-options{display:flex;flex-wrap:wrap;gap:12px;color:#cbd5e1;font-size:11px}.network-poll-list{display:grid;gap:12px}.network-poll-list article{display:grid;gap:12px;padding:16px;border:1px solid rgba(148,163,184,.16);border-radius:16px;background:#0c1423}.network-poll-list article>header{display:flex;justify-content:space-between;gap:10px}.network-poll-list article h3{margin:4px 0;color:#fff}.network-poll-list article p{margin:0;color:#94a3b8}.network-poll-list article>div{display:grid;gap:7px}.network-poll-list article>div>button{position:relative;overflow:hidden;padding:11px;border:1px solid rgba(148,163,184,.16);border-radius:10px;text-align:left;color:#fff;background:#111827}.network-poll-list article>div>button.voted{border-color:#facc15}.network-poll-list article>div>button span{position:relative;z-index:2;display:flex;justify-content:space-between;gap:8px}.network-poll-list article>div>button em{color:#94a3b8;font-size:10px}.network-poll-list article>div>button i{position:absolute;inset:0 auto 0 0;z-index:1;background:rgba(56,189,248,.14)}.network-poll-list footer{color:#64748b;font-size:10px}
-      .network-notifications>button{grid-template-columns:44px minmax(0,1fr) 18px!important;align-items:center!important}.network-notifications>button>i{width:38px!important;height:38px!important;display:grid;place-items:center;border-radius:12px!important;color:#facc15!important;font-size:10px;font-weight:1000;background:linear-gradient(145deg,#16223a,#0a1020)!important}.network-notifications>button>em{color:#64748b;font-style:normal;font-size:22px}.network-notifications>button p{line-height:1.35}.network-notifications>button small{display:block;margin-top:5px}
+      .network-channel-utilities label{min-width:0;flex:1;display:flex;align-items:center;gap:8px;padding:9px 12px;border:1px solid rgba(148,163,184,.16);border-radius:999px;background:#111827}.network-channel-utilities input{min-width:0;width:100%;border:0;outline:0;color:#fff;background:transparent}.network-channel-utilities button{padding:9px 12px;border:1px solid rgba(148,163,184,.16);border-radius:999px;color:#cbd5e1;background:#111827}.network-channel-utilities button.active{border-color:var(--cfb-gold);color:var(--cfb-gold);background:rgba(201,208,217,.08)}
+      .network-message-media{display:block;max-width:min(460px,100%);max-height:360px;margin-top:8px;border-radius:14px;object-fit:contain;background:var(--cfb-ink)}.network-message-link{color:#4f8fa8;text-decoration:underline;overflow-wrap:anywhere}.network-media-link{display:block}
+      .network-message-toolbar button.pinned{color:var(--cfb-gold)}.network-gif-toggle{position:absolute;right:46px;bottom:7px;height:34px;padding:0 8px;border:0;border-radius:9px;color:#fff;font-size:10px;font-weight:1000;background:#31343d}.network-compose-box textarea{padding-right:92px!important}
+      .network-reporting-card{display:grid;gap:14px;margin:14px;padding:18px;border:1px solid rgba(248,113,113,.22);border-radius:18px;background:linear-gradient(135deg,rgba(127,29,29,.18),rgba(15,23,42,.94))}.network-reporting-card span,.network-poll-builder header span{color:var(--cfb-gold);font-size:9px;font-weight:1000;letter-spacing:.14em}.network-reporting-card h3,.network-poll-builder h3{margin:4px 0;color:#fff}.network-reporting-card p{margin:0;color:var(--cfb-muted)}.network-reporting-card>a{justify-self:start;padding:11px 16px;border-radius:10px;color:#07111f;font-weight:1000;text-decoration:none;background:var(--cfb-gold)}.network-reporting-card>div:last-child{display:flex;gap:8px}.network-reporting-card input{min-width:0;flex:1;padding:10px;border:1px solid rgba(148,163,184,.18);border-radius:9px;color:#fff;background:#050a12}
+      .network-poll-zone{display:grid;gap:14px;padding:14px;border-bottom:1px solid rgba(148,163,184,.12)}.network-poll-builder{display:grid;gap:10px;padding:16px;border:1px solid rgba(79,143,168,.2);border-radius:16px;background:rgba(58,112,134,.05)}.network-poll-builder>input,.network-poll-builder>textarea,.network-poll-builder>div>input,.network-poll-options input[type=datetime-local]{padding:10px;border:1px solid rgba(148,163,184,.18);border-radius:9px;color:#fff;background:#050a12}.network-poll-builder>div:not(.network-poll-options){display:flex;gap:6px}.network-poll-builder>div>input{min-width:0;flex:1}.network-poll-options{display:flex;flex-wrap:wrap;gap:12px;color:#cbd5e1;font-size:11px}.network-poll-list{display:grid;gap:12px}.network-poll-list article{display:grid;gap:12px;padding:16px;border:1px solid rgba(148,163,184,.16);border-radius:16px;background:#0c1423}.network-poll-list article>header{display:flex;justify-content:space-between;gap:10px}.network-poll-list article h3{margin:4px 0;color:#fff}.network-poll-list article p{margin:0;color:var(--cfb-muted)}.network-poll-list article>div{display:grid;gap:7px}.network-poll-list article>div>button{position:relative;overflow:hidden;padding:11px;border:1px solid rgba(148,163,184,.16);border-radius:10px;text-align:left;color:#fff;background:#111827}.network-poll-list article>div>button.voted{border-color:var(--cfb-gold)}.network-poll-list article>div>button span{position:relative;z-index:2;display:flex;justify-content:space-between;gap:8px}.network-poll-list article>div>button em{color:var(--cfb-muted);font-size:10px}.network-poll-list article>div>button i{position:absolute;inset:0 auto 0 0;z-index:1;background:rgba(79,143,168,.14)}.network-poll-list footer{color:#64748b;font-size:10px}
+      .network-notifications>button{grid-template-columns:44px minmax(0,1fr) 18px!important;align-items:center!important}.network-notifications>button>i{width:38px!important;height:38px!important;display:grid;place-items:center;border-radius:12px!important;color:var(--cfb-gold)!important;font-size:10px;font-weight:1000;background:linear-gradient(145deg,#16223a,#0a1020)!important}.network-notifications>button>em{color:#64748b;font-style:normal;font-size:22px}.network-notifications>button p{line-height:1.35}.network-notifications>button small{display:block;margin-top:5px}
       @media(max-width:700px){.network-channel-utilities{position:sticky;top:0;z-index:7}.network-reporting-card>div:last-child{display:grid}.network-poll-options{display:grid}.network-poll-list article>header{display:grid}.network-poll-list article>div>button span{display:grid}.network-message-media{max-height:260px}}
 
-      /* v40 unified presentation system */
-      :root {
-        --cfb-surface:#0d1524;
-        --cfb-surface-2:#111c2e;
-        --cfb-border:rgba(148,163,184,.16);
-        --cfb-text:#f8fafc;
-        --cfb-muted:#9aa8bb;
-        --cfb-accent:#facc15;
-        --cfb-radius:18px;
-        --cfb-shadow:0 18px 50px rgba(0,0,0,.24);
-      }
       html { scroll-behavior:smooth; }
       body { text-rendering:optimizeLegibility; -webkit-font-smoothing:antialiased; }
       button,a,input,select,textarea { font:inherit; }
@@ -9890,18 +7329,18 @@ function GlobalStyle() {
       button { transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease,background .16s ease,color .16s ease; }
       @media (hover:hover) {
         button:not(:disabled):hover { transform:translateY(-1px); }
-        .cfb-v2-page > section:hover,.network-stage,.network-directory { border-color:rgba(250,204,21,.22); }
+        .cfb-v2-page > section:hover,.network-stage,.network-directory { border-color:rgba(62,127,193,.22); }
       }
       button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible {
-        outline:2px solid rgba(96,165,250,.9); outline-offset:2px;
+        outline:2px solid rgba(79,143,168,.9); outline-offset:2px;
       }
       .cfb-v2-page { gap:18px!important; }
       .cfb-v2-page > section:not([class*="elite-"]),
       .network-stage,.network-directory,.network-sidebar,
       .data-upload-card,.data-queue-card,.data-review-card,.data-checklist-card {
-        border:1px solid var(--cfb-border)!important;
-        border-radius:var(--cfb-radius)!important;
-        box-shadow:var(--cfb-shadow);
+        border:1px solid rgba(255,255,255,.08)!important;
+        border-radius:18px!important;
+        box-shadow:0 18px 50px rgba(0,0,0,.24);
       }
       .cfb-v2-page h1,.cfb-v2-page h2,.cfb-v2-page h3 { letter-spacing:-.025em; }
       .cfb-v2-page p,.network-stage p { line-height:1.55; }
@@ -9917,7 +7356,7 @@ function GlobalStyle() {
       .network-channel-utilities input { min-width:0; }
       .network-message-feed article { padding-block:14px; }
       .network-message-body { line-height:1.55; overflow-wrap:anywhere; }
-      .network-reply-preview { border-left:3px solid rgba(96,165,250,.65); background:rgba(96,165,250,.06); }
+      .network-reply-preview { border-left:3px solid rgba(79,143,168,.65); background:rgba(79,143,168,.06); }
       .home-newsroom-rail { min-height:0!important; }
       .home-newsroom-empty {
         grid-column:1/-1; min-height:116px; padding:22px; display:flex!important;
@@ -9927,7 +7366,7 @@ function GlobalStyle() {
       .home-newsroom-empty > div { display:grid; gap:6px; }
       .home-newsroom-empty b { color:#fff; font-size:18px; }
       .home-newsroom-empty span { color:var(--cfb-muted); font-size:13px; }
-      .home-newsroom-empty button { border:1px solid rgba(250,204,21,.3);border-radius:10px;padding:10px 14px;color:#facc15;background:rgba(250,204,21,.08);font-weight:900; }
+      .home-newsroom-empty button { border:1px solid rgba(201,208,217,.3);border-radius:10px;padding:10px 14px;color:var(--cfb-gold);background:rgba(201,208,217,.08);font-weight:900; }
       .data-checklist-progress { border-radius:12px; }
       .data-phase-grid article { min-width:0; }
       .data-check-item strong,.data-check-item small { overflow-wrap:anywhere; }
@@ -10232,7 +7671,7 @@ function GlobalStyle() {
         width:100%;
         height:100%;
         border-radius:inherit;
-        background:linear-gradient(145deg,#7f1d1d,#facc15);
+        background:linear-gradient(145deg,var(--cfb-red-dark),var(--cfb-gold));
         color:#fff;
         font-size:12px;
         letter-spacing:-.03em;
@@ -10820,16 +8259,16 @@ function GlobalStyle() {
       /* v50-network-media-ui-overhaul */
       :root{--ui-page-title:38px;--ui-section-title:26px;--ui-card-title:18px;--ui-body:15px;--ui-meta:13px;--ui-space-1:8px;--ui-space-2:12px;--ui-space-3:16px;--ui-space-4:24px;--ui-space-5:32px;--ui-radius:16px;--ui-shadow:0 16px 44px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.05)}
       .cfb-app h1{font-size:var(--ui-page-title)!important;line-height:1.02!important}.cfb-app h2{font-size:var(--ui-section-title)!important;line-height:1.08!important}.cfb-app h3{font-size:var(--ui-card-title)!important}.cfb-app p,.cfb-app li,.cfb-app input,.cfb-app select,.cfb-app textarea,.cfb-app button{font-size:var(--ui-body)}.cfb-app small,.cfb-app time{font-size:var(--ui-meta)}
-      .cfb-identity-bar{display:grid!important;grid-template-columns:minmax(190px,1.2fr) repeat(3,minmax(120px,.75fr)) minmax(180px,1fr) minmax(190px,1fr)!important;gap:1px!important;overflow:hidden!important;min-height:72px!important;border:1px solid rgba(250,204,21,.26)!important;border-radius:16px!important;background:#070b12!important;box-shadow:var(--ui-shadow)!important}
+      .cfb-identity-bar{display:grid!important;grid-template-columns:minmax(190px,1.2fr) repeat(3,minmax(120px,.75fr)) minmax(180px,1fr) minmax(190px,1fr)!important;gap:1px!important;overflow:hidden!important;min-height:72px!important;border:1px solid rgba(201,208,217,.26)!important;border-radius:16px!important;background:var(--cfb-panel)!important;box-shadow:var(--ui-shadow)!important}
       .cfb-identity-bar>*{min-width:0!important;min-height:72px!important;padding:12px 16px!important;background:linear-gradient(145deg,rgba(18,25,38,.98),rgba(4,7,13,.99))!important;color:#fff!important}.cfb-identity-bar>*+*{border-left:1px solid rgba(255,255,255,.08)!important}
-      .cfb-identity-brand>span{width:44px!important;height:44px!important;border-radius:13px!important;color:#fff!important;background:linear-gradient(145deg,#7f1d1d,#dc2626)!important;box-shadow:0 0 0 1px rgba(250,204,21,.45),0 10px 24px rgba(220,38,38,.22)!important}
-      .cfb-identity-item small,.cfb-identity-featured small,.cfb-identity-brand small{color:rgba(226,232,240,.58)!important;font-size:10px!important;letter-spacing:.10em!important}.cfb-identity-item b,.cfb-identity-featured b{font-size:14px!important;margin-top:4px!important}.cfb-identity-progress span{height:6px!important;margin-top:9px!important}.cfb-identity-featured{border-left:2px solid #facc15!important}
+      .cfb-identity-brand>span{width:44px!important;height:44px!important;border-radius:13px!important;color:#fff!important;background:linear-gradient(145deg,var(--cfb-red-dark),var(--cfb-red))!important;box-shadow:0 0 0 1px rgba(201,208,217,.45),0 10px 24px rgba(220,38,38,.22)!important}
+      .cfb-identity-item small,.cfb-identity-featured small,.cfb-identity-brand small{color:rgba(226,232,240,.58)!important;font-size:10px!important;letter-spacing:.10em!important}.cfb-identity-item b,.cfb-identity-featured b{font-size:14px!important;margin-top:4px!important}.cfb-identity-progress span{height:6px!important;margin-top:9px!important}.cfb-identity-featured{border-left:2px solid var(--cfb-gold)!important}
       .cfb-universal-search{width:100%!important;margin:0 0 16px!important}.cfb-universal-search-input{width:100%!important;min-height:48px!important;padding:0 16px!important;border-radius:14px!important;border:1px solid rgba(255,255,255,.12)!important;background:#111827!important;box-shadow:0 12px 30px rgba(0,0,0,.20)!important}.cfb-universal-search-input input{font-size:15px!important;min-width:0!important}.cfb-universal-search-input input::placeholder{color:rgba(226,232,240,.48)!important}
       .network-channel-list>button{grid-template-columns:34px minmax(0,1fr) auto!important;min-height:44px!important;padding:7px 10px!important;gap:10px!important}.network-channel-list>button strong{font-size:14px!important;line-height:1.2!important}.network-channel-list>button em{justify-self:end!important;white-space:nowrap!important;font-size:8px!important}.network-channel-mark{width:28px!important;height:28px!important}.network-matchup-logos{display:flex!important;align-items:center!important;gap:3px!important;transform:none!important}
       .network-server-rail button img{width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block}.network-server-rail button:first-child span{display:none!important}
       .network-composer{position:relative!important;display:grid!important;grid-template-columns:auto minmax(0,1fr)!important;align-items:end!important;gap:8px!important;min-height:58px!important;margin:0 14px 14px!important;padding:8px 10px!important;border-radius:12px!important;background:#383a40!important}.network-composer-tools{display:flex!important;align-items:center!important;gap:4px!important;padding-bottom:3px!important}.network-composer-tools button{min-width:38px!important;height:38px!important;min-height:38px!important;padding:0 8px!important;border:0!important;border-radius:8px!important;background:transparent!important;color:#b5bac1!important;font-size:12px!important;font-weight:900!important}.network-composer-tools button:first-child{font-size:25px!important;padding:0!important}.network-composer-tools button:hover,.network-composer-tools button.active{background:rgba(255,255,255,.08)!important;color:#fff!important}.network-compose-box textarea{width:100%!important;min-height:42px!important;max-height:160px!important;padding:10px 8px!important;border:0!important;background:transparent!important;color:#f2f3f5!important;font-size:15px!important;resize:none!important}.network-composer>small{grid-column:2;color:#949ba4!important;font-size:10px!important;margin-left:8px!important}.network-replying{grid-column:1/-1!important;margin:-8px -10px 4px!important;padding:7px 10px!important;border-radius:12px 12px 0 0!important}
       .network-giphy-picker{position:absolute;z-index:60;left:8px;bottom:calc(100% + 8px);width:min(580px,calc(100vw - 28px));max-height:min(620px,72vh);display:grid;grid-template-rows:auto auto minmax(0,1fr);gap:10px;padding:12px;border:1px solid rgba(255,255,255,.11);border-radius:14px;background:#1e1f22;box-shadow:0 24px 70px rgba(0,0,0,.62);overflow:hidden}.network-giphy-picker header{display:flex;justify-content:space-between;align-items:center}.network-giphy-picker header b,.network-giphy-picker header small{display:block}.network-giphy-picker header b{font-size:18px}.network-giphy-picker header small{color:#949ba4;font-size:10px;margin-top:2px}.network-giphy-picker header button{width:34px;min-width:34px;height:34px;min-height:34px;border:0;border-radius:8px;background:#2b2d31;color:#fff;font-size:20px}.network-giphy-picker>label{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:8px;padding:0 10px;border-radius:8px;background:#111214}.network-giphy-picker input{min-height:42px;border:0;background:transparent;color:#fff;outline:0}.network-giphy-grid{min-height:240px;overflow:auto}.network-giphy-empty{display:grid;gap:5px;padding:24px;text-align:center;border-radius:10px;background:#2b2d31}.network-giphy-empty span{color:#949ba4}
-      .drawer-menu-group:last-child .drawer-menu-grid{grid-template-columns:1fr!important;gap:10px!important}.coach-drawer-tile{grid-template-columns:72px minmax(0,1fr)!important;align-items:center!important;min-height:94px!important;padding:10px 16px 10px 22px!important;border-radius:14px!important;background:linear-gradient(145deg,#0d1727,#07101d)!important;box-shadow:0 12px 28px rgba(0,0,0,.20)!important}.coach-menu-logo-plate-v86{width:64px!important;height:64px!important;min-width:64px!important;border-radius:15px!important}.coach-nav-copy{display:block!important;min-width:0!important;text-align:left!important}.coach-nav-copy strong,.coach-nav-copy small,.coach-nav-copy em{display:block!important;min-width:0!important}.coach-nav-copy strong{overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;font-size:18px!important;line-height:1.12!important;color:#fff!important}.coach-nav-copy small{margin-top:5px!important;font-size:13px!important;color:rgba(255,255,255,.78)!important}.coach-nav-copy em{margin-top:7px!important;font-size:10px!important;font-style:normal!important;color:rgba(250,204,21,.72)!important;letter-spacing:.04em!important}.coach-drawer-tile>img{display:none!important}
+      .drawer-menu-group:last-child .drawer-menu-grid{grid-template-columns:1fr!important;gap:10px!important}.coach-drawer-tile{grid-template-columns:72px minmax(0,1fr)!important;align-items:center!important;min-height:94px!important;padding:10px 16px 10px 22px!important;border-radius:14px!important;background:linear-gradient(145deg,#0d1727,#07101d)!important;box-shadow:0 12px 28px rgba(0,0,0,.20)!important}.coach-menu-logo-plate-v86{width:64px!important;height:64px!important;min-width:64px!important;border-radius:15px!important}.coach-nav-copy{display:block!important;min-width:0!important;text-align:left!important}.coach-nav-copy strong,.coach-nav-copy small,.coach-nav-copy em{display:block!important;min-width:0!important}.coach-nav-copy strong{overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;font-size:18px!important;line-height:1.12!important;color:#fff!important}.coach-nav-copy small{margin-top:5px!important;font-size:13px!important;color:rgba(255,255,255,.78)!important}.coach-nav-copy em{margin-top:7px!important;font-size:10px!important;font-style:normal!important;color:rgba(201,208,217,.72)!important;letter-spacing:.04em!important}.coach-drawer-tile>img{display:none!important}
       @media(max-width:900px){.cfb-identity-bar{display:grid!important;grid-template-columns:1fr 1fr 1fr!important;overflow:visible!important}.cfb-identity-brand{grid-column:1/-1!important}.cfb-identity-progress,.cfb-identity-featured{display:none!important}.network-channel-list>button{min-height:50px!important;padding:9px 12px!important}.network-channel-list>button strong{font-size:15px!important}.network-composer{margin:0!important;border-radius:0!important;padding:9px 10px calc(9px + env(safe-area-inset-bottom))!important}.network-composer-tools button{min-width:42px!important;height:42px!important}.network-giphy-picker{position:fixed!important;left:0!important;right:0!important;bottom:0!important;width:100%!important;max-height:78vh!important;border-radius:18px 18px 0 0!important;padding:14px 12px calc(14px + env(safe-area-inset-bottom))!important}.coach-drawer-tile{min-height:88px!important;grid-template-columns:62px minmax(0,1fr)!important}.coach-menu-logo-plate-v86{width:56px!important;height:56px!important;min-width:56px!important}}
       @media(max-width:560px){.cfb-identity-bar{grid-template-columns:1fr 1fr!important}.cfb-identity-item:nth-of-type(3){display:none!important}.network-composer{grid-template-columns:1fr!important}.network-composer-tools{grid-row:2;overflow-x:auto;padding:2px 0 0!important}.network-compose-box{grid-row:1}.network-composer>small{display:none!important}.coach-nav-copy strong{font-size:16px!important}}
 
@@ -11024,7 +8463,7 @@ function GlobalStyle() {
 
 
       /* v51-sidebar-structural-rebuild */
-      .cfb-identity-brand{gap:12px!important}.cfb-identity-brand>span{flex:0 0 44px!important;width:44px!important;height:44px!important;border-radius:12px!important;display:grid!important;place-items:center!important;font-size:11px!important;line-height:1!important;font-weight:1000!important;color:#fff!important;background:linear-gradient(145deg,#8f1111,#d92727)!important;border:1px solid rgba(250,204,21,.55)!important}.cfb-identity-brand>div{min-width:0!important}.cfb-identity-brand b{display:block!important;font-size:14px!important;white-space:nowrap!important}.cfb-identity-brand small{display:block!important;margin-top:3px!important;font-size:9px!important}
+      .cfb-identity-brand{gap:12px!important}.cfb-identity-brand>span{flex:0 0 44px!important;width:44px!important;height:44px!important;border-radius:12px!important;display:grid!important;place-items:center!important;font-size:11px!important;line-height:1!important;font-weight:1000!important;color:#fff!important;background:linear-gradient(145deg,#8f1111,#d92727)!important;border:1px solid rgba(201,208,217,.55)!important}.cfb-identity-brand>div{min-width:0!important}.cfb-identity-brand b{display:block!important;font-size:14px!important;white-space:nowrap!important}.cfb-identity-brand small{display:block!important;margin-top:3px!important;font-size:9px!important}
 
       .network-channel-category{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:center!important;gap:8px!important;min-height:30px!important;margin:12px 4px 4px!important;padding:4px 6px!important;color:#aeb4bd!important;font-size:10px!important;font-weight:1000!important;letter-spacing:.065em!important;line-height:1.1!important}.network-channel-category i{display:none!important}.network-channel-category b{justify-self:end!important;color:#64748b!important;font-size:8px!important;font-weight:900!important}
 
@@ -11044,7 +8483,7 @@ function GlobalStyle() {
       .network-matchup-row{min-height:52px!important}
       .network-matchup-logos{display:grid!important;grid-template-columns:20px 10px 20px!important;align-items:center!important;justify-content:center!important;gap:0!important;width:42px!important;height:34px!important;overflow:visible!important}
       .network-matchup-logos img{width:20px!important;height:20px!important;object-fit:contain!important}
-      .network-matchup-logos b{font-size:7px!important;color:#facc15!important;text-align:center!important}
+      .network-matchup-logos b{font-size:7px!important;color:var(--cfb-gold)!important;text-align:center!important}
       .network-matchup-row .network-channel-copy strong{font-size:12px!important}.network-matchup-row .network-channel-copy small{color:#949ba4!important;font-size:10px!important}
 
       @media(min-width:901px){.discord-clone-page .network-layout{grid-template-columns:68px 320px minmax(0,1fr) 248px!important}}
@@ -11197,7 +8636,7 @@ function GlobalStyle() {
         display:block !important;
       }
       .sidebar-matchup-logos-v511 b {
-        color:#facc15 !important;
+        color:var(--cfb-gold) !important;
         font-size:7px !important;
         font-weight:1000 !important;
         text-align:center !important;
@@ -11243,7 +8682,7 @@ function GlobalStyle() {
         --v52-selected:#404249;
         --v52-text:#f2f3f5;
         --v52-muted:#949ba4;
-        --v52-gold:#d8b64c;
+        --v52-gold:#c9d0d9;
       }
 
       /* Mature league identity */
@@ -11395,7 +8834,7 @@ function GlobalStyle() {
         overflow:hidden!important;
         text-overflow:ellipsis!important;
         white-space:nowrap!important;
-        color:#d8b64c!important;
+        color:#c9d0d9!important;
         font-size:7px!important;
         font-weight:900!important;
         letter-spacing:.025em!important;
@@ -11422,7 +8861,7 @@ function GlobalStyle() {
         border:1px solid rgba(148,163,184,.16)!important;
         border-radius:10px!important;
         background:#0b1422!important;
-        color:#f8fafc!important;
+        color:var(--cfb-text)!important;
         cursor:pointer!important;
         font-family:inherit!important;
         transition:background .16s ease,border-color .16s ease,transform .16s ease!important;
@@ -11693,7 +9132,7 @@ function GlobalStyle() {
       .network-organizer-v53{
         min-height:100%!important;
         padding:24px!important;
-        color:#f8fafc!important;
+        color:var(--cfb-text)!important;
         background:linear-gradient(180deg,#0b1220 0%,#07101b 100%)!important;
         overflow:auto!important;
       }
@@ -11715,7 +9154,7 @@ function GlobalStyle() {
         border:1px solid rgba(224,189,75,.35)!important;
         border-radius:8px!important;
         background:#171b24!important;
-        color:#f8fafc!important;
+        color:var(--cfb-text)!important;
         font-weight:850!important;
       }
       .network-organizer-list-v53{display:grid!important;gap:14px!important}
@@ -11784,7 +9223,7 @@ function GlobalStyle() {
         border:1px solid rgba(148,163,184,.16)!important;
         border-radius:7px!important;
         background:#1a2434!important;
-        color:#f8fafc!important;
+        color:var(--cfb-text)!important;
         font-size:15px!important;
         font-weight:900!important;
       }
@@ -11810,24 +9249,6 @@ function GlobalStyle() {
       }
 
       /* v54-network-mobile-experience-overhaul */
-      :root{
-        --v54-ink:#050914;
-        --v54-navy:#08111f;
-        --v54-panel:#0d1727;
-        --v54-panel-2:#111d30;
-        --v54-panel-3:#16243a;
-        --v54-border:rgba(191,205,224,.13);
-        --v54-border-strong:rgba(222,190,74,.38);
-        --v54-gold:#e2be4b;
-        --v54-gold-soft:#f5d777;
-        --v54-cyan:#43c5e8;
-        --v54-text:#f4f7fb;
-        --v54-muted:#91a0b6;
-        --v54-success:#2dd486;
-        --v54-danger:#f0525f;
-        --v54-shadow:0 18px 56px rgba(0,0,0,.38);
-      }
-
       /* Global search: isolated so default browser button styles can never leak in. */
       .cfb-universal-search{
         position:relative!important;
@@ -11844,13 +9265,13 @@ function GlobalStyle() {
         min-width:0!important;
         min-height:52px!important;
         padding:0 14px!important;
-        border:1px solid var(--v54-border)!important;
+        border:1px solid rgba(255,255,255,.13)!important;
         border-radius:15px!important;
         background:linear-gradient(180deg,#111b2c,#0b1423)!important;
         box-shadow:0 10px 30px rgba(0,0,0,.22)!important;
       }
       .cfb-universal-search-input:focus-within{
-        border-color:var(--v54-border-strong)!important;
+        border-color:rgba(201,208,217,.4)!important;
         box-shadow:0 0 0 3px rgba(226,190,75,.10),0 14px 36px rgba(0,0,0,.28)!important;
       }
       .cfb-universal-search-input>span{
@@ -11866,7 +9287,7 @@ function GlobalStyle() {
         border:0!important;
         outline:0!important;
         background:transparent!important;
-        color:var(--v54-text)!important;
+        color:var(--cfb-text)!important;
         font-size:16px!important;
       }
       .cfb-universal-search-input input::placeholder{color:#748197!important}
@@ -11894,7 +9315,7 @@ function GlobalStyle() {
         max-height:min(560px,68vh)!important;
         overflow:auto!important;
         padding:10px!important;
-        border:1px solid var(--v54-border)!important;
+        border:1px solid rgba(255,255,255,.13)!important;
         border-radius:15px!important;
         background:rgba(8,15,27,.985)!important;
         box-shadow:0 24px 70px rgba(0,0,0,.62)!important;
@@ -11913,7 +9334,7 @@ function GlobalStyle() {
         padding:9px 11px!important;
         border:1px solid transparent!important;
         border-radius:11px!important;
-        color:var(--v54-text)!important;
+        color:var(--cfb-text)!important;
         cursor:pointer!important;
         font-family:inherit!important;
       }
@@ -11934,7 +9355,7 @@ function GlobalStyle() {
         white-space:nowrap!important;
       }
       .cfb-universal-search-results b{font-size:14px!important;color:#fff!important}
-      .cfb-universal-search-results small{margin-top:3px!important;color:var(--v54-muted)!important;font-size:11px!important}
+      .cfb-universal-search-results small{margin-top:3px!important;color:var(--cfb-muted)!important;font-size:11px!important}
       .cfb-universal-search-results em{
         color:#7f8ca0!important;
         font-size:9px!important;
@@ -11952,7 +9373,7 @@ function GlobalStyle() {
         border:1px solid rgba(255,255,255,.10)!important;
         border-radius:10px!important;
         background:#111d30!important;
-        color:var(--v54-gold)!important;
+        color:var(--cfb-gold)!important;
         font-weight:950!important;
       }
       .cfb-search-result-logo img{width:38px!important;height:38px!important;object-fit:contain!important}
@@ -11971,14 +9392,14 @@ function GlobalStyle() {
         --discord-muted:#91a0b6!important;
         --discord-link:#43c5e8!important;
         --discord-green:#2dd486!important;
-        --discord-blurple:#e2be4b!important;
-        color:var(--v54-text)!important;
+        --discord-blurple:#5865f2!important;
+        color:var(--cfb-text)!important;
       }
       .discord-clone-page .network-layout{
-        border:1px solid var(--v54-border)!important;
+        border:1px solid rgba(255,255,255,.13)!important;
         border-radius:18px!important;
         background:#101927!important;
-        box-shadow:var(--v54-shadow)!important;
+        box-shadow:0 18px 56px rgba(0,0,0,.38)!important;
       }
       .network-server-rail{background:#050914!important;border-right:1px solid rgba(255,255,255,.05)!important}
       .network-sidebar{background:#0b1423!important;border-right:1px solid rgba(255,255,255,.06)!important}
@@ -12023,10 +9444,10 @@ function GlobalStyle() {
         color:#dce3ed!important;
       }
       .network-search-popover{
-        border:1px solid var(--v54-border)!important;
+        border:1px solid rgba(255,255,255,.13)!important;
         border-radius:12px!important;
         background:#0a1322!important;
-        box-shadow:var(--v54-shadow)!important;
+        box-shadow:0 18px 56px rgba(0,0,0,.38)!important;
       }
       .network-message-feed{
         background:linear-gradient(180deg,#101927,#0e1725)!important;
@@ -12054,7 +9475,7 @@ function GlobalStyle() {
       .network-composer-tools button:hover,
       .network-composer-tools button.active{
         background:#24334a!important;
-        color:var(--v54-gold-soft)!important;
+        color:var(--cfb-gold)!important;
       }
 
       /* Premium mobile bottom navigation. */
@@ -12120,8 +9541,8 @@ function GlobalStyle() {
         bottom:3px!important;
         height:3px!important;
         border-radius:999px!important;
-        background:#e2be4b!important;
-        box-shadow:0 0 14px rgba(226,190,75,.65)!important;
+        background:#3e7fc1!important;
+        box-shadow:0 0 14px rgba(62,127,193,.65)!important;
       }
 
       /* Mobile and desktop menu parity. */
@@ -12341,7 +9762,7 @@ function GlobalStyle() {
 function Header({ loading, reload }) {
   return (
     <header style={heroBanner}>
-      <img src="/cfbelite-banner.png" alt="CFBElite 27 Dynasty" style={heroBannerImage} />
+      <img src="/cfbelite-banner.svg" alt="CFBElite — Elite Network Online Dynasty" style={heroBannerImage} />
       <div style={heroOverlay} />
 
       <div style={heroContent}>
@@ -12413,16 +9834,6 @@ function AppSkeleton({ visible }) {
         {Array.from({length:6},(_,index)=><div key={index} className="cfb-skeleton-card"><span/><span/><span/></div>)}
       </div>
     </section>
-  );
-}
-
-function EmptyState({ icon = "🏈", title = "Nothing here yet", description = "Data will appear here when it becomes available.", actionLabel, onAction }) {
-  return (
-    <div className="cfb-empty-state">
-      <span className="cfb-empty-icon">{icon}</span>
-      <div><h3>{title}</h3><p>{description}</p></div>
-      {actionLabel && onAction && <button type="button" onClick={onAction}>{actionLabel}</button>}
-    </div>
   );
 }
 
@@ -12534,8 +9945,18 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
   const primaryKeys=["dashboard","leagueHub","schedule","eliteBooks","redZone"];
   const exploreKeys=["newsroom","myTeam","rankingsCenter","teamsCoaches","leagueArchive","dataIntake",...(draftIsLive?["draftRoom"]:[])];
   const commissionerKeys=adminUnlocked?["commissionerCenter"]:[];
+  // These already have a dedicated home inside Rankings Center, League Archive, Teams & Coaches
+  // or the Commissioner Center tool grid — keeping them here too just duplicated every page as a
+  // second, uncategorized nav entry. They stay fully reachable (and searchable) via their hub;
+  // this only keeps them out of the flat menu list.
+  const HOUSED_IN_A_HUB=new Set([
+    "automaticRankings","gameTop25","conferencePower","eloRankings","powerIndex","recruitingRankings","rankingHistory",
+    "dynastyData","dynastyTimeline","dynastyRecords","rivalries","h2h","allAmericans","awards","heismans","nationalChampions","coachHOF","playerHOF",
+    "allTeamsRatings","teamSchedules",
+    "sportsbookManager","weeklyMatchups","userManager","assignments","leagueDataCenter","resultsManager","logoManager",
+  ]);
   const groupedKeys=new Set([...primaryKeys,...exploreKeys,...commissionerKeys,...coachKeys]);
-  const additionalKeys=tabs.map(([key])=>key).filter((key)=>!groupedKeys.has(key)&&!key.startsWith("coach-"));
+  const additionalKeys=tabs.map(([key])=>key).filter((key)=>!groupedKeys.has(key)&&!key.startsWith("coach-")&&!HOUSED_IN_A_HUB.has(key));
   const groups = [
     { title: "Primary", primary:true, keys: primaryKeys },
     { title: "Explore", keys: exploreKeys },
@@ -12549,31 +9970,32 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
   function handleSelect(key) {
     if((key.startsWith("coach-")||key.startsWith("team-"))&&soundPreferences.team_sounds)playEliteSound("team",true);
     else if(soundPreferences.menu_sounds)playEliteSound("menu",true);
+    triggerHaptic("tap",soundPreferences.haptics_enabled!==false);
     setActiveTab(key);
     setMenuOpen(false);
   }
 
   function navThemeFor(tabKey) {
-    const main = ["#20114f", "#facc15", "#ffffff"];
-    const data = ["#10203f", "#60a5fa", "#ffffff"];
-    const legacy = ["#1e163b", "#d4af37", "#ffffff"];
-    const ranking = ["#0f172a", "#22d3ee", "#ffffff"];
-    const history = ["#111827", "#c4b5fd", "#ffffff"];
-    const recognition = ["#141128", "#c4b5fd", "#ffffff"];
-    const admin = ["#2a123f", "#f97316", "#ffffff"];
+    const main = ["#20114f", "var(--cfb-gold)", "#ffffff"];
+    const data = ["#10203f", "#4f8fa8", "#ffffff"];
+    const legacy = ["#1e163b", "#c9d0d9", "#ffffff"];
+    const ranking = ["var(--cfb-panel)", "#2f9e94", "#ffffff"];
+    const history = ["#111827", "#9a8fd1", "#ffffff"];
+    const recognition = ["#141128", "#9a8fd1", "#ffffff"];
+    const admin = ["#2a123f", "#d17a3a", "#ffffff"];
 
     if (["dashboard", "schedule", "myTeam", "draftRoom"].includes(tabKey)) return main;
-    if (tabKey==="leagueHub") return ["#071521", "#38bdf8", "#ffffff"];
+    if (tabKey==="leagueHub") return ["#071521", "#4f8fa8", "#ffffff"];
     if (tabKey==="newsroom") return ["#161006", "#f5c542", "#ffffff"];
-    if (tabKey==="dataIntake") return ["#071a18", "#2dd4bf", "#ffffff"];
-    if (tabKey==="rankingsCenter") return ["#071923", "#22d3ee", "#ffffff"];
-    if (tabKey==="teamsCoaches") return ["#0b1730", "#60a5fa", "#ffffff"];
-    if (tabKey==="leagueArchive") return ["#171126", "#c4b5fd", "#ffffff"];
-    if (tabKey==="teamSchedules") return ["#081629", "#60a5fa", "#ffffff"];
+    if (tabKey==="dataIntake") return ["#071a18", "#3fae9e", "#ffffff"];
+    if (tabKey==="rankingsCenter") return ["#071923", "#2f9e94", "#ffffff"];
+    if (tabKey==="teamsCoaches") return ["#0b1730", "#4f8fa8", "#ffffff"];
+    if (tabKey==="leagueArchive") return ["#171126", "#9a8fd1", "#ffffff"];
+    if (tabKey==="teamSchedules") return ["#081629", "#4f8fa8", "#ffffff"];
     if (tabKey==="gameTop25") return ["#211705", "#f5c542", "#ffffff"];
-    if (tabKey==="dynastyData") return ["#171126", "#c4b5fd", "#ffffff"];
-    if (tabKey==="redZone") return ["#210608", "#ef4444", "#ffffff"];
-    if (["eliteBooks", "sportsbookHistory"].includes(tabKey)) return ["#07110d", "#35d07f", "#ffffff"];
+    if (tabKey==="dynastyData") return ["#171126", "#9a8fd1", "#ffffff"];
+    if (tabKey==="redZone") return ["#210608", "var(--cfb-danger)", "#ffffff"];
+    if (["eliteBooks", "sportsbookHistory"].includes(tabKey)) return ["#07110d", "var(--cfb-green)", "#ffffff"];
     if (["logoManager", "allTeamsRatings", "leagueDataCenter", "recruitingRankings", "resultsManager"].includes(tabKey)) return data;
     if (["dynastyTimeline", "dynastyRecords", "rivalries", "h2h"].includes(tabKey)) return legacy;
     if (["powerIndex", "eloRankings", "conferencePower"].includes(tabKey)) return ranking;
@@ -12627,7 +10049,7 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
     const teamName = team?.name || label || "Unassigned Program";
     const userName = user?.discord_username || "No active coach";
     const conference = team?.conference || "Independent";
-    const accent = team?.accent_color || team?.secondary_color || "#facc15";
+    const accent = team?.accent_color || team?.secondary_color || "var(--cfb-gold)";
     const active = activeTab === tabKey;
 
     return (
@@ -12703,291 +10125,9 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
     </>
   );
 }
-function PrestigeSpotlight({ teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats }) {
-  const rows = typeof dynastyPrestigeRows === "function" ? dynastyPrestigeRows(teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting, teamSeasonStats).slice(0,5) : [];
-  if (!rows.length) return null;
-
-  return (
-    <section style={prestigeSpotlight}>
-      <div style={sectionTop}>
-        <div>
-          <div style={eyebrow}>Prestige Spotlight</div>
-          <h2 style={sectionTitle}>Dynasty Power Programs</h2>
-        </div>
-      </div>
-      <div style={prestigeSpotlightGrid}>
-        {rows.map((row,index)=>(
-          <div key={row.team.id} style={prestigeSpotlightCard}>
-            <div style={leaderRow}><b>#{index+1}</b><span>{row.tier.stars}</span></div>
-            <div style={{display:"flex",alignItems:"center",gap:12}}>
-              <TeamLogoMark team={row.team} size={66} plate/>
-              <div>
-                <div style={prestigeTeamName}>{row.team.name}</div>
-                <div style={mutedText}>{row.tier.label}</div>
-              </div>
-            </div>
-            <div style={prestigeScore}>{row.score}</div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function Stats({ currentYear, setCurrentYear, currentWeek, setCurrentWeek, teams, assignments, saveSettings }) {
-  const validTeamIds = new Set(teams.map((team)=>team.id));
-  const activeCoaches = new Set(
-    assignments
-      .filter((assignment) =>
-        assignment.status === "Active" &&
-        assignment.discord_user_id &&
-        assignment.team_id &&
-        validTeamIds.has(assignment.team_id)
-      )
-      .map((assignment) => assignment.discord_user_id)
-  ).size;
-
-  return (
-    <div style={statsGrid}>
-      <Stat title="Active Coaches" value={`${activeCoaches} / 32`} />
-      <div style={statCard}>
-        <div style={statTitle}>Current Year</div>
-        <select value={currentYear} onChange={(e) => setCurrentYear(e.target.value)} style={statSelect}>
-          {YEARS.map((year) => (
-            <option key={year} value={year}>{year}</option>
-          ))}
-        </select>
-      </div>
-      <div style={statCard}>
-        <div style={statTitle}>Current Week</div>
-        <select value={currentWeek} onChange={(e) => setCurrentWeek(e.target.value)} style={statSelect}>
-          {WEEKS.map((week) => (
-            <option key={week} value={week}>{week}</option>
-          ))}
-        </select>
-      </div>
-      <div style={statCard}>
-        <div style={statTitle}>League Settings</div>
-        <button onClick={saveSettings} style={button}>Save Year / Week</button>
-        <p style={mutedText}>Click save after changing year or week so every visitor sees the same setting.</p>
-      </div>
-    </div>
-  );
-}
-
 function Stat({ title, value }) { return <div style={statCard}><div style={statTitle}>{title}</div><div style={statValue}>{value}</div></div>; }
 
-function UserStandings({ teams, results, goToTeam, sortState, setSortState }) {
-  const baseRows = teams
-    .map((team) => {
-      const record = recordFromResults(team.id, results);
-      return {
-        team,
-        teamName: team.name,
-        wins: record.wins,
-        losses: record.losses,
-        games: record.games,
-        avgPf: Number(record.avgPf),
-        avgPa: Number(record.avgPa),
-        top25: top25Wins(team.id, results),
-        sor: Number(strengthOfResult(team.id, teams, results)),
-      };
-    })
-    .sort((a, b) => compareForSort(a, b, "record", "desc"));
-
-  const rankedRows = baseRows.map((row, index) => ({ ...row, rank: index + 1 }));
-
-  const rows = [...rankedRows].sort((a, b) => compareForSort(a, b, sortState.key, sortState.direction));
-
-  return (
-    <section style={card}>
-      <h2 style={sectionTitle}>User vs User Standings</h2>
-      <Table headers={[
-        "#",
-        <SortButton label="Team" sortKey="teamName" sortState={sortState} setSortState={setSortState} />,
-        <SortButton label="Record" sortKey="record" sortState={sortState} setSortState={setSortState} />,
-        <SortButton label="Avg PF" sortKey="avgPf" sortState={sortState} setSortState={setSortState} />,
-        <SortButton label="Avg PA" sortKey="avgPa" sortState={sortState} setSortState={setSortState} />,
-        <SortButton label="Top 25" sortKey="top25" sortState={sortState} setSortState={setSortState} />,
-        <SortButton label="SOR" sortKey="sor" sortState={sortState} setSortState={setSortState} />,
-      ]}>
-        {rows.map((row, index) => (
-          <tr key={row.team.id} style={trStyle}>
-            <td style={td}>#{row.rank}</td>
-            <td style={clickableTeamCell} onClick={() => goToTeam(row.team.id)}><TeamLabel team={row.team} /></td>
-            <td style={td}>{row.wins}-{row.losses}</td>
-            <td style={td}>{row.avgPf.toFixed(1)}</td>
-            <td style={td}>{row.avgPa.toFixed(1)}</td>
-            <td style={td}>{row.top25}</td>
-            <td style={td}>{row.sor.toFixed(1)}</td>
-          </tr>
-        ))}
-      </Table>
-    </section>
-  );
-}
-
-function ChampionshipsByUser({ champions }) {
-  const rows = championshipRowsByDiscord(champions);
-
-  return (
-    <section style={card}>
-      <h2 style={sectionTitle}>National Championships by Discord User</h2>
-      <Table headers={["#", "Discord User", "Championships", "Teams / Years"]}>
-        {rows.length ? rows.map((row, index) => (
-          <tr key={row.discord} style={trStyle}>
-            <td style={td}>#{index + 1}</td>
-            <td style={teamCell}>{row.discord}</td>
-            <td style={td}>{row.total}</td>
-            <td style={td}>{row.teams.join(", ")}</td>
-          </tr>
-        )) : (
-          <tr style={trStyle}>
-            <td style={td}>—</td>
-            <td style={td}>No national champions recorded yet.</td>
-            <td style={td}>0</td>
-            <td style={td}>—</td>
-          </tr>
-        )}
-      </Table>
-    </section>
-  );
-}
-
-function RecordResult({ newResult, setNewResult, teams, users, assignments, submitResult }) {
-  const getActiveUserIdForTeam = (teamId) => {
-    return assignments.find((assignment) => assignment.team_id === teamId && assignment.status === "Active")?.discord_user_id || "";
-  };
-
-  function handleTeamChange(teamKey, userKey, teamId) {
-    setNewResult({
-      ...newResult,
-      [teamKey]: teamId,
-      [userKey]: getActiveUserIdForTeam(teamId),
-    });
-  }
-
-  return (
-    <section style={card}>
-      <h2 style={sectionTitle}>Record User vs User Result</h2>
-      <p style={mutedText}>Year and week are locked to the saved league settings above. Discord users auto-fill from active team assignments.</p>
-
-      <div style={formGrid}>
-        <input value={newResult.season_year} disabled title="Controlled by Current Year" style={{ ...input, opacity: 0.7, cursor: "not-allowed" }} />
-
-        <select value={newResult.week} disabled title="Controlled by Current Week" style={{ ...input, opacity: 0.7, cursor: "not-allowed" }}>
-          {WEEKS.map((w) => <option key={w}>{w}</option>)}
-        </select>
-
-        <select value={newResult.team_1_id} onChange={(e) => handleTeamChange("team_1_id", "team_1_user_id", e.target.value)} style={input}>
-          <option value="">Team 1</option>
-          {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
-        </select>
-
-        <select value={newResult.team_1_user_id} onChange={(e) => setNewResult({ ...newResult, team_1_user_id: e.target.value })} style={input}>
-          <option value="">Team 1 Discord</option>
-          {users.map((user) => <option key={user.id} value={user.id}>{user.discord_username}</option>)}
-        </select>
-
-        <input placeholder="Team 1 Rank" value={newResult.team_1_rank} onChange={(e) => setNewResult({ ...newResult, team_1_rank: e.target.value })} style={input} />
-        <input placeholder="Team 1 Score" value={newResult.team_1_score} onChange={(e) => setNewResult({ ...newResult, team_1_score: e.target.value })} style={input} />
-
-        <select value={newResult.team_2_id} onChange={(e) => handleTeamChange("team_2_id", "team_2_user_id", e.target.value)} style={input}>
-          <option value="">Team 2</option>
-          {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
-        </select>
-
-        <select value={newResult.team_2_user_id} onChange={(e) => setNewResult({ ...newResult, team_2_user_id: e.target.value })} style={input}>
-          <option value="">Team 2 Discord</option>
-          {users.map((user) => <option key={user.id} value={user.id}>{user.discord_username}</option>)}
-        </select>
-
-        <input placeholder="Team 2 Rank" value={newResult.team_2_rank} onChange={(e) => setNewResult({ ...newResult, team_2_rank: e.target.value })} style={input} />
-        <input placeholder="Team 2 Score" value={newResult.team_2_score} onChange={(e) => setNewResult({ ...newResult, team_2_score: e.target.value })} style={input} />
-        <input placeholder="Tags" value={newResult.tags} onChange={(e) => setNewResult({ ...newResult, tags: e.target.value })} style={input} />
-        <button onClick={submitResult} style={button}>Record Result</button>
-      </div>
-    </section>
-  );
-}
-
 function SearchBox({ value, onChange }) { return <input value={value} onChange={(e)=>onChange(e.target.value)} placeholder="Search..." style={searchInput}/>; }
-function Standings({ rows, search, setSearch, goToTeam, teams, results, draggedStanding, setDraggedStanding, reorderStandings, sortState, setSortState }) {
-  const computedRows = rows
-    .map((row, originalIndex) => {
-      const team = teams.find((item) => item.id === row.team_id);
-      const teamId = row.team_id;
-      const record = recordFromResults(teamId, results);
-      const bowl = bowlRecord(teamId, results);
-      return {
-        ...row,
-        originalIndex,
-        team,
-        teamName: row.team_name || team?.name || "",
-        wins: record.wins,
-        losses: record.losses,
-        games: record.games,
-        avgPf: Number(record.avgPf),
-        avgPa: Number(record.avgPa),
-        top25: top25Wins(teamId, results),
-        conf: titleCount(teamId, results, "Conference Championship Week"),
-        nattys: titleCount(teamId, results, "National Championship Week"),
-        bowlText: `${bowl.wins}-${bowl.losses}`,
-        bowlScore: bowl.wins - bowl.losses,
-        sor: Number(strengthOfResult(teamId, teams, results)),
-        rank: originalIndex + 1,
-      };
-    })
-    .sort((a, b) => {
-      if (sortState.key === "manual") return a.originalIndex - b.originalIndex;
-      return compareForSort(a, b, sortState.key, sortState.direction);
-    });
-
-  return (
-    <section style={card}>
-      <div style={sectionTop}>
-        <div>
-          <h2 style={sectionTitle}>Commissioner League Standings</h2>
-          <p style={mutedText}>Click a column header to sort greatest/least. Drag teams to save the official commissioner order for everyone.</p>
-        </div>
-        <SearchBox value={search} onChange={setSearch} />
-      </div>
-      <Table headers={[
-        "Move",
-        "#",
-        <SortButton label="Team" sortKey="teamName" sortState={sortState} setSortState={setSortState} />,
-        <SortButton label="W" sortKey="wins" sortState={sortState} setSortState={setSortState} />,
-        <SortButton label="L" sortKey="losses" sortState={sortState} setSortState={setSortState} />,
-        <SortButton label="Avg PF" sortKey="avgPf" sortState={sortState} setSortState={setSortState} />,
-        <SortButton label="Avg PA" sortKey="avgPa" sortState={sortState} setSortState={setSortState} />,
-        <SortButton label="Top 25" sortKey="top25" sortState={sortState} setSortState={setSortState} />,
-        <SortButton label="Conf" sortKey="conf" sortState={sortState} setSortState={setSortState} />,
-        <SortButton label="Nattys" sortKey="nattys" sortState={sortState} setSortState={setSortState} />,
-        <SortButton label="Bowl" sortKey="bowlScore" sortState={sortState} setSortState={setSortState} />,
-        <SortButton label="SOR" sortKey="sor" sortState={sortState} setSortState={setSortState} />,
-      ]}>
-        {computedRows.map((row, index) => (
-          <tr key={row.team_id} style={trStyle} draggable onDragStart={() => setDraggedStanding(row.team_id)} onDragOver={(e) => e.preventDefault()} onDrop={() => reorderStandings(row.team_id)}>
-            <td style={td}>☰</td>
-            <td style={td}>#{row.rank}</td>
-            <td style={clickableTeamCell} onClick={() => goToTeam(row.team_id)}><TeamLabel team={row.team} name={row.teamName} /></td>
-            <td style={td}>{row.wins}</td>
-            <td style={td}>{row.losses}</td>
-            <td style={td}>{row.avgPf.toFixed(1)}</td>
-            <td style={td}>{row.avgPa.toFixed(1)}</td>
-            <td style={td}>{row.top25}</td>
-            <td style={td}>{row.conf}</td>
-            <td style={td}>{row.nattys}</td>
-            <td style={td}>{row.bowlText}</td>
-            <td style={td}>{row.sor.toFixed(1)}</td>
-          </tr>
-        ))}
-      </Table>
-    </section>
-  );
-}
-
-
 function ResultsManager({ rows = [], teams = [], users = [], assignments = [], updateRow = async()=>{}, deleteRow = async()=>{} }) {
   const [query, setQuery] = useState("");
   const filtered = (rows || []).filter((row)=>{
@@ -13077,84 +10217,6 @@ function Results({ rows, deleteResult, search, setSearch }) {
 }
 
 
-function PrestigeLeaderboard({ users, teams, activeTeams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting }) {
-  const rows = getCoachStats(users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting)
-    .filter((row) => row.activeTeams.length || row.games || row.nattys || row.awards || row.allAmericans || row.heismans);
-
-  return (
-    <section style={card}>
-      <div style={sectionTop}>
-        <div>
-          <h2 style={sectionTitle}>Program Prestige by Discord User</h2>
-          <p style={mutedText}>Automated all-time coach prestige. Follows Discord users across team changes and updates from results, titles, awards, All-Americans, Heismans, and recruiting.</p>
-        </div>
-      </div>
-      <Table headers={["#", "Discord User", "Prestige", "Record", "Nattys", "Conf", "Top 25", "Awards", "AA", "Heisman", "Active Team", "Teams Coached"]}>
-        {rows.map((row, index) => (
-          <tr key={row.userId || row.discord} style={trStyle}>
-            <td style={td}>#{index + 1}</td>
-            <td style={teamCell}>{row.discord}</td>
-            <td style={td}>{row.prestige.toFixed(1)}</td>
-            <td style={td}>{row.wins}-{row.losses}</td>
-            <td style={td}>{row.nattys}</td>
-            <td style={td}>{row.confTitles}</td>
-            <td style={td}>{row.top25Wins}</td>
-            <td style={td}>{row.awards}</td>
-            <td style={td}>{row.allAmericans}</td>
-            <td style={td}>{row.heismans}</td>
-            <td style={td}>{row.activeTeamsText}</td>
-            <td style={td}>{row.teamsCoachedText}</td>
-          </tr>
-        ))}
-      </Table>
-    </section>
-  );
-}
-
-function RecordBook({ users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting, seasonPlayerStats = [], teamSeasonStats = [] }) {
-  const rows = recordBookRows(users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting, seasonPlayerStats, teamSeasonStats);
-
-  return (
-    <section style={card}>
-      <h2 style={sectionTitle}>Automated Record Book</h2>
-      <p style={mutedText}>Fully automated across all years from recorded games, team assignments, awards, All-Americans, Heismans, national champions, and recruiting ranks.</p>
-      <Table headers={["Record", "Holder", "Value"]}>
-        {rows.map((row) => (
-          <tr key={row.record} style={trStyle}>
-            <td style={teamCell}>{row.record}</td>
-            <td style={td}>{row.holder}</td>
-            <td style={td}>{row.value}</td>
-          </tr>
-        ))}
-      </Table>
-    </section>
-  );
-}
-
-function WeeklyNews({ results, teams, currentYear, currentWeek }) {
-  const items = weeklyNewsItems(results, teams, currentYear, currentWeek);
-  const [publishedNews,setPublishedNews]=useState([]);
-  useEffect(()=>{
-    let active=true;
-    supabase.from("league_news_articles").select("*").eq("status","published").order("published_at",{ascending:false}).limit(12).then(({data})=>{if(active)setPublishedNews(data||[]);});
-    return()=>{active=false;};
-  },[currentYear,currentWeek]);
-
-  return (
-    <section style={card}>
-      <h2 style={sectionTitle}>CFB Elite Newsroom</h2>
-      <p style={mutedText}>AI-assisted reporting built from verified league data and approved by a commissioner before publication.</p>
-      {publishedNews.length>0&&<div className="weekly-newsroom-feed">{publishedNews.map((article)=><article key={article.id}><span>{article.category} • {article.season_year} {article.week_label}</span><h3>{article.headline}</h3><strong>{article.dek}</strong><p>{article.body}</p><time>{new Date(article.published_at||article.generated_at).toLocaleString()}</time></article>)}</div>}
-      <div style={miniCard}>
-        <h3>{publishedNews.length?"Verified Results Wire":`${currentYear} — ${currentWeek}`}</h3>
-        {items.map((item, index) => (
-          <div key={index} style={miniRow}>{item}</div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 function Assignments({ rows, teams, users, currentYear, addAssignment, updateRow, deleteRow, drafts, setDrafts, saveDraft, getDraft, teamChange, setTeamChange, changeUserTeam }) {
   const activeRows = rows.filter((row) => assignmentActiveForYear(row, currentYear));
   const hiddenFormerCount = rows.length - activeRows.length;
@@ -13243,68 +10305,7 @@ function getDirectedH2HRows(results) {
   });
 }
 
-function TeamAssets({ teams, saveTeamAssets }) {
-  const [drafts, setDrafts] = useState({});
-
-  useEffect(() => {
-    setDrafts((previous) => {
-      const next = { ...previous };
-      teams.forEach((team) => {
-        next[team.id] = {
-          legacy_helmet_url: previous[team.id]?.helmet_url ?? team.logo_url ?? "",
-          logo_url: previous[team.id]?.logo_url ?? team.logo_url ?? "",
-          primary_color: previous[team.id]?.primary_color ?? team.primary_color ?? "",
-          secondary_color: previous[team.id]?.secondary_color ?? team.secondary_color ?? "",
-        };
-      });
-      return next;
-    });
-  }, [teams]);
-
-  const updateDraft = (teamId, field, value) => {
-    setDrafts((previous) => ({
-      ...previous,
-      [teamId]: {
-        ...(previous[teamId] || {}),
-        [field]: value,
-      },
-    }));
-  };
-
-  return (
-    <section style={card}>
-      <div style={sectionTop}>
-        <div>
-          <h2 style={sectionTitle}>Team Helmet / Logo Admin</h2>
-          <p style={mutedText}>Paste helmet/logo URLs and team colors for the 32 active league teams. Colors drive each team page background and text.</p>
-        </div>
-      </div>
-      <Table headers={["Preview", "Team", "Logo URL", "Primary Color", "Secondary Color", "Save"]}>
-        {teams.map((team) => {
-          const draft = drafts[team.id] || {            logo_url: team.logo_url || "",
-            primary_color: team.primary_color || "",
-            secondary_color: team.secondary_color || "",
-          };
-          const previewTeam = { ...team, ...draft };
-          return (
-            <tr key={team.id} style={trStyle}>
-              <td style={td}><TeamLabel team={previewTeam} /></td>
-              <td style={teamCell}>{team.name}</td>
-              <td style={td}><input value={draft.helmet_url} onChange={(e)=>updateDraft(team.id,"helmet_url",e.target.value)} placeholder="Helmet image URL" style={input}/></td>
-              <td style={td}><input value={draft.logo_url} onChange={(e)=>updateDraft(team.id,"logo_url",e.target.value)} placeholder="Logo image URL" style={input}/></td>
-              <td style={td}><input value={draft.primary_color} onChange={(e)=>updateDraft(team.id,"primary_color",e.target.value)} placeholder="#000000" style={input}/></td>
-              <td style={td}><input value={draft.secondary_color} onChange={(e)=>updateDraft(team.id,"secondary_color",e.target.value)} placeholder="#ffffff" style={input}/></td>
-              <td style={td}><button onClick={()=>saveTeamAssets(team, draft)} style={button}>Save</button></td>
-            </tr>
-          );
-        })}
-      </Table>
-    </section>
-  );
-}
-
 function H2H({ results, search, setSearch }) { const rows=getDirectedH2HRows(results).filter((r)=>JSON.stringify(r).toLowerCase().includes(search.toLowerCase())).sort((a,b)=>a.user.localeCompare(b.user)||a.opp.localeCompare(b.opp)); return <section style={card}><div style={sectionTop}><div><h2 style={sectionTitle}>User vs User H2H</h2><p style={mutedText}>All-time across every recorded season. Current streak is based on the most recent meetings between the two users.</p></div><SearchBox value={search} onChange={setSearch}/></div><Table headers={["User","Opponent","W","L","Record","Current Streak"]}>{rows.map((r)=><tr key={`${r.user}-${r.opp}`} style={trStyle}><td style={teamCell}>{r.user}</td><td style={td}>{r.opp}</td><td style={td}>{r.w}</td><td style={td}>{r.l}</td><td style={td}>{r.w}-{r.l}</td><td style={td}>{r.streak}</td></tr>)}</Table></section>; }
-function Rankings({ title, rows }) { return <div style={miniCard}><h3>{title}</h3>{rows.map((r,i)=><div key={r.team} style={miniRow}>#{i+1} {r.team}: <b>{r.total}</b></div>)}</div>; }
 function AllAmericans({ rows, teams }) {
   return (
     <section style={card}>
@@ -13390,8 +10391,6 @@ function TrophyGalleryV2({title,eyebrow,rows=[],teams=[],users=[],champions=fals
     return <article key={row.id} style={{...recognitionCard,background:`linear-gradient(145deg,${getTeamPrimary(team)}aa,rgba(2,6,23,.98))`,borderColor:`${getTeamSecondary(team)}55`}}><div style={recognitionHeader}><div><div style={recognitionKicker}>{row.season_year}</div><div style={recognitionPlayer}>{champions?(team?.name||"National Champion"):(row.player_name||"Heisman Winner")}</div><div style={recognitionMeta}>{champions?(user?.discord_username||row.discord_users?.discord_username||"Coach TBD"):`${row.position||"Player"} • ${team?.name||"Team"}`}</div></div><TeamLogoMark team={team} size={74} plate/></div></article>;
   }):<div style={v2Empty}>No {title.toLowerCase()} have been recorded yet.</div>}</div></section></main>;
 }
-function DraftOrder({ rows, users, updateRow, drafts, setDrafts, saveDraft, getDraft }) { return <section style={card}><h2 style={sectionTitle}>CFBElite 27 Draft Order</h2><Table headers={["Pick","Team Name","Discord User","Save"]}>{rows.map((r)=>{const d=getDraft(drafts,r);return <tr key={r.id} style={trStyle}><td style={teamCell}>#{r.pick_number}</td><td style={td}><input value={d.team_name||""} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),team_name:e.target.value}})} style={input}/></td><td style={td}><select value={d.discord_user_id||""} onChange={(e)=>setDrafts({...drafts,[r.id]:{...(drafts[r.id]||{}),discord_user_id:e.target.value}})} style={input}><option value="">Select User</option>{users.map((u)=><option key={u.id} value={u.id}>{u.discord_username}</option>)}</select></td><td style={td}><button onClick={()=>saveDraft("draft_order_27",r.id,drafts[r.id])} style={button}>Save</button></td></tr>})}</Table></section>; }
-function Playoff({ rows, teams, updateRow, drafts, setDrafts, saveDraft, getDraft }) { return <section style={card}><h2 style={sectionTitle}>College Football Playoff Bracket</h2><div style={bracketGrid}>{["First Round","Quarterfinals","Semifinals","National Championship"].map((round)=><div key={round}><h3>{round}</h3>{rows.filter((g)=>g.round===round).map((g)=>{const d=getDraft(drafts,g);return <div key={g.id} style={gameCard}><input value={d.bowl_name||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),bowl_name:e.target.value}})} placeholder="Bowl" style={input}/><input value={d.top_seed||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),top_seed:e.target.value}})} placeholder="Top Seed" style={input}/><select value={d.top_team_id||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),top_team_id:e.target.value}})} style={input}><option value="">Top Team</option>{teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}</select><b style={{textAlign:"center"}}>VS</b><input value={d.bottom_seed||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),bottom_seed:e.target.value}})} placeholder="Bottom Seed" style={input}/><select value={d.bottom_team_id||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),bottom_team_id:e.target.value}})} style={input}><option value="">Bottom Team</option>{teams.map((t)=><option key={t.id} value={t.id}>{t.name}</option>)}</select><input value={d.score||""} onChange={(e)=>setDrafts({...drafts,[g.id]:{...(drafts[g.id]||{}),score:e.target.value}})} placeholder="Score" style={input}/><button onClick={()=>saveDraft("playoff_games",g.id,drafts[g.id])} style={button}>Save Game</button></div>})}</div>)}</div></section>; }
 function TeamPage({ team, standings, results, allResults, teams, assignments, allAmericans, awards, heismans, recruiting, historyRows, currentYear, addRecruiting, addHistory, updateRow, deleteRow, newRecruiting, setNewRecruiting, newHistory, setNewHistory }) {
   const capturedSchedule=useCapturedTeamSchedule(team?.id,currentYear);
   const stat = standings || {};
@@ -13432,31 +10431,23 @@ const page = {
   minHeight:"100vh",
   width:"100%",
   background:"transparent",
-  color:"#f8fafc",
+  color:"var(--cfb-text)",
   overflowX:"hidden",
   fontFamily:"Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
 };
 const container={width:"100%",maxWidth:"1680px",margin:"0 auto",padding:"clamp(14px, 2vw, 28px)",boxSizing:"border-box"};
-const header={display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:20,background:"radial-gradient(circle at 85% 0%,rgba(220,38,38,.16),transparent 34%),linear-gradient(120deg,#05070c,#111827 66%,#080b12)",border:"1px solid rgba(255,255,255,.13)",borderTop:"4px solid #dc2626",borderRadius:10,padding:"clamp(14px, 2vw, 24px)",boxShadow:"0 22px 60px rgba(0,0,0,.38)"};
-const brandWrap={display:"flex",flexDirection:"column",alignItems:"flex-start",gap:8,minWidth:0};
-const headerLogo={width:"clamp(170px, 28vw, 340px)",height:"auto",display:"block",objectFit:"contain",filter:"drop-shadow(0 16px 32px rgba(0,0,0,.45))"};
+const header={display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:20,background:"radial-gradient(circle at 85% 0%,rgba(220,38,38,.16),transparent 34%),linear-gradient(120deg,var(--cfb-ink),#111827 66%,#080b12)",border:"1px solid rgba(255,255,255,.13)",borderTop:"4px solid var(--cfb-red)",borderRadius:10,padding:"clamp(14px, 2vw, 24px)",boxShadow:"0 22px 60px rgba(0,0,0,.38)"};
 const title={fontSize:"clamp(34px, 5vw, 64px)",fontWeight:1000,margin:0,color:"#fff",letterSpacing:"-.055em",textShadow:"0 12px 32px rgba(0,0,0,.4)"};
 const subtitle={marginTop:8,color:"#a8b3c4",fontSize:15};
-const statusBox={background:"linear-gradient(135deg,#dc2626,#991b1b)",border:"1px solid rgba(248,113,113,.65)",padding:"11px 17px",borderRadius:7,fontWeight:1000,color:"#fff",cursor:"pointer",boxShadow:"0 12px 28px rgba(220,38,38,.20)",textTransform:"uppercase",letterSpacing:".04em"};
-const tabScroller={overflowX:"auto",background:"rgba(5,7,12,.94)",border:"1px solid rgba(255,255,255,.12)",borderTop:"3px solid #dc2626",borderRadius:9,padding:8,marginBottom:18,position:"sticky",top:0,zIndex:10,backdropFilter:"blur(16px)",boxShadow:"0 12px 34px rgba(0,0,0,.3)"};
-const tabRow={display:"flex",gap:8,width:"max-content"};
-const tabStyle={background:"rgba(255,255,255,.035)",color:"#a8b3c4",border:"1px solid rgba(255,255,255,.08)",borderRadius:6,padding:"10px 14px",fontWeight:900,cursor:"pointer",whiteSpace:"nowrap"};
-const activeTabStyle={...tabStyle,background:"linear-gradient(135deg,#dc2626,#991b1b)",border:"1px solid #ef4444",color:"#fff",boxShadow:"0 8px 22px rgba(220,38,38,.18)"};
+const statusBox={background:"linear-gradient(135deg,var(--cfb-red),#991b1b)",border:"1px solid rgba(248,113,113,.65)",padding:"11px 17px",borderRadius:7,fontWeight:1000,color:"#fff",cursor:"pointer",boxShadow:"0 12px 28px rgba(220,38,38,.20)",textTransform:"uppercase",letterSpacing:".04em"};
 const statsGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))",gap:20,marginBottom:32};
-const statCard={background:"linear-gradient(155deg,rgba(14,19,30,.985),rgba(4,7,13,.995))",border:"1px solid rgba(255,255,255,.11)",borderTop:"3px solid #dc2626",borderRadius:9,padding:"clamp(16px, 2vw, 22px)",boxShadow:"0 16px 42px rgba(0,0,0,.3),inset 0 1px rgba(255,255,255,.04)",minHeight:112};
-const statTitle={color:"#94a3b8",fontSize:11,marginBottom:10,textTransform:"uppercase",letterSpacing:".11em",fontWeight:1000};
+const statCard={background:"linear-gradient(155deg,rgba(14,19,30,.985),rgba(4,7,13,.995))",border:"1px solid rgba(255,255,255,.11)",borderTop:"3px solid var(--cfb-red)",borderRadius:9,padding:"clamp(16px, 2vw, 22px)",boxShadow:"0 16px 42px rgba(0,0,0,.3),inset 0 1px rgba(255,255,255,.04)",minHeight:112};
+const statTitle={color:"var(--cfb-muted)",fontSize:11,marginBottom:10,textTransform:"uppercase",letterSpacing:".11em",fontWeight:1000};
 const statValue={fontSize:38,fontWeight:1000,color:"#fff"};
-const statInput={...statValue,background:"transparent",color:"white",border:"none",outline:"none",width:"100%"};
-const statSelect={background:"#111827",color:"#fff7ed",border:"1px solid rgba(250,204,21,.25)",borderRadius:12,padding:14,fontSize:24,fontWeight:900,width:"100%"};
 const card = {
   background:"linear-gradient(155deg,rgba(14,19,30,.985),rgba(4,7,13,.995))",
   border:"1px solid rgba(255,255,255,.11)",
-  borderTop:"3px solid #dc2626",
+  borderTop:"3px solid var(--cfb-red)",
   borderRadius:10,
   padding:"clamp(16px, 2vw, 24px)",
   marginBottom:22,
@@ -13466,7 +10457,7 @@ const sectionTop={display:"flex",alignItems:"center",justifyContent:"space-betwe
 const sectionTitle={fontSize:"clamp(22px, 2vw, 30px)",fontWeight:1000,margin:0,color:"#fff",letterSpacing:"-.045em"};
 const formGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))",gap:16,marginTop:20};
 const input = {
-  background: "#070b12",
+  background: "var(--cfb-panel)",
   border: "1px solid rgba(148,163,184,.28)",
   color: "#fff",
   padding: 12,
@@ -13480,7 +10471,7 @@ const input = {
 const smallInput={...input,width:"120px",marginRight:8};
 const searchInput={...input,maxWidth:320};
 const button = {
-  background: "linear-gradient(135deg,#dc2626,#991b1b)",
+  background: "linear-gradient(135deg,var(--cfb-red),#991b1b)",
   color: "#fff",
   border: "1px solid rgba(248,113,113,.38)",
   borderRadius: 7,
@@ -13491,20 +10482,15 @@ const button = {
   textTransform:"uppercase",
   letterSpacing:".035em",
 };
-const sortButton={background:"transparent",border:"none",color:"#facc15",fontSize:12,textTransform:"uppercase",fontWeight:1000,cursor:"pointer",padding:0};
-const deleteButton={background:"#7f1d1d",color:"white",border:"1px solid #ef4444",borderRadius:10,padding:"8px 10px",cursor:"pointer"};
+const deleteButton={background:"var(--cfb-red-dark)",color:"white",border:"1px solid var(--cfb-danger)",borderRadius:10,padding:"8px 10px",cursor:"pointer"};
 const table={width:"100%",borderCollapse:"separate",borderSpacing:0,minWidth:820};
-const th={textAlign:"left",padding:"13px 10px",color:"#94a3b8",fontSize:10,textTransform:"uppercase",borderBottom:"2px solid #dc2626",letterSpacing:".09em",fontWeight:1000,background:"#070a10"};
+const th={textAlign:"left",padding:"13px 10px",color:"var(--cfb-muted)",fontSize:10,textTransform:"uppercase",borderBottom:"2px solid var(--cfb-red)",letterSpacing:".09em",fontWeight:1000,background:"var(--cfb-panel-2)"};
 const trStyle={borderBottom:"1px solid rgba(255,255,255,.08)"};
 const td={padding:"16px 10px",color:"inherit",verticalAlign:"middle"};
 const teamCell={...td,color:"#fff",fontWeight:900};
-const clickableTeamCell={...teamCell,cursor:"pointer",textDecoration:"underline"};
 const mutedText={color:"#d6d3d1",marginTop:8,marginBottom:0};
 
-const bracketGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(260px, 1fr))",gap:16,marginTop:20};
-const gameCard={display:"grid",gap:10,border:"1px solid rgba(255,255,255,.1)",borderRadius:16,padding:14,background:"rgba(7,7,12,.75)",marginBottom:14};
 const twoCol={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(320px, 1fr))",gap:20,marginTop:24};
-const twoColWide={display:"grid",gridTemplateColumns:"minmax(0, 3fr) minmax(280px, 1fr)",gap:20,marginTop:20};
 const miniCard = {
   background:"linear-gradient(155deg,rgba(14,19,30,.96),rgba(4,7,13,.99))",
   border:"1px solid rgba(255,255,255,.10)",
@@ -13517,49 +10503,21 @@ const miniCard = {
 const miniRow={borderBottom:"1px solid rgba(255,255,255,.08)",padding:"10px 0",color:"#e4e4e7"};
 const miniTitle={marginTop:0,color:"#fff",fontWeight:1000,letterSpacing:"-.03em"};
 const recognitionGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(min(100%, 360px), 1fr))",gap:18,marginTop:22};
-const recognitionCard={background:"linear-gradient(155deg,rgba(14,19,30,.97),rgba(4,7,13,.99))",border:"1px solid rgba(255,255,255,.11)",borderTop:"3px solid #dc2626",borderRadius:10,padding:18,boxShadow:"0 16px 42px rgba(0,0,0,.3)",overflow:"hidden"};
+const recognitionCard={background:"linear-gradient(155deg,rgba(14,19,30,.97),rgba(4,7,13,.99))",border:"1px solid rgba(255,255,255,.11)",borderTop:"3px solid var(--cfb-red)",borderRadius:10,padding:18,boxShadow:"0 16px 42px rgba(0,0,0,.3)",overflow:"hidden"};
 const recognitionHeader={display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:14,borderBottom:"1px solid rgba(255,255,255,.08)",paddingBottom:14,marginBottom:14,flexWrap:"wrap"};
-const recognitionKicker={color:"#facc15",fontSize:12,fontWeight:950,textTransform:"uppercase",letterSpacing:".08em",marginBottom:6};
+const recognitionKicker={color:"var(--cfb-gold)",fontSize:12,fontWeight:950,textTransform:"uppercase",letterSpacing:".08em",marginBottom:6};
 const recognitionPlayer={fontSize:22,fontWeight:950,color:"#fff7ed",lineHeight:1.05};
 const recognitionMeta={color:"#d6d3d1",fontSize:13,marginTop:6};
 const recognitionTeamBadge={fontSize:13,color:"#fde68a",maxWidth:220};
-const recognitionFormGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(min(100%, 190px), 1fr))",gap:12};
-const recognitionActions={display:"flex",justifyContent:"flex-end",gap:10,marginTop:14,flexWrap:"wrap"};
-const fieldLabel={display:"grid",gap:6,color:"#c4b5fd",fontSize:11,fontWeight:900,textTransform:"uppercase",letterSpacing:".06em"};
 const teamLabel={display:"inline-flex",alignItems:"center",gap:10};
 const helmetIcon={width:30,height:30,objectFit:"contain",borderRadius:8,background:"rgba(255,255,255,.08)",padding:2};
 const helmetFallback={fontSize:22,lineHeight:1};
-const coachBanner={display:"flex",justifyContent:"space-between",gap:20,alignItems:"center",background:"rgba(7,7,12,.75)",border:"1px solid rgba(250,204,21,.16)",borderRadius:18,padding:18,margin:"18px 0 24px",flexWrap:"wrap"};
-const coachNameStyle={fontSize:28,fontWeight:900,color:"#facc15"};
-const pulseGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))",gap:20,marginBottom:32};
-const pulseCard={...statCard,background:"linear-gradient(135deg, rgba(49,46,129,.85), rgba(12,12,18,.95))"};
-const pulseValue={fontSize:24,fontWeight:950,color:"#facc15"};
-const rankCell={...td,fontWeight:950,color:"#facc15"};
-const scoreCell={...td,fontWeight:950,color:"#facc15",fontSize:18};
-const movementBase={display:"inline-flex",alignItems:"center",justifyContent:"center",minWidth:54,borderRadius:999,padding:"6px 10px",fontSize:12,fontWeight:950};
-const movementUp={...movementBase,background:"rgba(22,163,74,.18)",color:"#86efac",border:"1px solid rgba(134,239,172,.35)"};
-const movementDown={...movementBase,background:"rgba(220,38,38,.18)",color:"#fca5a5",border:"1px solid rgba(252,165,165,.35)"};
-const movementNeutral={...movementBase,background:"rgba(255,255,255,.08)",color:"#d6d3d1",border:"1px solid rgba(255,255,255,.14)"};
+const coachBanner={display:"flex",justifyContent:"space-between",gap:20,alignItems:"center",background:"rgba(7,7,12,.75)",border:"1px solid rgba(201,208,217,.16)",borderRadius:18,padding:18,margin:"18px 0 24px",flexWrap:"wrap"};
+const coachNameStyle={fontSize:28,fontWeight:900,color:"var(--cfb-gold)"};
+const rankCell={...td,fontWeight:950,color:"var(--cfb-gold)"};
+const scoreCell={...td,fontWeight:950,color:"var(--cfb-gold)",fontSize:18};
 const leaderRow={display:"flex",justifyContent:"space-between",gap:12,borderBottom:"1px solid rgba(255,255,255,.08)",padding:"11px 0",color:"#f5f5f4"};
-const activityList={display:"grid",gap:10,marginTop:18};
-const activityItem={background:"rgba(255,255,255,.045)",border:"1px solid rgba(255,255,255,.08)",borderRadius:14,padding:"12px 14px",color:"#f5f5f4"};
-const profileCard={...card,background:"radial-gradient(circle at 90% 0%,rgba(220,38,38,.14),transparent 32%),linear-gradient(135deg,#0d131e,#05070c)"};
-const profileHero={display:"flex",alignItems:"center",justifyContent:"space-between",gap:20,flexWrap:"wrap",marginBottom:20};
-const eyebrow={color:"#facc15",textTransform:"uppercase",letterSpacing:".12em",fontSize:12,fontWeight:950};
-const profileName={fontSize:"clamp(36px, 5vw, 64px)",margin:"6px 0",fontWeight:950,letterSpacing:"-.05em"};
-const hofCard={background:"radial-gradient(circle at 90% 0%,rgba(250,204,21,.11),transparent 30%),linear-gradient(145deg,#111827,#05070c 68%,#160809)",border:"1px solid rgba(250,204,21,.26)",borderTop:"3px solid #facc15",borderRadius:12,padding:24,boxShadow:"0 22px 60px rgba(0,0,0,.38)",minHeight:260,overflow:"hidden"};
-const hofTop={display:"grid",gridTemplateColumns:"86px minmax(0,1fr) 120px",gap:16,alignItems:"center"};
-const hofTopClean={display:"grid",gridTemplateColumns:"86px minmax(0,1fr)",gap:18,alignItems:"center"};
-const hofIconWrap={width:76,height:76,borderRadius:20,display:"grid",placeItems:"center",background:"rgba(0,0,0,.34)",border:"1px solid rgba(255,255,255,.14)",position:"relative"};
-const hofIcon={fontSize:42};
-const hofTeamImg={width:54,height:54,objectFit:"contain",imageRendering:"pixelated",filter:"drop-shadow(0 8px 14px rgba(0,0,0,.35))"};
-const hofMiniLogo={position:"absolute",right:-8,bottom:-8,background:"#111827",border:"1px solid rgba(250,204,21,.35)",borderRadius:10,padding:4};
-const hofName={fontSize:"clamp(24px, 2.4vw, 34px)",lineHeight:1.08,margin:"6px 0",fontWeight:950,color:"#fff7ed",overflowWrap:"anywhere"};
-const hofScore={background:"rgba(0,0,0,.38)",border:"1px solid rgba(250,204,21,.2)",borderRadius:18,padding:14,textAlign:"center"};
-const hofScoreBand={display:"flex",alignItems:"center",justifyContent:"space-between",gap:14,marginTop:18,background:"rgba(0,0,0,.36)",border:"1px solid rgba(250,204,21,.22)",borderRadius:18,padding:"14px 16px",color:"#c4b5fd",textTransform:"uppercase",letterSpacing:".08em",fontSize:12,fontWeight:900};
-const hofScoreBandB={fontSize:30,color:"#facc15"};
-const hofReason={marginTop:12,color:"#fde68a",fontWeight:800,fontSize:13,lineHeight:1.5};
-const hofScoreSpan={color:"#c4b5fd"};
+const eyebrow={color:"var(--cfb-gold)",textTransform:"uppercase",letterSpacing:".12em",fontSize:12,fontWeight:950};
 const hofChips={display:"flex",gap:10,flexWrap:"wrap",marginTop:22};
 const chip={display:"grid",gap:2,background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.12)",borderRadius:999,padding:"8px 12px",fontSize:12};
 const accoladeList={marginTop:16};
@@ -13570,9 +10528,9 @@ const heroBanner = {
   minHeight: 210,
   borderRadius: 22,
   overflow: "hidden",
-  border: "1px solid rgba(255,199,44,.45)",
+  border: "1px solid rgba(201,208,217,.4)",
   marginBottom: 14,
-  background: "#080814",
+  background: "var(--cfb-ink)",
   boxShadow: "0 20px 50px rgba(0,0,0,.45)",
 };
 
@@ -13583,13 +10541,13 @@ const heroBannerImage = {
   height: "100%",
   objectFit: "cover",
   objectPosition: "center",
-  opacity: 0.82,
+  opacity: 0.94,
 };
 
 const heroOverlay = {
   position: "absolute",
   inset: 0,
-  background: "linear-gradient(90deg, rgba(20,8,45,.18), rgba(20,8,45,.10), rgba(5,5,15,.22))",
+  background: "linear-gradient(90deg, rgba(10,13,19,.12), rgba(10,13,19,.05), rgba(10,13,19,.24))",
 };
 
 const heroContent = {
@@ -13602,21 +10560,6 @@ const heroContent = {
   gap: 24,
   padding: "34px 42px",
 };
-
-const heroTitle = {
-  margin: 0,
-  fontSize: "clamp(34px, 5vw, 72px)",
-  fontWeight: 900,
-  letterSpacing: "-2px",
-  color: "#fff",
-};
-
-const heroSubtitle = {
-  marginTop: 10,
-  fontSize: "clamp(15px, 2vw, 22px)",
-  color: "rgba(255,255,255,.86)",
-};
-
 
 const hofGrid = {
   display: "grid",
@@ -13688,43 +10631,12 @@ const drawerGroup = {
 };
 
 const drawerGroupTitle = {
-  color: "#facc15",
+  color: "var(--cfb-gold)",
   fontSize: 11,
   fontWeight: 950,
   letterSpacing: ".14em",
   textTransform: "uppercase",
   margin: "8px 8px",
-};
-
-const liquidGlassNav = {
-  width: "100%",
-  border: "1px solid rgba(255,255,255,.14)",
-  background: "linear-gradient(145deg, rgba(255,255,255,.12), rgba(255,255,255,.04))",
-  backdropFilter: "blur(18px) saturate(155%)",
-  WebkitBackdropFilter: "blur(18px) saturate(155%)",
-  color: "#f8fafc",
-  borderRadius: 18,
-  padding: "14px 16px",
-  fontWeight: 950,
-  cursor: "pointer",
-  boxShadow: "0 16px 42px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.14)",
-  textAlign: "left",
-};
-
-const drawerItem = {
-  ...liquidGlassNav,
-};
-
-const drawerItemActive = {
-  ...liquidGlassNav,
-  border: "1px solid rgba(250,204,21,.42)",
-  boxShadow: "0 0 0 1px rgba(250,204,21,.20), 0 18px 48px rgba(250,204,21,.12), inset 0 1px 0 rgba(255,255,255,.16)",
-};
-
-const drawerEmpty = {
-  padding: 12,
-  color: "rgba(255,255,255,.56)",
-  fontSize: 13,
 };
 
 const hofCardClean = {
@@ -13733,7 +10645,7 @@ const hofCardClean = {
   boxSizing: "border-box",
   overflow: "hidden",
   background: "linear-gradient(160deg, rgba(88,28,135,.72), rgba(15,23,42,.96) 50%, rgba(69,10,10,.72))",
-  border: "1px solid rgba(250,204,21,.28)",
+  border: "1px solid rgba(201,208,217,.28)",
   borderRadius: 22,
   padding: 18,
   boxShadow: "0 18px 48px rgba(0,0,0,.34)",
@@ -13767,8 +10679,8 @@ const hofScoreBox = {
   minWidth: 84,
   borderRadius: 16,
   padding: "10px 12px",
-  background: "rgba(250,204,21,.12)",
-  border: "1px solid rgba(250,204,21,.32)",
+  background: "rgba(201,208,217,.12)",
+  border: "1px solid rgba(201,208,217,.32)",
   textAlign: "center",
   color: "#fef3c7",
 };
@@ -13780,62 +10692,6 @@ const hofReasonClean = {
   lineHeight: 1.45,
 };
 
-
-const filterGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
-  gap: 10,
-  margin: "14px 0 18px",
-};
-
-const gotwCard = {
-  display: "grid",
-  gridTemplateColumns: "1fr auto 1fr",
-  gap: 16,
-  alignItems: "center",
-  padding: 18,
-  borderRadius: 20,
-  border: "1px solid rgba(250,204,21,.25)",
-  background: "linear-gradient(135deg, rgba(88,28,135,.55), rgba(15,23,42,.92))",
-};
-
-const gotwTeam = {
-  display: "grid",
-  gap: 8,
-  color: "#fff",
-  fontWeight: 900,
-};
-
-const gotwScore = {
-  width: 74,
-  height: 74,
-  borderRadius: 18,
-  display: "grid",
-  placeItems: "center",
-  background: "rgba(250,204,21,.18)",
-  border: "1px solid rgba(250,204,21,.45)",
-  color: "#fef3c7",
-  fontSize: 24,
-  fontWeight: 950,
-};
-
-const threeCol = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-  gap: 14,
-};
-
-const recapBox = {
-  width: "100%",
-  minHeight: 260,
-  borderRadius: 16,
-  border: "1px solid rgba(255,255,255,.14)",
-  background: "rgba(2,6,23,.72)",
-  color: "#fff",
-  padding: 14,
-  marginBottom: 12,
-  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-};
 
 const timelineList = {
   display: "grid",
@@ -13854,7 +10710,7 @@ const timelineItem = {
 };
 
 const timelineYear = {
-  color: "#facc15",
+  color: "var(--cfb-gold)",
   fontWeight: 950,
   fontSize: 18,
 };
@@ -13866,33 +10722,8 @@ const drawerAdminBox = {
   margin: "12px 14px 0",
   padding: 12,
   borderRadius: 16,
-  border: "1px solid rgba(250,204,21,.22)",
-  background: "rgba(250,204,21,.07)",
-};
-
-const adminUnlockRow = {
-  display: "grid",
-  gridTemplateColumns: "1fr auto",
-  gap: 8,
-};
-
-const drawerInput = {
-  minWidth: 0,
-  border: "1px solid rgba(255,255,255,.14)",
-  background: "rgba(2,6,23,.65)",
-  color: "#fff",
-  borderRadius: 10,
-  padding: "9px 10px",
-};
-
-const drawerUnlockButton = {
-  border: "1px solid rgba(250,204,21,.35)",
-  background: "rgba(250,204,21,.18)",
-  color: "#fef3c7",
-  borderRadius: 10,
-  padding: "9px 10px",
-  fontWeight: 900,
-  cursor: "pointer",
+  border: "1px solid rgba(201,208,217,.22)",
+  background: "rgba(201,208,217,.07)",
 };
 
 const adminUnlockedPill = {
@@ -13912,60 +10743,6 @@ const adminLockPanel = {
   marginTop: 14,
 };
 
-const snapshotGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-  gap: 10,
-};
-
-
-
-const headlineList = {
-  display: "grid",
-  gap: 10,
-  marginTop: 12,
-};
-
-
-
-
-const coachTreeGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-  gap: 14,
-  marginTop: 16,
-};
-
-const coachTreeCard = {
-  border: "1px solid rgba(255,255,255,.12)",
-  background: "rgba(255,255,255,.055)",
-  borderRadius: 20,
-  padding: 18,
-  display: "grid",
-  gap: 8,
-  overflow: "hidden",
-};
-
-const coachTreeName = {
-  color: "#facc15",
-  fontSize: "clamp(20px, 6vw, 30px)",
-  fontWeight: 950,
-  lineHeight: 1.05,
-  overflowWrap: "anywhere",
-};
-
-const coachTreeRecord = {
-  color: "#fff",
-  fontWeight: 900,
-  fontSize: 16,
-};
-
-const coachTreePath = {
-  color: "rgba(255,255,255,.72)",
-  lineHeight: 1.35,
-  overflowWrap: "anywhere",
-};
-
 const hofBreakdown = {
   display: "grid",
   gap: 6,
@@ -13973,167 +10750,6 @@ const hofBreakdown = {
   paddingTop: 12,
   borderTop: "1px solid rgba(255,255,255,.10)",
 };
-
-
-
-
-const homeHeroTitle = {
-  margin: "8px 0",
-  fontSize: "clamp(34px, 6vw, 72px)",
-  lineHeight: .95,
-  color: "#fff",
-  fontWeight: 950,
-};
-
-const homeHeroGrid = {
-  display: "grid",
-  gap: 12,
-};
-
-const homeHeroTile = {
-  border: "1px solid rgba(250,204,21,.20)",
-  background: "rgba(2,6,23,.45)",
-  borderRadius: 18,
-  padding: 16,
-  display: "grid",
-  gap: 6,
-};
-
-const tickerWrap = {
-  overflow: "hidden",
-  border: "1px solid rgba(250,204,21,.18)",
-  borderRadius: 16,
-  background: "rgba(250,204,21,.08)",
-  marginBottom: 18,
-};
-
-const tickerContent = {
-  display: "flex",
-  width: "max-content",
-  gap: 28,
-  padding: "12px 16px",
-  whiteSpace: "nowrap",
-  color: "#fef3c7",
-  fontWeight: 900,
-  animation: "cfbeliteTicker 85s linear infinite",
-};
-
-
-
-const quickJumpResults = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-  gap: 8,
-  marginTop: 10,
-};
-
-const quickJumpButton = {
-  border: "1px solid rgba(255,255,255,.12)",
-  background: "rgba(255,255,255,.055)",
-  color: "#fff",
-  borderRadius: 12,
-  padding: 10,
-  textAlign: "left",
-  cursor: "pointer",
-  fontWeight: 800,
-};
-
-const teamWatermark = {
-  position: "absolute",
-  right: -30,
-  top: -30,
-  width: 220,
-  height: 220,
-  objectFit: "contain",
-  opacity: .08,
-  pointerEvents: "none",
-};
-
-const ringRow = {
-  display: "flex",
-  gap: 4,
-  flexWrap: "wrap",
-  fontSize: 22,
-};
-
-const rivalryBadgeGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
-  gap: 10,
-};
-
-const rivalryBadge = {
-  border: "1px solid rgba(250,204,21,.22)",
-  background: "rgba(250,204,21,.08)",
-  borderRadius: 14,
-  padding: 12,
-  display: "grid",
-  gap: 4,
-};
-
-const hofLock = { color:"#bbf7d0", fontWeight:950, fontSize:11, marginTop:4 };
-const hofLikely = { color:"#fef3c7", fontWeight:950, fontSize:11, marginTop:4 };
-const hofFringe = { color:"#bfdbfe", fontWeight:950, fontSize:11, marginTop:4 };
-const hofWatch = { color:"rgba(255,255,255,.65)", fontWeight:950, fontSize:11, marginTop:4 };
-
-
-
-
-const coachAccentStripe = {
-  width: 7,
-  height: "100%",
-  minHeight: 54,
-  borderRadius: "0 999px 999px 0",
-  boxShadow: "0 0 18px currentColor",
-};
-
-const coachNavTextWrap = {
-  minWidth: 0,
-  display: "grid",
-  gap: 5,
-  position: "relative",
-  zIndex: 2,
-};
-
-const coachNavName = {
-  fontSize: "clamp(18px, 5vw, 26px)",
-  lineHeight: 1.02,
-  color: "#fff",
-  overflowWrap: "anywhere",
-  textShadow: "0 2px 14px rgba(0,0,0,.45)",
-};
-
-const coachNavTeam = {
-  color: "rgba(255,255,255,.86)",
-  fontSize: 13,
-  fontWeight: 900,
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
-  textShadow: "0 2px 10px rgba(0,0,0,.35)",
-};
-
-const activeSpark = {
-  color: "#facc15",
-  fontSize: 12,
-  filter: "drop-shadow(0 0 8px rgba(250,204,21,.75))",
-};
-
-
-
-
-const mobileCardGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))",
-  gap: 10,
-  marginBottom: 14,
-};
-
-
-
-
-
-
 
 
 
@@ -14159,165 +10775,6 @@ const colorDrawerStripe = {
 
 
 
-const teamProfileHeroClean = {
-  borderRadius: 0,
-  padding: "4px 0 22px",
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-  gap: 18,
-  alignItems: "start",
-  marginBottom: 18,
-  background: "transparent",
-  border: "none",
-  boxShadow: "none",
-};
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-const teamProfileName = {
-  margin: "12px 0 0",
-  color: "#fff",
-  fontSize: "clamp(46px, 8vw, 82px)",
-  lineHeight: .84,
-  letterSpacing: "-.055em",
-  fontWeight: 1000,
-  textShadow: "0 18px 42px rgba(0,0,0,.34)",
-};
-
-
-
-
-
-
-const teamProfileSubline = {
-  margin: "16px 0 0",
-  color: "rgba(255,255,255,.86)",
-  fontSize: "clamp(15px, 3.1vw, 21px)",
-  letterSpacing: "-.01em",
-  display: "flex",
-  gap: 10,
-  flexWrap: "wrap",
-  alignItems: "baseline",
-};
-
-const badgeRow = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: 10,
-  justifyContent: "flex-end",
-  alignItems: "center",
-  maxWidth: 520,
-};
-
-const teamBadgeBubble = {
-  minWidth: 118,
-  textAlign: "center",
-  border: "1px solid rgba(255,255,255,.26)",
-  borderRadius: 999,
-  padding: "9px 12px",
-  color: "#fff",
-  background: "rgba(255,255,255,.15)",
-  fontWeight: 950,
-  fontSize: 12,
-  backdropFilter: "blur(14px) saturate(140%)",
-  WebkitBackdropFilter: "blur(14px) saturate(140%)",
-  boxShadow: "inset 0 1px 0 rgba(255,255,255,.20)",
-};
-
-
-
-
-
-
-const liquidGlassPanel = {
-  background: "linear-gradient(155deg,rgba(14,19,30,.97),rgba(4,7,13,.99))",
-  backdropFilter: "blur(20px) saturate(135%)",
-  WebkitBackdropFilter: "blur(20px) saturate(135%)",
-  border: "1px solid rgba(255,255,255,.11)",
-  borderTop: "3px solid #dc2626",
-  borderRadius: 10,
-  padding: 24,
-  boxShadow: "0 20px 56px rgba(0,0,0,.36),inset 0 1px rgba(255,255,255,.045)",
-  marginBottom: 20,
-};
-
-
-
-
-const glassCard = {
-  ...liquidGlassPanel,
-};
-
-const glassMiniCard = {
-  ...liquidGlassTile,
-};
-
-const homeHeroCard = {
-  ...liquidGlassPanel,
-  display: "grid",
-  gridTemplateColumns: "minmax(0, 1fr) minmax(280px, .9fr)",
-  gap: 18,
-  alignItems: "center",
-  background: "linear-gradient(135deg, rgba(88,28,135,.58), rgba(255,255,255,.075), rgba(15,23,42,.86))",
-};
-
-const quickJumpCard = {
-  ...liquidGlassPanel,
-  padding: 14,
-};
-
-const rankingMobileCard = {
-  ...liquidGlassTile,
-  padding: 12,
-};
-
-const headlineItem = {
-  border: "1px solid rgba(255,255,255,.14)",
-  background: "linear-gradient(145deg, rgba(255,255,255,.12), rgba(255,255,255,.04))",
-  backdropFilter: "blur(18px) saturate(150%)",
-  WebkitBackdropFilter: "blur(18px) saturate(150%)",
-  color: "rgba(255,255,255,.90)",
-  borderRadius: 18,
-  padding: 14,
-  fontWeight: 850,
-  boxShadow: "inset 0 1px 0 rgba(255,255,255,.12)",
-};
-
-
-
-
-
 const successBox = {
   ...liquidGlassPanel,
   border: "1px solid rgba(34,197,94,.34)",
@@ -14334,20 +10791,6 @@ const errorBox = {
   fontWeight: 950,
 };
 
-const healthGood = {
-  ...liquidGlassPanel,
-  border: "1px solid rgba(34,197,94,.32)",
-  color: "#bbf7d0",
-  fontWeight: 950,
-};
-
-const healthWarn = {
-  ...liquidGlassPanel,
-  border: "1px solid rgba(250,204,21,.34)",
-  color: "#fef3c7",
-  display: "grid",
-  gap: 8,
-};
   async function startDraftClock(pickNumber = draftSettings27.current_pick, timerMinutes = draftSettings27.timer_minutes || 10) {
     const now = new Date().toISOString();
     const { error: pickError } = await supabase
@@ -14506,180 +10949,24 @@ const healthWarn = {
 
 
 
-const draftRoomWrap = {
-  display: "grid",
-  gap: 18,
-  background: "radial-gradient(circle at 50% -10%, rgba(250,204,21,.10), transparent 28%)",
-};
-
-const draftHero = {
-  ...liquidGlassPanel,
-  display: "grid",
-  gridTemplateColumns: "minmax(0, 1.15fr) minmax(280px, .85fr)",
-  gap: 18,
-  alignItems: "stretch",
-  border: "1px solid rgba(250,204,21,.32)",
-  background: "radial-gradient(circle at 0% 0%, rgba(250,204,21,.22), transparent 28%), radial-gradient(circle at 100% 0%, rgba(37,99,235,.20), transparent 32%), linear-gradient(135deg, rgba(3,7,18,.98), rgba(30,27,75,.92))",
-  boxShadow: "0 28px 90px rgba(0,0,0,.50), inset 0 1px 0 rgba(255,255,255,.08)",
-};
-
-const draftHeroTitle = {
-  margin: "8px 0",
-  color: "#fff",
-  fontSize: "clamp(48px, 8vw, 104px)",
-  lineHeight: .82,
-  letterSpacing: "-.075em",
-  fontWeight: 1000,
-  textShadow: "0 20px 60px rgba(0,0,0,.35)",
-};
-
-const onClockCard = {
-  ...liquidGlassTile,
-  display: "grid",
-  alignContent: "center",
-  gap: 8,
-  textAlign: "left",
-  border: "1px solid rgba(250,204,21,.28)",
-  background: "linear-gradient(145deg, rgba(15,23,42,.92), rgba(2,6,23,.98))",
-};
-
-const draftClockPick = {
-  color: "#facc15",
-  fontSize: "clamp(24px, 5vw, 46px)",
-  fontWeight: 1000,
-};
-
-const draftClockUser = {
-  color: "#fff",
-  fontSize: "clamp(20px, 4vw, 34px)",
-  fontWeight: 1000,
-  overflowWrap: "anywhere",
-};
-
-const draftTimer = {
-  color: "#facc15",
-  fontSize: "clamp(42px, 8vw, 88px)",
-  fontWeight: 1000,
-  letterSpacing: "-.055em",
-  lineHeight: .82,
-};
-
-const pickAnnouncementCard = {
-  ...liquidGlassPanel,
-  background: "linear-gradient(145deg, rgba(250,204,21,.16), rgba(255,255,255,.05))",
-};
-
-const pickAnnouncementTitle = {
-  margin: "8px 0",
-  color: "#fff",
-  fontSize: "clamp(24px, 5vw, 48px)",
-  fontWeight: 1000,
-  letterSpacing: "-.04em",
-};
-
 const pickTeamLine = {
   margin: 0,
-  color: "#facc15",
+  color: "var(--cfb-gold)",
   fontSize: "clamp(28px, 7vw, 68px)",
   fontWeight: 1000,
   letterSpacing: "-.06em",
 };
 
-const draftBoardGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-  gap: 12,
-};
-
-const draftPickTile = {
-  ...liquidGlassTile,
-  padding: 14,
-  border: "1px solid rgba(250,204,21,.18)",
-  background: "linear-gradient(145deg, rgba(15,23,42,.94), rgba(3,7,18,.985))",
-};
-
-const draftTileUser = {
-  color: "#fff",
-  fontWeight: 1000,
-  fontSize: 18,
-  overflowWrap: "anywhere",
-};
-
-const draftTileTeam = {
-  color: "#facc15",
-  fontWeight: 950,
-};
-
-
-
-const availableTeamTile = {
-  border: "1px solid rgba(250,204,21,.18)",
-  borderRadius: 18,
-  padding: 14,
-  display: "grid",
-  gap: 7,
-  color: "#fff",
-  boxShadow: "inset 0 1px 0 rgba(255,255,255,.14), 0 16px 42px rgba(0,0,0,.28)",
-};
-
-
-
-const draftConferenceGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-  gap: 10,
-};
-
-const draftConferenceTile = {
-  border: "1px solid rgba(255,255,255,.16)",
-  background: "linear-gradient(145deg, rgba(255,255,255,.11), rgba(255,255,255,.035))",
-  borderRadius: 16,
-  padding: 12,
-  display: "grid",
-  gap: 4,
-  color: "#fff",
-  boxShadow: "inset 0 1px 0 rgba(255,255,255,.14)",
-};
-
-
-
-const draftAdminHelp = {
-  marginTop: 12,
-  color: "rgba(255,255,255,.72)",
-  lineHeight: 1.45,
-  fontWeight: 750,
-};
-
 const pickPreviewCard = {
   marginTop: 14,
-  border: "1px solid rgba(250,204,21,.28)",
-  background: "linear-gradient(145deg, rgba(250,204,21,.14), rgba(255,255,255,.045))",
+  border: "1px solid rgba(201,208,217,.28)",
+  background: "linear-gradient(145deg, rgba(201,208,217,.14), rgba(255,255,255,.045))",
   borderRadius: 22,
   padding: 16,
   display: "grid",
   gap: 10,
 };
 
-
-const draftPickHeader = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: 8,
-  color: "rgba(255,255,255,.88)",
-  marginBottom: 8,
-};
-
-const draftConferenceTileLocked = {
-  border: "1px solid rgba(248,113,113,.75)",
-  background: "linear-gradient(145deg, rgba(127,29,29,.86), rgba(69,10,10,.68))",
-  borderRadius: 16,
-  padding: 12,
-  display: "grid",
-  gap: 4,
-  color: "#fff",
-  boxShadow: "0 0 0 1px rgba(248,113,113,.22), 0 18px 48px rgba(127,29,29,.34), inset 0 1px 0 rgba(255,255,255,.14)",
-};
 
 const availableTeamGrid = {
   display: "grid",
@@ -14689,37 +10976,6 @@ const availableTeamGrid = {
   gridAutoRows: "minmax(108px, auto)",
   minHeight: 620,
   overflow: "visible",
-};
-
-
-const draftBroadcastBanner = {
-  ...liquidGlassPanel,
-  display: "grid",
-  gridTemplateColumns: "minmax(0, 1fr) auto",
-  alignItems: "center",
-  gap: 18,
-  background: "radial-gradient(circle at 20% 0%, rgba(250,204,21,.24), transparent 34%), linear-gradient(135deg, rgba(2,6,23,.96), rgba(15,23,42,.88))",
-  border: "1px solid rgba(250,204,21,.32)",
-  boxShadow: "0 24px 80px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.08)",
-};
-
-const draftBroadcastTitle = {
-  color: "#fff",
-  fontSize: "clamp(38px, 7vw, 88px)",
-  lineHeight: .84,
-  letterSpacing: "-.07em",
-  fontWeight: 1000,
-  textTransform: "uppercase",
-  overflowWrap: "anywhere",
-};
-
-const draftBroadcastTimer = {
-  color: "#facc15",
-  fontSize: "clamp(38px, 8vw, 86px)",
-  lineHeight: .85,
-  letterSpacing: "-.05em",
-  fontWeight: 1000,
-  textShadow: "0 18px 52px rgba(250,204,21,.20)",
 };
 
 
@@ -14740,7 +10996,7 @@ const recordCard = {
 };
 
 const recordValue = {
-  color: "#facc15",
+  color: "var(--cfb-gold)",
   fontWeight: 1000,
   fontSize: "clamp(28px, 6vw, 48px)",
   lineHeight: .9,
@@ -14774,140 +11030,6 @@ const recordHolderPill = {
   wordBreak: "break-word",
 };
 
-const coachRingsPanel = {
-  ...liquidGlassPanel,
-  marginBottom: 18,
-  padding: 18,
-};
-
-const coachRingGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-  gap: 12,
-};
-
-const coachRingTile = {
-  ...liquidGlassTile,
-  textAlign: "center",
-  display: "grid",
-  gap: 6,
-  alignContent: "center",
-  minHeight: 124,
-};
-
-const coachRingIcons = {
-  minHeight: 28,
-  fontSize: 22,
-  display: "flex",
-  justifyContent: "center",
-  gap: 3,
-  flexWrap: "wrap",
-};
-
-const coachRingValue = {
-  color: "#fff",
-  fontSize: "clamp(30px, 7vw, 56px)",
-  fontWeight: 1000,
-  lineHeight: .88,
-  letterSpacing: "-.06em",
-};
-
-const superlativeRow = {
-  marginTop: 14,
-  display: "flex",
-  flexWrap: "wrap",
-  gap: 8,
-};
-
-const superlativePill = {
-  border: "1px solid rgba(250,204,21,.30)",
-  background: "rgba(250,204,21,.10)",
-  color: "#fef3c7",
-  borderRadius: 999,
-  padding: "9px 12px",
-  fontSize: 12,
-  fontWeight: 950,
-};
-
-
-const mobileList = {
-  display: "grid",
-  gap: 12,
-};
-
-const managerCard = {
-  ...liquidGlassTile,
-  display: "grid",
-  gap: 12,
-};
-
-const dangerButton = {
-  border: "1px solid rgba(248,113,113,.38)",
-  background: "linear-gradient(135deg, rgba(239,68,68,.92), rgba(127,29,29,.85))",
-  color: "#fff",
-  borderRadius: 16,
-  padding: "12px 16px",
-  fontWeight: 950,
-  cursor: "pointer",
-  boxShadow: "0 18px 42px rgba(248,113,113,.16), inset 0 1px 0 rgba(255,255,255,.18)",
-};
-
-
-const coachMenuLogoWatermark = {
-  position: "absolute",
-  right: 16,
-  top: "50%",
-  transform: "translateY(-50%)",
-  width: 96,
-  height: 96,
-  objectFit: "contain",
-  objectPosition: "center center",
-  opacity: .20,
-  pointerEvents: "none",
-  zIndex: 0,
-  filter: "drop-shadow(0 0 18px rgba(255,255,255,.16))",
-};
-
-const massFormGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
-  gap: 12,
-  marginTop: 18,
-  marginBottom: 18,
-};
-
-const massFormCard = {
-  ...liquidGlassTile,
-  color: "#fff",
-  textAlign: "left",
-  display: "grid",
-  gap: 8,
-  cursor: "pointer",
-};
-
-const massFormIcon = {
-  fontSize: 28,
-};
-
-const bulkTextArea = {
-  ...input,
-  minHeight: 220,
-  resize: "vertical",
-  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-};
-
-
-
-
-
-
-
-
-
-
-
-
-
 const entryPanel = {
   ...liquidGlassPanel,
   display: "grid",
@@ -14918,47 +11040,6 @@ const entryGrid = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
   gap: 12,
-};
-
-const recruitingMassGrid = {
-  display: "grid",
-  gap: 10,
-  maxHeight: "65vh",
-  overflow: "auto",
-  paddingRight: 4,
-};
-
-const recruitingMassRow = {
-  display: "grid",
-  gridTemplateColumns: "minmax(190px, 1.4fr) repeat(6, minmax(72px, .55fr))",
-  gap: 8,
-  alignItems: "center",
-  border: "1px solid rgba(255,255,255,.12)",
-  borderRadius: 14,
-  padding: 10,
-  background: "rgba(255,255,255,.045)",
-  color: "#fff",
-};
-
-
-
-
-const commishGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-  gap: 14,
-  marginTop: 18,
-  marginBottom: 18,
-};
-
-const commishToolCard = {
-  ...liquidGlassTile,
-  color: "#fff",
-  display: "grid",
-  gap: 8,
-  textAlign: "left",
-  cursor: "pointer",
-  minHeight: 112,
 };
 
 const logoManagerGrid = {
@@ -14976,99 +11057,6 @@ const logoManagerCard = {
   overflow: "hidden",
 };
 
-const logoPreviewBox = {
-  height: 96,
-  border: "1px solid rgba(255,255,255,.12)",
-  borderRadius: 16,
-  display: "grid",
-  placeItems: "center",
-  background: "rgba(255,255,255,.045)",
-  color: "rgba(255,255,255,.60)",
-  overflow: "hidden",
-};
-
-const logoPreviewImg = {
-  maxWidth: "84%",
-  maxHeight: "84%",
-  objectFit: "contain",
-};
-
-const prestigeGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-  gap: 14,
-  marginTop: 18,
-};
-
-const prestigeCard = {
-  ...liquidGlassTile,
-  display: "grid",
-  gap: 12,
-  minHeight: 230,
-};
-
-const prestigeScore = {
-  color: "#facc15",
-  fontSize: "clamp(42px, 10vw, 72px)",
-  fontWeight: 1000,
-  lineHeight: .85,
-  letterSpacing: "-.07em",
-};
-
-const prestigeTierPill = {
-  border: "1px solid rgba(250,204,21,.34)",
-  background: "rgba(250,204,21,.12)",
-  color: "#fef3c7",
-  borderRadius: 999,
-  padding: "7px 10px",
-  fontSize: 12,
-  fontWeight: 950,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  textAlign: "center",
-};
-
-const prestigeTeamName = {
-  color: "#fff",
-  fontWeight: 1000,
-  fontSize: 18,
-  overflowWrap: "anywhere",
-};
-
-const prestigeMiniGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(105px, 1fr))",
-  gap: 8,
-  color: "rgba(255,255,255,.76)",
-  fontSize: 12,
-};
-
-
-const broadcastHeaderGlow = {
-  background: "linear-gradient(90deg, rgba(124,58,237,.35), transparent 70%)",
-};
-
-const heroBroadcastCard = {
-  ...card,
-  borderRadius: 22,
-  border: "1px solid rgba(148,163,184,.24)",
-  background: "linear-gradient(145deg, rgba(15,23,42,.96), rgba(6,10,28,.99))",
-  boxShadow: "0 28px 90px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.075)",
-};
-
-const broadcastMetricCard = {
-  ...statCard,
-  borderRadius: 18,
-  background: "linear-gradient(145deg, rgba(20,30,64,.92), rgba(8,12,30,.98))",
-  border: "1px solid rgba(148,163,184,.22)",
-  boxShadow: "0 18px 55px rgba(0,0,0,.32)",
-};
-
-
-
-
-
 const navShell = {
   position: "sticky",
   top: 0,
@@ -15080,7 +11068,7 @@ const navShell = {
   marginBottom: 20,
   padding: "12px 14px",
   border: "1px solid rgba(255,255,255,.12)",
-  borderTop: "3px solid #dc2626",
+  borderTop: "3px solid var(--cfb-red)",
   borderRadius: 9,
   background: "linear-gradient(90deg,rgba(5,7,12,.97),rgba(15,21,33,.94))",
   backdropFilter: "blur(16px)",
@@ -15089,7 +11077,7 @@ const navShell = {
 
 const hamburgerButton = {
   border: "1px solid rgba(248,113,113,.46)",
-  background: "linear-gradient(135deg,#dc2626,#991b1b)",
+  background: "linear-gradient(135deg,var(--cfb-red),#991b1b)",
   color: "#fff",
   borderRadius: 7,
   padding: "12px 16px",
@@ -15115,7 +11103,7 @@ const drawerPanel = {
   height: "100%",
   background: "radial-gradient(circle at 0 0,rgba(220,38,38,.17),transparent 27%),linear-gradient(180deg,#080b12,#030509)",
   borderRight: "1px solid rgba(248,113,113,.26)",
-  borderTop: "4px solid #dc2626",
+  borderTop: "4px solid var(--cfb-red)",
   padding: 18,
   overflowY: "auto",
   boxShadow: "30px 0 90px rgba(0,0,0,.55)",
@@ -15136,73 +11124,13 @@ const colorDrawerItem = {
   fontWeight: 950,
 };
 
-const coachDrawerItem = {
-  position: "relative",
-  width: "100%",
-  minHeight: 112,
-  borderRadius: 20,
-  padding: "12px 20px 12px 14px",
-  display: "flex",
-  alignItems: "center",
-  gap: 20,
-  textAlign: "left",
-  overflow: "hidden",
-  cursor: "pointer",
-  fontWeight: 950,
-};
-
-
-const coachHero2 = {
-  ...broadcastPageCard,
-  display: "grid",
-  gridTemplateColumns: "auto minmax(0,1fr) auto",
-  gap: 18,
-  alignItems: "center",
-  marginBottom: 18,
-};
-
-const coachHeroLogoBox = {
-  width: 116,
-  height: 116,
-  borderRadius: 24,
-  display: "grid",
-  placeItems: "center",
-  background: "rgba(255,255,255,.06)",
-  border: "1px solid rgba(255,255,255,.14)",
-  fontWeight: 1000,
-};
-
-const coachHeroName = {
-  fontSize: "clamp(38px, 8vw, 72px)",
-  fontWeight: 1000,
-  letterSpacing: "-.06em",
-  lineHeight: .88,
-};
-
-const coachHeroBadges = {
-  display: "grid",
-  gap: 8,
-  justifyItems: "end",
-};
-
-const prestigeSpotlight = {
-  ...broadcastPageCard,
-  marginBottom: 26,
-};
-
-const prestigeSpotlightGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-  gap: 14,
-  marginTop: 18,
-};
-
-const prestigeSpotlightCard = {
-  ...liquidGlassTile,
-  display: "grid",
-  gap: 12,
-  minHeight: 190,
-  background: "linear-gradient(145deg, rgba(30,41,87,.75), rgba(8,12,30,.96))",
+const broadcastPageCard = {
+  ...card,
+  borderRadius: 10,
+  background: "linear-gradient(155deg,rgba(14,19,30,.98),rgba(4,7,13,.995))",
+  border: "1px solid rgba(255,255,255,.11)",
+  borderTop: "3px solid var(--cfb-red)",
+  boxShadow: "0 20px 58px rgba(0,0,0,.38),inset 0 1px rgba(255,255,255,.045)",
 };
 
 const teamEncyclopediaPanel = {
@@ -15219,15 +11147,6 @@ const programRingRow = {
 };
 
 
-const sortHeaderButton = {
-  background: "transparent",
-  border: "none",
-  color: "#f8fafc",
-  fontWeight: 950,
-  cursor: "pointer",
-  whiteSpace: "nowrap",
-};
-
 const dataCenterTabs = {
   display: "flex",
   flexWrap: "wrap",
@@ -15241,86 +11160,6 @@ const dataCenterTab = {
   background: "linear-gradient(135deg, rgba(30,41,59,.94), rgba(15,23,42,.94))",
 };
 
-const dashboardHero = {
-  ...broadcastPageCard,
-  display: "grid",
-  gridTemplateColumns: "minmax(0, 1.35fr) minmax(260px, .65fr)",
-  gap: 22,
-  alignItems: "center",
-};
-
-const dashboardHeroTitle = {
-  fontSize: "clamp(44px, 8vw, 92px)",
-  fontWeight: 1000,
-  letterSpacing: "-.075em",
-  lineHeight: .88,
-  margin: "10px 0",
-};
-
-const dashboardControls = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-  gap: 10,
-  marginTop: 18,
-  maxWidth: 620,
-};
-
-const dashboardHeroMetrics = {
-  display: "grid",
-  gap: 12,
-};
-
-const dashboardMetric = {
-  ...liquidGlassTile,
-  display: "grid",
-  gap: 6,
-  minHeight: 104,
-};
-
-const headlineGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-  gap: 12,
-  marginTop: 16,
-};
-
-const headlineCard = {
-  ...liquidGlassTile,
-  fontSize: 16,
-  fontWeight: 900,
-  minHeight: 96,
-  display: "flex",
-  alignItems: "center",
-};
-
-const conferenceOverviewGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-  gap: 12,
-  marginTop: 16,
-};
-
-const conferenceOverviewCard = {
-  ...liquidGlassTile,
-  display: "grid",
-  gap: 12,
-};
-
-const logoCluster = {
-  display: "flex",
-  alignItems: "center",
-  gap: 6,
-  flexWrap: "wrap",
-  minHeight: 38,
-};
-
-const positiveTrend = {
-  color: "#86efac",
-  fontSize: 12,
-  fontWeight: 950,
-};
-
-
 const autoUserBox = {
   ...liquidGlassTile,
   minHeight: 48,
@@ -15330,289 +11169,6 @@ const autoUserBox = {
   gap: 10,
   color: "rgba(255,255,255,.78)",
   fontWeight: 850,
-};
-
-const sportsReferenceGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-  gap: 14,
-  marginBottom: 18,
-};
-
-
-
-
-
-const prestigeHistoryGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-  gap: 14,
-  marginTop: 18,
-};
-
-const prestigeHistoryCard = {
-  ...liquidGlassTile,
-  display: "grid",
-  gap: 12,
-  minHeight: 260,
-};
-
-const trendBars = {
-  height: 84,
-  display: "flex",
-  alignItems: "end",
-  gap: 5,
-  padding: 8,
-  borderRadius: 14,
-  background: "rgba(255,255,255,.045)",
-  border: "1px solid rgba(255,255,255,.10)",
-};
-
-const trendBar = {
-  flex: 1,
-  minWidth: 8,
-  borderRadius: "6px 6px 0 0",
-  background: "linear-gradient(180deg,#facc15,#7c3aed)",
-};
-
-
-const dynastyShell = {
-  display: "grid",
-  gap: 22,
-};
-
-const dynastyHero = {
-  position: "relative",
-  overflow: "hidden",
-  borderRadius: 24,
-  padding: "clamp(24px, 4vw, 44px)",
-  border: "1px solid rgba(148,163,184,.24)",
-  background: "radial-gradient(circle at 15% 0%, rgba(96,165,250,.26), transparent 28%), radial-gradient(circle at 85% 10%, rgba(124,58,237,.30), transparent 35%), linear-gradient(135deg, rgba(2,6,23,.96), rgba(12,18,45,.98))",
-  boxShadow: "0 28px 90px rgba(0,0,0,.52), inset 0 1px 0 rgba(255,255,255,.08)",
-  display: "grid",
-  gridTemplateColumns: "minmax(0, 1fr) minmax(260px, 420px)",
-  gap: 22,
-  alignItems: "center",
-};
-
-const heroKicker = {
-  color: "#60a5fa",
-  fontSize: "clamp(18px, 2.1vw, 30px)",
-  fontWeight: 1000,
-  letterSpacing: ".12em",
-  textTransform: "uppercase",
-};
-
-const dynastyHeroTitle = {
-  fontSize: "clamp(40px, 5.6vw, 78px)",
-  fontWeight: 950,
-  lineHeight: 1.02,
-  letterSpacing: "-.045em",
-  margin: "8px 0 4px",
-  color: "#fff",
-  textShadow: "0 0 34px rgba(96,165,250,.20)",
-  maxWidth: "100%",
-};
-
-const dynastyHeroSub = {
-  color: "rgba(226,232,240,.82)",
-  fontSize: "clamp(17px, 1.7vw, 24px)",
-  fontWeight: 900,
-  margin: 0,
-  letterSpacing: "-.015em",
-};
-
-const heroControls = {
-  display: "grid",
-  gap: 12,
-  padding: 16,
-  borderRadius: 18,
-  background: "rgba(2,6,23,.48)",
-  border: "1px solid rgba(255,255,255,.10)",
-};
-
-const kpiGridV23 = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-  gap: 14,
-};
-
-const kpiCardV23 = {
-  borderRadius: 18,
-  padding: 20,
-  background: "linear-gradient(145deg, rgba(15,23,42,.92), rgba(5,8,22,.98))",
-  border: "1px solid rgba(148,163,184,.22)",
-  boxShadow: "0 18px 60px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.06)",
-  display: "grid",
-  gap: 8,
-};
-
-const dashboardPanelGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(310px, 1fr))",
-  gap: 16,
-};
-
-const mockPanel = {
-  borderRadius: 20,
-  padding: 18,
-  background: "linear-gradient(145deg, rgba(10,16,39,.96), rgba(4,7,21,.99))",
-  border: "1px solid rgba(148,163,184,.22)",
-  boxShadow: "0 24px 80px rgba(0,0,0,.44), inset 0 1px 0 rgba(255,255,255,.06)",
-  overflow: "hidden",
-};
-
-const panelHeaderV23 = {
-  display: "flex",
-  justifyContent: "space-between",
-  gap: 12,
-  alignItems: "center",
-  marginBottom: 14,
-};
-
-const panelTitleV23 = {
-  margin: 0,
-  color: "#fff",
-  fontSize: 21,
-  fontWeight: 1000,
-  letterSpacing: "-.03em",
-};
-
-const smallGhostButton = {
-  border: "1px solid rgba(96,165,250,.26)",
-  background: "rgba(15,23,42,.62)",
-  color: "#dbeafe",
-  borderRadius: 10,
-  padding: "9px 11px",
-  fontWeight: 900,
-};
-
-const rankListV23 = {
-  display: "grid",
-  gap: 8,
-  marginBottom: 12,
-};
-
-const rankRowV23 = {
-  width: "100%",
-  border: "1px solid rgba(255,255,255,.10)",
-  background: "rgba(255,255,255,.045)",
-  color: "#fff",
-  borderRadius: 13,
-  padding: "10px 12px",
-  display: "grid",
-  gridTemplateColumns: "32px 36px minmax(0,1fr) auto",
-  gap: 10,
-  alignItems: "center",
-  textAlign: "left",
-  cursor: "pointer",
-};
-
-const rankBadgeV23 = {
-  width: 28,
-  height: 28,
-  borderRadius: 999,
-  display: "grid",
-  placeItems: "center",
-  background: "rgba(96,165,250,.16)",
-  color: "#bfdbfe",
-  fontWeight: 1000,
-};
-
-const newsListV23 = {
-  display: "grid",
-  gap: 10,
-};
-
-const newsItemV23 = {
-  borderRadius: 14,
-  padding: 12,
-  background: "rgba(255,255,255,.045)",
-  border: "1px solid rgba(255,255,255,.09)",
-  color: "#fff",
-  fontWeight: 900,
-  display: "grid",
-  gap: 6,
-};
-
-const conferenceCardsV23 = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-  gap: 12,
-};
-
-const conferenceCardV23 = {
-  borderRadius: 16,
-  padding: 14,
-  background: "rgba(255,255,255,.045)",
-  border: "1px solid rgba(255,255,255,.10)",
-  display: "flex",
-  gap: 12,
-  alignItems: "center",
-};
-
-const conferenceLogoCircle = {
-  width: 54,
-  height: 54,
-  borderRadius: 16,
-  display: "grid",
-  placeItems: "center",
-  background: "rgba(255,255,255,.06)",
-  border: "1px solid rgba(255,255,255,.10)",
-};
-
-const coachProfileBannerV23 = {
-  position: "relative",
-  overflow: "hidden",
-  borderRadius: 26,
-  padding: "clamp(20px, 3vw, 34px)",
-  border: "1px solid rgba(148,163,184,.25)",
-  boxShadow: "0 28px 90px rgba(0,0,0,.46), inset 0 1px 0 rgba(255,255,255,.08)",
-  display: "grid",
-  gridTemplateColumns: "auto minmax(0,1fr) minmax(200px, 260px)",
-  gap: 22,
-  alignItems: "center",
-  marginBottom: 18,
-};
-
-const coachBannerLogoV23 = {
-  width: 132,
-  height: 132,
-  borderRadius: 28,
-  display: "grid",
-  placeItems: "center",
-  background: "rgba(255,255,255,.08)",
-  border: "1px solid rgba(255,255,255,.14)",
-};
-
-const coachBannerMainV23 = {
-  minWidth: 0,
-};
-
-const coachBannerNameV23 = {
-  fontSize: "clamp(42px, 7vw, 88px)",
-  fontWeight: 1000,
-  lineHeight: .82,
-  letterSpacing: "-.075em",
-  color: "#fff",
-  margin: "6px 0",
-};
-
-const coachPrestigeBoxV23 = {
-  borderRadius: 18,
-  padding: 18,
-  background: "rgba(2,6,23,.42)",
-  border: "1px solid rgba(255,255,255,.12)",
-  display: "grid",
-  gap: 8,
-  textAlign: "center",
-};
-
-const coachReferenceGridV23 = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-  gap: 14,
-  marginBottom: 18,
 };
 
 const hofProgressTrack = {
@@ -15628,1064 +11184,25 @@ const hofProgressTrack = {
 const hofProgressFill = {
   height: "100%",
   borderRadius: 999,
-  background: "linear-gradient(90deg,#facc15,#22c55e)",
+  background: "linear-gradient(90deg,var(--cfb-gold),var(--cfb-green))",
 };
 
-
-const dashboardCanvasV24 = {
-  display: "grid",
-  gap: 18,
-};
-
-const heroV24 = {
-  display: "grid",
-  gridTemplateColumns: "minmax(0,1fr) minmax(260px, 390px)",
-  gap: 20,
-  alignItems: "center",
-  padding: "clamp(22px, 3vw, 38px)",
-  borderRadius: 24,
-  border: "1px solid rgba(96,165,250,.20)",
-  background: "radial-gradient(circle at 18% 0%, rgba(96,165,250,.24), transparent 28%), radial-gradient(circle at 88% 20%, rgba(124,58,237,.22), transparent 34%), linear-gradient(135deg, rgba(3,7,18,.96), rgba(10,18,38,.98))",
-  boxShadow: "0 28px 90px rgba(0,0,0,.50), inset 0 1px 0 rgba(255,255,255,.07)",
-  overflow: "hidden",
-};
-
-const heroLogoLockupV24 = {
-  display: "flex",
-  alignItems: "center",
-  gap: 20,
-  minWidth: 0,
-};
-
-const heroLogoBoxV24 = {
-  width: "clamp(72px, 9vw, 118px)",
-  height: "clamp(72px, 9vw, 118px)",
-  borderRadius: 22,
-  display: "grid",
-  placeItems: "center",
-  background: "linear-gradient(145deg, rgba(15,23,42,.86), rgba(2,6,23,.95))",
-  border: "1px solid rgba(255,255,255,.14)",
-  fontSize: "clamp(21px, 2.7vw, 36px)",
-  fontWeight: 1000,
-  letterSpacing: "-.06em",
-  color: "#fff",
-  boxShadow: "0 20px 50px rgba(0,0,0,.32)",
-};
-
-const heroKickerV24 = {
-  color: "#60a5fa",
-  fontSize: "clamp(15px, 1.35vw, 21px)",
-  fontWeight: 1000,
-  letterSpacing: ".14em",
-  textTransform: "uppercase",
-};
-
-const heroTitleV24 = {
-  fontSize: "clamp(36px, 5vw, 72px)",
-  fontWeight: 1000,
-  lineHeight: .94,
-  letterSpacing: "-.055em",
-  margin: "5px 0 4px",
-  color: "#f8fafc",
-};
-
-const heroSubV24 = {
-  margin: 0,
-  color: "rgba(226,232,240,.78)",
-  fontSize: "clamp(17px, 1.8vw, 24px)",
-  fontWeight: 900,
-};
-
-const heroControlsV24 = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: 10,
-  padding: 14,
-  borderRadius: 18,
-  background: "rgba(2,6,23,.44)",
-  border: "1px solid rgba(255,255,255,.09)",
-};
-
-const kpiRailV24 = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
-  gap: 12,
-};
-
-const kpiV24 = {
-  minHeight: 116,
-  borderRadius: 18,
-  padding: 18,
-  background: "linear-gradient(145deg, rgba(15,23,42,.92), rgba(3,7,18,.985))",
-  border: "1px solid rgba(96,165,250,.14)",
-  boxShadow: "0 18px 55px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.055)",
-  display: "grid",
-  gap: 6,
-};
-
-const mainGridV24 = {
-  display: "grid",
-  gridTemplateColumns: "minmax(320px,1.15fr) minmax(300px,.92fr) minmax(300px,.92fr)",
-  gap: 16,
-};
-
-const panelV24 = {
-  borderRadius: 20,
-  padding: 16,
-  background: "linear-gradient(145deg, rgba(8,13,31,.96), rgba(3,7,18,.99))",
-  border: "1px solid rgba(148,163,184,.18)",
-  boxShadow: "0 24px 80px rgba(0,0,0,.40), inset 0 1px 0 rgba(255,255,255,.055)",
-  overflow: "hidden",
-};
-
-const panelHeaderV24 = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 12,
-  marginBottom: 14,
-};
-
-const pillButtonV24 = {
-  border: "1px solid rgba(96,165,250,.20)",
-  background: "rgba(15,23,42,.62)",
-  color: "#dbeafe",
-  borderRadius: 999,
-  padding: "8px 12px",
-  fontWeight: 900,
-};
-
-const rankingRowsV24 = {
-  display: "grid",
-  gap: 8,
-};
-
-const rankingRowV24 = {
-  width: "100%",
-  border: "1px solid rgba(255,255,255,.09)",
-  background: "rgba(255,255,255,.04)",
-  color: "#fff",
-  borderRadius: 13,
-  padding: "10px 11px",
-  display: "grid",
-  gridTemplateColumns: "28px 38px minmax(0,1fr) auto",
-  gap: 10,
-  alignItems: "center",
-  textAlign: "left",
-  cursor: "pointer",
-};
-
-const embeddedRankingsV24 = {
-  marginTop: 12,
-  maxHeight: 420,
-  overflow: "auto",
-  borderTop: "1px solid rgba(255,255,255,.08)",
-  paddingTop: 10,
-};
-
-const newsStackV24 = {
-  display: "grid",
-  gap: 10,
-};
-
-const newsCardV24 = {
-  display: "grid",
-  gridTemplateColumns: "38px minmax(0,1fr)",
-  gap: 10,
-  alignItems: "center",
-  borderRadius: 14,
-  padding: 12,
-  background: "rgba(255,255,255,.04)",
-  border: "1px solid rgba(255,255,255,.09)",
-};
-
-const newsIconV24 = {
-  width: 34,
-  height: 34,
-  display: "grid",
-  placeItems: "center",
-  borderRadius: 10,
-  background: "rgba(96,165,250,.12)",
-};
-
-const conferenceGridV24 = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-  gap: 12,
-};
-
-const conferenceV24 = {
-  display: "flex",
-  gap: 12,
-  alignItems: "center",
-  borderRadius: 15,
-  padding: 13,
-  background: "rgba(255,255,255,.04)",
-  border: "1px solid rgba(255,255,255,.09)",
-};
-
-const conferenceMarkV24 = {
-  width: 54,
-  height: 54,
-  display: "grid",
-  placeItems: "center",
-  borderRadius: 15,
-  background: "rgba(255,255,255,.055)",
-  border: "1px solid rgba(255,255,255,.09)",
-};
-
-
-
-const proPageV26 = {
-  display: "grid",
-  gap: 18,
-};
-
-const proHeroV26 = {
-  position: "relative",
-  overflow: "hidden",
-  display: "grid",
-  gridTemplateColumns: "minmax(0,1fr) minmax(280px,410px)",
-  gap: 22,
-  alignItems: "center",
-  padding: "clamp(24px, 4vw, 46px)",
-  borderRadius: 28,
-  border: "1px solid rgba(96,165,250,.22)",
-  background: "radial-gradient(circle at 18% 0%, rgba(96,165,250,.22), transparent 28%), radial-gradient(circle at 88% 18%, rgba(124,58,237,.18), transparent 32%), linear-gradient(135deg, rgba(2,6,23,.96), rgba(9,17,34,.98))",
-  boxShadow: "0 30px 100px rgba(0,0,0,.52), inset 0 1px 0 rgba(255,255,255,.075)",
-};
-
-const proHeroCopyV26 = {
-  minWidth: 0,
-};
-
-const proEyebrowV26 = {
-  color: "#60a5fa",
-  fontSize: "clamp(14px, 1.2vw, 19px)",
-  fontWeight: 1000,
-  letterSpacing: ".16em",
-  textTransform: "uppercase",
-};
-
-const proHeroTitleV26 = {
-  fontSize: "clamp(38px, 5.2vw, 74px)",
-  fontWeight: 1000,
-  lineHeight: .98,
-  letterSpacing: "-.055em",
-  margin: "7px 0 6px",
-  color: "#f8fafc",
-};
-
-const proHeroMetaV26 = {
-  color: "rgba(226,232,240,.80)",
-  fontSize: "clamp(17px, 1.7vw, 25px)",
-  fontWeight: 900,
-};
-
-const proHeroControlsV26 = {
-  display: "grid",
-  gap: 10,
-  padding: 16,
-  borderRadius: 18,
-  background: "rgba(2,6,23,.50)",
-  border: "1px solid rgba(255,255,255,.10)",
-};
-
-const proLabelV26 = {
-  display: "block",
-  color: "rgba(255,255,255,.60)",
-  fontSize: 11,
-  fontWeight: 950,
-  textTransform: "uppercase",
-  letterSpacing: ".08em",
-  marginBottom: 6,
-};
-
-const proKpiGridV26 = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
-  gap: 12,
-};
-
-const proKpiV26 = {
-  borderRadius: 18,
-  padding: 18,
-  minHeight: 112,
-  background: "linear-gradient(145deg, rgba(15,23,42,.92), rgba(3,7,18,.985))",
-  border: "1px solid rgba(96,165,250,.14)",
-  boxShadow: "0 18px 55px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.055)",
-  display: "grid",
-  gap: 6,
-};
-
-const proThreeColV26 = {
-  display: "grid",
-  gridTemplateColumns: "minmax(320px,1.12fr) minmax(290px,.94fr) minmax(290px,.94fr)",
-  gap: 16,
-};
-
-const proPanelV26 = {
-  borderRadius: 20,
-  padding: 16,
-  background: "linear-gradient(145deg, rgba(8,13,31,.96), rgba(3,7,18,.99))",
-  border: "1px solid rgba(148,163,184,.18)",
-  boxShadow: "0 24px 80px rgba(0,0,0,.40), inset 0 1px 0 rgba(255,255,255,.055)",
-  overflow: "hidden",
-};
-
-const proPanelHeadV26 = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 12,
-  marginBottom: 14,
-};
-
-const proListV26 = {
-  display: "grid",
-  gap: 8,
-};
-
-const proRankRowV26 = {
-  width: "100%",
-  border: "1px solid rgba(255,255,255,.09)",
-  background: "rgba(255,255,255,.04)",
-  color: "#fff",
-  borderRadius: 13,
-  padding: "10px 11px",
-  display: "grid",
-  gridTemplateColumns: "28px 38px minmax(0,1fr) auto",
-  gap: 10,
-  alignItems: "center",
-  textAlign: "left",
-  cursor: "pointer",
-};
-
-const proInsetV26 = {
-  marginTop: 12,
-  maxHeight: 360,
-  overflow: "auto",
-  borderTop: "1px solid rgba(255,255,255,.08)",
-  paddingTop: 10,
-};
-
-const proNewsV26 = {
-  display: "grid",
-  gap: 10,
-};
-
-const proNewsItemV26 = {
-  display: "grid",
-  gridTemplateColumns: "34px minmax(0,1fr)",
-  gap: 10,
-  alignItems: "center",
-  borderRadius: 14,
-  padding: 12,
-  background: "rgba(255,255,255,.04)",
-  border: "1px solid rgba(255,255,255,.09)",
-};
-
-const proConferenceGridV26 = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-  gap: 12,
-};
-
-const proConferenceCardV26 = {
-  display: "flex",
-  gap: 12,
-  alignItems: "center",
-  borderRadius: 15,
-  padding: 13,
-  background: "rgba(255,255,255,.04)",
-  border: "1px solid rgba(255,255,255,.09)",
-};
-
-const proConferenceLogoV26 = {
-  width: 54,
-  height: 54,
-  borderRadius: 15,
-  display: "grid",
-  placeItems: "center",
-  background: "rgba(255,255,255,.055)",
-  border: "1px solid rgba(255,255,255,.09)",
-};
-
-
-
-
-
-
-
-
-const mockDashboardV27 = {
-  display: "grid",
-  gap: 16,
-  color: "#f8fafc",
-};
-
-const mockHeroV27 = {
-  position: "relative",
-  minHeight: 154,
-  borderRadius: 18,
-  border: "1px solid rgba(59,130,246,.22)",
-  background: "radial-gradient(circle at 50% 0%, rgba(59,130,246,.26), transparent 32%), linear-gradient(135deg, rgba(2,6,23,.98), rgba(8,13,31,.98))",
-  boxShadow: "0 24px 70px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.07)",
-  overflow: "hidden",
-  display: "grid",
-  gridTemplateColumns: "1fr auto",
-  alignItems: "center",
-  gap: 18,
-  padding: "24px 28px",
-};
-
-const mockHeroCenterV27 = {
-  display: "grid",
-  justifyItems: "center",
-  textAlign: "center",
-  minWidth: 0,
-};
-
-const mockMiniLogoV27 = {
-  color: "#e5e7eb",
-  fontSize: "clamp(30px, 4.2vw, 58px)",
-  fontWeight: 1000,
-  letterSpacing: "-.045em",
-  lineHeight: .9,
-};
-
-const mockHeroTitleV27 = {
-  margin: "5px 0 0",
-  color: "#60a5fa",
-  fontSize: "clamp(18px, 1.9vw, 28px)",
-  fontWeight: 1000,
-  letterSpacing: ".03em",
-  textTransform: "uppercase",
-};
-
-const mockHeroSubtitleV27 = {
-  marginTop: 8,
-  color: "rgba(226,232,240,.78)",
-  fontSize: 14,
-  fontWeight: 900,
-};
-
-const mockHeroControlsV27 = {
-  width: 230,
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: 8,
-  alignSelf: "start",
-};
-
-const mockSelectV27 = {
-  background: "rgba(15,23,42,.86)",
-  border: "1px solid rgba(148,163,184,.22)",
-  color: "#fff",
-  borderRadius: 10,
-  padding: "10px 11px",
-  fontWeight: 850,
-  outline: "none",
-};
-
-const mockPrimaryButtonV27 = {
-  gridColumn: "1 / -1",
-  border: "1px solid rgba(37,99,235,.35)",
-  background: "linear-gradient(135deg,#2563eb,#7c3aed)",
-  color: "#fff",
-  borderRadius: 10,
-  padding: 11,
-  fontWeight: 950,
-  cursor: "pointer",
-};
-
-const mockKpiGridV27 = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-  gap: 10,
-};
-
-const mockKpiV27 = {
-  minHeight: 94,
-  borderRadius: 14,
-  border: "1px solid rgba(148,163,184,.16)",
-  background: "linear-gradient(145deg, rgba(15,23,42,.92), rgba(3,7,18,.98))",
-  padding: 16,
-  display: "grid",
-  gap: 5,
-  boxShadow: "0 14px 40px rgba(0,0,0,.30)",
-};
-
-const mockMainGridV27 = {
-  display: "grid",
-  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-  gap: 12,
-};
-
-const mockPanelV27 = {
-  borderRadius: 14,
-  border: "1px solid rgba(148,163,184,.16)",
-  background: "linear-gradient(145deg, rgba(8,13,31,.96), rgba(3,7,18,.99))",
-  boxShadow: "0 18px 54px rgba(0,0,0,.36), inset 0 1px 0 rgba(255,255,255,.05)",
-  padding: 14,
-  overflow: "hidden",
-};
-
-const mockPanelHeaderV27 = {
-  display: "grid",
-  gap: 4,
-  marginBottom: 12,
-};
-
-const mockRankingListV27 = {
-  display: "grid",
-  gap: 7,
-};
-
-const mockRankingRowV27 = {
-  width: "100%",
-  border: "1px solid rgba(255,255,255,.08)",
-  background: "rgba(255,255,255,.035)",
-  color: "#fff",
-  borderRadius: 10,
-  padding: "9px 10px",
-  display: "grid",
-  gridTemplateColumns: "24px 34px minmax(0,1fr) auto",
-  gap: 8,
-  alignItems: "center",
-  textAlign: "left",
-  cursor: "pointer",
-};
-
-const mockSecondaryButtonV27 = {
-  width: "100%",
-  marginTop: 10,
-  border: "1px solid rgba(96,165,250,.20)",
-  background: "rgba(15,23,42,.72)",
-  color: "#dbeafe",
-  borderRadius: 10,
-  padding: 10,
-  fontWeight: 900,
-  cursor: "pointer",
-};
-
-const mockNewsStackV27 = {
-  display: "grid",
-  gap: 8,
-};
-
-const mockNewsItemV27 = {
-  display: "grid",
-  gridTemplateColumns: "34px minmax(0,1fr)",
-  gap: 9,
-  alignItems: "center",
-  borderRadius: 10,
-  padding: 10,
-  background: "rgba(255,255,255,.035)",
-  border: "1px solid rgba(255,255,255,.08)",
-};
-
-const mockNewsIconV27 = {
-  width: 30,
-  height: 30,
-  borderRadius: 9,
-  display: "grid",
-  placeItems: "center",
-  background: "rgba(96,165,250,.12)",
-};
-
-const mockConferenceGridV27 = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
-  gap: 10,
-};
-
-const mockConferenceCardV27 = {
-  display: "flex",
-  alignItems: "center",
-  gap: 10,
-  borderRadius: 12,
-  border: "1px solid rgba(255,255,255,.08)",
-  background: "rgba(255,255,255,.035)",
-  padding: 11,
-};
-
-const mockConferenceLogoV27 = {
-  width: 48,
-  height: 48,
-  borderRadius: 12,
-  display: "grid",
-  placeItems: "center",
-  background: "rgba(255,255,255,.055)",
-  border: "1px solid rgba(255,255,255,.08)",
-};
-
-
-const v29Dashboard = {
-  display: "grid",
-  gap: 16,
-};
-
-const v29Hero = {
-  minHeight: 170,
-  borderRadius: 18,
-  border: "1px solid rgba(59,130,246,.24)",
-  background: "radial-gradient(circle at 50% 0%, rgba(59,130,246,.25), transparent 32%), radial-gradient(circle at 95% 0%, rgba(124,58,237,.14), transparent 30%), linear-gradient(135deg, rgba(2,6,23,.98), rgba(8,13,31,.98))",
-  boxShadow: "0 24px 70px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.07)",
-  overflow: "hidden",
-  display: "grid",
-  gridTemplateColumns: "1fr auto",
-  alignItems: "center",
-  gap: 18,
-  padding: "24px 28px",
-};
-
-const v29HeroBrand = {
-  textAlign: "center",
-  display: "grid",
-  gap: 6,
-  justifyItems: "center",
-};
-
-const v29LogoText = {
-  fontSize: "clamp(40px, 5.2vw, 78px)",
-  fontWeight: 1000,
-  letterSpacing: "-.055em",
-  lineHeight: .88,
-  color: "#e5e7eb",
-  textShadow: "0 0 30px rgba(96,165,250,.22)",
-};
-
-const v29HeroSubLogo = {
-  color: "#60a5fa",
-  fontSize: "clamp(18px, 2vw, 29px)",
-  fontWeight: 1000,
-  letterSpacing: ".04em",
-  textTransform: "uppercase",
-};
-
-const v29HeroControls = {
-  width: 246,
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: 8,
-  alignSelf: "start",
-};
-
-const v29ControlLabel = {
-  color: "rgba(255,255,255,.68)",
-  fontSize: 11,
-  fontWeight: 950,
-  textTransform: "uppercase",
-  letterSpacing: ".08em",
-  display: "grid",
-  gap: 5,
-};
-
-const v29Select = {
-  background: "rgba(15,23,42,.86)",
-  border: "1px solid rgba(148,163,184,.22)",
-  color: "#fff",
-  borderRadius: 10,
-  padding: "10px 11px",
-  fontWeight: 850,
-  outline: "none",
-};
-
-const v29SaveButton = {
-  gridColumn: "1 / -1",
-  border: "1px solid rgba(37,99,235,.35)",
-  background: "linear-gradient(135deg,#2563eb,#7c3aed)",
-  color: "#fff",
-  borderRadius: 10,
-  padding: 11,
-  fontWeight: 950,
-  cursor: "pointer",
-};
-
-const v29KpiGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-  gap: 10,
-};
-
-const v29Kpi = {
-  minHeight: 94,
-  borderRadius: 14,
-  border: "1px solid rgba(148,163,184,.16)",
-  background: "linear-gradient(145deg, rgba(15,23,42,.92), rgba(3,7,18,.98))",
-  padding: 16,
-  display: "grid",
-  gap: 5,
-  boxShadow: "0 14px 40px rgba(0,0,0,.30)",
-};
-
-const v29ThreeGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-  gap: 12,
-};
-
-const v29Panel = {
-  borderRadius: 14,
-  border: "1px solid rgba(148,163,184,.16)",
-  background: "linear-gradient(145deg, rgba(8,13,31,.96), rgba(3,7,18,.99))",
-  boxShadow: "0 18px 54px rgba(0,0,0,.36), inset 0 1px 0 rgba(255,255,255,.05)",
-  padding: 14,
-  overflow: "hidden",
-};
-
-const v29PanelTitle = {
-  display: "grid",
-  gap: 4,
-  marginBottom: 12,
-};
-
-const v29List = {
-  display: "grid",
-  gap: 7,
-};
-
-const v29RankRow = {
-  width: "100%",
-  border: "1px solid rgba(255,255,255,.08)",
-  background: "rgba(255,255,255,.035)",
-  color: "#fff",
-  borderRadius: 10,
-  padding: "9px 10px",
-  display: "grid",
-  gridTemplateColumns: "24px 34px minmax(0,1fr) auto",
-  gap: 8,
-  alignItems: "center",
-  textAlign: "left",
-  cursor: "pointer",
-};
-
-const v29PanelButton = {
-  width: "100%",
-  marginTop: 10,
-  border: "1px solid rgba(96,165,250,.20)",
-  background: "rgba(15,23,42,.72)",
-  color: "#dbeafe",
-  borderRadius: 10,
-  padding: 10,
-  fontWeight: 900,
-  cursor: "pointer",
-};
-
-const v29NewsList = {
-  display: "grid",
-  gap: 8,
-};
-
-const v29News = {
-  display: "grid",
-  gridTemplateColumns: "34px minmax(0,1fr)",
-  gap: 9,
-  alignItems: "center",
-  borderRadius: 10,
-  padding: 10,
-  background: "rgba(255,255,255,.035)",
-  border: "1px solid rgba(255,255,255,.08)",
-};
-
-const v29ConferenceGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
-  gap: 10,
-};
-
-const v29ConferenceCard = {
-  display: "flex",
-  alignItems: "center",
-  gap: 10,
-  borderRadius: 12,
-  border: "1px solid rgba(255,255,255,.08)",
-  background: "rgba(255,255,255,.035)",
-  padding: 11,
-};
-
-const v29ConferenceLogo = {
-  width: 48,
-  height: 48,
-  borderRadius: 12,
-  display: "grid",
-  placeItems: "center",
-  background: "rgba(255,255,255,.055)",
-  border: "1px solid rgba(255,255,255,.08)",
-};
-
-const liquidGlassTile = {
-  background: "linear-gradient(155deg,rgba(15,21,33,.94),rgba(4,7,13,.98))",
-  border: "1px solid rgba(255,255,255,.10)",
-  borderRadius: 9,
-  padding: 13,
-  boxShadow: "0 16px 44px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.05)",
-};
 
 const broadcastCard = {
   background:"linear-gradient(155deg,rgba(14,19,30,.97),rgba(4,7,13,.99))",
   border:"1px solid rgba(255,255,255,.11)",
-  borderTop:"3px solid #dc2626",
+  borderTop:"3px solid var(--cfb-red)",
   borderRadius:10,
   padding:"clamp(16px, 2vw, 24px)",
   boxShadow:"0 22px 70px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.035)"
 };
 
-const broadcastPageCard = {
-  ...card,
-  borderRadius: 10,
-  background: "linear-gradient(155deg,rgba(14,19,30,.98),rgba(4,7,13,.995))",
-  border: "1px solid rgba(255,255,255,.11)",
-  borderTop: "3px solid #dc2626",
-  boxShadow: "0 20px 58px rgba(0,0,0,.38),inset 0 1px rgba(255,255,255,.045)",
-};
-
-
-const dashboardPro = {
-  display: "grid",
-  gap: 18,
-};
-
-const dashboardHeroPro = {
-  display: "grid",
-  gridTemplateColumns: "minmax(0,1fr) minmax(260px, 360px)",
-  gap: 18,
-  alignItems: "center",
-  borderRadius: 24,
-  padding: "clamp(24px, 4vw, 44px)",
-  border: "1px solid rgba(96,165,250,.22)",
-  background: "radial-gradient(circle at 18% 0%, rgba(96,165,250,.22), transparent 30%), radial-gradient(circle at 90% 10%, rgba(124,58,237,.20), transparent 32%), linear-gradient(135deg, rgba(2,6,23,.98), rgba(8,13,31,.96))",
-  boxShadow: "0 28px 90px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.07)",
-};
-
 const dashboardKickerPro = {
-  color: "#60a5fa",
+  color: "#4f8fa8",
   fontWeight: 1000,
   letterSpacing: ".15em",
   textTransform: "uppercase",
   fontSize: 13,
-};
-
-const dashboardTitlePro = {
-  margin: "8px 0 6px",
-  color: "#f8fafc",
-  fontSize: "clamp(44px, 6.6vw, 94px)",
-  lineHeight: .88,
-  letterSpacing: "-.07em",
-  fontWeight: 1000,
-};
-
-const dashboardSubPro = {
-  margin: 0,
-  color: "rgba(226,232,240,.82)",
-  fontSize: "clamp(18px, 2vw, 27px)",
-  fontWeight: 900,
-};
-
-const dashboardControlsPro = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: 10,
-  padding: 14,
-  borderRadius: 16,
-  background: "rgba(2,6,23,.50)",
-  border: "1px solid rgba(255,255,255,.09)",
-};
-
-const dashboardKpiPro = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
-  gap: 12,
-};
-
-const dashboardKpiCardPro = {
-  minHeight: 118,
-  borderRadius: 16,
-  padding: 16,
-  border: "1px solid rgba(255,255,255,.08)",
-  background: "#0f172a",
-  boxShadow: "0 18px 48px rgba(0,0,0,.26), inset 0 1px 0 rgba(255,255,255,.035)",
-  display: "grid",
-  gap: 8,
-  alignContent: "center",
-};
-
-const dashboardFeatureGridPro = {
-  display: "grid",
-  gridTemplateColumns: "minmax(0, 1.15fr) minmax(320px, .85fr)",
-  gap: 16,
-};
-
-const dashboardRankPanelPro = {
-  borderRadius: 20,
-  padding: 18,
-  border: "1px solid rgba(96,165,250,.18)",
-  background: "linear-gradient(145deg, rgba(8,13,31,.96), rgba(3,7,18,.99))",
-  boxShadow: "0 24px 80px rgba(0,0,0,.40), inset 0 1px 0 rgba(255,255,255,.055)",
-  overflowX: "auto",
-};
-
-const dashboardSideStackPro = {
-  display: "grid",
-  gap: 16,
-};
-
-const dashboardSmallPanelPro = {
-  borderRadius: 20,
-  padding: 16,
-  border: "1px solid rgba(148,163,184,.16)",
-  background: "linear-gradient(145deg, rgba(8,13,31,.96), rgba(3,7,18,.99))",
-  boxShadow: "0 18px 55px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.055)",
-};
-
-const dashboardPanelHeaderPro = {
-  display: "grid",
-  gap: 4,
-  marginBottom: 14,
-};
-
-const dashboardRankingListPro = {
-  display: "grid",
-  gap: 9,
-};
-
-
-
-const dashboardMiniListPro = {
-  display: "grid",
-  gap: 8,
-};
-
-const dashboardMiniRowPro = {
-  width: "100%",
-  display: "grid",
-  gridTemplateColumns: "34px 34px minmax(0,1fr) auto",
-  gap: 9,
-  alignItems: "center",
-  border: "1px solid rgba(255,255,255,.08)",
-  borderRadius: 12,
-  padding: 10,
-  background: "rgba(255,255,255,.035)",
-  color: "#fff",
-  textAlign: "left",
-  cursor: "pointer",
-};
-
-const dashboardNewsListPro = {
-  display: "grid",
-  gap: 9,
-};
-
-const dashboardNewsRowPro = {
-  display: "grid",
-  gridTemplateColumns: "34px minmax(0,1fr)",
-  gap: 12,
-  alignItems: "center",
-  borderRadius: 12,
-  padding: "12px 14px",
-  background: "rgba(255,255,255,.035)",
-  border: "1px solid rgba(255,255,255,.08)",
-};
-
-
-
-
-const dashboardTeamCellPro = {
-  display: "flex",
-  alignItems: "center",
-  gap: 18,
-  minWidth: 0,
-  lineHeight: 1,
-};
-
-const dashboardTopThreeMini = {
-  display: "grid",
-  gap: 4,
-  marginTop: 4,
-};
-
-
-const dashboardTableHeadPro = {
-  display: "grid",
-  gridTemplateColumns: "58px minmax(230px,1.25fr) minmax(120px,.7fr) 54px 54px 80px 80px 78px 70px 82px",
-  gap: 12,
-  alignItems: "center",
-  padding: "0 16px 10px",
-  color: "#cbd5e1",
-  fontSize: 12,
-  fontWeight: 1000,
-  letterSpacing: ".08em",
-  textTransform: "uppercase",
-  minWidth: 980,
-};
-
-const dashboardHeaderButtonPro = {
-  background: "transparent",
-  border: 0,
-  color: "rgba(219,234,254,.72)",
-  textAlign: "left",
-  fontSize: 11,
-  fontWeight: 950,
-  textTransform: "uppercase",
-  letterSpacing: ".08em",
-  cursor: "pointer",
-  padding: 0,
-};
-
-const dashboardRankRowPro = {
-  width: "100%",
-  display: "grid",
-  gridTemplateColumns: "58px minmax(230px,1.25fr) minmax(120px,.7fr) 54px 54px 80px 80px 78px 70px 82px",
-  gap: 12,
-  alignItems: "center",
-  border: "1px solid rgba(255,255,255,.08)",
-  borderRadius: 14,
-  padding: "13px 16px",
-  color: "#f8fafc",
-  textAlign: "left",
-  cursor: "pointer",
-  minWidth: 980,
-};
-
-
-const dashboardProV37 = {
-  display: "grid",
-  gap: 18,
-};
-
-const dashboardHeroV37 = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
-  gap: 18,
-  alignItems: "center",
-  borderRadius: 18,
-  padding: "clamp(20px, 4vw, 48px)",
-  border: "1px solid rgba(255,255,255,.08)",
-  background: "#0f172a",
-  boxShadow: "0 24px 80px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.035)",
-  overflow: "hidden",
-};
-
-const dashboardTitleV37={
-  margin: "8px 0 8px",
-  color: "#f8fafc",
-  fontSize: "clamp(34px, 9vw, 92px)",
-  lineHeight: .9,
-  letterSpacing: "-.055em",
-  fontWeight: 1000,
-  overflowWrap: "normal",
-  wordBreak: "normal",
-};
-
-const dashboardRankPanelFullV37 = {
-  borderRadius: 16,
-  padding: 20,
-  border: "1px solid rgba(255,255,255,.08)",
-  background: "#0f172a",
-  boxShadow: "0 24px 70px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.035)",
-  overflowX: "auto",
-  WebkitOverflowScrolling: "touch",
 };
 
 const draftBroadcastPageV37 = {
@@ -16700,8 +11217,8 @@ const draftOnClockHeroV37 = {
   alignItems: "stretch",
   borderRadius: 26,
   padding: "clamp(18px, 4vw, 42px)",
-  border: "1px solid rgba(250,204,21,.34)",
-  background: "radial-gradient(circle at 12% 0%, rgba(250,204,21,.22), transparent 30%), radial-gradient(circle at 90% 0%, rgba(37,99,235,.22), transparent 34%), linear-gradient(135deg, rgba(2,6,23,.98), rgba(30,27,75,.92))",
+  border: "1px solid rgba(201,208,217,.34)",
+  background: "radial-gradient(circle at 12% 0%, rgba(201,208,217,.22), transparent 30%), radial-gradient(circle at 90% 0%, rgba(37,99,235,.22), transparent 34%), linear-gradient(135deg, rgba(2,6,23,.98), rgba(30,27,75,.92))",
   boxShadow: "0 30px 100px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.08)",
   overflow: "hidden",
 };
@@ -16723,7 +11240,7 @@ const draftOnClockNameV37 = {
 };
 
 const draftOnClockMetaV37 = {
-  color: "#facc15",
+  color: "var(--cfb-gold)",
   fontSize: "clamp(24px, 4vw, 48px)",
   fontWeight: 1000,
 };
@@ -16736,19 +11253,6 @@ const draftTimerCardV37 = {
   gap: 8,
   background: "rgba(2,6,23,.62)",
   border: "1px solid rgba(255,255,255,.12)",
-};
-
-const draftTickerV37 = {
-  borderRadius: 16,
-  padding: "12px 16px",
-  display: "flex",
-  gap: 20,
-  overflowX: "auto",
-  background: "linear-gradient(90deg, rgba(250,204,21,.12), rgba(37,99,235,.10))",
-  border: "1px solid rgba(250,204,21,.20)",
-  color: "#f8fafc",
-  fontWeight: 900,
-  whiteSpace: "nowrap",
 };
 
 const draftControlBarV37 = {
@@ -16796,91 +11300,10 @@ const draftBoardRowV37 = {
   minWidth: 720,
 };
 
-const draftAvailableGridV37 = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-  gap: 10,
-  marginTop: 10,
-};
-
-const draftAvailableTileV37 = {
-  minHeight: 136,
-  borderRadius: 16,
-  padding: 12,
-  display: "grid",
-  gap: 6,
-  alignContent: "start",
-  textAlign: "left",
-  color: "#fff",
-  border: "1px solid rgba(255,255,255,.18)",
-  cursor: "pointer",
-  boxShadow: "inset 0 1px 0 rgba(255,255,255,.14), 0 14px 32px rgba(0,0,0,.26)",
-  overflow: "hidden",
-};
-
-const coachPageV37 = {
-  display: "grid",
-  gap: 18,
-};
-
-const coachHeroV37 = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
-  gap: 18,
-  alignItems: "center",
-  borderRadius: 28,
-  padding: "clamp(18px, 4vw, 42px)",
-  border: "1px solid rgba(255,255,255,.18)",
-  boxShadow: "0 30px 100px rgba(0,0,0,.52), inset 0 1px 0 rgba(255,255,255,.08)",
-  overflow: "hidden",
-};
-
-const coachLogoV37 = {
-  width: 142,
-  height: 142,
-  borderRadius: 26,
-  display: "grid",
-  placeItems: "center",
-  background: "rgba(255,255,255,.08)",
-  border: "1px solid rgba(255,255,255,.14)",
-};
-
-const coachNameV37 = {
-  margin: "6px 0",
-  color: "#fff",
-  fontSize: "clamp(38px, 11vw, 96px)",
-  lineHeight: .88,
-  letterSpacing: "-.055em",
-  fontWeight: 1000,
-  overflowWrap: "anywhere",
-};
-
 const coachSubV37 = {
   margin: 0,
   color: "rgba(226,232,240,.82)",
   fontWeight: 850,
-};
-
-const coachPrestigeV37 = {
-  display: "grid",
-  gap: 6,
-  textAlign: "center",
-  borderRadius: 20,
-  padding: 18,
-  background: "rgba(2,6,23,.58)",
-  border: "1px solid rgba(255,255,255,.12)",
-};
-
-const coachQuickStatsV37 = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))",
-  gap: 12,
-};
-
-const coachGridV37 = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-  gap: 16,
 };
 
 const coachPanelV37 = {
@@ -16889,14 +11312,6 @@ const coachPanelV37 = {
 };
 
 
-const dashboardWirePanelV38 = {
-  borderRadius: 16,
-  padding: 18,
-  border: "1px solid rgba(255,255,255,.08)",
-  background: "#0f172a",
-  boxShadow: "0 18px 55px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.035)",
-};
-
 const draftLowerThirdV38 = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
@@ -16904,9 +11319,9 @@ const draftLowerThirdV38 = {
   alignItems: "center",
   borderRadius: 14,
   padding: "12px 16px",
-  background: "linear-gradient(90deg, rgba(250,204,21,.92), rgba(217,119,6,.88))",
-  color: "#020617",
-  border: "1px solid rgba(250,204,21,.35)",
+  background: "linear-gradient(90deg, rgba(201,208,217,.92), rgba(217,119,6,.88))",
+  color: "var(--cfb-ink)",
+  border: "1px solid rgba(201,208,217,.35)",
   boxShadow: "0 18px 48px rgba(0,0,0,.30)",
   fontWeight: 1000,
   overflow: "hidden",
@@ -16916,66 +11331,13 @@ const draftEspnTickerV38 = {
   borderRadius: 0,
   padding: "10px 0",
   overflow: "hidden",
-  background: "linear-gradient(90deg, #020617, #111827)",
-  borderTop: "2px solid #facc15",
-  borderBottom: "2px solid #facc15",
-  color: "#f8fafc",
+  background: "linear-gradient(90deg, var(--cfb-ink), #111827)",
+  borderTop: "2px solid var(--cfb-gold)",
+  borderBottom: "2px solid var(--cfb-gold)",
+  color: "var(--cfb-text)",
   fontWeight: 1000,
   whiteSpace: "nowrap",
   textTransform: "uppercase",
-};
-
-const coachFeatureGridV38 = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-  gap: 16,
-};
-
-const coachPrestigeTrendV38 = {
-  height: 170,
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(36px,1fr))",
-  alignItems: "end",
-  gap: 10,
-  padding: "18px 6px 4px",
-};
-
-const coachTrendColumnV38 = {
-  height: 150,
-  display: "grid",
-  gridTemplateRows: "1fr auto",
-  alignItems: "end",
-  gap: 8,
-  textAlign: "center",
-};
-
-const coachTrendBarV38 = {
-  width: "100%",
-  minHeight: 12,
-  borderRadius: "10px 10px 4px 4px",
-  boxShadow: "0 12px 30px rgba(0,0,0,.28)",
-};
-
-const coachRecruitGraphV38 = {
-  display: "grid",
-  gap: 8,
-};
-
-const coachTrophyGridV38 = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(92px, 1fr))",
-  gap: 10,
-};
-
-const coachTrophyV38 = {
-  minHeight: 96,
-  borderRadius: 14,
-  display: "grid",
-  placeItems: "center",
-  textAlign: "center",
-  padding: 10,
-  background: "rgba(255,255,255,.045)",
-  border: "1px solid rgba(255,255,255,.10)",
 };
 
 const draftTickerTrackV39 = {
@@ -16998,7 +11360,7 @@ const draftAssetPreviewV40 = {
 };
 
 const draftBroadcastEyebrowV40 = {
-  color: "#93c5fd",
+  color: "#9cc3d1",
   fontSize: 13,
   fontWeight: 1000,
   letterSpacing: ".18em",
@@ -17031,85 +11393,10 @@ const draftBestGridV40 = {
   gap: 12,
 };
 
-const draftBestTileV40 = {
-  display: "grid",
-  gridTemplateColumns: "1fr",
-  gap: 8,
-  justifyItems: "center",
-  alignContent: "center",
-  minHeight: 188,
-  borderRadius: 18,
-  padding: 16,
-  color: "#fff",
-  border: "1px solid rgba(255,255,255,.16)",
-  textAlign: "center",
-  cursor: "pointer",
-  overflow: "hidden",
-};
-
-const draftTileRatingsV40 = {
-  color: "rgba(255,255,255,.78)",
-  fontWeight: 800,
-  position: "relative",
-  zIndex: 1,
-};
-
-const draftTileScoreV40 = {
-  color: "#dbeafe",
-  fontWeight: 1000,
-  position: "relative",
-  zIndex: 1,
-};
-
-
-const draftBestRankV41 = {
-  color: "#dbeafe",
-  fontWeight: 1000,
-};
-
-const draftBestLogoV41 = {
-  display: "grid",
-  placeItems: "center",
-};
-
-const draftBestTeamInfoV41 = {
-  display: "grid",
-  gap: 4,
-  minWidth: 0,
-};
-
-const draftBestScoreV41 = {
-  justifySelf: "end",
-  fontSize: 22,
-  fontWeight: 1000,
-  color: "#f8fafc",
-};
-
-const coachFullWidthTableV41 = {
-  ...broadcastCard,
-  width: "100%",
-  maxWidth: "100%",
-  overflow: "hidden",
-  borderRadius: 18,
-  border: "1px solid rgba(71,85,105,.70)",
-  background: "linear-gradient(145deg, rgba(15,23,42,.97), rgba(2,6,23,.99))",
-};
-
-const coachStatsTableWrapV41 = {
-  width: "100%",
-  maxWidth: "100%",
-  overflowX: "auto",
-  overflowY: "hidden",
-  WebkitOverflowScrolling: "touch",
-  touchAction: "pan-x pan-y",
-  marginTop: 12,
-  paddingBottom: 6,
-};
-
 const tableSortButtonV41 = {
   background: "transparent",
   border: 0,
-  color: "#c4b5fd",
+  color: "#9a8fd1",
   fontWeight: 1000,
   textTransform: "uppercase",
   letterSpacing: ".08em",
@@ -17140,7 +11427,7 @@ const draftConferencePowerTileV42 = {
   padding: 12,
   background: "rgba(2,6,23,.52)",
   border: "1px solid rgba(148,163,184,.18)",
-  color: "#f8fafc",
+  color: "var(--cfb-text)",
 };
 
 const draftConferencePowerTopV42 = {
@@ -17170,7 +11457,7 @@ const draftBestTileV43 = {
   minHeight: 172,
   borderRadius: 18,
   padding: 14,
-  color: "#f8fafc",
+  color: "var(--cfb-text)",
   border: "1px solid rgba(255,255,255,.08)",
   textAlign: "center",
   cursor: "pointer",
@@ -17198,7 +11485,7 @@ const draftBestTeamNameV43 = {
 };
 
 const draftBestStarsV43 = {
-  color: "#facc15",
+  color: "var(--cfb-gold)",
   fontSize: 15,
   letterSpacing: ".05em",
   minHeight: 20,
@@ -17256,18 +11543,6 @@ const coachNameV43 = {
   overflowWrap: "anywhere",
 };
 
-const coachHeroMetricsV43 = {
-  display: "grid",
-  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-  gap: 10,
-};
-
-const coachResumeStripV43 = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-  gap: 12,
-};
-
 const coachProfileGridV43 = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
@@ -17280,18 +11555,6 @@ const tableEmptyStateV43 = {
   fontWeight: 800,
 };
 
-
-const wireTextStackV45 = {
-  display: "grid",
-  gap: 2,
-  minWidth: 0,
-};
-
-const dashboardTileSubV45 = {
-  color: "rgba(226,232,240,.78)",
-  fontWeight: 850,
-  lineHeight: 1.35,
-};
 
 const coachHeroMetricsV45 = {
   display: "grid",
@@ -17310,39 +11573,6 @@ const coachHeroMetricV45 = {
 };
 
 
-
-const cfpRevealGridV46 = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-  gap: 12,
-  margin: "14px 0 24px",
-};
-
-const cfpRevealCardV46 = {
-  display: "grid",
-  gridTemplateColumns: "46px 54px minmax(0,1fr) auto",
-  gap: 12,
-  alignItems: "center",
-  borderRadius: 14,
-  padding: 14,
-  color: "#f8fafc",
-  border: "1px solid rgba(255,255,255,.10)",
-  textAlign: "left",
-  cursor: "pointer",
-  boxShadow: "0 18px 48px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.06)",
-};
-
-const cfpRankV46 = {
-  fontSize: 22,
-  fontWeight: 1000,
-  color: "#d4af37",
-};
-
-const cfpTeamTextV46 = {
-  display: "grid",
-  gap: 3,
-  minWidth: 0,
-};
 
 const coachTrophyCaseV46 = {
   ...broadcastCard,
@@ -17389,8 +11619,8 @@ const coachMilestoneTileV46 = {
 const warRoomModePanelV46 = {
   borderRadius: 16,
   padding: 16,
-  border: "1px solid rgba(212,175,55,.22)",
-  background: "#0f172a",
+  border: "1px solid rgba(201,208,217,.22)",
+  background: "var(--cfb-panel)",
   boxShadow: "0 18px 55px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.035)",
 };
 
@@ -17399,75 +11629,6 @@ const warRoomModeGridV46 = {
   gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
   gap: 12,
 };
-
-const warRoomListV46 = {
-  borderRadius: 14,
-  padding: 12,
-  background: "rgba(255,255,255,.035)",
-  border: "1px solid rgba(255,255,255,.08)",
-};
-
-const warRoomRowV46 = {
-  width: "100%",
-  display: "grid",
-  gridTemplateColumns: "34px 32px minmax(0,1fr) auto",
-  gap: 8,
-  alignItems: "center",
-  border: 0,
-  borderRadius: 10,
-  padding: "9px 8px",
-  color: "#f8fafc",
-  background: "transparent",
-  textAlign: "left",
-  cursor: "pointer",
-};
-
-const hofRankingGridV46 = {
-  display: "grid",
-  gap: 10,
-  marginTop: 16,
-};
-
-const hofRankingCardV46 = {
-  display: "grid",
-  gridTemplateColumns: "70px minmax(0,1fr) auto",
-  gap: 14,
-  alignItems: "center",
-  borderRadius: 16,
-  padding: 16,
-  background: "linear-gradient(145deg, rgba(15,23,42,.96), rgba(2,6,23,.99))",
-  border: "1px solid rgba(212,175,55,.18)",
-};
-
-const hofRankNumberV46 = {
-  fontSize: 24,
-  fontWeight: 1000,
-  color: "#d4af37",
-};
-
-
-const dashboardRankNumberV47 = {
-  display: "inline-grid",
-  placeItems: "center",
-  width: 42,
-  height: 34,
-  borderRadius: 10,
-  background: "linear-gradient(135deg, rgba(212,175,55,.98), rgba(146,111,23,.94))",
-  color: "#020617",
-  fontStyle: "normal",
-  fontWeight: 1000,
-  boxShadow: "0 10px 24px rgba(212,175,55,.18), inset 0 1px 0 rgba(255,255,255,.30)",
-};
-
-const dashboardTileLinesV47 = {
-  display: "grid",
-  gap: 3,
-};
-
-const cfpGoldTextV47 = {
-  color: "#d4af37",
-};
-
 
 const draftConferenceSortBarV48 = {
   display: "flex",
@@ -17485,9 +11646,9 @@ const draftConferenceSortBarV48 = {
 };
 
 const draftConferenceSortSelectV48 = {
-  background: "#020617",
+  background: "var(--cfb-ink)",
   border: "1px solid rgba(255,255,255,.12)",
-  color: "#f8fafc",
+  color: "var(--cfb-text)",
   borderRadius: 10,
   padding: "10px 12px",
   fontWeight: 900,
@@ -17496,7 +11657,7 @@ const draftConferenceSortSelectV48 = {
 
 
 const draftTickerClockV49 = {
-  color: "#d4af37",
+  color: "#c9d0d9",
   fontWeight: 1000,
 };
 
@@ -17537,28 +11698,10 @@ const warRoomRowV49 = {
   border: "1px solid rgba(255,255,255,.07)",
   borderRadius: 10,
   padding: "9px 8px",
-  color: "#f8fafc",
+  color: "var(--cfb-text)",
   background: "rgba(2,6,23,.35)",
   textAlign: "left",
   cursor: "pointer",
-};
-
-
-const coachMenuLogoPlateV51 = {
-  width: 90,
-  height: 90,
-  minWidth: 90,
-  borderRadius: 20,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  background: "linear-gradient(180deg, rgba(255,255,255,.13), rgba(255,255,255,.045))",
-  border: "1px solid rgba(255,255,255,.18)",
-  boxShadow: "0 16px 34px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.13)",
-  position: "relative",
-  zIndex: 2,
-  overflow: "visible",
-  flexShrink: 0,
 };
 
 
@@ -17645,21 +11788,6 @@ const conferencePowerNameV54 = {
 };
 
 
-const coachMobileEmptyStateV56 = {
-  marginTop: 14,
-  padding: "18px",
-  borderRadius: 14,
-  background: "rgba(255,255,255,.035)",
-  border: "1px solid rgba(255,255,255,.07)",
-  color: "rgba(226,232,240,.86)",
-  display: "grid",
-  gap: 6,
-  lineHeight: 1.35,
-  whiteSpace: "normal",
-  overflowWrap: "break-word",
-};
-
-
 const prestigeStarsWrapV57 = {
   display: "inline-flex",
   alignItems: "center",
@@ -17686,7 +11814,7 @@ const prestigeStarFillV57 = {
   top: 0,
   height: "100%",
   overflow: "hidden",
-  color: "#d4af37",
+  color: "#c9d0d9",
   display: "block",
   whiteSpace: "nowrap",
 };
@@ -17740,7 +11868,7 @@ const allTeamsTableV58 = {
   minWidth: 980,
   borderCollapse: "separate",
   borderSpacing: "0 8px",
-  color: "#f8fafc",
+  color: "var(--cfb-text)",
 };
 
 const allTeamsRowV58 = {
@@ -17765,7 +11893,7 @@ const conferenceMultiFilterV60 = {
 const conferenceFilterPillV60 = {
   border: "1px solid rgba(255,255,255,.12)",
   background: "rgba(15,23,42,.88)",
-  color: "#f8fafc",
+  color: "var(--cfb-text)",
   borderRadius: 999,
   padding: "9px 12px",
   fontWeight: 950,
@@ -17773,14 +11901,14 @@ const conferenceFilterPillV60 = {
 };
 
 const conferenceFilterPillActiveV60 = {
-  border: "1px solid rgba(212,175,55,.72)",
-  background: "linear-gradient(135deg, rgba(212,175,55,.30), rgba(15,23,42,.92))",
+  border: "1px solid rgba(201,208,217,.72)",
+  background: "linear-gradient(135deg, rgba(201,208,217,.30), rgba(15,23,42,.92))",
   color: "#fef3c7",
   borderRadius: 999,
   padding: "9px 12px",
   fontWeight: 1000,
   cursor: "pointer",
-  boxShadow: "0 0 18px rgba(212,175,55,.16)",
+  boxShadow: "0 0 18px rgba(201,208,217,.16)",
 };
 
 
@@ -17795,14 +11923,14 @@ const saveAssetButtonV61 = {
 };
 
 const saveAssetButtonDirtyV61 = {
-  border: "1px solid rgba(212,175,55,.72)",
-  background: "linear-gradient(135deg, rgba(212,175,55,.95), rgba(180,83,9,.95))",
-  color: "#020617",
+  border: "1px solid rgba(201,208,217,.72)",
+  background: "linear-gradient(135deg, rgba(201,208,217,.95), rgba(180,83,9,.95))",
+  color: "var(--cfb-ink)",
   borderRadius: 12,
   padding: "11px 12px",
   fontWeight: 1000,
   cursor: "pointer",
-  boxShadow: "0 12px 28px rgba(212,175,55,.18)",
+  boxShadow: "0 12px 28px rgba(201,208,217,.18)",
 };
 
 
@@ -17817,74 +11945,7 @@ const recruitingRankingsTableV62 = {
   minWidth: 980,
   borderCollapse: "separate",
   borderSpacing: "0 8px",
-  color: "#f8fafc",
-};
-
-
-const dashboardFeatureGridV64 = {
-  display: "grid",
-  gridTemplateColumns: "minmax(0, 1.15fr) minmax(280px, .75fr) minmax(280px, .85fr)",
-  gap: 16,
-};
-
-const coachSpotlightCardV64 = {
-  ...broadcastCard,
-  background: "linear-gradient(135deg, rgba(15,23,42,.98), rgba(2,6,23,.98))",
-  border: "1px solid rgba(212,175,55,.22)",
-};
-
-const coachSpotlightInnerV64 = {
-  display: "grid",
-  gridTemplateColumns: "110px minmax(0,1fr)",
-  gap: 18,
-  alignItems: "center",
-  marginTop: 10,
-};
-
-const coachSpotlightTextV64 = {
-  display: "grid",
-  gap: 8,
-  minWidth: 0,
-};
-
-const coachSpotlightStatsV64 = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: 8,
-  alignItems: "center",
-};
-
-const dashboardMiniPanelV64 = {
-  ...broadcastCard,
-  minHeight: 260,
-};
-
-const dashboardMiniListV64 = {
-  display: "grid",
-  gap: 8,
-  marginTop: 10,
-};
-
-const dashboardMiniRowV64 = {
-  display: "grid",
-  gridTemplateColumns: "36px minmax(0,1fr) auto auto",
-  gap: 10,
-  alignItems: "center",
-  padding: "10px 12px",
-  borderRadius: 12,
-  background: "rgba(255,255,255,.04)",
-  border: "1px solid rgba(255,255,255,.07)",
-};
-
-const dashboardResultRowV64 = {
-  display: "grid",
-  gridTemplateColumns: "70px minmax(0,1fr) minmax(0,1fr)",
-  gap: 8,
-  alignItems: "center",
-  padding: "10px 12px",
-  borderRadius: 12,
-  background: "rgba(255,255,255,.04)",
-  border: "1px solid rgba(255,255,255,.07)",
+  color: "var(--cfb-text)",
 };
 
 
@@ -17909,65 +11970,6 @@ const teamBroadcastTextV66 = {
   lineHeight: 1.05,
 };
 
-const coachSpotlightTeamLineV66 = {
-  color: "#d4af37",
-  fontWeight: 1000,
-  letterSpacing: ".06em",
-  textTransform: "uppercase",
-};
-
-const dashboardResultTeamV66 = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 8,
-  minWidth: 0,
-};
-
-const dashboardConferenceTopV66 = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
-};
-
-
-const draftConferenceBadgeV68 = {
-  position: "absolute",
-  right: 10,
-  top: 10,
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
-  padding: "5px 7px",
-  borderRadius: 999,
-  background: "rgba(2,6,23,.54)",
-  border: "1px solid rgba(255,255,255,.14)",
-  color: "rgba(248,250,252,.86)",
-  fontWeight: 900,
-  fontSize: 10,
-  letterSpacing: ".04em",
-  textTransform: "uppercase",
-};
-
-const draftAvailableTopLineV68 = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: 8,
-};
-
-const draftConferencePillV68 = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 5,
-  padding: "4px 6px",
-  borderRadius: 999,
-  background: "rgba(2,6,23,.42)",
-  border: "1px solid rgba(255,255,255,.12)",
-  fontSize: 10,
-  fontWeight: 900,
-  color: "rgba(248,250,252,.88)",
-};
-
 const tableScrollWrapV68 = {
   overflowX: "auto",
   WebkitOverflowScrolling: "touch",
@@ -17979,34 +11981,8 @@ const wideManagerTableV68 = {
   width: "100%",
   borderCollapse: "separate",
   borderSpacing: 0,
-  color: "#f8fafc",
+  color: "var(--cfb-text)",
 };
-
-
-const draftConferenceBadgeV69 = {
-  position: "absolute",
-  right: 10,
-  top: 10,
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
-  maxWidth: "calc(100% - 68px)",
-  padding: "5px 8px",
-  borderRadius: 999,
-  background: "rgba(2,6,23,.66)",
-  border: "1px solid rgba(255,255,255,.16)",
-  color: "rgba(248,250,252,.92)",
-  fontWeight: 1000,
-  fontSize: 10,
-  letterSpacing: ".04em",
-  textTransform: "uppercase",
-  boxShadow: "0 10px 24px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.08)",
-  backdropFilter: "blur(10px)",
-  overflow: "hidden",
-  whiteSpace: "nowrap",
-  textOverflow: "ellipsis",
-};
-
 
 
 const draftConferenceBadgeV70 = {
@@ -18050,14 +12026,6 @@ const draftNilPipelineMiniV77 = {
   fontWeight: 800,
 };
 
-const draftNilCompactLineV77 = {
-  display: "block",
-  marginTop: 5,
-  color: "rgba(248,250,252,.78)",
-  fontWeight: 900,
-};
-
-
 const draftAvailableBestGridV79 = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))",
@@ -18076,251 +12044,6 @@ const draftSortStatusV80 = {
 };
 
 
-const coachNavTeamNameV82 = {
-  display: "block",
-  fontSize: "clamp(18px, 3.4vw, 27px)",
-  lineHeight: .92,
-  letterSpacing: "-.045em",
-  fontWeight: 1000,
-  color: "#fff",
-  textShadow: "0 10px 26px rgba(0,0,0,.30)",
-  overflowWrap: "anywhere",
-};
-
-const coachNavUserNameV82 = {
-  display: "block",
-  marginTop: 5,
-  color: "rgba(248,250,252,.84)",
-  fontSize: "clamp(11px, 2.4vw, 13px)",
-  lineHeight: 1.05,
-  fontWeight: 900,
-  overflowWrap: "anywhere",
-};
-
-
-const coachNavTextWrapV83 = {
-  position: "relative",
-  zIndex: 2,
-  minWidth: 0,
-  display: "grid",
-  gap: 4,
-  alignContent: "center",
-};
-
-const coachNavTeamNameV83 = {
-  display: "block",
-  color: "#fff",
-  fontSize: "clamp(16px, 3.4vw, 26px)",
-  lineHeight: .94,
-  letterSpacing: "-.055em",
-  fontWeight: 1000,
-  overflowWrap: "anywhere",
-  textShadow: "0 10px 26px rgba(0,0,0,.35)",
-};
-
-const coachNavUserNameV83 = {
-  display: "block",
-  color: "rgba(248,250,252,.84)",
-  fontSize: "clamp(11px, 2.2vw, 13px)",
-  lineHeight: 1.05,
-  fontWeight: 900,
-  overflowWrap: "anywhere",
-  textTransform: "none",
-};
-
-
-const coachMenuLogoPlateV86 = {
-  position: "relative",
-  zIndex: 3,
-  width: 88,
-  height: 88,
-  minWidth: 88,
-  minHeight: 88,
-  borderRadius: 20,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  overflow: "hidden",
-  background: "linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.04))",
-  border: "1px solid rgba(255,255,255,.20)",
-  boxShadow: "0 14px 30px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.15)",
-};
-
-const coachNavTextWrapV86 = {
-  position: "relative",
-  zIndex: 4,
-  minWidth: 0,
-  display: "grid",
-  gap: 4,
-  alignContent: "center",
-  overflow: "hidden",
-  paddingLeft: 8,
-};
-
-
-const gameCenterPageV87 = { display:"grid", gap:18 };
-const gameCenterHeroV87 = { ...liquidGlassPanel, display:"flex", justifyContent:"space-between", alignItems:"center", gap:18, padding:24, background:"radial-gradient(circle at 0 0, rgba(250,204,21,.16), transparent 35%), linear-gradient(135deg, rgba(2,6,23,.98), rgba(15,23,42,.96))" };
-const gameCenterTitleV87 = { margin:"4px 0", fontSize:"clamp(42px,8vw,86px)", lineHeight:.88, letterSpacing:"-.07em", fontWeight:1000, color:"#fff" };
-const gameCenterHeroStatV87 = { minWidth:150, textAlign:"center", padding:18, borderRadius:18, background:"rgba(255,255,255,.06)", border:"1px solid rgba(255,255,255,.12)" };
-const gameCenterHeroStatV87b = {};
-const gameCenterFiltersV87 = { display:"grid", gridTemplateColumns:"180px minmax(220px,1fr) 180px", gap:10 };
-const gameCenterFeaturedV87 = { borderRadius:24, border:"1px solid rgba(255,255,255,.16)", padding:20, boxShadow:"0 24px 60px rgba(0,0,0,.32)" };
-const gameCenterFeaturedLabelV87 = { textAlign:"center", color:"#facc15", fontWeight:1000, letterSpacing:".12em", fontSize:12 };
-const gameCenterFeaturedTeamsV87 = { display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:20, alignItems:"center", marginTop:14 };
-const gameCenterVsV87 = { fontWeight:1000, fontSize:18, color:"#f8fafc", textAlign:"center" };
-const gameCenterGridV87 = { display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(310px,1fr))", gap:14 };
-const gameCenterCardV87 = { borderRadius:20, border:"1px solid rgba(255,255,255,.12)", background:"linear-gradient(145deg,rgba(15,23,42,.96),rgba(2,6,23,.98))", padding:16, boxShadow:"0 16px 38px rgba(0,0,0,.26)" };
-const gameCenterCardTopV87 = { display:"flex", justifyContent:"space-between", color:"rgba(226,232,240,.78)", fontSize:11, fontWeight:1000, letterSpacing:".08em" };
-const gameCenterMatchupV87 = { display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:10, alignItems:"center", marginTop:14 };
-const gameCenterTeamV87 = { display:"grid", justifyItems:"center", gap:6, textAlign:"center", color:"#fff" };
-const gameCenterTeamCompactV87 = { display:"grid", justifyItems:"center", gap:4, textAlign:"center", color:"#fff", minWidth:0 };
-const gameCenterRankV87 = { color:"#facc15", fontSize:13 };
-const gameCenterFinalScoreV87 = { textAlign:"center", marginTop:12, fontSize:22, fontWeight:1000, color:"#fff" };
-
-const dashboardSchedulePanelV87 = { ...liquidGlassPanel, padding:18, display:"grid", gap:14 };
-const dashboardGameOfWeekV87 = { border:"1px solid rgba(250,204,21,.28)", borderRadius:20, padding:16, color:"#fff", cursor:"pointer" };
-const dashboardGameEyebrowV87 = { textAlign:"center", color:"#facc15", fontWeight:1000, letterSpacing:".12em", fontSize:11 };
-const dashboardMatchupRowV87 = { display:"grid", gridTemplateColumns:"1fr auto 1fr", alignItems:"center", gap:12, marginTop:12 };
-const dashboardMatchupTeamV87 = { display:"flex", alignItems:"center", justifyContent:"center", gap:8, fontWeight:1000 };
-const dashboardScheduleGridV87 = { display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(230px,1fr))", gap:10 };
-const dashboardScheduleCardV87 = { display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:8, alignItems:"center", padding:10, borderRadius:14, background:"rgba(15,23,42,.78)", border:"1px solid rgba(255,255,255,.10)", color:"#fff", cursor:"pointer" };
-const dashboardScheduleSideV87 = { display:"flex", alignItems:"center", gap:5, minWidth:0, fontSize:12, fontWeight:1000 };
-const dashboardScheduleLinkV87 = { justifySelf:"end", border:0, background:"transparent", color:"#facc15", fontWeight:1000, cursor:"pointer" };
-
-
-const gameCenterMetaV89 = { display:"flex", justifyContent:"space-between", gap:8, marginTop:12, color:"rgba(226,232,240,.72)", fontSize:10, fontWeight:900, textTransform:"uppercase", letterSpacing:".05em" };
-const gameCenterGotwButtonV89 = { width:"100%", marginTop:12, border:"1px solid rgba(250,204,21,.35)", borderRadius:12, padding:"9px 12px", background:"rgba(250,204,21,.10)", color:"#facc15", fontWeight:1000, cursor:"pointer" };
-const dashboardFeatureGridV89 = { display:"grid", gridTemplateColumns:"minmax(300px,.75fr) minmax(0,1.5fr)", gap:16 };
-const dashboardConferencePowerWideV89 = { ...liquidGlassPanel, padding:18, minWidth:0 };
-const dashboardConferenceHeadV89 = { display:"grid", gridTemplateColumns:"60px 1.3fr 1fr 80px 70px 90px 70px 80px", gap:10, padding:"0 12px 8px", color:"rgba(226,232,240,.58)", fontSize:10, fontWeight:1000, textTransform:"uppercase", letterSpacing:".06em" };
-const dashboardConferenceRowsV89 = { display:"grid", gap:8 };
-const dashboardConferenceRowV89 = { display:"grid", gridTemplateColumns:"60px 1.3fr 1fr 80px 70px 90px 70px 80px", gap:10, alignItems:"center", padding:"10px 12px", borderRadius:14, border:"1px solid rgba(255,255,255,.10)", color:"#fff", fontSize:12 };
-const dashboardSchedulePanelV89 = { ...liquidGlassPanel, padding:18, display:"grid", gap:14 };
-const dashboardSeasonWeeksV89 = { display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(310px,1fr))", gap:12 };
-const dashboardWeekGroupV89 = { borderRadius:16, padding:12, background:"rgba(15,23,42,.68)", border:"1px solid rgba(255,255,255,.10)" };
-const dashboardWeekHeaderV89 = { display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10, color:"#fff" };
-const dashboardWeekGamesV89 = { display:"grid", gap:8 };
-const dashboardScheduleCardV89 = { display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:8, alignItems:"center", padding:9, borderRadius:12, background:"rgba(2,6,23,.72)", border:"1px solid rgba(255,255,255,.08)", color:"#fff", cursor:"pointer" };
-
-
-const gameCenterControlNoteV90 = {
-  padding:"10px 14px",
-  borderRadius:12,
-  background:"rgba(250,204,21,.08)",
-  border:"1px solid rgba(250,204,21,.22)",
-  color:"rgba(248,250,252,.90)",
-  fontSize:12,
-};
-
-const gameCenterConferenceLogosV90 = {
-  display:"inline-flex",
-  alignItems:"center",
-  justifyContent:"center",
-  gap:8,
-};
-
-const dashboardConferenceLogoCellV90 = {
-  display:"flex",
-  alignItems:"center",
-  justifyContent:"flex-start",
-};
-
-const dashboardScheduleSideV90 = {
-  display:"grid",
-  gridTemplateColumns:"34px 38px minmax(0,1fr)",
-  alignItems:"center",
-  justifyItems:"center",
-  gap:6,
-  minWidth:0,
-  fontSize:12,
-  fontWeight:1000,
-};
-
-const gameCenterTeamV90 = {
-  display:"grid",
-  justifyItems:"center",
-  alignContent:"start",
-  gap:7,
-  textAlign:"center",
-  color:"#fff",
-  minWidth:0,
-};
-
-const gameCenterTeamCompactV90 = {
-  display:"grid",
-  justifyItems:"center",
-  alignContent:"start",
-  gap:5,
-  textAlign:"center",
-  color:"#fff",
-  minWidth:0,
-};
-
-const gameCenterRankLogoV90 = {
-  display:"grid",
-  justifyItems:"center",
-  alignItems:"center",
-  gap:3,
-  minHeight:72,
-};
-
-const gameCenterRankV90 = {
-  color:"#facc15",
-  fontSize:13,
-  lineHeight:1,
-};
-
-const gameCenterTeamNameV90 = {
-  display:"block",
-  lineHeight:1.05,
-  minHeight:"2.1em",
-};
-
-const gameCenterUserV90 = {
-  color:"rgba(248,250,252,.82)",
-  lineHeight:1.05,
-};
-
-
-const gameCenterRankLogoV91 = {
-  position:"relative",
-  display:"inline-grid",
-  placeItems:"center",
-  minWidth:64,
-  minHeight:64,
-};
-
-const gameCenterRankBadgeV91 = {
-  position:"absolute",
-  top:-4,
-  right:-8,
-  zIndex:5,
-  minWidth:30,
-  height:24,
-  padding:"0 7px",
-  borderRadius:999,
-  display:"inline-flex",
-  alignItems:"center",
-  justifyContent:"center",
-  background:"#facc15",
-  color:"#111827",
-  border:"2px solid rgba(2,6,23,.95)",
-  boxShadow:"0 8px 18px rgba(0,0,0,.35)",
-  fontSize:11,
-  fontWeight:1000,
-  lineHeight:1,
-};
-
-const dashboardConferenceMobileMetricsV91 = {
-  display:"none",
-  gridColumn:"1 / -1",
-  gridTemplateColumns:"repeat(5,minmax(0,1fr))",
-  gap:6,
-  marginTop:8,
-  paddingTop:8,
-  borderTop:"1px solid rgba(255,255,255,.10)",
-};
-
 const actionRow = {
   display:"flex",
   alignItems:"center",
@@ -18331,16 +12054,15 @@ const actionRow = {
 
 // CFBElite v2 presentation system
 const v2Page={display:"grid",gap:16,width:"100%",paddingBottom:24};
-const v2PageHero={display:"flex",alignItems:"center",justifyContent:"space-between",gap:22,flexWrap:"wrap",padding:"clamp(20px,3vw,34px)",borderRadius:10,background:"radial-gradient(circle at 88% 0%,rgba(220,38,38,.16),transparent 34%),linear-gradient(118deg,#05070c,#101827 64%,#080b12)",border:"1px solid rgba(255,255,255,.13)",borderTop:"4px solid #dc2626",boxShadow:"0 22px 60px rgba(0,0,0,.34)"};
-const v2Eyebrow={display:"block",color:"#facc15",fontSize:11,fontWeight:1000,letterSpacing:".17em",textTransform:"uppercase",marginBottom:8};
+const v2PageHero={display:"flex",alignItems:"center",justifyContent:"space-between",gap:22,flexWrap:"wrap",padding:"clamp(20px,3vw,34px)",borderRadius:10,background:"radial-gradient(circle at 88% 0%,rgba(220,38,38,.16),transparent 34%),linear-gradient(118deg,var(--cfb-ink),#101827 64%,#080b12)",border:"1px solid rgba(255,255,255,.13)",borderTop:"4px solid var(--cfb-red)",boxShadow:"0 22px 60px rgba(0,0,0,.34)"};
+const v2Eyebrow={display:"block",color:"var(--cfb-gold)",fontSize:11,fontWeight:1000,letterSpacing:".17em",textTransform:"uppercase",marginBottom:8};
 const v2PageTitle={margin:0,fontSize:"clamp(40px,5.4vw,72px)",lineHeight:.96,letterSpacing:"-.055em",fontWeight:1000,color:"#fff"};
 const v2DashboardTitle={...v2PageTitle,fontSize:"clamp(38px,5vw,66px)",maxWidth:760};
 const v2PageSub={margin:"10px 0 0",color:"#cbd5e1",fontSize:"clamp(13px,1.5vw,16px)",lineHeight:1.55,maxWidth:760};
 const v2Panel={background:"linear-gradient(155deg,rgba(14,19,30,.985),rgba(4,7,13,.995))",border:"1px solid rgba(255,255,255,.11)",borderRadius:10,padding:"clamp(16px,2.2vw,26px)",boxShadow:"0 16px 42px rgba(0,0,0,.28)",minWidth:0,overflow:"hidden"};
 const v2PanelHeader={display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:16,flexWrap:"wrap",marginBottom:18};
-const v2PrimaryButton={border:"1px solid #ef4444",borderRadius:5,padding:"11px 15px",background:"linear-gradient(135deg,#dc2626,#991b1b)",color:"#fff",fontWeight:1000,cursor:"pointer",boxShadow:"0 10px 24px rgba(220,38,38,.16)",textTransform:"uppercase",letterSpacing:".04em"};
-const v2GhostButton={border:"1px solid rgba(148,163,184,.32)",borderRadius:11,padding:"10px 14px",background:"rgba(15,23,42,.78)",color:"#f8fafc",fontWeight:900,cursor:"pointer"};
-const v2TextButton={border:0,background:"transparent",color:"#facc15",fontWeight:900,cursor:"pointer",padding:4};
+const v2PrimaryButton={border:"1px solid var(--cfb-danger)",borderRadius:5,padding:"11px 15px",background:"linear-gradient(135deg,var(--cfb-red),#991b1b)",color:"#fff",fontWeight:1000,cursor:"pointer",boxShadow:"0 10px 24px rgba(220,38,38,.16)",textTransform:"uppercase",letterSpacing:".04em"};
+const v2GhostButton={border:"1px solid rgba(148,163,184,.32)",borderRadius:11,padding:"10px 14px",background:"rgba(15,23,42,.78)",color:"var(--cfb-text)",fontWeight:900,cursor:"pointer"};
 const v2DangerSoft={border:"1px solid rgba(248,113,113,.30)",borderRadius:11,padding:"10px 13px",background:"rgba(127,29,29,.22)",color:"#fecaca",fontWeight:900,cursor:"pointer"};
 const v2DangerButton={...v2DangerSoft,background:"#b91c1c",borderColor:"#fca5a5",color:"#fff"};
 const v2Input={background:"rgba(2,6,23,.88)",border:"1px solid rgba(148,163,184,.32)",color:"#fff",borderRadius:11,padding:"11px 12px",minHeight:44,minWidth:0,maxWidth:"100%"};
@@ -18349,53 +12071,25 @@ const v2InlineActions={display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"
 const v2InlineForm={display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"};
 const v2FormGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))",gap:12};
 const v2FieldLabel={display:"grid",gap:8,color:"#cbd5e1",fontSize:12,fontWeight:900,textTransform:"uppercase",letterSpacing:".08em"};
-const v2Notice={padding:"12px 15px",borderRadius:12,background:"rgba(30,64,175,.20)",border:"1px solid rgba(96,165,250,.30)",color:"#dbeafe",fontWeight:800};
-const v2Empty={padding:"28px 18px",border:"1px dashed rgba(148,163,184,.28)",borderRadius:14,color:"#94a3b8",textAlign:"center",gridColumn:"1/-1"};
-const v2SuccessState={...v2Empty,color:"#86efac",borderColor:"rgba(74,222,128,.26)",background:"rgba(22,101,52,.10)"};
-
+const v2Notice={padding:"12px 15px",borderRadius:12,background:"rgba(30,64,175,.20)",border:"1px solid rgba(79,143,168,.30)",color:"#dbeafe",fontWeight:800};
+const v2Empty={padding:"28px 18px",border:"1px dashed rgba(148,163,184,.28)",borderRadius:14,color:"var(--cfb-muted)",textAlign:"center",gridColumn:"1/-1"};
 const v2DashboardHero={...v2PageHero,display:"grid",gridTemplateColumns:"minmax(0,1fr) minmax(250px,auto)",alignItems:"end"};
-const v2AdvanceCard={display:"grid",gap:4,padding:"16px 18px",borderRadius:16,background:"rgba(2,6,23,.55)",border:"1px solid rgba(250,204,21,.18)",minWidth:250};
+const v2AdvanceCard={display:"grid",gap:4,padding:"16px 18px",borderRadius:16,background:"rgba(2,6,23,.55)",border:"1px solid rgba(201,208,217,.18)",minWidth:250};
 const v2HeroControls={gridColumn:"1/-1",display:"flex",gap:10,flexWrap:"wrap",paddingTop:14,borderTop:"1px solid rgba(255,255,255,.08)"};
-const v2KpiGrid={display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:14};
-const v2Kpi={display:"grid",gap:5,padding:"17px 18px",borderRadius:16,background:"rgba(15,23,42,.94)",border:"1px solid rgba(148,163,184,.14)",borderTop:"3px solid #60a5fa",boxShadow:"0 14px 34px rgba(0,0,0,.20)"};
-const v2LeaderGrid={display:"grid",gridTemplateColumns:"repeat(5,minmax(0,1fr))",gap:10};
-const v2LeaderTile={display:"grid",alignContent:"start",minWidth:0,background:"linear-gradient(165deg,#111827,#070a10)",border:"1px solid rgba(255,255,255,.12)",borderTop:"3px solid #dc2626",borderRadius:8,boxShadow:"0 16px 38px rgba(0,0,0,.25)",overflow:"hidden"};
-const v2LeaderHeader={display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,padding:"12px 13px",borderBottom:"1px solid rgba(255,255,255,.10)",color:"#f8fafc",fontSize:11,fontWeight:1000,textTransform:"uppercase",letterSpacing:".065em"};
-const v2LeaderRows={display:"grid",padding:"5px 10px 9px"};
-const v2LeaderRow={display:"grid",gridTemplateColumns:"18px 30px minmax(0,1fr) auto",alignItems:"center",gap:7,minWidth:0,padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,.07)"};
-const v2LeaderLogo={width:30,height:30,display:"grid",placeItems:"center",overflow:"hidden"};
-const v2LeaderMonogram={width:27,height:27,display:"grid",placeItems:"center",borderRadius:4,background:"#1f2937",color:"#facc15",fontSize:9,fontWeight:1000};
-const v2LeaderText={display:"grid",gap:2,minWidth:0,overflow:"hidden"};
-const v2LeaderValue={fontStyle:"normal",fontWeight:1000,color:"#facc15",fontSize:12};
-const v2LeaderEmpty={padding:16,color:"#64748b",fontSize:12,textAlign:"center"};
-const v2HomeGrid={display:"grid",gridTemplateColumns:"minmax(0,1.35fr) minmax(320px,.75fr)",gap:18,alignItems:"start"};
-const v2HomeFeatured={display:"grid",gridTemplateColumns:"minmax(0,1fr) auto minmax(0,1fr)",gap:20,alignItems:"center",padding:"24px 18px",borderRadius:18,border:"1px solid rgba(255,255,255,.10)"};
-const v2CompactList={display:"grid",gap:9};
-const v2CompactGame={display:"grid",gridTemplateColumns:"minmax(0,1fr) 34px minmax(0,1fr)",alignItems:"center",gap:8,width:"100%",padding:"10px 12px",borderRadius:6,border:"1px solid rgba(148,163,184,.16)",background:"rgba(255,255,255,.035)",color:"#fff",cursor:"pointer",overflow:"hidden"};
-const v2CompactTeam={display:"flex",alignItems:"center",gap:7,minWidth:0,overflow:"hidden",whiteSpace:"nowrap",fontWeight:800};
-const v2CompactLogo={width:30,height:30,minWidth:30,display:"grid",placeItems:"center",overflow:"hidden"};
-const v2CompactVs={textAlign:"center",fontSize:10,letterSpacing:".1em",color:"#94a3b8"};
 const v2RankingList={display:"grid",gap:8};
 const v2RankingTableScroll={overflowX:"auto",paddingBottom:3};
-const v2RankingTableHead={display:"grid",gridTemplateColumns:"54px minmax(210px,1.35fr) 62px 72px 70px 78px 76px 76px 98px",alignItems:"center",gap:9,minWidth:900,padding:"9px 12px",background:"#05070c",borderBottom:"2px solid #dc2626",color:"#94a3b8",fontSize:10,fontWeight:1000,letterSpacing:".07em",textTransform:"uppercase"};
-const v2RankingRow={display:"grid",gridTemplateColumns:"54px minmax(210px,1.35fr) 62px 72px 70px 78px 76px 76px 98px",alignItems:"center",gap:9,minWidth:900,width:"100%",padding:"10px 12px",borderRadius:4,border:"1px solid rgba(148,163,184,.14)",borderLeft:"3px solid #dc2626",background:"rgba(255,255,255,.035)",color:"#fff",cursor:"pointer",textAlign:"left"};
+const v2RankingTableHead={display:"grid",gridTemplateColumns:"54px minmax(210px,1.35fr) 62px 72px 70px 78px 76px 76px 98px",alignItems:"center",gap:9,minWidth:900,padding:"9px 12px",background:"var(--cfb-ink)",borderBottom:"2px solid var(--cfb-red)",color:"var(--cfb-muted)",fontSize:10,fontWeight:1000,letterSpacing:".07em",textTransform:"uppercase"};
+const v2RankingRow={display:"grid",gridTemplateColumns:"54px minmax(210px,1.35fr) 62px 72px 70px 78px 76px 76px 98px",alignItems:"center",gap:9,minWidth:900,width:"100%",padding:"10px 12px",borderRadius:4,border:"1px solid rgba(148,163,184,.14)",borderLeft:"3px solid var(--cfb-red)",background:"rgba(255,255,255,.035)",color:"#fff",cursor:"pointer",textAlign:"left"};
 const v2RankingIdentity={display:"grid",gridTemplateColumns:"42px minmax(0,1fr)",alignItems:"center",gap:9,minWidth:0};
 const v2RankingLogo={width:40,height:40,display:"grid",placeItems:"center",overflow:"hidden"};
 const v2RankingTeam={display:"grid",gap:2,minWidth:0};
-const v2ConferenceTableScroll={overflowX:"auto",border:"1px solid rgba(255,255,255,.10)",borderRadius:6};
-const v2ConferenceTableHead={display:"grid",gridTemplateColumns:"48px minmax(190px,1.3fr) 74px 96px 80px 74px 90px 96px 84px 60px",alignItems:"center",gap:10,minWidth:940,padding:"10px 12px",background:"#05070c",borderBottom:"2px solid #dc2626",color:"#94a3b8",fontSize:10,fontWeight:1000,letterSpacing:".07em",textTransform:"uppercase"};
-const v2ConferenceTableRow={display:"grid",gridTemplateColumns:"48px minmax(190px,1.3fr) 74px 96px 80px 74px 90px 96px 84px 60px",alignItems:"center",gap:10,minWidth:940,padding:"11px 12px",borderBottom:"1px solid rgba(255,255,255,.08)",background:"rgba(255,255,255,.025)",color:"#e5e7eb",fontSize:12};
 const v2ConferenceIdentity={display:"flex",alignItems:"center",gap:10,minWidth:0,whiteSpace:"nowrap"};
 const v2MovementUp={color:"#86efac",fontSize:12,fontWeight:1000};
 const v2MovementDown={color:"#fca5a5",fontSize:12,fontWeight:1000};
 const v2MovementEven={color:"#64748b",fontSize:12,fontWeight:1000};
-const v2ResultRow={display:"grid",gridTemplateColumns:"1fr auto 1fr 70px",gap:10,alignItems:"center",padding:"11px 12px",borderRadius:12,background:"rgba(255,255,255,.035)",border:"1px solid rgba(148,163,184,.12)"};
-const v2CoachSpotlight={display:"grid",gridTemplateColumns:"110px 1fr",alignItems:"center",gap:18};
-const v2WireList={display:"grid",gap:10};
-
 const v2HeroStats={display:"grid",gridTemplateColumns:"repeat(3,minmax(76px,1fr))",gap:10};
-const v2FeaturedGame={padding:"clamp(18px,3vw,32px)",borderRadius:22,border:"1px solid rgba(250,204,21,.28)",boxShadow:"0 24px 68px rgba(0,0,0,.34)"};
-const v2FeaturedKicker={textAlign:"center",color:"#facc15",fontWeight:1000,letterSpacing:".12em",fontSize:12,marginBottom:18};
+const v2FeaturedGame={padding:"clamp(18px,3vw,32px)",borderRadius:22,border:"1px solid rgba(201,208,217,.28)",boxShadow:"0 24px 68px rgba(0,0,0,.34)"};
+const v2FeaturedKicker={textAlign:"center",color:"var(--cfb-gold)",fontWeight:1000,letterSpacing:".12em",fontSize:12,marginBottom:18};
 const v2FeaturedMatchup={display:"grid",gridTemplateColumns:"minmax(0,1fr) minmax(150px,auto) minmax(0,1fr)",gap:24,alignItems:"center"};
 const v2FeaturedScore={display:"grid",justifyItems:"center",gap:4,color:"#fff",textAlign:"center"};
 const v2MatchupTeam={display:"grid",justifyItems:"center",gap:7,textAlign:"center",minWidth:0};
@@ -18405,28 +12099,18 @@ const v2SideLabel={color:"#64748b",fontSize:9,fontWeight:1000,letterSpacing:".12
 const v2FilterBar={display:"grid",gap:12,padding:"14px",borderRadius:16,background:"rgba(15,23,42,.82)",border:"1px solid rgba(148,163,184,.14)"};
 const v2WeekTabs={display:"flex",gap:7,overflowX:"auto",paddingBottom:5};
 const v2WeekTab={border:"1px solid rgba(148,163,184,.22)",borderRadius:999,padding:"8px 12px",background:"rgba(2,6,23,.72)",color:"#cbd5e1",fontWeight:900,cursor:"pointer",whiteSpace:"nowrap"};
-const v2WeekTabActive={...v2WeekTab,background:"#facc15",borderColor:"#fde68a",color:"#111827"};
+const v2WeekTabActive={...v2WeekTab,background:"var(--cfb-gold)",borderColor:"#fde68a",color:"#111827"};
 const v2FilterInputs={display:"grid",gridTemplateColumns:"minmax(220px,1fr) 180px auto",gap:10};
 const v2GameGrid={display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:14};
-const v2GameCard={display:"grid",gap:14,padding:16,borderRadius:8,background:"linear-gradient(155deg,rgba(14,19,30,.985),rgba(4,7,13,.995))",border:"1px solid rgba(255,255,255,.12)",borderTop:"3px solid #dc2626",boxShadow:"0 16px 42px rgba(0,0,0,.28)",minWidth:0};
+const v2GameCard={display:"grid",gap:14,padding:16,borderRadius:8,background:"linear-gradient(155deg,rgba(14,19,30,.985),rgba(4,7,13,.995))",border:"1px solid rgba(255,255,255,.12)",borderTop:"3px solid var(--cfb-red)",boxShadow:"0 16px 42px rgba(0,0,0,.28)",minWidth:0};
 const v2GameCardTop={display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,color:"#cbd5e1",fontSize:12,fontWeight:900};
 const v2FinalBadge={padding:"5px 8px",borderRadius:999,background:"rgba(22,163,74,.18)",color:"#86efac",border:"1px solid rgba(74,222,128,.24)"};
-const v2UpcomingBadge={...v2FinalBadge,background:"rgba(37,99,235,.18)",color:"#bfdbfe",borderColor:"rgba(96,165,250,.24)"};
+const v2UpcomingBadge={...v2FinalBadge,background:"rgba(37,99,235,.18)",color:"#bfdbfe",borderColor:"rgba(79,143,168,.24)"};
 const v2CardMatchup={display:"grid",gridTemplateColumns:"minmax(0,1fr) auto minmax(0,1fr)",gap:8,alignItems:"center"};
-const v2CardScore={fontSize:"clamp(20px,2vw,30px)",fontWeight:1000,color:"#facc15",textAlign:"center",whiteSpace:"nowrap"};
-const v2GameMeta={display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,paddingTop:10,borderTop:"1px solid rgba(148,163,184,.12)",color:"#94a3b8",fontSize:11};
-const v2GameLinks={display:"flex",gap:10,flexWrap:"wrap",fontSize:12,color:"#93c5fd"};
+const v2CardScore={fontSize:"clamp(20px,2vw,30px)",fontWeight:1000,color:"var(--cfb-gold)",textAlign:"center",whiteSpace:"nowrap"};
+const v2GameMeta={display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,paddingTop:10,borderTop:"1px solid rgba(148,163,184,.12)",color:"var(--cfb-muted)",fontSize:11};
+const v2GameLinks={display:"flex",gap:10,flexWrap:"wrap",fontSize:12,color:"#9cc3d1"};
 const v2CardActions={display:"flex",gap:7,flexWrap:"wrap"};
-
-const v2ByeGrid={display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:14};
-const v2SeedCard={display:"grid",justifyItems:"center",gap:7,textAlign:"center",padding:18,borderRadius:17,border:"1px solid rgba(250,204,21,.20)"};
-const v2PlayoffGrid={display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:14};
-const v2PlayoffGame={display:"grid",gridTemplateColumns:"1fr auto 1fr",alignItems:"center",gap:12,padding:18,borderRadius:17,background:"rgba(255,255,255,.035)",border:"1px solid rgba(148,163,184,.14)"};
-const v2PlayoffAt={color:"#facc15",fontWeight:1000,fontSize:12};
-const v2BubbleList={display:"grid",gap:9};
-const v2MediaGrid={display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:14};
-const v2MediaCard={display:"grid",gap:16,padding:18,borderRadius:18,border:"1px solid rgba(148,163,184,.16)"};
-const v2RecapPreview={whiteSpace:"pre-wrap",wordBreak:"break-word",padding:18,borderRadius:14,background:"rgba(2,6,23,.78)",border:"1px solid rgba(148,163,184,.16)",color:"#e2e8f0",lineHeight:1.55,margin:0};
 
 const v2UserGrid={display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12};
 const v2UserCard={display:"grid",gap:14,padding:15,borderRadius:15,background:"rgba(255,255,255,.035)",border:"1px solid rgba(148,163,184,.14)"};
@@ -18440,7 +12124,7 @@ const v2AdminGrid={display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",
 const v2HealthList={display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10};
 const v2ToolGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12};
 const v2ToolCard={display:"grid",gap:7,textAlign:"left",padding:16,borderRadius:15,background:"rgba(255,255,255,.035)",border:"1px solid rgba(148,163,184,.16)",color:"#fff",cursor:"pointer"};
-const v2CountPill={display:"inline-grid",placeItems:"center",minWidth:36,height:30,borderRadius:999,background:"rgba(250,204,21,.16)",color:"#facc15",fontWeight:1000};
+const v2CountPill={display:"inline-grid",placeItems:"center",minWidth:36,height:30,borderRadius:999,background:"rgba(201,208,217,.16)",color:"var(--cfb-gold)",fontWeight:1000};
 
 const v2CoachSeasonStrip={display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10,margin:"14px 0 20px"};
 const v2FormDots={display:"flex",gap:5,alignItems:"center"};
@@ -18448,7 +12132,7 @@ const v2FormWin={display:"inline-grid",placeItems:"center",width:24,height:24,bo
 const v2FormLoss={...v2FormWin,background:"#991b1b",color:"#fee2e2"};
 const v2NextOpponent={display:"flex",alignItems:"center",gap:7};
 
-const v2MobileNav={position:"fixed",left:"max(6px,env(safe-area-inset-left))",right:"max(6px,env(safe-area-inset-right))",bottom:"max(8px,env(safe-area-inset-bottom))",zIndex:150,gridTemplateColumns:"repeat(6,minmax(0,1fr))",gap:2,padding:6,borderRadius:12,background:"rgba(2,6,23,.97)",border:"1px solid rgba(255,255,255,.16)",borderTop:"3px solid #dc2626",backdropFilter:"blur(18px)",boxShadow:"0 18px 60px rgba(0,0,0,.48)"};
-const v2MobileNavButton={display:"grid",justifyItems:"center",gap:2,padding:"7px 3px",border:0,borderRadius:11,background:"transparent",color:"#94a3b8",fontSize:10,fontWeight:900,cursor:"pointer"};
-const v2MobileNavActive={...v2MobileNavButton,background:"rgba(250,204,21,.15)",color:"#facc15"};
+const v2MobileNav={position:"fixed",left:"max(6px,env(safe-area-inset-left))",right:"max(6px,env(safe-area-inset-right))",bottom:"max(8px,env(safe-area-inset-bottom))",zIndex:150,gridTemplateColumns:"repeat(6,minmax(0,1fr))",gap:2,padding:6,borderRadius:12,background:"rgba(2,6,23,.97)",border:"1px solid rgba(255,255,255,.16)",borderTop:"3px solid var(--cfb-red)",backdropFilter:"blur(18px)",boxShadow:"0 18px 60px rgba(0,0,0,.48)"};
+const v2MobileNavButton={display:"grid",justifyItems:"center",gap:2,padding:"7px 3px",border:0,borderRadius:11,background:"transparent",color:"var(--cfb-muted)",fontSize:10,fontWeight:900,cursor:"pointer"};
+const v2MobileNavActive={...v2MobileNavButton,background:"rgba(201,208,217,.15)",color:"var(--cfb-gold)"};
 

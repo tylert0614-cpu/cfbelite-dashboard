@@ -1,11 +1,11 @@
 {
-  "name": "CFB Elite 27",
-  "short_name": "CFB Elite",
-  "description": "The private home of the CFB Elite 27 online dynasty.",
+  "name": "CFBElite | Elite Network",
+  "short_name": "CFBElite",
+  "description": "The coaches' hub for the Elite Network CFB 27 online dynasty.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#020617",
-  "theme_color": "#0f172a",
+  "background_color": "#0a0d13",
+  "theme_color": "#0a0d13",
   "orientation": "any",
   "categories": ["sports", "social", "entertainment"],
   "icons": [
