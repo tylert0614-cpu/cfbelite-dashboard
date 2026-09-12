@@ -5853,7 +5853,7 @@ function GlobalStyle() {
       .cfb-table-scroll table thead { position:sticky; top:0; z-index:2; background:var(--cfb-panel-2); }
       .cfb-table-scroll tbody tr { transition:background .16s ease; }
       .cfb-table-scroll tbody tr:hover { background:rgba(62,127,193,.065); }
-      .cfb-v2-page h1,.cfb-v2-page h2,.cfb-v2-page h3 { font-family:var(--cfb-display); }
+      h1,h2,h3 { font-family:var(--cfb-display); }
       .cfb-v2-page h2 { letter-spacing:-.035em; }
       .cfb-v2-page input,.cfb-v2-page select,.cfb-v2-page textarea {
         background:var(--cfb-panel) !important;
@@ -7355,7 +7355,7 @@ function GlobalStyle() {
         border-radius:18px!important;
         box-shadow:0 18px 50px rgba(0,0,0,.24);
       }
-      .cfb-v2-page h1,.cfb-v2-page h2,.cfb-v2-page h3 { letter-spacing:-.025em; }
+      h1,h2,h3 { letter-spacing:-.025em; }
       .cfb-v2-page p,.network-stage p { line-height:1.55; }
       .network-channel-list > button,.network-message-feed article,
       .data-import-list > button,.data-check-item {
@@ -10499,9 +10499,9 @@ const button = {
 };
 const deleteButton={background:"var(--cfb-red-dark)",color:"white",border:"1px solid var(--cfb-danger)",borderRadius:10,padding:"8px 10px",cursor:"pointer"};
 const table={width:"100%",borderCollapse:"separate",borderSpacing:0,minWidth:820};
-const th={textAlign:"left",padding:"13px 10px",color:"var(--cfb-muted)",fontSize:10,textTransform:"uppercase",borderBottom:"2px solid var(--cfb-red)",letterSpacing:".09em",fontWeight:1000,background:"var(--cfb-panel-2)"};
+const th={textAlign:"left",padding:"13px 10px",color:"var(--cfb-muted)",fontFamily:"var(--cfb-display)",fontSize:10,textTransform:"uppercase",borderBottom:"2px solid var(--cfb-red)",letterSpacing:".09em",fontWeight:1000,background:"var(--cfb-panel-2)"};
 const trStyle={borderBottom:"1px solid rgba(255,255,255,.08)"};
-const td={padding:"16px 10px",color:"inherit",verticalAlign:"middle"};
+const td={padding:"16px 10px",color:"inherit",verticalAlign:"middle",fontVariantNumeric:"tabular-nums"};
 const teamCell={...td,color:"#fff",fontWeight:900};
 const mutedText={color:"#d6d3d1",marginTop:8,marginBottom:0};
 
@@ -10529,10 +10529,10 @@ const helmetIcon={width:30,height:30,objectFit:"contain",borderRadius:8,backgrou
 const helmetFallback={fontSize:22,lineHeight:1};
 const coachBanner={display:"flex",justifyContent:"space-between",gap:20,alignItems:"center",background:"rgba(7,7,12,.75)",border:"1px solid rgba(201,208,217,.16)",borderRadius:18,padding:18,margin:"18px 0 24px",flexWrap:"wrap"};
 const coachNameStyle={fontSize:28,fontWeight:900,color:"var(--cfb-gold)"};
-const rankCell={...td,fontWeight:950,color:"var(--cfb-gold)"};
-const scoreCell={...td,fontWeight:950,color:"var(--cfb-gold)",fontSize:18};
+const rankCell={...td,fontFamily:"var(--cfb-display)",fontWeight:600,color:"var(--cfb-gold)"};
+const scoreCell={...td,fontFamily:"var(--cfb-display)",fontWeight:600,color:"var(--cfb-gold)",fontSize:18};
 const leaderRow={display:"flex",justifyContent:"space-between",gap:12,borderBottom:"1px solid rgba(255,255,255,.08)",padding:"11px 0",color:"#f5f5f4"};
-const eyebrow={color:"var(--cfb-gold)",textTransform:"uppercase",letterSpacing:".12em",fontSize:12,fontWeight:950};
+const eyebrow={color:"var(--cfb-gold)",fontFamily:"var(--cfb-display)",textTransform:"uppercase",letterSpacing:".12em",fontSize:12,fontWeight:950};
 const hofChips={display:"flex",gap:10,flexWrap:"wrap",marginTop:22};
 const chip={display:"grid",gap:2,background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.12)",borderRadius:999,padding:"8px 12px",fontSize:12};
 const accoladeList={marginTop:16};
