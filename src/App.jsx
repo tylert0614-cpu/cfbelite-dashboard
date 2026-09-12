@@ -851,7 +851,7 @@ export default function App() {
     await saveCommissionerRankings(next);
   }
 
-  const baseTabs = [["dashboard","Home"],["leagueHub","CFBElite Network"],["newsroom","Newsroom"],["schedule","GameCenter"],["eliteBooks","Elite Books"],["redZone","RedZone"],["myTeam","My Team"],["rankingsCenter","Rankings Center"],["teamsCoaches","Teams & Coaches"],["leagueArchive","League Archive"],["dataIntake","Upload Screenshots"],["automaticRankings","Automatic Rankings"],["gameTop25","Dynasty Top 25"],["teamSchedules","Team Schedules"],["dynastyData","Season Data Archive"],["sportsbookHistory","All-Time Sportsbook"],["allTeamsRatings","Teams"],["eloRankings","User ELO"],["powerIndex","All-Time Coach Rankings"],["rankingHistory","Ranking History"],["conferencePower","Conference Power"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["rivalries","Rivalries"],["h2h","User vs User H2H"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],["commissionerCenter","Commissioner Center"],["sportsbookManager","Elite Books Manager"],["weeklyMatchups","Schedule Manager"],["userManager","League Members"],["assignments","Team Assignments"],["leagueDataCenter","League Data Center"],["resultsManager","Results Manager"],["logoManager","Team Assets"],["draftRoom","CFBElite 27 Draft Room"],...coachProfileUsers.map((user) => [`coach-${user.id}`, user.activeTeamName || user.discord_username])];
+  const baseTabs = [["dashboard","Home"],["leagueHub","CFBElite Network"],["newsroom","Newsroom"],["schedule","GameCenter"],["eliteBooks","Elite Books"],["redZone","RedZone"],["myTeam","My Team"],["rankingsCenter","Rankings Center"],["teamsCoaches","Teams & Coaches"],["leagueArchive","League Archive"],["dataIntake","Upload Screenshots"],["automaticRankings","Automatic Rankings"],["gameTop25","Dynasty Top 25"],["teamSchedules","Team Schedules"],["dynastyData","Season Data Archive"],["sportsbookHistory","All-Time Sportsbook"],["allTeamsRatings","Teams"],["eloRankings","User ELO"],["powerIndex","All-Time Coach Rankings"],["rankingHistory","Ranking History"],["conferencePower","Conference Power"],["recruitingRankings","Recruiting Rankings"],["dynastyTimeline","Dynasty Timeline"],["dynastyRecords","League Records"],["h2h","User vs User H2H"],["coachHOF","Coach Hall of Fame"],["playerHOF","Player Hall of Fame"],["allAmericans","All-Americans"],["awards","Awards"],["heismans","Heisman Winners"],["nationalChampions","National Champions"],["commissionerCenter","Commissioner Center"],["sportsbookManager","Elite Books Manager"],["weeklyMatchups","Schedule Manager"],["userManager","League Members"],["assignments","Team Assignments"],["leagueDataCenter","League Data Center"],["resultsManager","Results Manager"],["logoManager","Team Assets"],["draftRoom","CFBElite 27 Draft Room"],...coachProfileUsers.map((user) => [`coach-${user.id}`, user.activeTeamName || user.discord_username])];
   const tabs = useMemo(() => {
     const tabMap = new Map(baseTabs);
     const ordered = tabOrder
@@ -1688,7 +1688,6 @@ export default function App() {
     {activeTab === "schedule" && <GameCenterV2 teams={teamOptions} users={userOptions} assignments={assignments} weeklyMatchups={weeklyMatchups} results={results} currentYear={currentYear} currentWeek={currentWeek} conferenceAssets={conferenceAssets} adminUnlocked={adminUnlocked} loadData={loadData} setActiveTab={setActiveTab}/>}
     {activeTab === "eloRankings" && <EloRankings users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
     {activeTab === "dynastyRecords" && <DynastyRecords users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} seasonPlayerStats={seasonPlayerStats} teamSeasonStats={teamSeasonStats}/>}    
-{activeTab === "rivalries" && <Rivalries users={userOptions} teams={teamOptions} assignments={assignments} results={results}/>}    
     {activeTab === "powerIndex" && <DynastyPowerIndex users={userOptions} teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>}
     {activeTab === "commissionerCenter" && (adminUnlocked ? <CommissionerCenterV2 currentYear={currentYear} currentWeek={currentWeek} advanceAt={advanceAt} setAdvanceAt={setAdvanceAt} setActiveTab={setActiveTab} saveLeagueSettings={saveLeagueSettings} saveCurrentRankingSnapshot={saveCurrentRankingSnapshot} loadData={loadData} teams={teamOptions} users={userOptions} assignments={assignments} results={results} weeklyMatchups={weeklyMatchups} awards={awards} allAmericans={allAmericans} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>) }    
     {activeTab === "sportsbookManager" && (adminUnlocked ? <EliteBooksManager sportsbook={sportsbook} users={userOptions} teams={activeTeamOptions} assignments={assignments} currentYear={currentYear} currentWeek={currentWeek} advanceAt={advanceAt} busy={sportsbookBusy} linkedDiscordUser={linkedDiscordUser} generateBoard={generateSportsbookBoard} seedFutures={seedSportsbookFutures} settleFuture={settleFutureMarket} setMatchupLock={setMatchupBettingLock} voidMatchup={voidSportsbookMatchup} updateSeed={updateSportsbookSeed} updateTeamSeed={updateSportsbookTeamSeed} loadData={loadEliteBooksData}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>)}
@@ -1705,7 +1704,7 @@ export default function App() {
     {activeTab === "playerHOF" && <PlayerHallOfFame teams={teamOptions} assignments={assignments} results={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions}/>}    
     {activeTab === "assignments" && (adminUnlocked ? <Assignments rows={assignments} teams={teamOptions} users={activeUserOptions} currentYear={currentYear} addAssignment={addAssignment} updateRow={updateRow} deleteRow={deleteRow} drafts={draftAssignments} setDrafts={setDraftAssignments} saveDraft={saveDraft} getDraft={getDraft} teamChange={teamChange} setTeamChange={setTeamChange} changeUserTeam={changeUserTeam}/> : <AdminLocked adminCodeInput={adminCodeInput} setAdminCodeInput={setAdminCodeInput} unlockAdmin={unlockAdmin}/>) }    
     {activeTab === "resultsManager" && <ResultsManager rows={results} teams={teamOptions} users={userOptions} assignments={assignments} updateRow={updateRow} deleteRow={deleteRow}/>}    
-    {activeTab === "h2h" && <H2H results={results} search={search.h2h} setSearch={(v)=>setSearch({...search,h2h:v})}/>}    
+    {activeTab === "h2h" && <H2H results={results} users={userOptions} assignments={assignments} search={search.h2h} setSearch={(v)=>setSearch({...search,h2h:v})}/>}    
     {activeTab === "allAmericans" && <AllAmericans rows={allAmericans} teams={teamOptions} addRow={addAA} updateRow={updateRow} deleteRow={deleteRow} rankings={[]} drafts={draftAllAmericans} setDrafts={setDraftAllAmericans} saveDraft={saveDraft} getDraft={getDraft}/>}    
     {activeTab === "awards" && <Awards rows={awards} teams={teamOptions} addRow={addAward} updateRow={updateRow} deleteRow={deleteRow} rankings={[]} drafts={draftAwards} setDrafts={setDraftAwards} saveDraft={saveDraft} getDraft={getDraft}/>}    
     {activeTab === "heismans" && (adminUnlocked ? <Heismans rows={heismans} teams={teamOptions} addRow={addHeisman} updateRow={updateRow} deleteRow={deleteRow} drafts={draftHeismans} setDrafts={setDraftHeismans} saveDraft={saveDraft} getDraft={getDraft}/> : <TrophyGalleryV2 title="Heisman Winners" eyebrow="COLLEGE FOOTBALL'S HIGHEST HONOR" rows={heismans} teams={teamOptions} users={userOptions}/>)}    
@@ -1718,7 +1717,7 @@ export default function App() {
 
 
 
-function Rivalries({ users, teams, assignments, results }) {
+function rivalryRows(users, assignments, results) {
   const map = new Map();
   results.forEach((result)=>{
     const u1 = result.team_1_user_id || coachForTeamYear(result.team_1_id, result.season_year, assignments)?.discord_user_id;
@@ -1737,8 +1736,7 @@ function Rivalries({ users, teams, assignments, results }) {
     if (!row.largest || margin > row.largest.margin) row.largest = { margin, result };
   });
   const userName = (id)=>users.find((u)=>u.id===id)?.discord_username || "Unknown";
-  const rows = [...map.values()].filter((row)=>row.games.length >= 2).sort((a,b)=>b.games.length-a.games.length).slice(0,30);
-  return <section style={card}><h2 style={sectionTitle}>Rivalries</h2><p style={mutedText}>Automatically built from repeated user-vs-user matchups.</p><Table headers={["Rivalry", "Series", "Points", "Largest Win", "Games"]}>{rows.map((row)=><tr key={`${row.u1}-${row.u2}`} style={trStyle}><td style={teamCell}>{userName(row.u1)} vs {userName(row.u2)}</td><td style={td}>{row.wins[row.u1]}-{row.wins[row.u2]}</td><td style={td}>{row.points[row.u1]}-{row.points[row.u2]}</td><td style={td}>{row.largest?.margin || 0}</td><td style={td}>{row.games.length}</td></tr>)}</Table></section>;
+  return [...map.values()].filter((row)=>row.games.length >= 2).sort((a,b)=>b.games.length-a.games.length).slice(0,30).map((row)=>({...row,name1:userName(row.u1),name2:userName(row.u2)}));
 }
 
 function DynastyRecords({ users, teams, assignments, results, allAmericans, awards, heismans, nationalChampions, recruiting, seasonPlayerStats = [], teamSeasonStats = [] }) {
@@ -3059,8 +3057,7 @@ function LeagueArchiveCenterV38({setActiveTab}) {
       {key:"dynastyRecords",title:"League Records",description:"Career and single-season records"},
     ]},
     {kicker:"RIVALRIES",title:"Head-to-Head",description:"The matchups and grudges that define the league.",items:[
-      {key:"rivalries",title:"Rivalries",description:"Recurring matchups and series history"},
-      {key:"h2h",title:"User vs User H2H",description:"Complete coach head-to-head records"},
+      {key:"h2h",title:"User vs User H2H",description:"Complete coach records, plus a Notable Rivalries view"},
     ]},
     {kicker:"TROPHY ROOM",title:"Recognition",description:"Championships, award winners and national recognition.",items:[
       {key:"allAmericans",title:"All-Americans",description:"All-American archive"},
@@ -6354,6 +6351,10 @@ function GlobalStyle() {
       .cfb-results-score-editor span { color:var(--cfb-muted); font-weight:700; }
       .cfb-results-score-editor button { border:0; border-radius:6px; padding:6px 9px; color:#fff; background:linear-gradient(135deg,var(--cfb-red),var(--cfb-red-dark)); font-family:var(--cfb-display); font-size:11px; font-weight:700; cursor:pointer; }
       .cfb-results-score-editor button:disabled { opacity:.6; cursor:not-allowed; }
+
+      .cfb-h2h-mode-toggle { display:flex; gap:8px; margin:14px 0 18px; }
+      .cfb-h2h-mode-toggle button { border:1px solid rgba(148,163,184,.24); border-radius:999px; padding:8px 14px; color:var(--cfb-muted); background:rgba(2,6,23,.6); font-family:var(--cfb-display); font-size:11px; font-weight:700; letter-spacing:.03em; cursor:pointer; }
+      .cfb-h2h-mode-toggle button.active { border-color:var(--cfb-red); color:#fff; background:linear-gradient(135deg,var(--cfb-red),var(--cfb-red-dark)); }
 
       @media (max-width: 520px) {
         [style*="clamp(44px, 8vw, 92px)"] {
@@ -9992,7 +9993,7 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
   // this only keeps them out of the flat menu list.
   const HOUSED_IN_A_HUB=new Set([
     "automaticRankings","gameTop25","conferencePower","eloRankings","powerIndex","recruitingRankings","rankingHistory",
-    "dynastyData","dynastyTimeline","dynastyRecords","rivalries","h2h","allAmericans","awards","heismans","nationalChampions","coachHOF","playerHOF",
+    "dynastyData","dynastyTimeline","dynastyRecords","h2h","allAmericans","awards","heismans","nationalChampions","coachHOF","playerHOF",
     "allTeamsRatings","teamSchedules",
     "sportsbookManager","weeklyMatchups","userManager","assignments","leagueDataCenter","resultsManager","logoManager",
   ]);
@@ -10038,7 +10039,7 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
     if (tabKey==="redZone") return ["#210608", "var(--cfb-danger)", "#ffffff"];
     if (["eliteBooks", "sportsbookHistory"].includes(tabKey)) return ["#07110d", "var(--cfb-green)", "#ffffff"];
     if (["logoManager", "allTeamsRatings", "leagueDataCenter", "recruitingRankings", "resultsManager"].includes(tabKey)) return data;
-    if (["dynastyTimeline", "dynastyRecords", "rivalries", "h2h"].includes(tabKey)) return legacy;
+    if (["dynastyTimeline", "dynastyRecords", "h2h"].includes(tabKey)) return legacy;
     if (["powerIndex", "eloRankings", "conferencePower"].includes(tabKey)) return ranking;
     if (["coachHOF", "playerHOF"].includes(tabKey)) return history;
     if (["allAmericans", "awards", "heismans", "nationalChampions"].includes(tabKey)) return recognition;
@@ -10358,7 +10359,18 @@ function getDirectedH2HRows(results) {
   });
 }
 
-function H2H({ results, search, setSearch }) { const rows=getDirectedH2HRows(results).filter((r)=>JSON.stringify(r).toLowerCase().includes(search.toLowerCase())).sort((a,b)=>a.user.localeCompare(b.user)||a.opp.localeCompare(b.opp)); return <section style={card}><div style={sectionTop}><div><h2 style={sectionTitle}>User vs User H2H</h2><p style={mutedText}>All-time across every recorded season. Current streak is based on the most recent meetings between the two users.</p></div><SearchBox value={search} onChange={setSearch}/></div><Table headers={["User","Opponent","W","L","Record","Current Streak"]}>{rows.map((r)=><tr key={`${r.user}-${r.opp}`} style={trStyle}><td style={teamCell}>{r.user}</td><td style={td}>{r.opp}</td><td style={td}>{r.w}</td><td style={td}>{r.l}</td><td style={td}>{r.w}-{r.l}</td><td style={td}>{r.streak}</td></tr>)}</Table></section>; }
+function H2H({ results, users=[], assignments=[], search, setSearch }) {
+  const [mode,setMode]=useState("all");
+  const rows=getDirectedH2HRows(results).filter((r)=>JSON.stringify(r).toLowerCase().includes(search.toLowerCase())).sort((a,b)=>a.user.localeCompare(b.user)||a.opp.localeCompare(b.opp));
+  const rivalries=rivalryRows(users,assignments,results).filter((row)=>JSON.stringify(row).toLowerCase().includes(search.toLowerCase()));
+  return <section style={card}>
+    <div style={sectionTop}><div><h2 style={sectionTitle}>User vs User H2H</h2><p style={mutedText}>{mode==="all"?"All-time across every recorded season. Current streak is based on the most recent meetings between the two users.":"Recurring series (2+ meetings), sorted by how often the two have played."}</p></div><SearchBox value={search} onChange={setSearch}/></div>
+    <div className="cfb-h2h-mode-toggle"><button type="button" className={mode==="all"?"active":""} onClick={()=>setMode("all")}>All Pairings</button><button type="button" className={mode==="rivalries"?"active":""} onClick={()=>setMode("rivalries")}>Notable Rivalries</button></div>
+    {mode==="all"
+      ? <Table headers={["User","Opponent","W","L","Record","Current Streak"]}>{rows.map((r)=><tr key={`${r.user}-${r.opp}`} style={trStyle}><td style={teamCell}>{r.user}</td><td style={td}>{r.opp}</td><td style={td}>{r.w}</td><td style={td}>{r.l}</td><td style={td}>{r.w}-{r.l}</td><td style={td}>{r.streak}</td></tr>)}</Table>
+      : <Table headers={["Rivalry","Series","Points","Largest Win","Games"]}>{rivalries.map((row)=><tr key={`${row.u1}-${row.u2}`} style={trStyle}><td style={teamCell}>{row.name1} vs {row.name2}</td><td style={td}>{row.wins[row.u1]}-{row.wins[row.u2]}</td><td style={td}>{row.points[row.u1]}-{row.points[row.u2]}</td><td style={td}>{row.largest?.margin||0}</td><td style={td}>{row.games.length}</td></tr>)}</Table>}
+  </section>;
+}
 function AllAmericans({ rows, teams }) {
   return (
     <section style={card}>
