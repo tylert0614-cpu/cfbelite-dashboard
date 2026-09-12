@@ -10134,7 +10134,7 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
       </div>
 
       <nav className="cfb-mobile-nav-v2" style={v2MobileNav} aria-label="Primary mobile navigation">
-        {[["dashboard","Home","⌂"],["leagueHub","Network","●"],["schedule","Games","🏈"],["eliteBooks","Books","$"],["redZone","RedZone","◉"]].map(([key,label,icon])=><button key={key} type="button" className={activeTab===key?"active":""} style={activeTab===key?v2MobileNavActive:v2MobileNavButton} onClick={()=>handleSelect(key)}><b>{icon}</b><span>{label}</span></button>)}
+        {[["dashboard","Home"],["leagueHub","Network"],["schedule","Games"],["eliteBooks","Books"],["redZone","RedZone"]].map(([key,label])=><button key={key} type="button" className={activeTab===key?"active":""} style={activeTab===key?v2MobileNavActive:v2MobileNavButton} onClick={()=>handleSelect(key)}><b>{navMeta[key]?.[0]||"•"}</b><span>{label}</span></button>)}
         <button type="button" className="more" style={v2MobileNavButton} onClick={()=>setMenuOpen(true)}><b>☰</b><span>More</span></button>
       </nav>
 
