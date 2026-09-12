@@ -1674,7 +1674,7 @@ export default function App() {
     {activeTab === "teamsCoaches" && <TeamsCoachesCenterV38 teams={activeTeamOptions} users={userOptions} assignments={assignments} currentYear={currentYear} setActiveTab={setActiveTab}/>} 
     {activeTab === "leagueArchive" && <LeagueArchiveCenterV38 setActiveTab={setActiveTab}/>} 
     {activeTab === "automaticRankings" && <AutomaticRankingsPageV38 teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} currentYear={currentYear} currentWeek={currentWeek} rankingSnapshots={rankingSnapshots} goToTeam={goToTeam} setActiveTab={setActiveTab}/>} 
-    {activeTab === "leagueHub" && <FeatureErrorBoundary title="CFBElite Network"><LeagueHub discordSession={discordSession} linkedDiscordUser={linkedDiscordUser} users={userOptions} teams={activeTeamOptions} assignments={assignments} weeklyMatchups={weeklyMatchups} currentYear={currentYear} setActiveTab={setActiveTab} setError={setError}/></FeatureErrorBoundary>} 
+    {activeTab === "leagueHub" && <FeatureErrorBoundary title="CFBElite Network"><LeagueHub discordSession={discordSession} linkedDiscordUser={linkedDiscordUser} users={userOptions} teams={activeTeamOptions} assignments={assignments} weeklyMatchups={weeklyMatchups} results={currentYearResults} currentYear={currentYear} setActiveTab={setActiveTab} setError={setError}/></FeatureErrorBoundary>}
     {activeTab === "newsroom" && <NewsroomPlatform discordSession={discordSession} linkedDiscordUser={linkedDiscordUser} users={userOptions} teams={activeTeamOptions} assignments={assignments} currentYear={currentYear} setActiveTab={setActiveTab} setError={setError}/>} 
     {activeTab === "dataIntake" && <LeagueDataIntakeCenter discordSession={discordSession} linkedDiscordUser={linkedDiscordUser} currentYear={currentYear} currentWeek={currentWeek} adminUnlocked={adminUnlocked} setError={setError}/>} 
     {activeTab === "gameTop25" && <CapturedTop25Page currentYear={currentYear} teams={teamOptions} setActiveTab={setActiveTab}/>} 
@@ -2019,10 +2019,13 @@ function networkTeamForUser(userId,teams,assignments,currentYear) {
   return teams.find((team)=>String(team.id)===String(assignment?.team_id));
 }
 
-function NetworkIdentity({userId,users,teams,assignments,currentYear,compact=false}) {
+function NetworkIdentity({userId,users,teams,assignments,currentYear,compact=false,colored=false,onClick}) {
   const user=users.find((row)=>String(row.id)===String(userId));
   const team=networkTeamForUser(userId,teams,assignments,currentYear);
-  return <span className={`network-identity ${compact?"compact":""}`}><TeamLogoMark team={team} size={compact?28:38}/><span><strong>{user?.discord_username||"League Member"}</strong>{!compact&&<small>{team?.name||"CFB Elite"}</small>}</span></span>;
+  const nameStyle=colored?{color:getTeamPrimary(team)}:undefined;
+  const content=<><TeamLogoMark team={team} size={compact?28:38}/><span><strong style={nameStyle}>{user?.discord_username||"League Member"}</strong>{!compact&&<small>{team?.name||"CFB Elite"}</small>}</span></>;
+  if(onClick)return <button type="button" className={`network-identity network-identity-trigger ${compact?"compact":""}`} onClick={onClick}>{content}</button>;
+  return <span className={`network-identity ${compact?"compact":""}`}>{content}</span>;
 }
 
 function cleanNetworkChannelName(value=""){
@@ -2239,7 +2242,7 @@ function NetworkOrganizer({
   </section>;
 }
 
-function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignments=[],weeklyMatchups=[],currentYear,setActiveTab,setError}) {
+function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignments=[],weeklyMatchups=[],results=[],currentYear,setActiveTab,setError}) {
   console.info("CFBElite Network build v54-network-mobile-experience-overhaul");
   const [mode,setMode]=useState("channels");
   const [mobileView,setMobileView]=useState("directory");
@@ -2289,6 +2292,7 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
   const [permissionDraft,setPermissionDraft]=useState({view:"inherit",post:"inherit",manage:"inherit",muted_until:""});
   const lastNotificationRef=useRef(null);
   const isCommissioner=Boolean(linkedDiscordUser?.is_commissioner);
+  const [profileUserId,setProfileUserId]=useState(null);
 
   async function loadNetworkShell() {
     if(!discordSession?.user)return;
@@ -2594,6 +2598,13 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
   const postingBlocked=mode==="channels"&&!canModerate&&(selectedChannelRow?.is_locked||selectedChannelRow?.channel_type==="announcements"||myPermission?.can_post===false);
   const reactionsFor=(messageId)=>{const grouped=new Map();reactions.filter((row)=>String(row.message_id)===String(messageId)).forEach((row)=>{const item=grouped.get(row.reaction)||{reaction:row.reaction,count:0,mine:false};item.count++;if(String(row.discord_user_id)===String(linkedDiscordUser.id))item.mine=true;grouped.set(row.reaction,item);});return [...grouped.values()];};
   const displayMembers=users.filter((user)=>user.is_active!==false&&!user.is_banned).sort((a,b)=>Number(presenceUserIds.has(String(b.id)))-Number(presenceUserIds.has(String(a.id)))||String(a.discord_username).localeCompare(String(b.discord_username)));
+  const memberStatusFor=(userId)=>{const row=activePresence.find((item)=>String(item.discord_user_id)===String(userId));return row?(row.status==="online"?"online":"idle"):"offline";};
+  const memberPresenceGroups=[
+    {key:"commissioner",label:"COMMISSIONER",members:displayMembers.filter((user)=>user.is_commissioner)},
+    {key:"online",label:"ONLINE",members:displayMembers.filter((user)=>!user.is_commissioner&&memberStatusFor(user.id)==="online")},
+    {key:"idle",label:"IDLE",members:displayMembers.filter((user)=>!user.is_commissioner&&memberStatusFor(user.id)==="idle")},
+    {key:"offline",label:"OFFLINE",members:displayMembers.filter((user)=>!user.is_commissioner&&memberStatusFor(user.id)==="offline")},
+  ].filter((group)=>group.members.length);
   const topRoleForUser=(userId)=>roles.filter((role)=>roleMembers.some((member)=>String(member.role_id)===String(role.id)&&String(member.discord_user_id)===String(userId))).sort((a,b)=>Number(b.position)-Number(a.position))[0];
   const publicChannels=channels.filter((channel)=>!channel.is_auto_matchup);
   const matchupChannels=channels.filter((channel)=>channel.is_auto_matchup);
@@ -2670,7 +2681,30 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
     </div>}
   </div>
   <button className={pinnedOnly?"active":""} onClick={()=>setPinnedOnly((value)=>!value)}>📌 {pinnedOnly?"Showing Pins":"Pinned"}</button>
-</div>}{mode==="channels"&&selectedChannelRow?.slug==="player-reporting"&&<section className="network-reporting-card"><div><span>CONFIDENTIAL REPORTING</span><h3>Report a League Member</h3><p>Use the official Google Form. Reports stay outside the public channel and go directly to the commissioner review workflow.</p></div>{reportingUrl?<a href={reportingUrl} target="_blank" rel="noreferrer">Open Player Report Form ↗</a>:<b>Reporting form link has not been added yet.</b>}{isCommissioner&&<div><input value={reportingDraft} onChange={(event)=>setReportingDraft(event.target.value)} placeholder="Paste the Google Form URL"/><button onClick={saveReportingUrl}>Save Link</button></div>}</section>}{mode==="channels"&&selectedChannelRow?.slug==="polls"&&<section className="network-poll-zone">{isCommissioner&&<div className="network-poll-builder"><header><span>CREATE A POLL</span><h3>Ask the League</h3></header><input value={pollForm.question} onChange={(event)=>setPollForm({...pollForm,question:event.target.value})} placeholder="Poll question"/><textarea value={pollForm.description} onChange={(event)=>setPollForm({...pollForm,description:event.target.value})} placeholder="Optional context"/>{pollForm.options.map((option,index)=><div key={index}><input value={option} onChange={(event)=>setPollForm({...pollForm,options:pollForm.options.map((value,itemIndex)=>itemIndex===index?event.target.value:value)})} placeholder={`Choice ${index+1}`}/>{pollForm.options.length>2&&<button onClick={()=>setPollForm({...pollForm,options:pollForm.options.filter((_,itemIndex)=>itemIndex!==index)})}>×</button>}</div>)}<button className="secondary" onClick={()=>setPollForm({...pollForm,options:[...pollForm.options,""]})}>＋ Add Choice</button><div className="network-poll-options"><label><input type="checkbox" checked={pollForm.multiple_choice} onChange={(event)=>setPollForm({...pollForm,multiple_choice:event.target.checked})}/> Multiple choices</label><label><input type="checkbox" checked={pollForm.anonymous} onChange={(event)=>setPollForm({...pollForm,anonymous:event.target.checked})}/> Anonymous voting</label><label><input type="checkbox" checked={pollForm.hide_results} onChange={(event)=>setPollForm({...pollForm,hide_results:event.target.checked})}/> Hide results until close</label><label>Ends <input type="datetime-local" value={pollForm.ends_at} onChange={(event)=>setPollForm({...pollForm,ends_at:event.target.value})}/></label></div><button disabled={busy} onClick={createPoll}>Publish Poll</button></div>}<div className="network-poll-list">{polls.map((poll)=>{const options=pollOptions.filter((row)=>String(row.poll_id)===String(poll.id));const votes=pollVotes.filter((row)=>String(row.poll_id)===String(poll.id));const myVotes=new Set(votes.filter((row)=>String(row.discord_user_id)===String(linkedDiscordUser.id)).map((row)=>String(row.option_id)));const total=votes.length;const hidden=poll.hide_results&&!poll.is_closed&&new Date(poll.ends_at||"2999-01-01")>new Date();return <article key={poll.id}><header><div><span>{pollCountdown(poll)}</span><h3>{poll.question}</h3><p>{poll.description}</p></div>{isCommissioner&&!poll.is_closed&&<button onClick={()=>closePoll(poll)}>Close Poll</button>}</header><div>{options.map((option)=>{const count=votes.filter((vote)=>String(vote.option_id)===String(option.id)).length;const pct=total?Math.round((count/total)*100):0;return <button key={option.id} className={myVotes.has(String(option.id))?"voted":""} disabled={poll.is_closed||new Date(poll.ends_at||"2999-01-01")<=new Date()} onClick={()=>votePoll(poll,option.id)}><span><b>{option.option_text}</b><em>{hidden?"Results hidden":`${count} vote${count===1?"":"s"} • ${pct}%`}</em></span>{!hidden&&<i style={{width:`${pct}%`}}/>}</button>})}</div><footer>{total} total vote{total===1?"":"s"} • {poll.multiple_choice?"Multiple choice":"Single choice"} • {poll.anonymous?"Anonymous":"Public voters"}</footer></article>})}{!polls.length&&<div className="network-empty"><b>No polls yet.</b><span>A commissioner can create the first league poll above.</span></div>}</div></section>}<div className="network-message-feed">{displayedMessages.map((message)=>{const parent=displayedMessages.find((row)=>String(row.id)===String(message.reply_to_id));const mine=String(message.author_discord_user_id)===String(linkedDiscordUser.id);return <article key={message.id} className={mine?"mine":""}>{parent&&<button className="network-reply-context" onClick={()=>document.getElementById(`network-message-${parent.id}`)?.scrollIntoView({behavior:"smooth",block:"center"})}><b>↳ {users.find((user)=>String(user.id)===String(parent.author_discord_user_id))?.discord_username||"League Member"}</b><span><NetworkMessageBody body={parent.body} customEmojis={customEmojis}/></span></button>}<div id={`network-message-${message.id}`} className="network-message-head"><NetworkIdentity userId={message.author_discord_user_id} users={users} teams={teams} assignments={assignments} currentYear={currentYear}/><time>{new Date(message.created_at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}{message.edited_at?" • edited":""}</time></div><p><NetworkMessageBody body={message.body} customEmojis={customEmojis}/></p><div className="network-message-toolbar"><button onClick={()=>setReplyingTo(message)}>↩ Reply</button>{mode==="channels"&&canModerate&&<button className={message.is_pinned?"pinned":""} onClick={()=>togglePinnedMessage(message)}>📌 {message.is_pinned?"Unpin":"Pin"}</button>}{mode==="channels"&&(mine||canModerate)&&<><button onClick={()=>editMessage(message)}>Edit</button><button className="danger" onClick={()=>deleteMessage(message)}>Delete</button></>}</div>{mode==="channels"&&<div className="network-reaction-row">{reactionsFor(message.id).map((item)=><button key={item.reaction} className={item.mine?"mine":""} onClick={()=>toggleReaction(message.id,item.reaction)}><NetworkEmojiToken value={item.reaction} customEmojis={customEmojis}/> <b>{item.count}</b></button>)}<span className="network-quick-react">{NETWORK_EMOJIS.slice(0,6).map((emoji)=><button key={emoji} onClick={()=>toggleReaction(message.id,emoji)}>{emoji}</button>)}</span>{customEmojis.slice(0,4).map((emoji)=><button key={emoji.id} onClick={()=>toggleReaction(message.id,`:${emoji.name}:`)}><img src={emoji.image_url} alt={emoji.name}/></button>)}</div>}</article>;})}{!displayedMessages.length&&<div className="network-empty"><b>Start the conversation.</b><span>This space is ready for the league.</span></div>}</div><div className="network-composer">{replyingTo&&<div className="network-replying"><span><b>Replying to {users.find((user)=>String(user.id)===String(replyingTo.author_discord_user_id))?.discord_username||"League Member"}</b><small>{replyingTo.body}</small></span><button onClick={()=>setReplyingTo(null)}>×</button></div>}<div className="network-composer-tools"><button title="Attach image or file" onClick={()=>attachmentInputRef.current?.click()} disabled={attachmentBusy}>＋</button><button title="Search GIPHY" className={giphyOpen?"active":""} onClick={()=>{setGiphyOpen((value)=>!value);setEmojiOpen(false);}}>GIF</button><button title="Emoji" className={emojiOpen?"active":""} onClick={()=>{setEmojiOpen((value)=>!value);setGiphyOpen(false);}}>☺</button>{mode==="channels"&&selectedChannelRow?.slug==="polls"&&<button title="Create poll" onClick={()=>document.querySelector(".network-poll-builder")?.scrollIntoView({behavior:"smooth"})}>Poll</button>}</div><div className="network-compose-box"><textarea value={draft} onChange={(event)=>setDraft(event.target.value)} onPaste={(event)=>{const file=[...(event.clipboardData?.files||[])][0];if(file){event.preventDefault();uploadNetworkAttachment(file);}}} onKeyDown={(event)=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();sendMessage();}}} placeholder={composerPlaceholder} disabled={(mode==="direct"&&!selectedConversation)||postingBlocked}/></div><input ref={attachmentInputRef} hidden type="file" accept="image/*,.pdf,.doc,.docx,.txt,.csv,.zip" onChange={(event)=>uploadNetworkAttachment(event.target.files?.[0])}/><NetworkGiphyPicker open={giphyOpen} onClose={()=>setGiphyOpen(false)} onSelect={(url)=>sendMessage(url)}/>{emojiOpen&&<div className="network-emoji-picker">{NETWORK_EMOJIS.map((emoji)=><button key={emoji} onClick={()=>setDraft((value)=>`${value}${emoji}`)}>{emoji}</button>)}{customEmojis.map((emoji)=><button key={emoji.id} onClick={()=>setDraft((value)=>`${value}:${emoji.name}:`)}><img src={emoji.image_url} alt={emoji.name}/></button>)}</div>}<small>Enter to send • Shift + Enter for a new line</small></div></>}</section><aside className="network-member-rail"><header><span>LEAGUE MEMBERS</span><b>{onlineUsers.length} ONLINE</b></header><div>{displayMembers.map((user)=>{const role=topRoleForUser(user.id);const online=presenceUserIds.has(String(user.id));return <button key={user.id} onClick={()=>String(user.id)!==String(linkedDiscordUser.id)&&startConversation(user.id)}><i className={online?"online":""}/><NetworkIdentity userId={user.id} users={users} teams={teams} assignments={assignments} currentYear={currentYear} compact/><em style={{color:role?.color||"#64748b"}}>{role?.name||"League Member"}</em></button>})}</div></aside></div>
+</div>}{mode==="channels"&&selectedChannelRow?.slug==="player-reporting"&&<section className="network-reporting-card"><div><span>CONFIDENTIAL REPORTING</span><h3>Report a League Member</h3><p>Use the official Google Form. Reports stay outside the public channel and go directly to the commissioner review workflow.</p></div>{reportingUrl?<a href={reportingUrl} target="_blank" rel="noreferrer">Open Player Report Form ↗</a>:<b>Reporting form link has not been added yet.</b>}{isCommissioner&&<div><input value={reportingDraft} onChange={(event)=>setReportingDraft(event.target.value)} placeholder="Paste the Google Form URL"/><button onClick={saveReportingUrl}>Save Link</button></div>}</section>}{mode==="channels"&&selectedChannelRow?.slug==="polls"&&<section className="network-poll-zone">{isCommissioner&&<div className="network-poll-builder"><header><span>CREATE A POLL</span><h3>Ask the League</h3></header><input value={pollForm.question} onChange={(event)=>setPollForm({...pollForm,question:event.target.value})} placeholder="Poll question"/><textarea value={pollForm.description} onChange={(event)=>setPollForm({...pollForm,description:event.target.value})} placeholder="Optional context"/>{pollForm.options.map((option,index)=><div key={index}><input value={option} onChange={(event)=>setPollForm({...pollForm,options:pollForm.options.map((value,itemIndex)=>itemIndex===index?event.target.value:value)})} placeholder={`Choice ${index+1}`}/>{pollForm.options.length>2&&<button onClick={()=>setPollForm({...pollForm,options:pollForm.options.filter((_,itemIndex)=>itemIndex!==index)})}>×</button>}</div>)}<button className="secondary" onClick={()=>setPollForm({...pollForm,options:[...pollForm.options,""]})}>＋ Add Choice</button><div className="network-poll-options"><label><input type="checkbox" checked={pollForm.multiple_choice} onChange={(event)=>setPollForm({...pollForm,multiple_choice:event.target.checked})}/> Multiple choices</label><label><input type="checkbox" checked={pollForm.anonymous} onChange={(event)=>setPollForm({...pollForm,anonymous:event.target.checked})}/> Anonymous voting</label><label><input type="checkbox" checked={pollForm.hide_results} onChange={(event)=>setPollForm({...pollForm,hide_results:event.target.checked})}/> Hide results until close</label><label>Ends <input type="datetime-local" value={pollForm.ends_at} onChange={(event)=>setPollForm({...pollForm,ends_at:event.target.value})}/></label></div><button disabled={busy} onClick={createPoll}>Publish Poll</button></div>}<div className="network-poll-list">{polls.map((poll)=>{const options=pollOptions.filter((row)=>String(row.poll_id)===String(poll.id));const votes=pollVotes.filter((row)=>String(row.poll_id)===String(poll.id));const myVotes=new Set(votes.filter((row)=>String(row.discord_user_id)===String(linkedDiscordUser.id)).map((row)=>String(row.option_id)));const total=votes.length;const hidden=poll.hide_results&&!poll.is_closed&&new Date(poll.ends_at||"2999-01-01")>new Date();return <article key={poll.id}><header><div><span>{pollCountdown(poll)}</span><h3>{poll.question}</h3><p>{poll.description}</p></div>{isCommissioner&&!poll.is_closed&&<button onClick={()=>closePoll(poll)}>Close Poll</button>}</header><div>{options.map((option)=>{const count=votes.filter((vote)=>String(vote.option_id)===String(option.id)).length;const pct=total?Math.round((count/total)*100):0;return <button key={option.id} className={myVotes.has(String(option.id))?"voted":""} disabled={poll.is_closed||new Date(poll.ends_at||"2999-01-01")<=new Date()} onClick={()=>votePoll(poll,option.id)}><span><b>{option.option_text}</b><em>{hidden?"Results hidden":`${count} vote${count===1?"":"s"} • ${pct}%`}</em></span>{!hidden&&<i style={{width:`${pct}%`}}/>}</button>})}</div><footer>{total} total vote{total===1?"":"s"} • {poll.multiple_choice?"Multiple choice":"Single choice"} • {poll.anonymous?"Anonymous":"Public voters"}</footer></article>})}{!polls.length&&<div className="network-empty"><b>No polls yet.</b><span>A commissioner can create the first league poll above.</span></div>}</div></section>}<div className="network-message-feed">{displayedMessages.map((message,messageIndex)=>{const parent=displayedMessages.find((row)=>String(row.id)===String(message.reply_to_id));const mine=String(message.author_discord_user_id)===String(linkedDiscordUser.id);const previousMessage=displayedMessages[messageIndex-1];const grouped=Boolean(previousMessage)&&!parent&&String(previousMessage.author_discord_user_id)===String(message.author_discord_user_id)&&(new Date(message.created_at)-new Date(previousMessage.created_at))<300000;return <article key={message.id} className={`${mine?"mine":""} ${grouped?"grouped":""}`.trim()}>{parent&&<button className="network-reply-context" onClick={()=>document.getElementById(`network-message-${parent.id}`)?.scrollIntoView({behavior:"smooth",block:"center"})}><b>↳ {users.find((user)=>String(user.id)===String(parent.author_discord_user_id))?.discord_username||"League Member"}</b><span><NetworkMessageBody body={parent.body} customEmojis={customEmojis}/></span></button>}<div id={`network-message-${message.id}`} className="network-message-head"><NetworkIdentity userId={message.author_discord_user_id} users={users} teams={teams} assignments={assignments} currentYear={currentYear} colored onClick={()=>setProfileUserId(message.author_discord_user_id)}/><time>{new Date(message.created_at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}{message.edited_at?" • edited":""}</time></div><p><NetworkMessageBody body={message.body} customEmojis={customEmojis}/></p><div className="network-message-toolbar"><button onClick={()=>setReplyingTo(message)}>↩ Reply</button>{mode==="channels"&&canModerate&&<button className={message.is_pinned?"pinned":""} onClick={()=>togglePinnedMessage(message)}>📌 {message.is_pinned?"Unpin":"Pin"}</button>}{mode==="channels"&&(mine||canModerate)&&<><button onClick={()=>editMessage(message)}>Edit</button><button className="danger" onClick={()=>deleteMessage(message)}>Delete</button></>}</div>{mode==="channels"&&<div className="network-reaction-row">{reactionsFor(message.id).map((item)=><button key={item.reaction} className={item.mine?"mine":""} onClick={()=>toggleReaction(message.id,item.reaction)}><NetworkEmojiToken value={item.reaction} customEmojis={customEmojis}/> <b>{item.count}</b></button>)}<span className="network-quick-react">{NETWORK_EMOJIS.slice(0,6).map((emoji)=><button key={emoji} onClick={()=>toggleReaction(message.id,emoji)}>{emoji}</button>)}</span>{customEmojis.slice(0,4).map((emoji)=><button key={emoji.id} onClick={()=>toggleReaction(message.id,`:${emoji.name}:`)}><img src={emoji.image_url} alt={emoji.name}/></button>)}</div>}</article>;})}{!displayedMessages.length&&<div className="network-empty"><b>Start the conversation.</b><span>This space is ready for the league.</span></div>}</div><div className="network-composer">{replyingTo&&<div className="network-replying"><span><b>Replying to {users.find((user)=>String(user.id)===String(replyingTo.author_discord_user_id))?.discord_username||"League Member"}</b><small>{replyingTo.body}</small></span><button onClick={()=>setReplyingTo(null)}>×</button></div>}<div className="network-composer-tools"><button title="Attach image or file" onClick={()=>attachmentInputRef.current?.click()} disabled={attachmentBusy}>＋</button><button title="Search GIPHY" className={giphyOpen?"active":""} onClick={()=>{setGiphyOpen((value)=>!value);setEmojiOpen(false);}}>GIF</button><button title="Emoji" className={emojiOpen?"active":""} onClick={()=>{setEmojiOpen((value)=>!value);setGiphyOpen(false);}}>☺</button>{mode==="channels"&&selectedChannelRow?.slug==="polls"&&<button title="Create poll" onClick={()=>document.querySelector(".network-poll-builder")?.scrollIntoView({behavior:"smooth"})}>Poll</button>}</div><div className="network-compose-box"><textarea value={draft} onChange={(event)=>setDraft(event.target.value)} onPaste={(event)=>{const file=[...(event.clipboardData?.files||[])][0];if(file){event.preventDefault();uploadNetworkAttachment(file);}}} onKeyDown={(event)=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();sendMessage();}}} placeholder={composerPlaceholder} disabled={(mode==="direct"&&!selectedConversation)||postingBlocked}/></div><input ref={attachmentInputRef} hidden type="file" accept="image/*,.pdf,.doc,.docx,.txt,.csv,.zip" onChange={(event)=>uploadNetworkAttachment(event.target.files?.[0])}/><NetworkGiphyPicker open={giphyOpen} onClose={()=>setGiphyOpen(false)} onSelect={(url)=>sendMessage(url)}/>{emojiOpen&&<div className="network-emoji-picker">{NETWORK_EMOJIS.map((emoji)=><button key={emoji} onClick={()=>setDraft((value)=>`${value}${emoji}`)}>{emoji}</button>)}{customEmojis.map((emoji)=><button key={emoji.id} onClick={()=>setDraft((value)=>`${value}:${emoji.name}:`)}><img src={emoji.image_url} alt={emoji.name}/></button>)}</div>}<small>Enter to send • Shift + Enter for a new line</small></div></>}</section><aside className="network-member-rail"><header><span>LEAGUE MEMBERS</span><b>{onlineUsers.length} ONLINE</b></header><div>{memberPresenceGroups.map((group)=><React.Fragment key={group.key}><div className="network-member-group-label"><span>{group.label}</span><b>{group.members.length}</b></div>{group.members.map((user)=>{const role=topRoleForUser(user.id);const status=memberStatusFor(user.id);return <button key={user.id} onClick={()=>String(user.id)!==String(linkedDiscordUser.id)&&startConversation(user.id)}><i className={status}/><NetworkIdentity userId={user.id} users={users} teams={teams} assignments={assignments} currentYear={currentYear} compact colored/><em style={{color:role?.color||"#64748b"}}>{role?.name||"League Member"}</em></button>})}</React.Fragment>)}</div></aside></div>
+  {profileUserId&&(()=>{
+    const profileUser=users.find((row)=>String(row.id)===String(profileUserId));
+    const profileTeam=networkTeamForUser(profileUserId,teams,assignments,currentYear);
+    const record=profileTeam?recordFromResults(profileTeam.id,results):null;
+    const ranked=profileTeam?computerRankingRows(teams,results,assignments,users):[];
+    const rankIndex=profileTeam?ranked.findIndex((row)=>String(row.team.id)===String(profileTeam.id)):-1;
+    const profileRoles=roles.filter((role)=>roleMembers.some((member)=>String(member.role_id)===String(role.id)&&String(member.discord_user_id)===String(profileUserId)));
+    const profileStatus=memberStatusFor(profileUserId);
+    return <div className="network-profile-overlay" onClick={()=>setProfileUserId(null)}>
+      <div className="network-profile-card" onClick={(event)=>event.stopPropagation()} style={{"--profile-team":getTeamPrimary(profileTeam),"--profile-team-secondary":getTeamSecondary(profileTeam)}}>
+        <button type="button" className="network-profile-close" onClick={()=>setProfileUserId(null)} aria-label="Close profile">×</button>
+        <div className="network-profile-banner"><TeamLogoMark team={profileTeam} size={64} plate/><i className={profileStatus}/></div>
+        <h3>{profileUser?.discord_username||"League Member"}</h3>
+        <p>{profileTeam?.name||"Unassigned"}{profileUser?.is_commissioner?" • Commissioner":""}</p>
+        {profileTeam&&record&&record.games>0&&<div className="network-profile-stats">
+          <div><b>{record.wins}-{record.losses}</b><span>Record</span></div>
+          <div><b>{rankIndex>=0?`#${rankIndex+1}`:"—"}</b><span>Rank</span></div>
+        </div>}
+        {profileRoles.length>0&&<div className="network-profile-roles">{profileRoles.map((role)=><span key={role.id} style={{background:`${role.color}26`,color:role.color,borderColor:`${role.color}55`}}>{role.name}</span>)}</div>}
+        {isCommissioner&&String(profileUserId)!==String(linkedDiscordUser.id)&&<div className="network-profile-actions"><button type="button" onClick={()=>{setProfileUserId(null);setActiveTab?.("teamsCoaches");}}>Manage in Commissioner Center →</button></div>}
+      </div>
+    </div>;
+  })()}
   </main>;
 }
 
@@ -7386,144 +7420,7 @@ function GlobalStyle() {
         .data-check-item select { grid-column:1/-1; width:100%; }
       }
 
-      /* v41 Discord clone treatment */
-      .discord-clone-page {
-        --discord-bg:#313338;
-        --discord-sidebar:#2b2d31;
-        --discord-deep:#1e1f22;
-        --discord-input:#383a40;
-        --discord-hover:#35373c;
-        --discord-active:#404249;
-        --discord-text:#f2f3f5;
-        --discord-muted:#b5bac1;
-        --discord-blue:#5865f2;
-        max-width:none!important;
-        padding:0!important;
-        gap:0!important;
-        background:var(--discord-deep)!important;
-        border-radius:18px;
-        overflow:hidden;
-      }
-      .discord-clone-page .discord-server-banner {
-        min-height:68px!important;
-        padding:14px 18px!important;
-        margin:0!important;
-        border:0!important;
-        border-bottom:1px solid rgba(0,0,0,.35)!important;
-        border-radius:0!important;
-        background:var(--discord-deep)!important;
-        box-shadow:none!important;
-      }
-      .discord-clone-page .discord-server-banner h1 { font-size:20px!important; letter-spacing:0!important; margin:0!important; }
-      .discord-clone-page .discord-server-banner p,
-      .discord-clone-page .discord-server-banner > div > span { display:none!important; }
-      .discord-clone-page .network-layout {
-        min-height:calc(100vh - 150px)!important;
-        border:0!important;
-        border-radius:0!important;
-        background:var(--discord-bg)!important;
-        box-shadow:none!important;
-      }
-      .discord-clone-page .network-sidebar {
-        width:300px!important;
-        background:var(--discord-sidebar)!important;
-        border-right:0!important;
-      }
-      .discord-clone-page .network-sidebar > nav {
-        padding:8px!important;
-        background:var(--discord-sidebar)!important;
-        border:0!important;
-        display:grid!important;
-        grid-template-columns:repeat(3,1fr)!important;
-        gap:4px!important;
-      }
-      .discord-clone-page .network-sidebar > nav button {
-        min-height:36px!important;
-        padding:7px 8px!important;
-        border:0!important;
-        border-radius:6px!important;
-        background:transparent!important;
-        color:var(--discord-muted)!important;
-        box-shadow:none!important;
-      }
-      .discord-clone-page .network-sidebar > nav button:hover { background:var(--discord-hover)!important; color:var(--discord-text)!important; }
-      .discord-clone-page .network-sidebar > nav button.active { background:var(--discord-active)!important; color:#fff!important; box-shadow:none!important; }
-      .discord-clone-page .network-sidebar-label,
-      .discord-clone-page .network-channel-category {
-        color:#949ba4!important;
-        background:transparent!important;
-        border:0!important;
-        font-size:11px!important;
-        font-weight:800!important;
-        letter-spacing:.03em!important;
-      }
-      .discord-clone-page .network-channel-list { padding:0 8px 10px!important; }
-      .discord-clone-page .network-channel-list > button {
-        min-height:38px!important;
-        padding:6px 8px!important;
-        margin:1px 0!important;
-        border:0!important;
-        border-radius:6px!important;
-        background:transparent!important;
-        color:var(--discord-muted)!important;
-        box-shadow:none!important;
-      }
-      .discord-clone-page .network-channel-list > button:hover { background:var(--discord-hover)!important; color:var(--discord-text)!important; transform:none!important; }
-      .discord-clone-page .network-channel-list > button.active { background:var(--discord-active)!important; color:#fff!important; }
-      .discord-clone-page .network-channel-list > button strong { color:inherit!important; font-size:15px!important; }
-      .discord-clone-page .network-channel-list > button small { display:none!important; }
-      .discord-clone-page .network-online-roster { border-top:1px solid rgba(0,0,0,.28)!important; background:#232428!important; }
-      .discord-clone-page .network-stage,
-      .discord-clone-page .network-message-feed { background:var(--discord-bg)!important; }
-      .discord-clone-page .network-stage-header {
-        min-height:58px!important;
-        padding:10px 16px!important;
-        border:0!important;
-        border-bottom:1px solid rgba(0,0,0,.35)!important;
-        background:var(--discord-bg)!important;
-        box-shadow:0 1px 0 rgba(0,0,0,.2)!important;
-      }
-      .discord-clone-page .network-stage-header h2 { font-size:18px!important; color:var(--discord-text)!important; }
-      .discord-clone-page .network-stage-header p { color:var(--discord-muted)!important; }
-      .discord-clone-page .network-message-feed { padding:12px 0 110px!important; }
-      .discord-clone-page .network-message-feed article {
-        border:0!important;
-        border-radius:0!important;
-        padding:8px 16px!important;
-        margin:0!important;
-        background:transparent!important;
-        box-shadow:none!important;
-      }
-      .discord-clone-page .network-message-feed article:hover { background:#2e3035!important; }
-      .discord-clone-page .network-message-feed article p { color:#dbdee1!important; font-size:16px!important; line-height:1.35!important; }
-      .discord-clone-page .network-message-feed time { color:#949ba4!important; font-size:11px!important; }
-      .discord-clone-page .network-composer {
-        position:sticky!important;
-        bottom:0!important;
-        margin:0 16px 16px!important;
-        padding:0!important;
-        border:0!important;
-        background:transparent!important;
-      }
-      .discord-clone-page .network-compose-box,
-      .discord-clone-page .network-composer textarea {
-        border:0!important;
-        border-radius:8px!important;
-        background:var(--discord-input)!important;
-        color:var(--discord-text)!important;
-        box-shadow:none!important;
-      }
-      .discord-clone-page .network-send { background:var(--discord-blue)!important; border-radius:6px!important; }
-      .discord-clone-page button { transition:background-color .12s ease,color .12s ease,opacity .12s ease!important; }
       .drawer-menu-group:last-child { margin-top:18px!important; padding-top:16px!important; border-top:1px solid rgba(255,255,255,.10)!important; }
-      @media (max-width:760px) {
-        .discord-clone-page { border-radius:0!important; }
-        .discord-clone-page .discord-server-banner { display:none!important; }
-        .discord-clone-page .network-sidebar { width:100%!important; }
-        .discord-clone-page .network-mobile-hub-header { background:var(--discord-deep)!important; border-bottom:1px solid rgba(0,0,0,.35)!important; }
-        .discord-clone-page .network-message-feed { padding-bottom:98px!important; }
-        .discord-clone-page .network-composer { margin:0 8px 8px!important; }
-      }
 
       /* v44-network-discord-mimic */
       :root {
@@ -8352,13 +8249,6 @@ function GlobalStyle() {
         text-overflow:ellipsis !important;
       }
 
-      /* Slightly widen the Discord channel rail on desktop. */
-      @media (min-width:901px) {
-        .discord-clone-page .network-layout {
-          grid-template-columns:68px 292px minmax(0,1fr) 248px !important;
-        }
-      }
-
       /* GIPHY picker no longer depends on the failing React Grid renderer. */
       .network-giphy-picker {
         grid-template-rows:auto auto minmax(0,1fr) !important;
@@ -8461,194 +8351,8 @@ function GlobalStyle() {
       /* v51-sidebar-structural-rebuild */
       .cfb-identity-brand{gap:12px!important}.cfb-identity-brand>span{flex:0 0 44px!important;width:44px!important;height:44px!important;border-radius:12px!important;display:grid!important;place-items:center!important;font-size:11px!important;line-height:1!important;font-weight:1000!important;color:#fff!important;background:linear-gradient(145deg,#8f1111,#d92727)!important;border:1px solid rgba(201,208,217,.55)!important}.cfb-identity-brand>div{min-width:0!important}.cfb-identity-brand b{display:block!important;font-size:14px!important;white-space:nowrap!important}.cfb-identity-brand small{display:block!important;margin-top:3px!important;font-size:9px!important}
 
-      .network-channel-category{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:center!important;gap:8px!important;min-height:30px!important;margin:12px 4px 4px!important;padding:4px 6px!important;color:#aeb4bd!important;font-size:10px!important;font-weight:1000!important;letter-spacing:.065em!important;line-height:1.1!important}.network-channel-category i{display:none!important}.network-channel-category b{justify-self:end!important;color:#64748b!important;font-size:8px!important;font-weight:900!important}
-
-      .network-channel-list{padding:0 6px 16px!important}
-      .network-channel-list>button{position:relative!important;display:grid!important;grid-template-columns:42px minmax(0,1fr) auto!important;grid-template-areas:"leading copy status"!important;align-items:center!important;column-gap:10px!important;width:100%!important;min-width:0!important;min-height:46px!important;margin:1px 0!important;padding:6px 8px!important;overflow:hidden!important;border:0!important;border-radius:6px!important;background:transparent!important;box-shadow:none!important;text-align:left!important}
-      .network-channel-list>button:hover{background:#35373c!important}.network-channel-list>button.active{background:#404249!important}
-      .network-channel-leading{grid-area:leading!important;width:42px!important;height:34px!important;min-width:42px!important;display:grid!important;place-items:center!important;overflow:visible!important}
-      .network-channel-copy{grid-area:copy!important;min-width:0!important;overflow:hidden!important}
-      .network-channel-copy strong,.network-channel-copy small{display:block!important;min-width:0!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}
-      .network-channel-copy strong{color:#b5bac1!important;font-size:14px!important;font-weight:700!important;line-height:1.2!important}.network-channel-copy small{margin-top:2px!important;color:#7d838d!important;font-size:9px!important;line-height:1.05!important}
-      .network-channel-list>button.active .network-channel-copy strong,.network-channel-list>button:hover .network-channel-copy strong{color:#f2f3f5!important}
-      .network-channel-list>button em{grid-area:status!important;position:static!important;right:auto!important;top:auto!important;transform:none!important;max-width:72px!important;justify-self:end!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;color:#f0b232!important;font-size:7px!important;font-style:normal!important;font-weight:1000!important;letter-spacing:.035em!important;text-align:right!important;pointer-events:none!important}
-
-      .network-standard-row .network-channel-mark{width:28px!important;height:28px!important;min-width:28px!important;display:grid!important;place-items:center!important;border:0!important;background:transparent!important;color:#949ba4!important;font-size:22px!important;line-height:1!important}
-      .network-standard-row .network-channel-mark.glyph{font-size:0!important}.network-standard-row .network-channel-mark.glyph::before{content:"#";font-size:22px!important;font-weight:500!important;color:#949ba4!important}
-
-      .network-matchup-row{min-height:52px!important}
-      .network-matchup-logos{display:grid!important;grid-template-columns:20px 10px 20px!important;align-items:center!important;justify-content:center!important;gap:0!important;width:42px!important;height:34px!important;overflow:visible!important}
-      .network-matchup-logos img{width:20px!important;height:20px!important;object-fit:contain!important}
-      .network-matchup-logos b{font-size:7px!important;color:var(--cfb-gold)!important;text-align:center!important}
-      .network-matchup-row .network-channel-copy strong{font-size:12px!important}.network-matchup-row .network-channel-copy small{color:#949ba4!important;font-size:10px!important}
-
-      @media(min-width:901px){.discord-clone-page .network-layout{grid-template-columns:68px 320px minmax(0,1fr) 248px!important}}
-      @media(max-width:900px){.network-channel-category{min-height:32px!important;margin-top:14px!important;font-size:11px!important}.network-channel-list>button{min-height:50px!important;padding:8px 10px!important}.network-channel-copy strong{font-size:15px!important}.network-channel-list>button em{max-width:76px!important;font-size:7px!important}}
-      @media(max-width:560px){.network-channel-list>button{grid-template-columns:42px minmax(0,1fr) auto!important;padding-right:9px!important}.network-channel-list>button em{position:static!important;right:auto!important;top:auto!important;transform:none!important}}
-
-      /* v51.1-sidebar-isolation-hotfix */
-
       .network-server-rail {
         padding-top:14px !important;
-      }
-
-      .sidebar-category-v511 {
-        all:unset !important;
-        box-sizing:border-box !important;
-        display:grid !important;
-        grid-template-columns:minmax(0,1fr) auto !important;
-        align-items:center !important;
-        gap:8px !important;
-        width:100% !important;
-        min-height:30px !important;
-        margin:14px 0 4px !important;
-        padding:4px 8px !important;
-        color:#aeb4bd !important;
-        font-family:inherit !important;
-      }
-      .sidebar-category-v511 span {
-        min-width:0 !important;
-        overflow:hidden !important;
-        text-overflow:ellipsis !important;
-        white-space:nowrap !important;
-        font-size:10px !important;
-        font-weight:1000 !important;
-        letter-spacing:.065em !important;
-      }
-      .sidebar-category-v511 b {
-        justify-self:end !important;
-        color:#64748b !important;
-        font-size:8px !important;
-        font-weight:900 !important;
-      }
-
-      .sidebar-row-v511 {
-        all:unset !important;
-        box-sizing:border-box !important;
-        display:grid !important;
-        grid-template-columns:42px minmax(0,1fr) auto !important;
-        align-items:center !important;
-        gap:10px !important;
-        width:100% !important;
-        min-width:0 !important;
-        min-height:46px !important;
-        margin:1px 0 !important;
-        padding:6px 8px !important;
-        border-radius:6px !important;
-        color:#b5bac1 !important;
-        cursor:pointer !important;
-        font-family:inherit !important;
-        text-align:left !important;
-        overflow:hidden !important;
-      }
-      .sidebar-row-v511:hover {
-        background:#35373c !important;
-      }
-      .sidebar-row-v511.is-active {
-        background:#404249 !important;
-        color:#f2f3f5 !important;
-      }
-
-      .sidebar-leading-v511 {
-        all:unset !important;
-        box-sizing:border-box !important;
-        width:42px !important;
-        height:34px !important;
-        display:grid !important;
-        place-items:center !important;
-        overflow:visible !important;
-      }
-
-      .sidebar-hash-v511 {
-        all:unset !important;
-        display:block !important;
-        color:#949ba4 !important;
-        font-size:22px !important;
-        font-weight:500 !important;
-        line-height:1 !important;
-      }
-
-      .sidebar-copy-v511 {
-        all:unset !important;
-        box-sizing:border-box !important;
-        display:block !important;
-        min-width:0 !important;
-        overflow:hidden !important;
-        font-family:inherit !important;
-      }
-      .sidebar-copy-v511 strong,
-      .sidebar-copy-v511 small {
-        display:block !important;
-        min-width:0 !important;
-        overflow:hidden !important;
-        text-overflow:ellipsis !important;
-        white-space:nowrap !important;
-        font-family:inherit !important;
-      }
-      .sidebar-copy-v511 strong {
-        color:inherit !important;
-        font-size:14px !important;
-        font-weight:700 !important;
-        line-height:1.2 !important;
-      }
-      .sidebar-copy-v511 small {
-        margin-top:2px !important;
-        color:#8b919a !important;
-        font-size:10px !important;
-        line-height:1.1 !important;
-      }
-
-      .sidebar-status-v511 {
-        all:unset !important;
-        box-sizing:border-box !important;
-        justify-self:end !important;
-        max-width:76px !important;
-        overflow:hidden !important;
-        text-overflow:ellipsis !important;
-        white-space:nowrap !important;
-        color:#f0b232 !important;
-        font-family:inherit !important;
-        font-size:7px !important;
-        font-style:normal !important;
-        font-weight:1000 !important;
-        letter-spacing:.035em !important;
-        text-align:right !important;
-      }
-
-      .sidebar-matchup-logos-v511 {
-        all:unset !important;
-        box-sizing:border-box !important;
-        display:grid !important;
-        grid-template-columns:20px 10px 20px !important;
-        align-items:center !important;
-        justify-content:center !important;
-        width:42px !important;
-        height:34px !important;
-      }
-      .sidebar-matchup-logos-v511 img {
-        width:20px !important;
-        height:20px !important;
-        object-fit:contain !important;
-        display:block !important;
-      }
-      .sidebar-matchup-logos-v511 b {
-        color:var(--cfb-gold) !important;
-        font-size:7px !important;
-        font-weight:1000 !important;
-        text-align:center !important;
-      }
-
-      .sidebar-row-v511.is-matchup {
-        min-height:52px !important;
-      }
-      .sidebar-row-v511.is-matchup .sidebar-copy-v511 strong {
-        font-size:12px !important;
-      }
-
-      @media (min-width:901px) {
-        .discord-clone-page .network-layout {
-          grid-template-columns:58px 330px minmax(0,1fr) 248px !important;
-        }
       }
 
       @media (max-width:900px) {
@@ -9762,6 +9466,62 @@ function GlobalStyle() {
           height:40px!important;
         }
       }
+
+      /* The Huddle — layout fix: edge-to-edge mobile, borderless grouped messages, hairline desktop dividers only */
+      @media(max-width:900px){
+        .discord-clone-page,
+        .discord-clone-page .network-layout{
+          border:0!important;
+          border-radius:0!important;
+          box-shadow:none!important;
+        }
+        .network-mobile-hub-header{border-radius:0!important}
+      }
+      @media(min-width:901px){
+        .discord-clone-page .network-layout{
+          border:0!important;
+          box-shadow:none!important;
+        }
+      }
+      .network-message-feed article{
+        border:0!important;
+        border-radius:0!important;
+        background:transparent!important;
+        box-shadow:none!important;
+        margin:0!important;
+        padding:6px 16px!important;
+      }
+      .network-message-feed article:hover{background:rgba(255,255,255,.03)!important}
+      .network-message-feed article.grouped{padding-top:1px!important;padding-bottom:1px!important}
+      .network-message-feed article.grouped .network-message-head{display:none!important}
+      .network-message-feed article.grouped>p{margin-left:48px!important}
+      .network-message-feed article.grouped .network-message-toolbar,
+      .network-message-feed article.grouped .network-reaction-row{margin-left:48px!important}
+      .network-identity-trigger{all:unset!important;box-sizing:border-box!important;display:inline-flex!important;align-items:center!important;gap:10px!important;cursor:pointer!important;border-radius:6px!important}
+      .network-identity-trigger:hover strong{text-decoration:underline!important}
+      .network-member-group-label{display:flex!important;align-items:center!important;justify-content:space-between!important;padding:10px 8px 4px!important;color:#7d838d!important;font-size:9.5px!important;font-weight:900!important;letter-spacing:.06em!important}
+      .network-member-group-label b{color:#5c6270!important;font-weight:800!important}
+      .network-member-rail i{width:8px!important;height:8px!important;border-radius:999px!important;background:#5c6270!important}
+      .network-member-rail i.online{background:#23c55e!important;box-shadow:0 0 6px rgba(35,197,94,.6)!important}
+      .network-member-rail i.idle{background:#f0b232!important;box-shadow:0 0 6px rgba(240,178,50,.5)!important}
+      .network-member-rail i.offline{background:#4b5262!important;box-shadow:none!important}
+      .network-profile-overlay{position:fixed!important;inset:0!important;z-index:400!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:16px!important;background:rgba(4,6,10,.72)!important;backdrop-filter:blur(4px)!important}
+      .network-profile-card{position:relative!important;width:min(360px,100%)!important;padding:22px 20px!important;border:1px solid rgba(255,255,255,.12)!important;border-radius:16px!important;background:#12161f!important;box-shadow:0 30px 80px rgba(0,0,0,.5)!important;text-align:center!important}
+      .network-profile-close{all:unset!important;position:absolute!important;top:10px!important;right:12px!important;color:#8b92a5!important;font-size:20px!important;line-height:1!important;cursor:pointer!important}
+      .network-profile-banner{position:relative!important;display:flex!important;justify-content:center!important;padding:6px 0 14px!important}
+      .network-profile-banner i{position:absolute!important;right:calc(50% - 34px)!important;bottom:10px!important;width:14px!important;height:14px!important;border-radius:999px!important;border:2px solid #12161f!important;background:#4b5262!important}
+      .network-profile-banner i.online{background:#23c55e!important}
+      .network-profile-banner i.idle{background:#f0b232!important}
+      .network-profile-card h3{margin:0!important;color:#fff!important;font-size:18px!important}
+      .network-profile-card>p{margin:4px 0 0!important;color:#8b92a5!important;font-size:12.5px!important}
+      .network-profile-stats{display:flex!important;justify-content:center!important;gap:26px!important;margin-top:16px!important;padding-top:16px!important;border-top:1px solid rgba(255,255,255,.08)!important}
+      .network-profile-stats div{display:flex!important;flex-direction:column!important;gap:2px!important}
+      .network-profile-stats b{color:#fff!important;font-size:15px!important}
+      .network-profile-stats span{color:#7d838d!important;font-size:9.5px!important;text-transform:uppercase!important;letter-spacing:.05em!important}
+      .network-profile-roles{display:flex!important;flex-wrap:wrap!important;justify-content:center!important;gap:6px!important;margin-top:14px!important}
+      .network-profile-roles span{padding:3px 9px!important;border:1px solid!important;border-radius:999px!important;font-size:10.5px!important;font-weight:700!important}
+      .network-profile-actions{margin-top:16px!important}
+      .network-profile-actions button{width:100%!important;padding:10px!important;border:1px solid rgba(255,255,255,.14)!important;border-radius:8px!important;background:rgba(255,255,255,.05)!important;color:#e5e7eb!important;font-weight:700!important;font-size:12.5px!important;cursor:pointer!important}
 `}</style>
   );
 }
