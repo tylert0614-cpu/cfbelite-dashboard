@@ -2280,9 +2280,6 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
   const [emojiBusy,setEmojiBusy]=useState(false);
   const [roles,setRoles]=useState([]);
   const [roleMembers,setRoleMembers]=useState([]);
-  const [newsArticles,setNewsArticles]=useState([]);
-  const [newsJobs,setNewsJobs]=useState([]);
-  const [newsBusy,setNewsBusy]=useState(false);
   const [roleForm,setRoleForm]=useState({id:null,name:"",color:"#4f8fa8",position:100,can_manage_channels:false,can_manage_messages:false,can_manage_members:false,is_managed:false});
   const [manageOpen,setManageOpen]=useState(false);
   const [organizeOpen,setOrganizeOpen]=useState(false);
@@ -2296,7 +2293,7 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
   async function loadNetworkShell() {
     if(!discordSession?.user)return;
     await supabase.rpc("ensure_league_network_profile");
-    const [channelRes,categoryRes,conversationRes,memberRes,notificationRes,prefRes,presenceRes,permissionRes,emojiRes,roleRes,roleMemberRes,newsRes,newsJobRes]=await Promise.all([
+    const [channelRes,categoryRes,conversationRes,memberRes,notificationRes,prefRes,presenceRes,permissionRes,emojiRes,roleRes,roleMemberRes]=await Promise.all([
       supabase.from("league_channels").select("*").eq("is_archived",false).order("sort_order"),
       supabase.from("league_channel_categories").select("*").eq("is_archived",false).order("sort_order"),
       supabase.from("direct_conversations").select("*").order("last_message_at",{ascending:false}),
@@ -2308,12 +2305,10 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
       supabase.from("league_custom_emojis").select("*").eq("is_active",true).order("name"),
       supabase.from("league_roles").select("*").order("position",{ascending:false}),
       supabase.from("league_role_members").select("*"),
-      supabase.from("league_news_articles").select("*").order("generated_at",{ascending:false}).limit(80),
-      supabase.from("league_news_jobs").select("*").order("created_at",{ascending:false}).limit(30),
     ]);
     const nextChannels=channelRes.data||[];
     setChannels(nextChannels);setSelectedChannel((current)=>nextChannels.some((row)=>String(row.id)===String(current))?current:(nextChannels[0]?.id||null));
-    setCategories(categoryRes.data||[]);setConversations(conversationRes.data||[]);setConversationMembers(memberRes.data||[]);setPresence(presenceRes.data||[]);setPermissions(permissionRes.data||[]);setCustomEmojis(emojiRes.data||[]);setRoles(roleRes.data||[]);setRoleMembers(roleMemberRes.data||[]);setNewsArticles(newsRes.data||[]);setNewsJobs(newsJobRes.data||[]);
+    setCategories(categoryRes.data||[]);setConversations(conversationRes.data||[]);setConversationMembers(memberRes.data||[]);setPresence(presenceRes.data||[]);setPermissions(permissionRes.data||[]);setCustomEmojis(emojiRes.data||[]);setRoles(roleRes.data||[]);setRoleMembers(roleMemberRes.data||[]);
     const nextNotifications=notificationRes.data||[];
     if(lastNotificationRef.current&&nextNotifications[0]?.id&&nextNotifications[0].id!==lastNotificationRef.current&&prefRes.data?.sound_enabled!==false)playEliteSound("notification",true);
     lastNotificationRef.current=nextNotifications[0]?.id||lastNotificationRef.current;
@@ -2355,8 +2350,6 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
       .on("postgres_changes",{event:"*",schema:"public",table:"direct_messages"},()=>loadDirectMessages())
       .on("postgres_changes",{event:"*",schema:"public",table:"league_channels"},()=>loadNetworkShell())
       .on("postgres_changes",{event:"*",schema:"public",table:"league_channel_categories"},()=>loadNetworkShell())
-      .on("postgres_changes",{event:"*",schema:"public",table:"league_news_articles"},()=>loadNetworkShell())
-      .on("postgres_changes",{event:"*",schema:"public",table:"league_news_jobs"},()=>loadNetworkShell())
       .on("postgres_changes",{event:"*",schema:"public",table:"league_presence"},()=>loadNetworkShell())
       .on("postgres_changes",{event:"*",schema:"public",table:"league_polls"},()=>loadSocialExtras())
       .on("postgres_changes",{event:"*",schema:"public",table:"league_poll_options"},()=>loadSocialExtras())
@@ -2572,25 +2565,6 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
   async function toggleRoleMember(roleId,userId,assigned){setBusy(true);const {error}=await supabase.rpc("set_league_role_member",{p_role_id:roleId,p_discord_user_id:String(userId),p_assigned:Boolean(assigned)});setBusy(false);if(error)setError?.(`Role membership not changed: ${error.message}`);else await loadNetworkShell();}
   function selectPermissionUser(userId){setPermissionUserId(userId);const row=permissions.find((item)=>String(item.channel_id)===String(channelForm.id)&&String(item.discord_user_id)===String(userId));const tri=(value)=>value===true?"allow":value===false?"deny":"inherit";setPermissionDraft({view:tri(row?.can_view),post:tri(row?.can_post),manage:tri(row?.can_manage),muted_until:row?.muted_until?String(row.muted_until).slice(0,16):""});}
   async function saveChannelPermission(){if(!permissionUserId||!channelForm.id)return;const parse=(value)=>value==="allow"?true:value==="deny"?false:null;const {error}=await supabase.rpc("set_league_channel_permission",{p_channel_id:channelForm.id,p_discord_user_id:String(permissionUserId),p_can_view:parse(permissionDraft.view),p_can_post:parse(permissionDraft.post),p_can_manage:parse(permissionDraft.manage),p_muted_until:permissionDraft.muted_until?new Date(permissionDraft.muted_until).toISOString():null});if(error)setError?.(`Permission not saved: ${error.message}`);else{setError?.("Channel permission saved.");await loadNetworkShell();}}
-  async function generateLeagueNews(){
-    if(!isCommissioner||newsBusy)return;setNewsBusy(true);
-    const queued=await supabase.rpc("queue_league_news_digest");
-    if(queued.error){setNewsBusy(false);setError?.(`Newsroom job not queued: ${queued.error.message}`);return;}
-    const generated=await supabase.functions.invoke("generate-league-news",{body:{source:"commissioner"}});
-    setNewsBusy(false);await loadNetworkShell();
-    if(generated.error){setError?.("The story was queued and the automatic Newsroom worker will retry it shortly.");return;}
-    setError?.(`Newsroom created ${generated.data?.articles||0} commissioner-review draft${generated.data?.articles===1?"":"s"}.`);
-  }
-  async function saveNewsDraft(article,values){
-    if(!isCommissioner)return;setNewsBusy(true);
-    const {error}=await supabase.rpc("update_league_news_draft",{p_article_id:article.id,p_headline:values.headline,p_dek:values.dek,p_body:values.body});
-    setNewsBusy(false);if(error){setError?.(`Draft not saved: ${error.message}`);return;}await loadNetworkShell();setError?.("Newsroom draft saved.");
-  }
-  async function reviewNewsArticle(article,action){
-    if(!isCommissioner||!window.confirm(action==="publish"?"Publish this story to the Newsroom channel and notify eligible members?":"Reject this draft?"))return;
-    setNewsBusy(true);const {error}=await supabase.rpc("review_league_news_article",{p_article_id:article.id,p_action:action});setNewsBusy(false);
-    if(error){setError?.(`Newsroom review failed: ${error.message}`);return;}await loadNetworkShell();setError?.(action==="publish"?"Story published to the Newsroom channel. Push delivery is queued.":"Draft rejected.");
-  }
 
   const selectedChannelRow=channels.find((row)=>String(row.id)===String(selectedChannel));
   const unread=notifications.filter((row)=>!row.read_at).length;
@@ -2663,7 +2637,6 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
   const composerPlaceholder=postingBlocked?"Posting is restricted in this channel":mode==="direct"?"Message privately…":selectedChannelRow?.is_auto_matchup?"Message this matchup…":`Message #${cleanNetworkChannelName(selectedChannelRow?.name)||"channel"}…`;
   const returnToDirectory=()=>{setMobileView("directory");setManageOpen(false);if(!["channels","direct"].includes(mode))setMode("channels");};
 
-  if(mode==="news")return <main className="cfb-v2-page network-page newsroom-page"><header className="newsroom-page-bar"><button onClick={()=>{setMode("channels");setMobileView("directory");}}>‹ Back to CFBElite Network</button><div><span>CFB ELITE NETWORK</span><strong>Newsroom Control</strong></div><b>{onlineUsers.length} ONLINE</b></header><LeagueNewsroom articles={newsArticles} jobs={newsJobs} isCommissioner={isCommissioner} busy={newsBusy} onGenerate={generateLeagueNews} onSave={saveNewsDraft} onReview={reviewNewsArticle}/></main>;
 
   return <main className={`cfb-v2-page network-page discord-clone-page network-mobile-${mobileView}`}>
     <section className="network-hero discord-server-banner"><div><span>CFBELITE 27</span><h1>CFBElite Network</h1><p>League channels, direct messages, reactions, replies and notifications.</p></div><div className="network-live-presence"><i/><strong>{onlineUsers.length}</strong><span>ONLINE</span></div></section>
@@ -2672,7 +2645,7 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
       <aside className="network-server-rail" aria-label="CFBElite Network shortcuts">
         <button className={mode==="direct"?"active":""} title="Direct Messages" onClick={()=>{setMode("direct");setMobileView("directory");}}><img src={NETWORK_RAIL_ASSETS.messages} alt="Direct Messages"/></button>
         <button className={mode==="notifications"?"active":""} title="Notifications" onClick={()=>{setMode("notifications");setMobileView("panel");}}><img src={NETWORK_RAIL_ASSETS.alerts} alt="Notifications"/>{unread>0&&<b>{unread}</b>}</button>
-        <button className={mode==="news"?"active":""} title="Newsroom" onClick={()=>{setMode("news");setMobileView("panel");}}><img src={NETWORK_RAIL_ASSETS.newsroom} alt="Newsroom"/></button>
+        <button title="Newsroom" onClick={()=>setActiveTab?.("newsroom")}><img src={NETWORK_RAIL_ASSETS.newsroom} alt="Newsroom"/></button>
       </aside>
       <aside className="network-sidebar">
       <div className="network-mobile-directory-title"><strong>CFBElite 27 Dynasty</strong><span>League channels and conversations</span></div>
@@ -2701,20 +2674,6 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
   </main>;
 }
 
-function LeagueNewsroom({articles=[],jobs=[],isCommissioner,busy,onGenerate,onSave,onReview}) {
-  const [editing,setEditing]=useState(null);
-  const visible=[...articles].sort((a,b)=>new Date(b.published_at||b.generated_at)-new Date(a.published_at||a.generated_at));
-  const published=visible.filter((row)=>row.status==="published");
-  const drafts=visible.filter((row)=>row.status==="draft");
-  const pendingJobs=jobs.filter((row)=>row.status==="pending"||row.status==="processing").length;
-  function begin(article){setEditing({id:article.id,headline:article.headline,dek:article.dek||"",body:article.body});}
-  return <div className="league-newsroom">
-    <header className="league-newsroom-hero"><div><span>CFB ELITE NEWSWIRE</span><h2>The Newsroom</h2><p>Verified league data becomes polished coverage. Every AI-assisted story is reviewed by a commissioner before it reaches the league.</p></div><div className="league-newsroom-stats"><b>{published.length}</b><span>PUBLISHED</span><b>{drafts.length}</b><span>IN REVIEW</span></div>{isCommissioner&&<button disabled={busy} onClick={onGenerate}>{busy?"Building the wire…":"Generate News Digest"}</button>}</header>
-    {isCommissioner&&<section className="league-newsroom-desk"><div><span>COMMISSIONER DESK</span><strong>{pendingJobs?`${pendingJobs} automation job${pendingJobs===1?"":"s"} running or queued`:drafts.length?`${drafts.length} draft${drafts.length===1?"":"s"} ready for review`:"The desk is clear"}</strong></div><small>Results and week advances queue stories automatically. Nothing is published without approval.</small></section>}
-    {isCommissioner&&drafts.length>0&&<section className="league-newsroom-section"><header><span>REVIEW QUEUE</span><h3>Draft stories</h3></header><div className="league-newsroom-grid">{drafts.map((article)=>{const active=editing?.id===article.id;return <article key={article.id} className="newsroom-story draft"><div className="newsroom-story-meta"><b>{article.category}</b><span>{article.season_year} • {article.week_label}</span><em>AI DRAFT</em></div>{active?<><input value={editing.headline} onChange={(event)=>setEditing({...editing,headline:event.target.value})}/><input value={editing.dek} onChange={(event)=>setEditing({...editing,dek:event.target.value})}/><textarea value={editing.body} onChange={(event)=>setEditing({...editing,body:event.target.value})}/></>:<><h4>{article.headline}</h4><strong>{article.dek}</strong><p>{article.body}</p></>}<footer>{active?<><button disabled={busy} onClick={async()=>{await onSave(article,editing);setEditing(null);}}>Save Draft</button><button className="secondary" onClick={()=>setEditing(null)}>Cancel</button></>:<button onClick={()=>begin(article)}>Edit</button>}<button disabled={busy} className="publish" onClick={()=>onReview(article,"publish")}>Publish</button><button disabled={busy} className="reject" onClick={()=>onReview(article,"reject")}>Reject</button></footer></article>;})}</div></section>}
-    <section className="league-newsroom-section"><header><span>LATEST COVERAGE</span><h3>Published stories</h3></header>{published.length?<div className="league-newsroom-grid published">{published.map((article)=><article key={article.id} className="newsroom-story published"><div className="newsroom-story-meta"><b>{article.category}</b><span>{article.season_year} • {article.week_label}</span><em>VERIFIED</em></div><h4>{article.headline}</h4><strong>{article.dek}</strong><p>{article.body}</p><footer><time>{new Date(article.published_at||article.generated_at).toLocaleString()}</time></footer></article>)}</div>:<div className="league-newsroom-empty"><b>The wire is warming up.</b><span>The first commissioner-approved story will appear here.</span></div>}</section>
-  </div>;
-}
 
 function NewsroomPlatform({discordSession,linkedDiscordUser,users=[],teams=[],assignments=[],currentYear,setActiveTab,setError}) {
   const [articles,setArticles]=useState([]);
@@ -7234,17 +7193,7 @@ function GlobalStyle() {
       .network-page .network-stage-header { border-bottom:1px solid rgba(201,208,217,.18);box-shadow:inset 0 -2px rgba(229,72,77,.28);background:rgba(8,12,18,.88); }
       .network-page .network-composer { border-top:2px solid rgba(229,72,77,.45);background:#0d121b; }
       .network-page .network-send { color:#fff;background:linear-gradient(135deg,#e5484d,#9f1520);box-shadow:0 8px 24px rgba(229,72,77,.2); }
-      .newsroom-page { min-height:calc(100vh - 30px);padding:14px!important; }
-      .newsroom-page-bar { display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;padding:13px 18px;border:1px solid rgba(201,208,217,.22);border-top:3px solid #3e7fc1;border-radius:14px 14px 0 0;background:#0b1018; }
-      .newsroom-page-bar button { justify-self:start;border:1px solid rgba(39,151,255,.32);border-radius:9px;padding:10px 13px;color:#dbeafe;background:rgba(39,151,255,.1);font-weight:900;cursor:pointer; }
-      .newsroom-page-bar div { display:grid;text-align:center; }.newsroom-page-bar span { color:#c9d0d9;font-size:9px;font-weight:1000;letter-spacing:.16em; }.newsroom-page-bar strong { color:#fff;font-size:17px; }.newsroom-page-bar > b { justify-self:end;color:#4ade80;font-size:10px;letter-spacing:.12em; }
-      .league-newsroom { min-height:calc(100vh - 110px);color:#f7f8fb;background:var(--cfb-panel-2); }
-      .league-newsroom-hero { display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:24px;padding:32px;border-bottom:1px solid rgba(201,208,217,.22);background:radial-gradient(circle at 76% 40%,rgba(229,72,77,.18),transparent 28%),linear-gradient(115deg,#0b1018,#101827 64%,#1c0c11); }
-      .league-newsroom-hero span,.league-newsroom-section > header span,.league-newsroom-desk > div > span { color:#c9d0d9;font-size:9px;font-weight:1000;letter-spacing:.17em; }
-      .league-newsroom-hero h2 { margin:5px 0 7px;font-size:clamp(34px,5vw,70px);line-height:.95;letter-spacing:-.055em; }.league-newsroom-hero p { max-width:760px;margin:0;color:#aeb8c7;font-size:14px;line-height:1.55; }
-      .league-newsroom-hero > button { border:1px solid rgba(201,208,217,.4);border-radius:10px;padding:13px 17px;color:#171208;background:linear-gradient(135deg,#ffd95e,#e9b72f);font-size:11px;font-weight:1000;cursor:pointer; }
-      .league-newsroom-stats { display:grid;grid-template-columns:auto auto;align-items:center;gap:4px 10px;padding:14px 17px;border:1px solid rgba(39,151,255,.25);border-radius:12px;background:#07101d; }.league-newsroom-stats b { color:#fff;font-size:24px; }.league-newsroom-stats span { color:#9cc3d1;font-size:8px;letter-spacing:.12em; }
-      .league-newsroom-desk { display:flex;align-items:center;justify-content:space-between;gap:20px;padding:14px 28px;border-bottom:2px solid rgba(229,72,77,.38);background:#101620; }.league-newsroom-desk > div { display:grid;gap:3px; }.league-newsroom-desk strong { font-size:14px; }.league-newsroom-desk small { color:#98a4b5; }
+      .league-newsroom-section > header span { color:#c9d0d9;font-size:9px;font-weight:1000;letter-spacing:.17em; }
       .league-newsroom-section { padding:26px 28px; }.league-newsroom-section + .league-newsroom-section { border-top:1px solid rgba(39,151,255,.16); }.league-newsroom-section > header h3 { margin:4px 0 18px;font-size:26px; }
       .league-newsroom-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px; }.league-newsroom-grid.published article:first-child { grid-column:1/-1; }
       .newsroom-story { min-width:0;padding:20px;border:1px solid rgba(148,163,184,.17);border-radius:14px;background:linear-gradient(145deg,#121924,#0b1018);box-shadow:0 12px 30px rgba(0,0,0,.25); }.newsroom-story.draft { border-top:3px solid #c9d0d9; }.newsroom-story.published { border-top:3px solid #3e7fc1; }
@@ -7259,9 +7208,7 @@ function GlobalStyle() {
       @media (max-width:720px) {
         .network-page .network-sidebar > nav button.active { border-color:rgba(201,208,217,.55)!important;color:#171208!important;background:linear-gradient(135deg,#ffd95e,#e9b72f)!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)!important; }
         .network-page .network-channel-list > button.active { color:#fff!important;background:linear-gradient(90deg,rgba(229,72,77,.28),rgba(39,151,255,.1))!important;box-shadow:inset 4px 0 var(--cfb-danger)!important; }
-        .newsroom-page { padding:0!important; }.newsroom-page-bar { position:sticky;top:0;z-index:30;grid-template-columns:auto 1fr auto;border-radius:0;padding:10px; }.newsroom-page-bar div { text-align:left; }.newsroom-page-bar > b { font-size:8px; }
-        .league-newsroom-hero { grid-template-columns:1fr;padding:24px 18px;gap:16px; }.league-newsroom-stats { grid-template-columns:auto 1fr auto 1fr; }.league-newsroom-hero > button { width:100%; }
-        .league-newsroom-desk { align-items:flex-start;flex-direction:column;padding:14px 18px; }.league-newsroom-section { padding:21px 14px; }.league-newsroom-grid { grid-template-columns:1fr; }.league-newsroom-grid.published article:first-child { grid-column:1; }.newsroom-story { padding:17px; }.newsroom-story h4 { font-size:25px; }
+        .league-newsroom-section { padding:21px 14px; }.league-newsroom-grid { grid-template-columns:1fr; }.league-newsroom-grid.published article:first-child { grid-column:1; }.newsroom-story { padding:17px; }.newsroom-story h4 { font-size:25px; }
         .home-newsroom-rail > header { align-items:flex-start;flex-direction:column;padding:17px; }.home-newsroom-rail > header button { width:100%; }.home-newsroom-rail > div { grid-template-columns:1fr; }.home-newsroom-rail article,.home-newsroom-rail article:last-child { border-right:0;border-bottom:1px solid rgba(148,163,184,.13); }.home-newsroom-rail article.open { grid-column:1; }.home-newsroom-rail article > button { min-height:112px;padding:16px; }
         .newsroom-platform-page { padding:0!important; }.newsroom-platform-hero { grid-template-columns:1fr;padding:27px 18px;border-radius:0;gap:16px; }.newsroom-platform-hero h1 { font-size:55px; }.newsroom-platform-score { min-width:0; }.newsroom-platform-hero > button { width:100%; }.newsroom-platform-desk { align-items:flex-start;flex-direction:column;margin:10px;border-radius:10px; }.newsroom-review { margin:10px; }.newsroom-platform-feed { margin:10px;border-radius:12px; }.newsroom-platform-feed > header { align-items:flex-start;flex-direction:column;gap:12px;padding:17px; }.newsroom-platform-feed > header button { width:100%; }.newsroom-platform-story-head { padding:18px 46px 18px 16px; }.newsroom-platform-story-head h3 { font-size:27px; }.newsroom-platform-story-body { padding:0 16px 20px; }.newsroom-platform-story-body > p { font-size:14px; }.newsroom-comment > div { align-items:flex-start;flex-direction:column; }
       }
