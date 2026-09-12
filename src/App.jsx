@@ -6484,7 +6484,6 @@ function GlobalStyle() {
       .cfb-v2-week-tabs::-webkit-scrollbar-thumb { background: rgba(148,163,184,.35); border-radius: 999px; }
       .cfb-v2-ranking-row > span, .cfb-v2-ranking-row > strong { white-space:nowrap; }
       .cfb-v2-conference-scroll, .cfb-v2-ranking-table-scroll { scrollbar-width:thin; scrollbar-color:rgba(62,127,193,.7) rgba(255,255,255,.06); }
-      .cfb-mobile-nav-v2 { display:none !important; }
       @keyframes cfbV2Fade { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:none; } }
       @media (prefers-reduced-motion: reduce) {
         *, *::before, *::after { animation-duration:.01ms !important; transition-duration:.01ms !important; scroll-behavior:auto !important; }
@@ -6497,7 +6496,6 @@ function GlobalStyle() {
       }
       @media (max-width: 760px) {
         body { padding-bottom:82px; }
-        .cfb-mobile-nav-v2 { display:grid !important; }
         .cfb-v2-page { gap:12px !important; }
         .cfb-v2-page > section:not(.elite-ticker) { border-radius:8px !important; }
         .cfb-table-scroll { margin-top:14px !important; border-radius:7px; }
@@ -9479,69 +9477,79 @@ function GlobalStyle() {
       /* Premium mobile bottom navigation. */
       .cfb-mobile-nav-v2{
         position:fixed!important;
-        left:12px!important;
-        right:12px!important;
+        left:10px!important;
+        right:10px!important;
         bottom:calc(10px + env(safe-area-inset-bottom))!important;
         z-index:1200!important;
         display:grid!important;
         grid-template-columns:repeat(6,minmax(0,1fr))!important;
-        gap:5px!important;
-        min-height:72px!important;
-        padding:8px!important;
-        border:1px solid rgba(226,190,75,.24)!important;
-        border-top:3px solid #ef3340!important;
+        gap:4px!important;
+        min-height:64px!important;
+        padding:7px!important;
+        border:1px solid rgba(201,208,217,.16)!important;
+        border-top:3px solid var(--cfb-red)!important;
         border-radius:18px!important;
-        background:rgba(5,9,20,.96)!important;
-        box-shadow:0 20px 60px rgba(0,0,0,.62),inset 0 1px 0 rgba(255,255,255,.05)!important;
-        backdrop-filter:blur(18px)!important;
+        background:rgba(8,11,18,.94)!important;
+        box-shadow:0 20px 60px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.05)!important;
+        backdrop-filter:blur(20px)!important;
       }
       .cfb-mobile-nav-v2 button{
         all:unset!important;
         box-sizing:border-box!important;
         position:relative!important;
-        display:grid!important;
-        place-items:center!important;
-        align-content:center!important;
-        gap:4px!important;
+        display:flex!important;
+        flex-direction:column!important;
+        align-items:center!important;
+        justify-content:center!important;
+        gap:3px!important;
         min-width:0!important;
-        min-height:54px!important;
+        min-height:50px!important;
         border-radius:12px!important;
-        color:#91a0b6!important;
+        color:var(--cfb-muted)!important;
         cursor:pointer!important;
-        font-family:inherit!important;
+        font-family:var(--cfb-display)!important;
+        transition:color .15s ease,background .15s ease!important;
       }
-      .cfb-mobile-nav-v2 button b{
-        display:grid!important;
-        place-items:center!important;
-        min-height:20px!important;
-        color:inherit!important;
-        font-size:15px!important;
-        line-height:1!important;
+      .cfb-mobile-nav-v2 button svg{
+        display:block!important;
+        width:20px!important;
+        height:20px!important;
+        flex:0 0 auto!important;
       }
       .cfb-mobile-nav-v2 button span{
+        display:block!important;
+        max-width:100%!important;
         overflow:hidden!important;
         text-overflow:ellipsis!important;
         white-space:nowrap!important;
         color:inherit!important;
-        font-size:10px!important;
-        font-weight:800!important;
+        font-size:9.5px!important;
+        font-weight:600!important;
+        letter-spacing:.01em!important;
       }
       .cfb-mobile-nav-v2 button.active{
-        color:#ffe067!important;
-        background:linear-gradient(180deg,rgba(226,190,75,.22),rgba(226,190,75,.10))!important;
-        box-shadow:inset 0 0 0 1px rgba(226,190,75,.24),0 8px 24px rgba(0,0,0,.26)!important;
+        color:#fff!important;
+        background:linear-gradient(180deg,rgba(62,127,193,.28),rgba(62,127,193,.08))!important;
+        box-shadow:inset 0 0 0 1px rgba(62,127,193,.35)!important;
       }
       .cfb-mobile-nav-v2 button.active::after{
         content:""!important;
         position:absolute!important;
-        left:22%!important;
-        right:22%!important;
-        bottom:3px!important;
-        height:3px!important;
+        left:26%!important;
+        right:26%!important;
+        bottom:4px!important;
+        height:2.5px!important;
         border-radius:999px!important;
-        background:#3e7fc1!important;
-        box-shadow:0 0 14px rgba(62,127,193,.65)!important;
+        background:var(--cfb-red)!important;
+        box-shadow:0 0 10px var(--cfb-red)!important;
       }
+      .cfb-mobile-nav-v2 button:active{ transform:scale(.94)!important; }
+
+      .cfb-desktop-nav-v2{ display:none; align-items:center; gap:3px; padding:4px; border-radius:9px; background:rgba(2,6,23,.5); border:1px solid rgba(255,255,255,.08); }
+      .cfb-desktop-nav-v2 button{ display:flex; align-items:center; gap:7px; border:0; border-radius:7px; padding:9px 13px; color:var(--cfb-muted); background:transparent; font-family:var(--cfb-display); font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; transition:color .15s ease,background .15s ease; }
+      .cfb-desktop-nav-v2 button svg{ width:17px; height:17px; flex:0 0 auto; }
+      .cfb-desktop-nav-v2 button:hover{ color:#fff; background:rgba(255,255,255,.05); }
+      .cfb-desktop-nav-v2 button.active{ color:#fff; background:linear-gradient(135deg,var(--cfb-red),var(--cfb-red-dark)); box-shadow:0 8px 20px rgba(62,127,193,.25); }
 
       /* Mobile and desktop menu parity. */
       .cfb-nav-drawer-v54 .drawer-menu-group{
@@ -9727,6 +9735,7 @@ function GlobalStyle() {
 
       @media(min-width:901px){
         .cfb-mobile-nav-v2{display:none!important}
+        .cfb-desktop-nav-v2{display:flex!important}
       }
 
       @media(max-width:560px){
@@ -9737,7 +9746,7 @@ function GlobalStyle() {
           padding:7px 5px!important;
         }
         .cfb-mobile-nav-v2 button span{font-size:9px!important}
-        .cfb-mobile-nav-v2 button b{font-size:14px!important}
+        .cfb-mobile-nav-v2 button svg{width:18px!important;height:18px!important}
         .cfb-identity-bar>.cfb-identity-item,
         .cfb-identity-bar>.cfb-identity-progress,
         .cfb-identity-bar>.cfb-identity-featured{
@@ -9930,6 +9939,18 @@ function UniversalSearchBar({ tabs = [], teams = [], users = [], assignments = [
   );
 }
 
+function PrimaryNavIcon({name}) {
+  const p = {width:20,height:20,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"};
+  if(name==="home") return <svg {...p}><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10"/></svg>;
+  if(name==="network") return <svg {...p}><path d="M8 4h12M8 12h12M8 20h12"/><circle cx="4" cy="4" r="1.4" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="4" cy="20" r="1.4" fill="currentColor" stroke="none"/></svg>;
+  if(name==="games") return <svg {...p}><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9"/></svg>;
+  if(name==="books") return <svg {...p}><path d="M4 19V6a2 2 0 012-2h9l5 5v10a2 2 0 01-2 2H6a2 2 0 01-2-2z"/><path d="M14 4v5h5"/></svg>;
+  if(name==="redzone") return <svg {...p}><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/></svg>;
+  if(name==="menu") return <svg {...p}><path d="M4 7h16M4 12h16M4 17h16"/></svg>;
+  return null;
+}
+const PRIMARY_NAV_ITEMS=[["dashboard","Home","home"],["leagueHub","Network","network"],["schedule","Games","games"],["eliteBooks","Books","books"],["redZone","RedZone","redzone"]];
+
 function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reorderTabs, adminUnlocked, adminCodeInput, setAdminCodeInput, unlockAdmin, teams = [], assignments = [], currentYear, users: navUsers = [], discordSession, linkedDiscordUser, signInWithDiscord, signOutDiscord,soundPreferences={},draftIsLive=false}) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuSearch,setMenuSearch]=useState("");
@@ -10075,14 +10096,17 @@ function TabBar({ tabs, activeTab, setActiveTab, draggedTab, setDraggedTab, reor
         <button type="button" onClick={() => setMenuOpen(true)} style={hamburgerButton}>
           ☰ Menu
         </button>
+        <nav className="cfb-desktop-nav-v2" aria-label="Primary navigation">
+          {PRIMARY_NAV_ITEMS.map(([key,label,icon])=><button key={key} type="button" className={activeTab===key?"active":""} onClick={()=>handleSelect(key)}><PrimaryNavIcon name={icon}/><span>{label}</span></button>)}
+        </nav>
         <div style={activePagePill}>
           {tabMap.get(activeTab) || "Dashboard"}
         </div>
       </div>
 
       <nav className="cfb-mobile-nav-v2" style={v2MobileNav} aria-label="Primary mobile navigation">
-        {[["dashboard","Home"],["leagueHub","Network"],["schedule","Games"],["eliteBooks","Books"],["redZone","RedZone"]].map(([key,label])=><button key={key} type="button" className={activeTab===key?"active":""} style={activeTab===key?v2MobileNavActive:v2MobileNavButton} onClick={()=>handleSelect(key)}><b>{navMeta[key]?.[0]||"•"}</b><span>{label}</span></button>)}
-        <button type="button" className="more" style={v2MobileNavButton} onClick={()=>setMenuOpen(true)}><b>☰</b><span>More</span></button>
+        {PRIMARY_NAV_ITEMS.map(([key,label,icon])=><button key={key} type="button" className={activeTab===key?"active":""} style={activeTab===key?v2MobileNavActive:v2MobileNavButton} onClick={()=>handleSelect(key)}><PrimaryNavIcon name={icon}/><span>{label}</span></button>)}
+        <button type="button" className="more" style={v2MobileNavButton} onClick={()=>setMenuOpen(true)}><PrimaryNavIcon name="menu"/><span>More</span></button>
       </nav>
 
       {menuOpen && (
