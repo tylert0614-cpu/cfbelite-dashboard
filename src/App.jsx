@@ -3125,7 +3125,7 @@ function DashboardV2({ teams = [], users = [], assignments = [], results = [], a
   return <main className="cfb-v2-page" style={v2Page}>
     <section className="cfb-v2-dashboard-hero" style={v2DashboardHero}>
       <div><span style={v2Eyebrow}>CFBELITE 27 • DYNASTY HQ</span><h1 style={v2DashboardTitle}>This Week in CFBElite</h1><p style={v2PageSub}>{currentYear} season • {currentWeek} • Live league operations and competition hub</p></div>
-      <div style={v2AdvanceCard}><span>Next Advancement</span><b>{countdown?.label||"Not scheduled"}</b><small>{advanceAt?new Date(advanceAt).toLocaleString():"Commissioner can set the deadline"}</small></div>
+      <div style={v2AdvanceCard}><span style={v2SideLabel}>Next Advancement</span><b style={{fontFamily:"var(--cfb-display)",fontVariantNumeric:"tabular-nums",fontWeight:600,fontSize:20}}>{countdown?.label||"Not scheduled"}</b><small>{advanceAt?new Date(advanceAt).toLocaleString():"Commissioner can set the deadline"}</small></div>
       {adminUnlocked&&<div style={v2HeroControls}><select value={currentYear} onChange={(e)=>setCurrentYear(e.target.value)} style={v2Input}>{YEARS.map((year)=><option key={year}>{year}</option>)}</select><select value={currentWeek} onChange={(e)=>setCurrentWeek(e.target.value)} style={v2Input}>{WEEKS.map((week)=><option key={week}>{week}</option>)}</select><button style={v2PrimaryButton} onClick={saveSettings}>Save League Week</button></div>}
     </section>
 
@@ -4339,7 +4339,7 @@ function CommissionerCenterV2({currentYear,currentWeek,advanceAt,setAdvanceAt,se
   const tools=[["sportsbookManager","Elite Books Manager","Lines, locks, voids and grading"],["weeklyMatchups","Schedule Manager","Games, streams, VODs, and bulk imports"],["userManager","League Members","Access, roles, bans and commissioner status"],["assignments","Team Assignments","Manage current and former team ownership"],["dataIntake","Screenshot Intake","AI-assisted uploads, review and checklist"],["leagueDataCenter","League Data Center","Enter results, recruiting, and season statistics"],["resultsManager","Results Manager","Correct or remove recorded game results"],["logoManager","Team Assets","Team logos, colors, ratings, and conferences"],["draftRoom","Draft Room","Open and manage the live league draft"],["allAmericans","Recognition","All-Americans, awards, Heismans, and champions"]];
   return <main className="cfb-v2-page" style={v2Page}>
     <div style={v2PageHero}><div><span style={v2Eyebrow}>PRIVATE ADMIN AREA</span><h1 style={v2PageTitle}>Commissioner Center</h1><p style={v2PageSub}>League operations, data health, schedule control, and season management.</p></div><button style={v2GhostButton} onClick={loadData}>Refresh All Data</button></div>
-    <section className="cfb-v2-admin-grid" style={v2AdminGrid}><div style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>LEAGUE CLOCK</span><h2>{currentYear} • {currentWeek}</h2></div></div><label style={v2FieldLabel}>Next advancement<input type="datetime-local" style={v2Input} value={isoToLocalDateTimeInput(advanceAt)} onChange={(e)=>setAdvanceAt(localDateTimeInputToIso(e.target.value))}/></label><div style={v2InlineActions}><button style={v2PrimaryButton} onClick={saveLeagueSettings}>Save League Settings</button><button style={v2GhostButton} onClick={saveCurrentRankingSnapshot}>Save Ranking Snapshot</button></div></div><div style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>DATA HEALTH</span><h2>{duplicateUsers.length+duplicateTeams.length+missingAssets.length+unresolved.length?"Attention Needed":"All Clear"}</h2></div></div><div style={v2HealthList}><div><b>{duplicateUsers.length}</b><span>Duplicate usernames</span></div><div><b>{duplicateTeams.length}</b><span>Duplicate active teams</span></div><div><b>{missingAssets.length}</b><span>Teams missing branding</span></div><div><b>{unresolved.length}</b><span>Matchups missing users</span></div><div><b>{seasonResults.length}</b><span>Recorded season results</span></div></div></div></section>
+    <section className="cfb-v2-admin-grid" style={v2AdminGrid}><div style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>LEAGUE CLOCK</span><h2>{currentYear} • {currentWeek}</h2></div></div><label style={v2FieldLabel}>Next advancement<input type="datetime-local" style={v2Input} value={isoToLocalDateTimeInput(advanceAt)} onChange={(e)=>setAdvanceAt(localDateTimeInputToIso(e.target.value))}/></label><div style={v2InlineActions}><button style={v2PrimaryButton} onClick={saveLeagueSettings}>Save League Settings</button><button style={v2GhostButton} onClick={saveCurrentRankingSnapshot}>Save Ranking Snapshot</button></div></div><div style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>DATA HEALTH</span><h2>{duplicateUsers.length+duplicateTeams.length+missingAssets.length+unresolved.length?"Attention Needed":"All Clear"}</h2></div></div><div style={v2HealthList}><div style={v2HealthRow}><b style={v2HealthFigure}>{duplicateUsers.length}</b><span>Duplicate usernames</span></div><div style={v2HealthRow}><b style={v2HealthFigure}>{duplicateTeams.length}</b><span>Duplicate active teams</span></div><div style={v2HealthRow}><b style={v2HealthFigure}>{missingAssets.length}</b><span>Teams missing branding</span></div><div style={v2HealthRow}><b style={v2HealthFigure}>{unresolved.length}</b><span>Matchups missing users</span></div><div style={v2HealthRow}><b style={v2HealthFigure}>{seasonResults.length}</b><span>Recorded season results</span></div></div></div></section>
     <section style={v2Panel}><div style={v2PanelHeader}><div><span style={v2Eyebrow}>ADMIN TOOLS</span><h2>League Management</h2></div></div><div className="cfb-v2-tool-grid" style={v2ToolGrid}>{tools.map(([key,title,desc])=><button key={key} style={v2ToolCard} onClick={()=>setActiveTab(key)}><b>{title}</b><span>{desc}</span><em>Open →</em></button>)}</div></section>
     <BackupExportPanel teams={teams} users={users} assignments={assignments} results={results} awards={awards} allAmericans={allAmericans} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting}/>
   </main>;
@@ -12071,7 +12071,7 @@ const actionRow = {
 // CFBElite v2 presentation system
 const v2Page={display:"grid",gap:16,width:"100%",paddingBottom:24};
 const v2PageHero={display:"flex",alignItems:"center",justifyContent:"space-between",gap:22,flexWrap:"wrap",padding:"clamp(20px,3vw,34px)",borderRadius:10,background:"radial-gradient(circle at 88% 0%,rgba(62,127,193,.16),transparent 34%),linear-gradient(118deg,var(--cfb-ink),#101827 64%,#080b12)",border:"1px solid rgba(255,255,255,.13)",borderTop:"4px solid var(--cfb-red)",boxShadow:"0 22px 60px rgba(0,0,0,.34)"};
-const v2Eyebrow={display:"block",color:"var(--cfb-gold)",fontSize:11,fontWeight:1000,letterSpacing:".17em",textTransform:"uppercase",marginBottom:8};
+const v2Eyebrow={display:"block",fontFamily:"var(--cfb-display)",color:"var(--cfb-gold)",fontSize:11,fontWeight:1000,letterSpacing:".17em",textTransform:"uppercase",marginBottom:8};
 const v2PageTitle={margin:0,fontSize:"clamp(40px,5.4vw,72px)",lineHeight:.96,letterSpacing:"-.055em",fontWeight:1000,color:"#fff"};
 const v2DashboardTitle={...v2PageTitle,fontSize:"clamp(38px,5vw,66px)",maxWidth:760};
 const v2PageSub={margin:"10px 0 0",color:"#cbd5e1",fontSize:"clamp(13px,1.5vw,16px)",lineHeight:1.55,maxWidth:760};
@@ -12100,14 +12100,14 @@ const v2RankingIdentity={display:"grid",gridTemplateColumns:"42px minmax(0,1fr)"
 const v2RankingLogo={width:40,height:40,display:"grid",placeItems:"center",overflow:"hidden"};
 const v2RankingTeam={display:"grid",gap:2,minWidth:0};
 const v2ConferenceIdentity={display:"flex",alignItems:"center",gap:10,minWidth:0,whiteSpace:"nowrap"};
-const v2MovementUp={color:"#86efac",fontSize:12,fontWeight:1000};
-const v2MovementDown={color:"#fca5a5",fontSize:12,fontWeight:1000};
-const v2MovementEven={color:"#64748b",fontSize:12,fontWeight:1000};
+const v2MovementUp={fontFamily:"var(--cfb-display)",fontVariantNumeric:"tabular-nums",color:"#86efac",fontSize:12,fontWeight:1000};
+const v2MovementDown={fontFamily:"var(--cfb-display)",fontVariantNumeric:"tabular-nums",color:"#fca5a5",fontSize:12,fontWeight:1000};
+const v2MovementEven={fontFamily:"var(--cfb-display)",fontVariantNumeric:"tabular-nums",color:"#64748b",fontSize:12,fontWeight:1000};
 const v2HeroStats={display:"grid",gridTemplateColumns:"repeat(3,minmax(76px,1fr))",gap:10};
 const v2FeaturedGame={padding:"clamp(18px,3vw,32px)",borderRadius:22,border:"1px solid rgba(201,208,217,.28)",boxShadow:"0 24px 68px rgba(0,0,0,.34)"};
 const v2FeaturedKicker={textAlign:"center",color:"var(--cfb-gold)",fontWeight:1000,letterSpacing:".12em",fontSize:12,marginBottom:18};
 const v2FeaturedMatchup={display:"grid",gridTemplateColumns:"minmax(0,1fr) minmax(150px,auto) minmax(0,1fr)",gap:24,alignItems:"center"};
-const v2FeaturedScore={display:"grid",justifyItems:"center",gap:4,color:"#fff",textAlign:"center"};
+const v2FeaturedScore={display:"grid",justifyItems:"center",gap:4,color:"#fff",textAlign:"center",fontFamily:"var(--cfb-display)",fontVariantNumeric:"tabular-nums"};
 const v2MatchupTeam={display:"grid",justifyItems:"center",gap:7,textAlign:"center",minWidth:0};
 const v2MatchupTeamCompact={...v2MatchupTeam,gap:5};
 const v2LogoRank={position:"relative",display:"inline-grid",placeItems:"center"};
@@ -12123,7 +12123,7 @@ const v2GameCardTop={display:"flex",alignItems:"center",justifyContent:"space-be
 const v2FinalBadge={padding:"5px 8px",borderRadius:999,background:"rgba(22,163,74,.18)",color:"#86efac",border:"1px solid rgba(74,222,128,.24)"};
 const v2UpcomingBadge={...v2FinalBadge,background:"rgba(37,99,235,.18)",color:"#bfdbfe",borderColor:"rgba(79,143,168,.24)"};
 const v2CardMatchup={display:"grid",gridTemplateColumns:"minmax(0,1fr) auto minmax(0,1fr)",gap:8,alignItems:"center"};
-const v2CardScore={fontSize:"clamp(20px,2vw,30px)",fontWeight:1000,color:"var(--cfb-gold)",textAlign:"center",whiteSpace:"nowrap"};
+const v2CardScore={fontFamily:"var(--cfb-display)",fontVariantNumeric:"tabular-nums",fontSize:"clamp(20px,2vw,30px)",fontWeight:600,color:"var(--cfb-gold)",textAlign:"center",whiteSpace:"nowrap"};
 const v2GameMeta={display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,paddingTop:10,borderTop:"1px solid rgba(148,163,184,.12)",color:"var(--cfb-muted)",fontSize:11};
 const v2GameLinks={display:"flex",gap:10,flexWrap:"wrap",fontSize:12,color:"#9cc3d1"};
 const v2CardActions={display:"flex",gap:7,flexWrap:"wrap"};
@@ -12138,13 +12138,15 @@ const v2ScheduleEditor={display:"grid",gap:14,padding:16,borderRadius:16,backgro
 const v2ScheduleEditorHead={display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"};
 const v2AdminGrid={display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:18};
 const v2HealthList={display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10};
+const v2HealthRow={display:"flex",alignItems:"center",gap:8,padding:"9px 11px",borderRadius:9,background:"rgba(255,255,255,.03)",border:"1px solid rgba(148,163,184,.12)"};
+const v2HealthFigure={fontFamily:"var(--cfb-display)",fontVariantNumeric:"tabular-nums",fontWeight:600,fontSize:17,color:"var(--cfb-gold)"};
 const v2ToolGrid={display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12};
 const v2ToolCard={display:"grid",gap:7,textAlign:"left",padding:16,borderRadius:15,background:"rgba(255,255,255,.035)",border:"1px solid rgba(148,163,184,.16)",color:"#fff",cursor:"pointer"};
-const v2CountPill={display:"inline-grid",placeItems:"center",minWidth:36,height:30,borderRadius:999,background:"rgba(201,208,217,.16)",color:"var(--cfb-gold)",fontWeight:1000};
+const v2CountPill={display:"inline-grid",placeItems:"center",minWidth:36,height:30,borderRadius:999,background:"rgba(201,208,217,.16)",color:"var(--cfb-gold)",fontFamily:"var(--cfb-display)",fontVariantNumeric:"tabular-nums",fontWeight:600};
 
 const v2CoachSeasonStrip={display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10,margin:"14px 0 20px"};
 const v2FormDots={display:"flex",gap:5,alignItems:"center"};
-const v2FormWin={display:"inline-grid",placeItems:"center",width:24,height:24,borderRadius:999,background:"#166534",color:"#dcfce7",fontStyle:"normal",fontSize:11};
+const v2FormWin={display:"inline-grid",placeItems:"center",width:24,height:24,borderRadius:999,background:"#166534",color:"#dcfce7",fontStyle:"normal",fontFamily:"var(--cfb-display)",fontWeight:700,fontSize:11};
 const v2FormLoss={...v2FormWin,background:"#991b1b",color:"#fee2e2"};
 const v2NextOpponent={display:"flex",alignItems:"center",gap:7};
 
