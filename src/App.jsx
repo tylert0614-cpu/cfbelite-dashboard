@@ -6349,6 +6349,12 @@ function GlobalStyle() {
         }
       }
 
+      .cfb-results-score-editor { display:flex; align-items:center; gap:5px; }
+      .cfb-results-score-editor input { width:44px; padding:6px 5px; border:1px solid rgba(148,163,184,.28); border-radius:6px; color:#fff; background:var(--cfb-panel); font-family:var(--cfb-display); font-variant-numeric:tabular-nums; font-weight:600; font-size:14px; text-align:center; }
+      .cfb-results-score-editor span { color:var(--cfb-muted); font-weight:700; }
+      .cfb-results-score-editor button { border:0; border-radius:6px; padding:6px 9px; color:#fff; background:linear-gradient(135deg,var(--cfb-red),var(--cfb-red-dark)); font-family:var(--cfb-display); font-size:11px; font-weight:700; cursor:pointer; }
+      .cfb-results-score-editor button:disabled { opacity:.6; cursor:not-allowed; }
+
       @media (max-width: 520px) {
         [style*="clamp(44px, 8vw, 92px)"] {
           font-size: 42px !important;
@@ -10165,6 +10171,18 @@ function Stat({ title, value }) { return <div style={statCard}><div style={statT
 function SearchBox({ value, onChange }) { return <input value={value} onChange={(e)=>onChange(e.target.value)} placeholder="Search..." style={searchInput}/>; }
 function ResultsManager({ rows = [], teams = [], users = [], assignments = [], updateRow = async()=>{}, deleteRow = async()=>{} }) {
   const [query, setQuery] = useState("");
+  const [drafts, setDrafts] = useState({});
+  const [saving, setSaving] = useState(null);
+  const draftFor = (row) => drafts[row.id] || { team_1_score: row.team_1_score, team_2_score: row.team_2_score };
+  const isDirty = (row) => { const draft = draftFor(row); return String(draft.team_1_score ?? "") !== String(row.team_1_score ?? "") || String(draft.team_2_score ?? "") !== String(row.team_2_score ?? ""); };
+  async function saveScore(row) {
+    const draft = draftFor(row);
+    setSaving(row.id);
+    await updateRow("game_results", row.id, "team_1_score", draft.team_1_score);
+    await updateRow("game_results", row.id, "team_2_score", draft.team_2_score);
+    setSaving(null);
+    setDrafts((prev)=>{ const next = { ...prev }; delete next[row.id]; return next; });
+  }
   const filtered = (rows || []).filter((row)=>{
     const haystack = [
       row.week,
@@ -10183,7 +10201,7 @@ function ResultsManager({ rows = [], teams = [], users = [], assignments = [], u
       <div style={sectionTop}>
         <div>
           <h2 style={sectionTitle}>Results Manager</h2>
-          <p style={mutedText}>Review, search, and delete recorded results. Use League Data Center to enter new games.</p>
+          <p style={mutedText}>Review, correct, and delete recorded results. Use League Data Center to enter new games.</p>
         </div>
         <SearchBox value={query} onChange={setQuery}/>
       </div>
@@ -10209,7 +10227,7 @@ function ResultsManager({ rows = [], teams = [], users = [], assignments = [], u
                 <td>{row.week}</td>
                 <td><TeamBroadcastMark team={row.team_1 || teams.find((team)=>team.id===row.team_1_id)} size={30}/></td>
                 <td>{row.user_1?.discord_username || users.find((u)=>u.id===row.team_1_user_id)?.discord_username || "CPU"}</td>
-                <td><b>{row.team_1_score}-{row.team_2_score}</b></td>
+                <td><div className="cfb-results-score-editor"><input type="number" value={draftFor(row).team_1_score ?? ""} onChange={(event)=>setDrafts((prev)=>({...prev,[row.id]:{...draftFor(row),team_1_score:event.target.value}}))}/><span>-</span><input type="number" value={draftFor(row).team_2_score ?? ""} onChange={(event)=>setDrafts((prev)=>({...prev,[row.id]:{...draftFor(row),team_2_score:event.target.value}}))}/>{isDirty(row)&&<button type="button" disabled={saving===row.id} onClick={()=>saveScore(row)}>{saving===row.id?"…":"Save"}</button>}</div></td>
                 <td><TeamBroadcastMark team={row.team_2 || teams.find((team)=>team.id===row.team_2_id)} size={30}/></td>
                 <td>{row.user_2?.discord_username || users.find((u)=>u.id===row.team_2_user_id)?.discord_username || "CPU"}</td>
                 <td>{Array.isArray(row.tags) ? row.tags.join(", ") : row.tags || "—"}</td>
