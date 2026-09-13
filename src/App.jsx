@@ -262,10 +262,26 @@ function ConferenceLogoMark({ conference, conferenceAssets = [], size = 42 }) {
   return <span style={{ width:size, height:size, display:"inline-grid", placeItems:"center" }}><img src={url} alt="" style={{ width:size, height:size, objectFit:"contain", display:"block" }}/></span>;
 }
 
-function TeamLogoMark({ team, size = 34, faded = false, plate = false }) {
+function TeamLogoMark({ team, size = 34, faded = false, plate = false, circle = false }) {
   const url = team?.logo_url || team?.logo || team?.image_url;
   const baseSize = Number(size) || 34;
   const imageSize = Math.round(baseSize * (plate ? 1.35 : 1.58));
+
+  if (circle) {
+    const initials = String(team?.name || "CFB").split(" ").map((part)=>part[0]).join("").slice(0,3).toUpperCase();
+    return (
+      <span style={{
+        width: baseSize, height: baseSize, minWidth: baseSize, minHeight: baseSize,
+        borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center",
+        overflow: "hidden", flexShrink: 0, opacity: faded ? .5 : 1,
+        background: getTeamPrimary(team), boxShadow: "0 0 0 2px rgba(255,255,255,.08)",
+      }}>
+        {url
+          ? <img src={url} alt="" style={{ width:"72%", height:"72%", objectFit:"contain", display:"block", filter: faded ? "grayscale(.12)" : "drop-shadow(0 2px 4px rgba(0,0,0,.35))" }}/>
+          : <span style={{ color:"#fff", fontFamily:"var(--cfb-display)", fontWeight:700, fontSize:Math.max(9,baseSize*.30) }}>{initials}</span>}
+      </span>
+    );
+  }
 
   const wrapStyle = {
     width: baseSize,
@@ -2023,7 +2039,7 @@ function NetworkIdentity({userId,users,teams,assignments,currentYear,compact=fal
   const user=users.find((row)=>String(row.id)===String(userId));
   const team=networkTeamForUser(userId,teams,assignments,currentYear);
   const nameStyle=colored?{color:getTeamPrimary(team)}:undefined;
-  const content=<><TeamLogoMark team={team} size={compact?28:38}/><span><strong style={nameStyle}>{user?.discord_username||"League Member"}</strong>{!compact&&<small>{team?.name||"CFB Elite"}</small>}</span></>;
+  const content=<><TeamLogoMark team={team} size={compact?28:38} circle/><span><strong style={nameStyle}>{user?.discord_username||"League Member"}</strong>{!compact&&<small>{team?.name||"CFB Elite"}</small>}</span></>;
   if(onClick)return <button type="button" className={`network-identity network-identity-trigger ${compact?"compact":""}`} onClick={onClick}>{content}</button>;
   return <span className={`network-identity ${compact?"compact":""}`}>{content}</span>;
 }
@@ -2729,7 +2745,7 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
     return <div className="network-profile-overlay" onClick={()=>setProfileUserId(null)}>
       <div className="network-profile-card" onClick={(event)=>event.stopPropagation()} style={{"--profile-team":getTeamPrimary(profileTeam),"--profile-team-secondary":getTeamSecondary(profileTeam)}}>
         <button type="button" className="network-profile-close" onClick={()=>setProfileUserId(null)} aria-label="Close profile">×</button>
-        <div className="network-profile-banner"><TeamLogoMark team={profileTeam} size={64} plate/><i className={profileStatus}/></div>
+        <div className="network-profile-banner"><TeamLogoMark team={profileTeam} size={64} circle/><i className={profileStatus}/></div>
         <h3>{profileUser?.discord_username||"League Member"}</h3>
         <p>{profileTeam?.name||"Unassigned"}{profileUser?.is_commissioner?" • Commissioner":""}</p>
         {profileTeam&&record&&record.games>0&&<div className="network-profile-stats">
@@ -9535,7 +9551,7 @@ function GlobalStyle() {
       .network-message-feed article.grouped .network-reaction-row{margin-left:48px!important}
       .network-identity-trigger{all:unset!important;box-sizing:border-box!important;display:flex!important;align-items:center!important;flex-direction:row!important;gap:9px!important;text-align:left!important;cursor:pointer!important;border-radius:6px!important}
       .network-identity-trigger:hover strong{text-decoration:underline!important}
-      .network-member-group-label{display:flex!important;align-items:center!important;justify-content:space-between!important;padding:10px 8px 4px!important;color:#7d838d!important;font-size:9.5px!important;font-weight:900!important;letter-spacing:.06em!important}
+      .network-member-group-label{display:flex!important;align-items:center!important;justify-content:space-between!important;padding:10px 8px 4px!important;color:#7d838d!important;font-family:var(--cfb-display)!important;font-size:9.5px!important;font-weight:700!important;letter-spacing:.1em!important;text-transform:uppercase!important}
       .network-member-group-label b{color:#5c6270!important;font-weight:800!important}
       .network-member-rail i{width:8px!important;height:8px!important;border-radius:999px!important;background:#5c6270!important}
       .network-member-rail i.online{background:#23c55e!important;box-shadow:0 0 6px rgba(35,197,94,.6)!important}
@@ -9549,7 +9565,7 @@ function GlobalStyle() {
       .network-profile-banner>i{position:absolute!important;left:calc(50% + 19px)!important;bottom:-31px!important;width:14px!important;height:14px!important;border-radius:999px!important;border:2px solid #12161f!important;background:#4b5262!important}
       .network-profile-banner>i.online{background:#23c55e!important}
       .network-profile-banner>i.idle{background:#f0b232!important}
-      .network-profile-card h3{margin:0!important;color:#fff!important;font-size:18px!important}
+      .network-profile-card h3{margin:0!important;color:#fff!important;font-family:var(--cfb-display)!important;font-size:19px!important;font-weight:600!important}
       .network-profile-card>p{margin:4px 0 0!important;color:#8b92a5!important;font-size:12.5px!important}
       .network-profile-stats{display:flex!important;justify-content:center!important;gap:26px!important;margin-top:16px!important;padding-top:16px!important;border-top:1px solid rgba(255,255,255,.08)!important}
       .network-profile-stats div{display:flex!important;flex-direction:column!important;gap:2px!important}
@@ -9561,7 +9577,7 @@ function GlobalStyle() {
       .network-profile-actions button{width:100%!important;padding:10px!important;border:1px solid rgba(255,255,255,.14)!important;border-radius:8px!important;background:rgba(255,255,255,.05)!important;color:#e5e7eb!important;font-weight:700!important;font-size:12.5px!important;cursor:pointer!important}
       .network-kickoff-card{display:flex!important;flex-wrap:wrap!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;margin:12px 16px 0!important;padding:12px 14px!important;border:1px solid rgba(255,255,255,.1)!important;border-radius:12px!important;background:rgba(62,127,193,.07)!important}
       .network-kickoff-locked,.network-kickoff-proposed,.network-kickoff-empty{display:flex!important;flex-direction:column!important;gap:2px!important}
-      .network-kickoff-card b{color:#fff!important;font-size:13.5px!important}
+      .network-kickoff-card b{color:#fff!important;font-family:var(--cfb-display)!important;font-size:14px!important;font-weight:600!important}
       .network-kickoff-card span{color:#9aa4b8!important;font-size:11.5px!important}
       .network-kickoff-proposed{flex-direction:row!important;align-items:center!important;flex-wrap:wrap!important;gap:10px!important}
       .network-kickoff-proposed button,.network-kickoff-form button{padding:8px 14px!important;border:0!important;border-radius:7px!important;background:var(--cfb-red)!important;color:#fff!important;font-weight:800!important;font-size:12px!important;cursor:pointer!important;white-space:nowrap!important}
