@@ -105,6 +105,26 @@ function localDateTimeInputToIso(value) {
   const date = new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), 0, 0);
   return Number.isNaN(date.getTime()) ? "" : date.toISOString();
 }
+function headToHeadSummary(team1Id, team2Id, results) {
+  const games = results.filter((r) => (String(r.team_1_id) === String(team1Id) && String(r.team_2_id) === String(team2Id)) || (String(r.team_1_id) === String(team2Id) && String(r.team_2_id) === String(team1Id)));
+  if (!games.length) return null;
+  const sorted = [...games].sort((a, b) => Number(a.season_year) - Number(b.season_year));
+  let team1Wins = 0, team2Wins = 0;
+  sorted.forEach((r) => {
+    const team1First = String(r.team_1_id) === String(team1Id);
+    const s1 = Number((team1First ? r.team_1_score : r.team_2_score) || 0);
+    const s2 = Number((team1First ? r.team_2_score : r.team_1_score) || 0);
+    if (s1 > s2) team1Wins += 1; else if (s2 > s1) team2Wins += 1;
+  });
+  const last = sorted[sorted.length - 1];
+  const lastTeam1First = String(last.team_1_id) === String(team1Id);
+  return {
+    games: sorted.length, team1Wins, team2Wins,
+    lastSeason: last.season_year,
+    lastScore1: lastTeam1First ? last.team_1_score : last.team_2_score,
+    lastScore2: lastTeam1First ? last.team_2_score : last.team_1_score,
+  };
+}
 function recordFromResults(teamId, results, year = null) {
   const filtered = results.filter((r) => (!year || String(r.season_year) === String(year)) && (r.team_1_id === teamId || r.team_2_id === teamId));
   let wins = 0; let losses = 0; let pf = 0; let pa = 0;
@@ -2757,7 +2777,12 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
   const canSchedule=isParticipant||isCommissioner;
   const iProposed=String(live.kickoff_proposed_by)===String(linkedDiscordUser.id);
   const formatKickoff=(value)=>new Date(value).toLocaleString([],{weekday:"short",hour:"numeric",minute:"2-digit"});
-  return <section className="network-kickoff-card">
+  const roomTeam1=teams.find((team)=>String(team.id)===String(matchup.team_1_id));
+  const roomTeam2=teams.find((team)=>String(team.id)===String(matchup.team_2_id));
+  const h2h=roomTeam1&&roomTeam2?headToHeadSummary(roomTeam1.id,roomTeam2.id,allResults):null;
+  return <>
+  {h2h&&<div className="network-rivalry-banner">🏟️ All-time: <b>{roomTeam1?.name} {h2h.team1Wins}-{h2h.team2Wins} {roomTeam2?.name}</b><span>Last met {h2h.lastSeason} • {h2h.lastScore1}-{h2h.lastScore2}</span></div>}
+  <section className="network-kickoff-card">
     {live.kickoff_status==="confirmed"
       ? <div className="network-kickoff-locked"><b>🔒 Kickoff locked: {formatKickoff(live.scheduled_at)}</b><span>Betting closes automatically at kickoff.</span><button type="button" onClick={()=>downloadKickoffCalendar(matchup,live.scheduled_at)}>+ Add to Calendar</button></div>
       : live.kickoff_status==="proposed"
@@ -2769,7 +2794,8 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
       <input type="datetime-local" value={kickoffDraft[matchup.id]||""} onChange={(event)=>setKickoffDraft((value)=>({...value,[matchup.id]:event.target.value}))}/>
       <button type="button" disabled={!kickoffDraft[matchup.id]} onClick={()=>{proposeKickoff(matchup,new Date(kickoffDraft[matchup.id]).toISOString());setKickoffDraft((value)=>({...value,[matchup.id]:""}));}}>{live.kickoff_status==="proposed"?"Counter-propose":"Propose Kickoff Time"}</button>
     </div>}
-  </section>;
+  </section>
+  </>;
 })()}<div className="network-message-feed">{displayedMessages.map((message,messageIndex)=>{const parent=displayedMessages.find((row)=>String(row.id)===String(message.reply_to_id));const mine=String(message.author_discord_user_id)===String(linkedDiscordUser.id);const previousMessage=displayedMessages[messageIndex-1];const grouped=Boolean(previousMessage)&&!parent&&String(previousMessage.author_discord_user_id)===String(message.author_discord_user_id)&&(new Date(message.created_at)-new Date(previousMessage.created_at))<300000;return <article key={message.id} className={`${mine?"mine":""} ${grouped?"grouped":""}`.trim()}>{parent&&<button className="network-reply-context" onClick={()=>document.getElementById(`network-message-${parent.id}`)?.scrollIntoView({behavior:"smooth",block:"center"})}><b>↳ {users.find((user)=>String(user.id)===String(parent.author_discord_user_id))?.discord_username||"League Member"}</b><span><NetworkMessageBody body={parent.body} customEmojis={customEmojis}/></span></button>}<div id={`network-message-${message.id}`} className="network-message-head"><NetworkIdentity userId={message.author_discord_user_id} users={users} teams={teams} assignments={assignments} currentYear={currentYear} colored onClick={()=>setProfileUserId(message.author_discord_user_id)}/><time>{new Date(message.created_at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}{message.edited_at?" • edited":""}</time></div><p><NetworkMessageBody body={message.body} customEmojis={customEmojis}/></p><div className="network-message-toolbar"><button onClick={()=>setReplyingTo(message)}>↩ Reply</button>{mode==="channels"&&canModerate&&<button className={message.is_pinned?"pinned":""} onClick={()=>togglePinnedMessage(message)}>📌 {message.is_pinned?"Unpin":"Pin"}</button>}{mode==="channels"&&(mine||canModerate)&&<><button onClick={()=>editMessage(message)}>Edit</button><button className="danger" onClick={()=>deleteMessage(message)}>Delete</button></>}</div>{mode==="channels"&&<div className="network-reaction-row">{reactionsFor(message.id).map((item)=><button key={item.reaction} className={item.mine?"mine":""} onClick={()=>toggleReaction(message.id,item.reaction)}><NetworkEmojiToken value={item.reaction} customEmojis={customEmojis}/> <b>{item.count}</b></button>)}<span className="network-quick-react">{NETWORK_EMOJIS.slice(0,6).map((emoji)=><button key={emoji} onClick={()=>toggleReaction(message.id,emoji)}>{emoji}</button>)}</span>{customEmojis.slice(0,4).map((emoji)=><button key={emoji.id} onClick={()=>toggleReaction(message.id,`:${emoji.name}:`)}><img src={emoji.image_url} alt={emoji.name}/></button>)}</div>}</article>;})}{!displayedMessages.length&&<div className="network-empty"><b>Start the conversation.</b><span>This space is ready for the league.</span></div>}</div><div className="network-composer">{replyingTo&&<div className="network-replying"><span><b>Replying to {users.find((user)=>String(user.id)===String(replyingTo.author_discord_user_id))?.discord_username||"League Member"}</b><small>{replyingTo.body}</small></span><button onClick={()=>setReplyingTo(null)}>×</button></div>}<div className="network-composer-tools"><button title="Attach image or file" onClick={()=>attachmentInputRef.current?.click()} disabled={attachmentBusy}>＋</button><button title="Search GIPHY" className={giphyOpen?"active":""} onClick={()=>{setGiphyOpen((value)=>!value);setEmojiOpen(false);}}>GIF</button><button title="Emoji" className={emojiOpen?"active":""} onClick={()=>{setEmojiOpen((value)=>!value);setGiphyOpen(false);}}>☺</button>{mode==="channels"&&selectedChannelRow?.slug==="polls"&&<button title="Create poll" onClick={()=>document.querySelector(".network-poll-builder")?.scrollIntoView({behavior:"smooth"})}>Poll</button>}</div><div className="network-compose-box"><textarea value={draft} onChange={(event)=>setDraft(event.target.value)} onPaste={(event)=>{const file=[...(event.clipboardData?.files||[])][0];if(file){event.preventDefault();uploadNetworkAttachment(file);}}} onKeyDown={(event)=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();sendMessage();}}} placeholder={composerPlaceholder} disabled={(mode==="direct"&&!selectedConversation)||postingBlocked}/></div><input ref={attachmentInputRef} hidden type="file" accept="image/*,.pdf,.doc,.docx,.txt,.csv,.zip" onChange={(event)=>uploadNetworkAttachment(event.target.files?.[0])}/><NetworkGiphyPicker open={giphyOpen} onClose={()=>setGiphyOpen(false)} onSelect={(url)=>sendMessage(url)}/>{emojiOpen&&<div className="network-emoji-picker">{NETWORK_EMOJIS.map((emoji)=><button key={emoji} onClick={()=>setDraft((value)=>`${value}${emoji}`)}>{emoji}</button>)}{customEmojis.map((emoji)=><button key={emoji.id} onClick={()=>setDraft((value)=>`${value}:${emoji.name}:`)}><img src={emoji.image_url} alt={emoji.name}/></button>)}</div>}<small>Enter to send • Shift + Enter for a new line</small></div></>}</section><aside className="network-member-rail"><header><span>LEAGUE MEMBERS</span><b>{onlineUsers.length} ONLINE</b></header><div>{memberPresenceGroups.map((group)=><React.Fragment key={group.key}><div className="network-member-group-label"><span>{group.label}</span><b>{group.members.length}</b></div>{group.members.map((user)=>{const role=topRoleForUser(user.id);const status=memberStatusFor(user.id);return <button key={user.id} onClick={()=>String(user.id)!==String(linkedDiscordUser.id)&&startConversation(user.id)}><i className={status}/><NetworkIdentity userId={user.id} users={users} teams={teams} assignments={assignments} currentYear={currentYear} compact colored/><em style={{color:role?.color||"#64748b"}}>{role?.name||"League Member"}</em></button>})}</React.Fragment>)}</div></aside></div>
   {profileUserId&&(()=>{
     const profileUser=users.find((row)=>String(row.id)===String(profileUserId));
@@ -9631,6 +9657,9 @@ function GlobalStyle() {
       .network-profile-milestones span{padding:3px 9px!important;border:1px solid!important;border-radius:999px!important;background:rgba(255,255,255,.04)!important;font-size:10.5px!important;font-weight:700!important}
       .network-profile-actions{margin-top:16px!important}
       .network-profile-actions button{width:100%!important;padding:10px!important;border:1px solid rgba(255,255,255,.14)!important;border-radius:8px!important;background:rgba(255,255,255,.05)!important;color:#e5e7eb!important;font-weight:700!important;font-size:12.5px!important;cursor:pointer!important}
+      .network-rivalry-banner{display:flex!important;flex-wrap:wrap!important;align-items:center!important;gap:8px!important;margin:12px 16px 0!important;padding:9px 14px!important;border:1px solid rgba(255,255,255,.08)!important;border-radius:10px!important;background:rgba(255,255,255,.03)!important;color:#9aa4b8!important;font-size:12px!important}
+      .network-rivalry-banner b{color:#e5e7eb!important;font-weight:700!important}
+      .network-rivalry-banner span{margin-left:auto!important;color:#7d838d!important;font-size:11px!important}
       .network-kickoff-card{display:flex!important;flex-wrap:wrap!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;margin:12px 16px 0!important;padding:12px 14px!important;border:1px solid rgba(255,255,255,.1)!important;border-radius:12px!important;background:rgba(62,127,193,.07)!important}
       .network-kickoff-locked,.network-kickoff-proposed,.network-kickoff-empty{display:flex!important;flex-direction:column!important;gap:2px!important}
       .network-kickoff-card b{color:#fff!important;font-family:var(--cfb-display)!important;font-size:14px!important;font-weight:600!important}
