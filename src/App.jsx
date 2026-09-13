@@ -1690,7 +1690,7 @@ export default function App() {
     {activeTab === "teamsCoaches" && <TeamsCoachesCenterV38 teams={activeTeamOptions} users={userOptions} assignments={assignments} currentYear={currentYear} setActiveTab={setActiveTab}/>} 
     {activeTab === "leagueArchive" && <LeagueArchiveCenterV38 setActiveTab={setActiveTab}/>} 
     {activeTab === "automaticRankings" && <AutomaticRankingsPageV38 teams={activeTeamOptions} users={userOptions} assignments={assignments} results={currentYearResults} currentYear={currentYear} currentWeek={currentWeek} rankingSnapshots={rankingSnapshots} goToTeam={goToTeam} setActiveTab={setActiveTab}/>} 
-    {activeTab === "leagueHub" && <FeatureErrorBoundary title="CFBElite Network"><LeagueHub discordSession={discordSession} linkedDiscordUser={linkedDiscordUser} users={userOptions} teams={activeTeamOptions} assignments={assignments} weeklyMatchups={weeklyMatchups} results={currentYearResults} currentYear={currentYear} setActiveTab={setActiveTab} setError={setError}/></FeatureErrorBoundary>}
+    {activeTab === "leagueHub" && <FeatureErrorBoundary title="CFBElite Network"><LeagueHub discordSession={discordSession} linkedDiscordUser={linkedDiscordUser} users={userOptions} teams={activeTeamOptions} assignments={assignments} weeklyMatchups={weeklyMatchups} results={currentYearResults} allResults={results} allAmericans={allAmericans} awards={awards} heismans={heismans} nationalChampions={nationalChampions} recruiting={recruiting} currentYear={currentYear} setActiveTab={setActiveTab} setError={setError}/></FeatureErrorBoundary>}
     {activeTab === "newsroom" && <NewsroomPlatform discordSession={discordSession} linkedDiscordUser={linkedDiscordUser} users={userOptions} teams={activeTeamOptions} assignments={assignments} currentYear={currentYear} setActiveTab={setActiveTab} setError={setError}/>} 
     {activeTab === "dataIntake" && <LeagueDataIntakeCenter discordSession={discordSession} linkedDiscordUser={linkedDiscordUser} currentYear={currentYear} currentWeek={currentWeek} adminUnlocked={adminUnlocked} setError={setError}/>} 
     {activeTab === "gameTop25" && <CapturedTop25Page currentYear={currentYear} teams={teamOptions} setActiveTab={setActiveTab}/>} 
@@ -2258,7 +2258,7 @@ function NetworkOrganizer({
   </section>;
 }
 
-function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignments=[],weeklyMatchups=[],results=[],currentYear,setActiveTab,setError}) {
+function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignments=[],weeklyMatchups=[],results=[],allResults=[],allAmericans=[],awards=[],heismans=[],nationalChampions=[],recruiting=[],currentYear,setActiveTab,setError}) {
   console.info("CFBElite Network build v54-network-mobile-experience-overhaul");
   const [mode,setMode]=useState("channels");
   const [mobileView,setMobileView]=useState("directory");
@@ -2309,6 +2309,16 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
   const lastNotificationRef=useRef(null);
   const isCommissioner=Boolean(linkedDiscordUser?.is_commissioner);
   const [profileUserId,setProfileUserId]=useState(null);
+  const [commandPaletteOpen,setCommandPaletteOpen]=useState(false);
+  const [commandQuery,setCommandQuery]=useState("");
+  useEffect(()=>{
+    const onKeyDown=(event)=>{
+      if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==="k"){event.preventDefault();setCommandPaletteOpen((value)=>!value);}
+      else if(event.key==="Escape")setCommandPaletteOpen(false);
+    };
+    window.addEventListener("keydown",onKeyDown);
+    return()=>window.removeEventListener("keydown",onKeyDown);
+  },[]);
   const [kickoffOverrides,setKickoffOverrides]=useState({});
   const [kickoffDraft,setKickoffDraft]=useState({});
   const kickoffFor=(matchup)=>({...matchup,...(kickoffOverrides[String(matchup?.id)]||{})});
@@ -2323,6 +2333,21 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
     if(error){setError?.(`Kickoff not confirmed: ${error.message}`);return;}
     setKickoffOverrides((current)=>({...current,[String(matchup.id)]:data}));
     setError?.("Kickoff locked in. Betting closes automatically at kickoff.");
+  }
+  function downloadKickoffCalendar(matchup,kickoffAt){
+    const team1=teams.find((team)=>String(team.id)===String(matchup.team_1_id));
+    const team2=teams.find((team)=>String(team.id)===String(matchup.team_2_id));
+    const title=`${team1?.name||"Team 1"} vs ${team2?.name||"Team 2"} — CFBElite Kickoff`;
+    const start=new Date(kickoffAt);
+    const end=new Date(start.getTime()+3.5*60*60*1000);
+    const stamp=(date)=>date.toISOString().replace(/[-:]/g,"").split(".")[0]+"Z";
+    const ics=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//CFBElite//The Huddle//EN","BEGIN:VEVENT",`UID:kickoff-${matchup.id}@cfbelite`,`DTSTAMP:${stamp(new Date())}`,`DTSTART:${stamp(start)}`,`DTEND:${stamp(end)}`,`SUMMARY:${title}`,"DESCRIPTION:Betting closes automatically at kickoff.","END:VEVENT","END:VCALENDAR"].join("\r\n");
+    const blob=new Blob([ics],{type:"text/calendar"});
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement("a");
+    link.href=url;link.download=`${(team1?.name||"kickoff").replace(/[^a-z0-9]+/gi,"-")}-vs-${(team2?.name||"game").replace(/[^a-z0-9]+/gi,"-")}.ics`;
+    document.body.appendChild(link);link.click();document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }
 
   async function loadNetworkShell() {
@@ -2418,6 +2443,7 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
     finally{setAttachmentBusy(false);if(attachmentInputRef.current)attachmentInputRef.current.value="";}
   }
   async function startConversation(userId){setBusy(true);const {data,error}=await supabase.rpc("start_direct_conversation",{p_other_discord_user_id:String(userId)});setBusy(false);if(error){setError?.(`Conversation could not start: ${error.message}`);return;}await loadNetworkShell();setSelectedConversation(data);setMode("direct");setMobileView("chat");setMemberSearch("");}
+  function jumpToMemberDM(userId){setCommandPaletteOpen(false);setCommandQuery("");startConversation(userId);}
   async function savePreference(field,value){const next={...(preferences||{}),auth_user_id:discordSession.user.id,discord_user_id:String(linkedDiscordUser.id),[field]:value,updated_at:new Date().toISOString()};setPreferences(next);localStorage.setItem("cfb-network-preferences",JSON.stringify(next));window.dispatchEvent(new Event("cfb-preferences"));const {error}=await supabase.from("notification_preferences").upsert(next,{onConflict:"auth_user_id"});if(error)setError?.(`Preference not saved: ${error.message}`);}
   async function enablePush(){
     try{
@@ -2642,6 +2668,16 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
   const uncategorizedChannels=channels.filter((channel)=>!channel.category_id);
   const matchupForChannel=(channel)=>weeklyMatchups.find((matchup)=>String(matchup.id)===String(channel.matchup_id));
   const openMobileChannel=(channel)=>{setSelectedChannel(channel.id);setManageOpen(false);setMode("channels");setMobileView("chat");};
+  const commandQueryLower=commandQuery.trim().toLowerCase();
+  const commandChannelResults=commandPaletteOpen?channels.filter((channel)=>!channel.is_auto_matchup&&(!commandQueryLower||cleanNetworkChannelName(channel.name).toLowerCase().includes(commandQueryLower))).slice(0,6):[];
+  const commandMatchupResults=commandPaletteOpen?channels.filter((channel)=>channel.is_auto_matchup).map((channel)=>{
+    const matchup=matchupForChannel(channel);
+    const team1=matchup?.team_1||teams.find((team)=>String(team.id)===String(matchup?.team_1_id));
+    const team2=matchup?.team_2||teams.find((team)=>String(team.id)===String(matchup?.team_2_id));
+    return {channel,label:team1&&team2?`${team1.name} vs ${team2.name}`:cleanNetworkChannelName(channel.name)};
+  }).filter((row)=>!commandQueryLower||row.label.toLowerCase().includes(commandQueryLower)).slice(0,6):[];
+  const commandMemberResults=commandPaletteOpen&&commandQueryLower?users.filter((user)=>user.is_active!==false&&!user.is_banned&&String(user.id)!==String(linkedDiscordUser.id)&&String(user.discord_username).toLowerCase().includes(commandQueryLower)).slice(0,6):[];
+  const closeCommandPalette=()=>{setCommandPaletteOpen(false);setCommandQuery("");};
   const renderChannelButton=(channel)=>{
     const matchup=matchupForChannel(channel);
     const team1=matchup?.team_1||teams.find((team)=>String(team.id)===String(matchup?.team_1_id));
@@ -2688,6 +2724,7 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
         <button className={mode==="direct"?"active":""} title="Direct Messages" onClick={()=>{setMode("direct");setMobileView("directory");}}><img src={NETWORK_RAIL_ASSETS.messages} alt="Direct Messages"/></button>
         <button className={mode==="notifications"?"active":""} title="Notifications" onClick={()=>{setMode("notifications");setMobileView("panel");}}><img src={NETWORK_RAIL_ASSETS.alerts} alt="Notifications"/>{unread>0&&<b>{unread}</b>}</button>
         <button title="Newsroom" onClick={()=>setActiveTab?.("newsroom")}><img src={NETWORK_RAIL_ASSETS.newsroom} alt="Newsroom"/></button>
+        <button className="network-search-trigger" title="Jump to (Ctrl/Cmd+K)" onClick={()=>setCommandPaletteOpen(true)}>⌕</button>
       </aside>
       <aside className="network-sidebar">
       <div className="network-mobile-directory-title"><strong>CFBElite 27 Dynasty</strong><span>League channels and conversations</span></div>
@@ -2722,7 +2759,7 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
   const formatKickoff=(value)=>new Date(value).toLocaleString([],{weekday:"short",hour:"numeric",minute:"2-digit"});
   return <section className="network-kickoff-card">
     {live.kickoff_status==="confirmed"
-      ? <div className="network-kickoff-locked"><b>🔒 Kickoff locked: {formatKickoff(live.scheduled_at)}</b><span>Betting closes automatically at kickoff.</span></div>
+      ? <div className="network-kickoff-locked"><b>🔒 Kickoff locked: {formatKickoff(live.scheduled_at)}</b><span>Betting closes automatically at kickoff.</span><button type="button" onClick={()=>downloadKickoffCalendar(matchup,live.scheduled_at)}>+ Add to Calendar</button></div>
       : live.kickoff_status==="proposed"
         ? <div className="network-kickoff-proposed"><b>{iProposed?"Waiting on the other coach to confirm":"A kickoff time was proposed"}</b><span>{formatKickoff(live.kickoff_proposed_at)}</span>{canSchedule&&!iProposed&&<button type="button" onClick={()=>confirmKickoff(matchup)}>Confirm this time</button>}</div>
         : canSchedule
@@ -2742,6 +2779,12 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
     const rankIndex=profileTeam?ranked.findIndex((row)=>String(row.team.id)===String(profileTeam.id)):-1;
     const profileRoles=roles.filter((role)=>roleMembers.some((member)=>String(member.role_id)===String(role.id)&&String(member.discord_user_id)===String(profileUserId)));
     const profileStatus=memberStatusFor(profileUserId);
+    const careerStats=getCoachStats(users,teams,assignments,allResults,allAmericans,awards,heismans,nationalChampions,recruiting).find((row)=>String(row.userId)===String(profileUserId));
+    const milestones=[
+      careerStats?.nattys>0&&{label:careerStats.nattys>1?`${careerStats.nattys}x National Champion`:"National Champion",color:"#f0b232"},
+      careerStats?.confTitles>0&&{label:careerStats.confTitles>1?`${careerStats.confTitles}x Conference Champion`:"Conference Champion",color:"#2fb673"},
+      careerStats?.heismans>0&&{label:careerStats.heismans>1?`${careerStats.heismans}x Heisman Winner`:"Heisman Winner",color:"#bcd6f0"},
+    ].filter(Boolean);
     return <div className="network-profile-overlay" onClick={()=>setProfileUserId(null)}>
       <div className="network-profile-card" onClick={(event)=>event.stopPropagation()} style={{"--profile-team":getTeamPrimary(profileTeam),"--profile-team-secondary":getTeamSecondary(profileTeam)}}>
         <button type="button" className="network-profile-close" onClick={()=>setProfileUserId(null)} aria-label="Close profile">×</button>
@@ -2752,11 +2795,22 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
           <div><b>{record.wins}-{record.losses}</b><span>Record</span></div>
           <div><b>{rankIndex>=0?`#${rankIndex+1}`:"—"}</b><span>Rank</span></div>
         </div>}
+        {milestones.length>0&&<div className="network-profile-milestones">{milestones.map((badge)=><span key={badge.label} style={{color:badge.color,borderColor:`${badge.color}55`}}>🏅 {badge.label}</span>)}</div>}
         {profileRoles.length>0&&<div className="network-profile-roles">{profileRoles.map((role)=><span key={role.id} style={{background:`${role.color}26`,color:role.color,borderColor:`${role.color}55`}}>{role.name}</span>)}</div>}
         {isCommissioner&&String(profileUserId)!==String(linkedDiscordUser.id)&&<div className="network-profile-actions"><button type="button" onClick={()=>{setProfileUserId(null);setActiveTab?.("teamsCoaches");}}>Manage in Commissioner Center →</button></div>}
       </div>
     </div>;
   })()}
+  {commandPaletteOpen&&<div className="network-command-overlay" onClick={closeCommandPalette}>
+    <div className="network-command-palette" onClick={(event)=>event.stopPropagation()}>
+      <input autoFocus value={commandQuery} onChange={(event)=>setCommandQuery(event.target.value)} placeholder="Jump to a room, matchup, or member…"/>
+      {commandQueryLower&&!commandChannelResults.length&&!commandMatchupResults.length&&!commandMemberResults.length&&<div className="network-command-empty">No matches for "{commandQuery}"</div>}
+      {commandChannelResults.length>0&&<div className="network-command-group"><span>CHANNELS</span>{commandChannelResults.map((channel)=><button type="button" key={channel.id} onClick={()=>{openMobileChannel(channel);closeCommandPalette();}}>#{cleanNetworkChannelName(channel.name)}</button>)}</div>}
+      {commandMatchupResults.length>0&&<div className="network-command-group"><span>MATCHUP ROOMS</span>{commandMatchupResults.map(({channel,label})=><button type="button" key={channel.id} onClick={()=>{openMobileChannel(channel);closeCommandPalette();}}>{label}</button>)}</div>}
+      {commandMemberResults.length>0&&<div className="network-command-group"><span>MEMBERS</span>{commandMemberResults.map((user)=><button type="button" key={user.id} onClick={()=>jumpToMemberDM(user.id)}>{user.discord_username}</button>)}</div>}
+      {!commandQueryLower&&<div className="network-command-hint">Type to search • Esc to close</div>}
+    </div>
+  </div>}
   </main>;
 }
 
@@ -9573,6 +9627,8 @@ function GlobalStyle() {
       .network-profile-stats span{color:#7d838d!important;font-size:9.5px!important;text-transform:uppercase!important;letter-spacing:.05em!important}
       .network-profile-roles{display:flex!important;flex-wrap:wrap!important;justify-content:center!important;gap:6px!important;margin-top:14px!important}
       .network-profile-roles span{padding:3px 9px!important;border:1px solid!important;border-radius:999px!important;font-size:10.5px!important;font-weight:700!important}
+      .network-profile-milestones{display:flex!important;flex-wrap:wrap!important;justify-content:center!important;gap:6px!important;margin-top:12px!important}
+      .network-profile-milestones span{padding:3px 9px!important;border:1px solid!important;border-radius:999px!important;background:rgba(255,255,255,.04)!important;font-size:10.5px!important;font-weight:700!important}
       .network-profile-actions{margin-top:16px!important}
       .network-profile-actions button{width:100%!important;padding:10px!important;border:1px solid rgba(255,255,255,.14)!important;border-radius:8px!important;background:rgba(255,255,255,.05)!important;color:#e5e7eb!important;font-weight:700!important;font-size:12.5px!important;cursor:pointer!important}
       .network-kickoff-card{display:flex!important;flex-wrap:wrap!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;margin:12px 16px 0!important;padding:12px 14px!important;border:1px solid rgba(255,255,255,.1)!important;border-radius:12px!important;background:rgba(62,127,193,.07)!important}
@@ -9580,7 +9636,18 @@ function GlobalStyle() {
       .network-kickoff-card b{color:#fff!important;font-family:var(--cfb-display)!important;font-size:14px!important;font-weight:600!important}
       .network-kickoff-card span{color:#9aa4b8!important;font-size:11.5px!important}
       .network-kickoff-proposed{flex-direction:row!important;align-items:center!important;flex-wrap:wrap!important;gap:10px!important}
-      .network-kickoff-proposed button,.network-kickoff-form button{padding:8px 14px!important;border:0!important;border-radius:7px!important;background:var(--cfb-red)!important;color:#fff!important;font-weight:800!important;font-size:12px!important;cursor:pointer!important;white-space:nowrap!important}
+      .network-kickoff-proposed button,.network-kickoff-form button,.network-kickoff-locked button{padding:8px 14px!important;border:0!important;border-radius:7px!important;background:var(--cfb-red)!important;color:#fff!important;font-weight:800!important;font-size:12px!important;cursor:pointer!important;white-space:nowrap!important}
+      .network-kickoff-locked button{align-self:flex-start!important;margin-top:4px!important}
+      .network-command-overlay{position:fixed!important;inset:0!important;z-index:500!important;display:flex!important;align-items:flex-start!important;justify-content:center!important;padding:14vh 16px 16px!important;background:rgba(4,6,10,.72)!important;backdrop-filter:blur(4px)!important}
+      .network-command-palette{width:min(480px,100%)!important;border:1px solid rgba(255,255,255,.14)!important;border-radius:14px!important;background:#12161f!important;box-shadow:0 30px 80px rgba(0,0,0,.55)!important;overflow:hidden!important}
+      .network-command-palette>input{width:100%!important;padding:16px 18px!important;border:0!important;border-bottom:1px solid rgba(255,255,255,.1)!important;background:transparent!important;color:#fff!important;font-size:15px!important;outline:none!important}
+      .network-command-group{padding:8px!important}
+      .network-command-group>span{display:block!important;padding:8px 10px 4px!important;color:#7d838d!important;font-family:var(--cfb-display)!important;font-size:9.5px!important;font-weight:700!important;letter-spacing:.1em!important}
+      .network-command-group>button{all:unset!important;box-sizing:border-box!important;display:block!important;width:100%!important;padding:10px!important;border-radius:8px!important;color:#e5e7eb!important;font-size:13px!important;cursor:pointer!important}
+      .network-command-group>button:hover{background:rgba(62,127,193,.14)!important;color:#fff!important}
+      .network-command-empty,.network-command-hint{padding:16px 18px!important;color:#7d838d!important;font-size:12.5px!important;text-align:center!important}
+      .network-search-trigger{font-size:20px!important;font-weight:900!important}
+      @media(max-width:900px){.network-search-trigger{display:none!important}}
       .network-kickoff-proposed button:disabled,.network-kickoff-form button:disabled{opacity:.5!important;cursor:not-allowed!important}
       .network-kickoff-form{display:flex!important;flex-wrap:wrap!important;gap:8px!important;align-items:center!important;width:100%!important}
       .network-kickoff-form input{min-width:0!important;flex:1 1 200px!important;padding:8px 10px!important;border:1px solid rgba(255,255,255,.16)!important;border-radius:7px!important;background:#0d1420!important;color:#e5e7eb!important;font-size:12px!important}
