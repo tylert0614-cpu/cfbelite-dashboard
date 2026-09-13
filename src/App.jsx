@@ -9533,7 +9533,7 @@ function GlobalStyle() {
       .network-message-feed article.grouped>p{margin-left:48px!important}
       .network-message-feed article.grouped .network-message-toolbar,
       .network-message-feed article.grouped .network-reaction-row{margin-left:48px!important}
-      .network-identity-trigger{all:unset!important;box-sizing:border-box!important;display:inline-flex!important;align-items:center!important;gap:10px!important;cursor:pointer!important;border-radius:6px!important}
+      .network-identity-trigger{all:unset!important;box-sizing:border-box!important;display:flex!important;align-items:center!important;flex-direction:row!important;gap:9px!important;text-align:left!important;cursor:pointer!important;border-radius:6px!important}
       .network-identity-trigger:hover strong{text-decoration:underline!important}
       .network-member-group-label{display:flex!important;align-items:center!important;justify-content:space-between!important;padding:10px 8px 4px!important;color:#7d838d!important;font-size:9.5px!important;font-weight:900!important;letter-spacing:.06em!important}
       .network-member-group-label b{color:#5c6270!important;font-weight:800!important}
@@ -9542,12 +9542,13 @@ function GlobalStyle() {
       .network-member-rail i.idle{background:#f0b232!important;box-shadow:0 0 6px rgba(240,178,50,.5)!important}
       .network-member-rail i.offline{background:#4b5262!important;box-shadow:none!important}
       .network-profile-overlay{position:fixed!important;inset:0!important;z-index:400!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:16px!important;background:rgba(4,6,10,.72)!important;backdrop-filter:blur(4px)!important}
-      .network-profile-card{position:relative!important;width:min(360px,100%)!important;padding:22px 20px!important;border:1px solid rgba(255,255,255,.12)!important;border-radius:16px!important;background:#12161f!important;box-shadow:0 30px 80px rgba(0,0,0,.5)!important;text-align:center!important}
-      .network-profile-close{all:unset!important;position:absolute!important;top:10px!important;right:12px!important;color:#8b92a5!important;font-size:20px!important;line-height:1!important;cursor:pointer!important}
-      .network-profile-banner{position:relative!important;display:flex!important;justify-content:center!important;padding:6px 0 14px!important}
-      .network-profile-banner i{position:absolute!important;right:calc(50% - 34px)!important;bottom:10px!important;width:14px!important;height:14px!important;border-radius:999px!important;border:2px solid #12161f!important;background:#4b5262!important}
-      .network-profile-banner i.online{background:#23c55e!important}
-      .network-profile-banner i.idle{background:#f0b232!important}
+      .network-profile-card{position:relative!important;width:min(360px,100%)!important;padding:22px 20px!important;border:1px solid rgba(255,255,255,.12)!important;border-radius:16px!important;background:#12161f!important;box-shadow:0 30px 80px rgba(0,0,0,.5)!important;text-align:center!important;overflow:hidden!important}
+      .network-profile-close{all:unset!important;position:absolute!important;top:10px!important;right:12px!important;z-index:2!important;color:rgba(255,255,255,.85)!important;font-size:20px!important;line-height:1!important;cursor:pointer!important}
+      .network-profile-banner{position:relative!important;margin:-22px -20px 34px!important;padding-top:56px!important;background:linear-gradient(135deg,var(--profile-team),var(--profile-team-secondary))!important;border-radius:16px 16px 0 0!important}
+      .network-profile-banner>span{position:absolute!important;left:50%!important;bottom:-28px!important;transform:translateX(-50%)!important;width:64px!important;height:64px!important;border-radius:999px!important;background:#12161f!important;box-shadow:0 0 0 4px #12161f!important;display:grid!important;place-items:center!important;overflow:hidden!important}
+      .network-profile-banner>i{position:absolute!important;left:calc(50% + 19px)!important;bottom:-31px!important;width:14px!important;height:14px!important;border-radius:999px!important;border:2px solid #12161f!important;background:#4b5262!important}
+      .network-profile-banner>i.online{background:#23c55e!important}
+      .network-profile-banner>i.idle{background:#f0b232!important}
       .network-profile-card h3{margin:0!important;color:#fff!important;font-size:18px!important}
       .network-profile-card>p{margin:4px 0 0!important;color:#8b92a5!important;font-size:12.5px!important}
       .network-profile-stats{display:flex!important;justify-content:center!important;gap:26px!important;margin-top:16px!important;padding-top:16px!important;border-top:1px solid rgba(255,255,255,.08)!important}
@@ -9565,8 +9566,14 @@ function GlobalStyle() {
       .network-kickoff-proposed{flex-direction:row!important;align-items:center!important;flex-wrap:wrap!important;gap:10px!important}
       .network-kickoff-proposed button,.network-kickoff-form button{padding:8px 14px!important;border:0!important;border-radius:7px!important;background:var(--cfb-red)!important;color:#fff!important;font-weight:800!important;font-size:12px!important;cursor:pointer!important;white-space:nowrap!important}
       .network-kickoff-proposed button:disabled,.network-kickoff-form button:disabled{opacity:.5!important;cursor:not-allowed!important}
-      .network-kickoff-form{display:flex!important;gap:8px!important;align-items:center!important}
-      .network-kickoff-form input{padding:8px 10px!important;border:1px solid rgba(255,255,255,.16)!important;border-radius:7px!important;background:#0d1420!important;color:#e5e7eb!important;font-size:12px!important}
+      .network-kickoff-form{display:flex!important;flex-wrap:wrap!important;gap:8px!important;align-items:center!important;width:100%!important}
+      .network-kickoff-form input{min-width:0!important;flex:1 1 200px!important;padding:8px 10px!important;border:1px solid rgba(255,255,255,.16)!important;border-radius:7px!important;background:#0d1420!important;color:#e5e7eb!important;font-size:12px!important}
+      @media(max-width:560px){
+        .network-kickoff-card{margin:10px 10px 0!important;padding:12px!important}
+        .network-kickoff-form{flex-direction:column!important;align-items:stretch!important}
+        .network-kickoff-form input,.network-kickoff-form button,.network-kickoff-proposed button{width:100%!important}
+        .network-kickoff-proposed{flex-direction:column!important;align-items:stretch!important}
+      }
 `}</style>
   );
 }
