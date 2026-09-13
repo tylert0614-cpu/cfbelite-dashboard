@@ -1,23 +1,35 @@
--- CFBElite 27 v22: blend a real ELO rating (built from full game history) into
--- the Elite Books power rating, and recency-weight the 12-game form window
--- so a team's last game counts more than its eighth-most-recent game.
+-- CFBElite 27 v22: blend a persisted ELO rating into the Elite Books power
+-- rating, and recency-weight the 12-game form window so a team's last game
+-- counts more than its eighth-most-recent game.
 --
--- This is additive on top of v21, not a replacement: the outer shrinkage
--- formula (recent form weighted by reliability, preseason edge weighted by
--- inverse reliability) is untouched. The only two changes are (1) what goes
--- into the "preseason edge" term -- now a 60/40 blend of the existing
--- skill/overall seed and a persisted ELO rating instead of skill/overall
--- alone, and (2) the 12-game recent-form averages are now weighted so game 1
--- (most recent) counts 12x and game 12 (oldest in the window) counts 1x,
--- instead of a plain average. Caps, rounding, moneyline hold, home-field
--- edge, and frozen-line handling are all unchanged from v21.
+-- Rebuilt against the function's ACTUAL live definition, fetched directly
+-- from production before writing this. Production had already moved past
+-- this repo's git history: the live generate_elite_books_board tags itself
+-- 'v22-results-only' / 'seed_inputs_retired':true, meaning the coach-skill
+-- (discord_users.sportsbook_seed) and team-overall (teams.sportsbook_team_seed)
+-- inputs this repo's older v21 migration used were deliberately turned off
+-- in production and the model now runs on game results alone (0.68 margin
+-- weight, games/6.0 and games/10.0 reliability divisors, flat 49.5 total
+-- baseline -- all different from this repo's stale v21 draft).
+--
+-- This migration respects that retirement rather than undoing it: it does
+-- NOT reintroduce skill/overall, and never touches discord_users or teams.
+-- ELO takes the *same slot* seed_edge used to occupy pre-retirement -- the
+-- low-reliability fallback term -- so early-week/thin-history matchups get
+-- a real signal (a persisted, cross-season rating built from game_results)
+-- instead of a flat 50, while a team with a full 6+/10+ game sample is still
+-- priced almost entirely off actual results, same as production today.
+--
+-- Every other line (board upsert, line columns, frozen-line handling,
+-- moneyline hold, ranks) is preserved exactly as it runs in production.
 --
 -- No parlays. Not part of this or any prior model version.
 
 begin;
 
--- ELO needs state that persists across weeks -- unlike the rest of this
--- model, which recomputes everything fresh from game_results on every call.
+-- ELO needs state that persists across weeks and seasons -- unlike the rest
+-- of this model, which recomputes everything fresh from game_results on
+-- every call.
 create table if not exists public.team_elo_ratings (
   team_id text primary key,
   rating numeric not null default 1500,
@@ -116,20 +128,13 @@ declare
   history_pa2 numeric;
   history_total1 numeric;
   history_total2 numeric;
-  skill1 numeric;
-  skill2 numeric;
-  overall1 numeric;
-  overall2 numeric;
   elo1 numeric;
   elo2 numeric;
   elo_edge1 numeric;
   elo_edge2 numeric;
-  seed_edge1 numeric;
-  seed_edge2 numeric;
   reliability1 numeric;
   reliability2 numeric;
   total_reliability numeric;
-  seed_total numeric;
   form_total numeric;
   margin numeric;
   projected_total numeric;
@@ -209,57 +214,35 @@ begin
          limit 12
       ) x;
 
-    select du.sportsbook_seed into skill1
-      from public.team_assignments ta
-      join public.discord_users du on du.id::text=ta.discord_user_id::text
-     where ta.team_id::text=m.team_1_id::text and (ta.status='Active' or ta.status is null)
-     order by ta.created_at desc limit 1;
-
-    select du.sportsbook_seed into skill2
-      from public.team_assignments ta
-      join public.discord_users du on du.id::text=ta.discord_user_id::text
-     where ta.team_id::text=m.team_2_id::text and (ta.status='Active' or ta.status is null)
-     order by ta.created_at desc limit 1;
-
-    select sportsbook_team_seed into overall1 from public.teams where id::text=m.team_1_id::text;
-    select sportsbook_team_seed into overall2 from public.teams where id::text=m.team_2_id::text;
-
     select rating into elo1 from public.team_elo_ratings where team_id=m.team_1_id::text;
     select rating into elo2 from public.team_elo_ratings where team_id=m.team_2_id::text;
-
-    skill1:=coalesce(skill1,50);
-    skill2:=coalesce(skill2,50);
-    overall1:=coalesce(overall1,70);
-    overall2:=coalesce(overall2,70);
     elo1:=coalesce(elo1,1500);
     elo2:=coalesce(elo2,1500);
 
-    reliability1:=least(1,games1/8.0);
-    reliability2:=least(1,games2/8.0);
+    reliability1:=least(1,games1/6.0);
+    reliability2:=least(1,games2/6.0);
 
     -- ELO points run roughly +/-400 for a competitive-but-not-extreme spread
     -- across a 32-team league; /25 puts that on the same rough scale as the
-    -- existing skill/overall edge below (roughly +/-16 points at the extreme).
+    -- power-rating points this term feeds into.
     elo_edge1:=(elo1-1500)/25.0;
     elo_edge2:=(elo2-1500)/25.0;
 
-    -- 60% preseason talent projection (coach skill + team overall), 40% ELO
-    -- built from actual results -- a blend, not a replacement. This whole
-    -- term still only matters at the margin the outer shrinkage formula
-    -- below assigns it, same as v21's seed_edge did.
-    seed_edge1:=(((skill1-50)*0.18)+((overall1-70)*0.42))*0.6+(elo_edge1*0.4);
-    seed_edge2:=(((skill2-50)*0.18)+((overall2-70)*0.42))*0.6+(elo_edge2*0.4);
-
-    p1:=50+(history_margin1*0.60*reliability1)+(seed_edge1*(1-(reliability1*0.80)));
-    p2:=50+(history_margin2*0.60*reliability2)+(seed_edge2*(1-(reliability2*0.80)));
+    -- Results-only power rating (production's current model), with ELO
+    -- taking the low-reliability fallback slot the retired skill/overall
+    -- seed edge used to occupy: a team with a full sample is priced almost
+    -- entirely off recent results, same as today; a team with little or no
+    -- in-season history gets priced off its persisted, cross-season rating
+    -- instead of a flat 50.
+    p1:=50+(history_margin1*0.68*reliability1)+(elo_edge1*(1-reliability1));
+    p2:=50+(history_margin2*0.68*reliability2)+(elo_edge2*(1-reliability2));
 
     -- team_1 is away and team_2 is home in GameCenter.
     margin:=round(greatest(-35,least(35,(p1-p2)-2.5))*2)/2.0;
 
-    total_reliability:=least(1,(games1+games2)/12.0);
-    seed_total:=49.5+((overall1+overall2-140)*0.18);
+    total_reliability:=least(1,(games1+games2)/10.0);
     form_total:=(history_pf1+history_pa1+history_pf2+history_pa2)/2.0;
-    projected_total:=round(greatest(30,least(85,(form_total*total_reliability)+(seed_total*(1-total_reliability))))*2)/2.0;
+    projected_total:=round(greatest(30,least(85,(form_total*total_reliability)+(49.5*(1-total_reliability))))*2)/2.0;
 
     probability:=greatest(.06,least(.94,1/(1+exp(-margin/9.0))));
 
@@ -290,11 +273,10 @@ begin
         'team_2_points_for',round(history_pf2,2),'team_2_points_against',round(history_pa2,2),
         'team_1_average_total',round(history_total1,2),'team_2_average_total',round(history_total2,2),
         'projected_total',projected_total,'fair_team_1_probability',round(probability,4),
-        'moneyline_hold',0.045,'team_1_skill',skill1,'team_2_skill',skill2,
-        'team_1_overall',overall1,'team_2_overall',overall2,
+        'moneyline_hold',0.045,
         'team_1_elo',round(elo1,1),'team_2_elo',round(elo2,1),
         'team_1_elo_edge',round(elo_edge1,2),'team_2_elo_edge',round(elo_edge2,2),
-        'home_field',2.5,'generated_at',now()
+        'home_field',2.5,'seed_inputs_retired',true,'generated_at',now()
       )
     )
     on conflict(board_id,matchup_id) do update set
@@ -317,6 +299,6 @@ end;
 $$;
 
 comment on function public.generate_elite_books_board(integer,text) is
-  'v22: v21 recent form + preseason seed, now blended 60/40 with a persisted ELO rating and recency-weighted within the 12-game form window. Same caps, hold, and frozen-line handling as v21. No parlays.';
+  'v22: production''s results-only model (seed_inputs_retired) plus a persisted, cross-season ELO rating in the low-reliability fallback slot, and recency-weighted within the 12-game form window. Same caps, hold, and frozen-line handling as production. No parlays.';
 
 commit;
