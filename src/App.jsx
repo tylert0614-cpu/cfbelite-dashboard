@@ -17,6 +17,7 @@ const NETWORK_RAIL_ASSETS={
   messages:svgDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#2b2d31"/><path d="M17 19h30v21H31l-9 7v-7h-5z" fill="#dbeafe"/><circle cx="25" cy="30" r="2" fill="#5865f2"/><circle cx="32" cy="30" r="2" fill="#5865f2"/><circle cx="39" cy="30" r="2" fill="#5865f2"/></svg>`),
   alerts:svgDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#2b2d31"/><path d="M23 39h18l-3-5v-7a6 6 0 0 0-12 0v7z" fill="#c9d0d9"/><path d="M28 42h8a4 4 0 0 1-8 0z" fill="#eef1f6"/></svg>`),
   newsroom:svgDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#2b2d31"/><path d="M17 18h30v28H17z" fill="#e5e7eb"/><path d="M22 23h20v6H22zm0 10h9v8h-9zm12 0h8v2h-8zm0 5h8v2h-8z" fill="#111827"/><path d="M18 18h29v5H18z" fill="#3e7fc1"/></svg>`),
+  search:svgDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#2b2d31"/><circle cx="29" cy="29" r="11" fill="none" stroke="#eef1f6" stroke-width="4"/><path d="M37.5 37.5 46 46" stroke="#eef1f6" stroke-width="4" stroke-linecap="round"/></svg>`),
 };
 const GIPHY_API_KEY=String(import.meta.env.VITE_GIPHY_API_KEY||"").trim().replace(/^[\'"]|[\'"]$/g,"");
 const giphyFetch=GIPHY_API_KEY?new GiphyFetch(GIPHY_API_KEY):null;
@@ -2775,7 +2776,7 @@ function LeagueHub({discordSession,linkedDiscordUser,users=[],teams=[],assignmen
         <button className={mode==="direct"?"active":""} title="Direct Messages" onClick={()=>{setMode("direct");setMobileView("directory");}}><img src={NETWORK_RAIL_ASSETS.messages} alt="Direct Messages"/></button>
         <button className={mode==="notifications"?"active":""} title="Notifications" onClick={()=>{setMode("notifications");setMobileView("panel");}}><img src={NETWORK_RAIL_ASSETS.alerts} alt="Notifications"/>{unread>0&&<b>{unread}</b>}</button>
         <button title="Newsroom" onClick={()=>setActiveTab?.("newsroom")}><img src={NETWORK_RAIL_ASSETS.newsroom} alt="Newsroom"/></button>
-        <button className="network-search-trigger" title="Jump to (Ctrl/Cmd+K)" onClick={()=>setCommandPaletteOpen(true)}>⌕</button>
+        <button className="network-search-trigger" title="Jump to (Ctrl/Cmd+K)" onClick={()=>setCommandPaletteOpen(true)}><img src={NETWORK_RAIL_ASSETS.search} alt="Jump to search"/></button>
       </aside>
       <aside className="network-sidebar">
       <div className="network-mobile-directory-title"><strong>CFBElite 27 Dynasty</strong><span>League channels and conversations</span></div>
